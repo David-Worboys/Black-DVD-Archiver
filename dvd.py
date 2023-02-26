@@ -624,6 +624,8 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
+        debug = True
+
         dvd_dims = dvdarch_utils.get_dvd_dims(
             self.dvd_setup.menu_aspect_ratio, self.dvd_setup.video_standard
         )
@@ -677,11 +679,12 @@ class DVD:
         if result == -1:
             return -1, message
 
-        print("=============================")
-        print(f"DBG  {canvas_height=} {canvas_width=} ")
-        print(f"DBG {dvd_dims=}")
-        print(f"DBG {cell_coords=}")
-        print("=============================")
+        if debug:
+            print("=============================")
+            print(f"DBG  {canvas_height=} {canvas_width=} ")
+            print(f"DBG {dvd_dims=}")
+            print(f"DBG {cell_coords=}")
+            print("=============================")
 
         result, message = self._prepare_buttons(
             cell_coords=cell_coords,
@@ -729,20 +732,19 @@ class DVD:
         font: str = "DejaVu-Sans-Bold"
         pointsize: int = 20
         # fill: str = "white"
-        fill: str = "gold"
-        stroke: str = "black"
-        strokewidth: int = 0
+        # fill: str = "gold"
+        # stroke: str = "black"
+        # strokewidth: int = 0
         # word_spacing: int = 0
         # clear_inner_stroke: bool = True
         # line_height: int = 0
         # max_width: int = 0
         # max_lines: int = 1
         # size: int = 0
-        undercolor = "RoyalBlue"
-        background: str = "none"
-        gravity: str = "center"
+        # undercolor = "RoyalBlue"
+        # background: str = "none"
+        # gravity: str = "center"
 
-        # ===== Helper functions
         for input_video in self.dvd_setup.input_videos:
             # Setup required files
             path_name = os.path.dirname(input_video.menu_image_file_path)
@@ -1276,9 +1278,7 @@ class DVD:
         # Create the spumux xml control file
         spumux_dict = {
             "subpictures": {
-                "@format": "PAL"
-                if self.dvd_setup.video_standard == sys_consts.PAL
-                else "NTSC",
+                "@format": self.dvd_setup.video_standard,
                 "stream": {
                     "spu": {
                         "@force": "yes",
@@ -1566,7 +1566,7 @@ class DVD:
         )
         spumux_xml = f"{path_name}{os.path.sep}spumux.xml"
 
-        env = {"VIDEO_FORMAT": "PAL"}
+        env = {"VIDEO_FORMAT": self.dvd_setup.video_standard}
 
         commands = [
             sys_consts.SPUMUX,
@@ -1659,7 +1659,7 @@ class DVD:
             return -1, f"Sys Error: Cound Not Write {dvd_author_file}"
 
         # Run the DVDauthor XML control file
-        env = {"VIDEO_FORMAT": "PAL"}
+        env = {"VIDEO_FORMAT": DVD_Config.video_standard}
 
         commands = [
             sys_consts.DVDAUTHOR,
