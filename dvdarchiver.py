@@ -1,8 +1,8 @@
 """
-    Implements the black DVD archiver UI. 
+    Implements the Black DVD archiver UI. 
     
-    Black because it simplifies the production of a DVD image by naking the choices I think are best. 
-    The user does not get to choose the layout of the menu buttons.
+    Black because it simplifies the production of a DVD image by making the choices I think are best. 
+    The user choice of the menu button layout is restricted by these choices and will remain so.
 
     Copyright (C) 2022  David Worboys (-:alumnus Moyhu Primary School et al.:-)
 
