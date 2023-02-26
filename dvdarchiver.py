@@ -271,9 +271,12 @@ class DVD_Archiver:
                 dvd_config.menu_font_color = text_color_combo.value_get().data
                 dvd_config.menu_font_point_size = self._menu_title_font_size
 
+                dvd_title:str = event.value_get(container_tag="dvd_properties", tag="dvd_title")
+                
                 dvd = DVD()
                 dvd.dvd_setup = dvd_config
                 dvd.working_folder = dvd_folder
+                dvd.dvd_title = dvd_title
 
                 result, error_message = dvd.build()
 
@@ -372,7 +375,7 @@ class DVD_Archiver:
             tag="control_buttons",
             align=qtg.ALIGN.LEFT,  # text="DVD Options"
         ).add_row(
-            qtg.FormContainer(text="DVD Properties").add_row(
+            qtg.FormContainer(tag="dvd_properties",text="DVD Properties").add_row(
                 qtg.Label(
                     tag="project_video_standard",
                     label="Video Standard",

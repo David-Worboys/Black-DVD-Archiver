@@ -272,9 +272,10 @@ class DVD:
 
     # Internal instance vars
     _dvd_setup: DVD_Config = None
-    _working_folder: str = ""
-
+    _dvd_title: str = ""
+    
     # folders
+    _working_folder: str = ""
     _dvd_working_folder: str = ""
     _dvd_out_folder: str = ""
     _menu_image_folder: str = ""
@@ -308,6 +309,18 @@ class DVD:
         ), f"{value=}. Must be a non-empty string"
 
         self._working_folder = value
+
+    @property
+    def dvd_title(self):
+        return self._dvd_title
+
+    @dvd_title.setter
+    def dvd_title(self, value: str):
+        assert (
+            isinstance(value, str)
+        ), f"{value=}. Must be str"
+
+        self._dvd_title = value
 
     def build(self) -> tuple[int, str]:
         """Builds the  DVD Folder/File structure
@@ -398,7 +411,8 @@ class DVD:
             except OSError as error:
                 return -1, f"{error.errno} {error.strerror}"
 
-        file_handler.make_dir(self._dvd_working_folder)
+        if file_handler.path_exists(self.working_folder) and file_handler.path_writeable(self.working_folder):            
+            file_handler.make_dir(self._dvd_working_folder)
 
         if file_handler.path_exists(
             self._dvd_working_folder
@@ -845,10 +859,14 @@ class DVD:
         assert (
             isinstance(border_right, int) and border_right >= 0
         ), f"{border_right=}. Must be int >= than zero"
+
         # TODO Make these values configurable
         buttons_across = 1
-        header_pad = 10
+        header_pad = 10        
         button_padding = 10
+
+        if self.dvd_title == "": #Header pad is only for titles
+            header_pad = 0
 
         # Compute the canvas size and ratio
         canvas_width = dvd_dims.display_width - (border_left + border_right)
@@ -967,7 +985,7 @@ class DVD:
 
         pointsize = self.dvd_setup.menu_font_point_size
         font = self.dvd_setup.menu_font
-        text = "This Is A Test!"
+        dvd_title = self.dvd_title
 
         commands = [
             sys_consts.CONVERT,
@@ -982,27 +1000,21 @@ class DVD:
         if result == -1:
             return -1, message
 
-        result, message = dvdarch_utils.overlay_text(
-            in_file=self._background_canvas_file,
-            text=text,
-            text_font=self.dvd_setup.menu_font,
-            text_pointsize=self.dvd_setup.menu_font_point_size,
-            text_color=self.dvd_setup.menu_font_color,
-            position="top",
-            background_color=self.dvd_setup.menu_background_color,
-            opacity=0.9,
-        )
+        if dvd_title.strip()!= "":
+            result, message = dvdarch_utils.overlay_text(
+                in_file=self._background_canvas_file,
+                text=dvd_title,
+                text_font=self.dvd_setup.menu_font,
+                text_pointsize=self.dvd_setup.menu_font_point_size,
+                text_color=self.dvd_setup.menu_font_color,
+                position="top",
+                background_color=self.dvd_setup.menu_background_color,
+                opacity=0.9,
+            )
 
-        if result == -1:
-            return -1, message
-
-        text_width, text_height = dvdarch_utils.get_text_dims(
-            text=text, font=font, pointsize=pointsize
-        )
-
-        if text_width == -1 or text_height == -1:
-            return -1, "Failed to get text size"
-
+            if result == -1:
+                return -1, message
+            
         return 1, ""
 
     def _prepare_buttons(
@@ -1659,7 +1671,7 @@ class DVD:
             return -1, f"Sys Error: Cound Not Write {dvd_author_file}"
 
         # Run the DVDauthor XML control file
-        env = {"VIDEO_FORMAT": DVD_Config.video_standard}
+        env = {"VIDEO_FORMAT": self.dvd_setup.video_standard}
 
         commands = [
             sys_consts.DVDAUTHOR,
