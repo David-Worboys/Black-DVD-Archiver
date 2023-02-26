@@ -20,6 +20,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
+import datetime
 import math
 import os
 import psutil
@@ -125,8 +126,11 @@ class DVD_Config:
     _menu_background_color: str = "wheat"
     _menu_font_color: str = "gold"
     _menu_font_point_size: int = 24
-    _menu_font: str = ""
+    _menu_font: str = ""    
     _menu_aspect_ratio: str = sys_consts.AR43
+    _timestamp_font: str = ""
+    _timestamp_font_point_size: int = 9
+    _timestamp_prefix: str = "DVD Image Date:"
     _video_standard: str = sys_consts.PAL
 
     @property
@@ -210,8 +214,17 @@ class DVD_Config:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a non-empty string"
 
-        self._menu_font = value
-
+        if os.path.exists(value):
+            self._menu_font = value  
+            return
+        else:
+            for font in dvdarch_utils.get_fonts():    
+                if font[0] == value:
+                    self._menu_font = font[1]
+                    return
+                
+        raise RuntimeError(f"{value=}. Font not found")        
+        
     @property
     def menu_font_color(self) -> str:
         return self._menu_font_color
@@ -233,6 +246,51 @@ class DVD_Config:
         assert isinstance(value, int) and value > 1, f"{value=}. Must be an int > 1"
 
         self._menu_font_point_size = value
+
+    @property
+    def timestamp_font(self) -> str:
+        return self._timestamp_font
+
+    @timestamp_font.setter
+    def timestamp_font(self, value: str):
+        assert (
+            isinstance(value, str) and value.strip() != ""
+        ), f"{value=}. Must be a non-empty string"
+
+        if os.path.exists(value):
+            self._timestamp_font = value  
+            return
+        else:
+            for font in dvdarch_utils.get_fonts():    
+                if font[0] == value:
+                    self._timestamp_font = font[1]
+                    return
+                
+        raise RuntimeError(f"{value=}. Font not found")        
+        
+
+
+    @property
+    def timestamp_font_point_size(self) -> int:
+        return self._timestamp_font_point_size
+
+    @timestamp_font_point_size.setter
+    def timestamp_font_point_size(self, value: int):
+        assert isinstance(value, int) and value > 1, f"{value=}. Must be an int > 1"
+
+        self._timestamp_font_point_size = value  
+
+    @property
+    def timestamp_prefix(self) -> str:
+        return self._timestamp_prefix
+
+    @timestamp_prefix.setter
+    def timestamp_prefix(self, value: str):
+        assert (
+            isinstance(value, str) and value.strip() != ""
+        ), f"{value=}. Must be a non-empty string"
+
+        self._timestamp_prefix = value        
 
     @property
     def video_standard(self):
@@ -273,6 +331,8 @@ class DVD:
     # Internal instance vars
     _dvd_setup: DVD_Config = None
     _dvd_title: str = ""
+    _dvd_timestamp: str = ""
+    _dvd_timestamp_x_offset: int = 10 # TODO Make user configurable
     
     # folders
     _working_folder: str = ""
@@ -337,19 +397,9 @@ class DVD:
         assert len(self.dvd_setup.input_videos) == len(
             self.dvd_setup.menu_labels
         ), "Input videos and menu_labels must be the same length"
-
-        dvd_dims = dvdarch_utils.get_dvd_dims(sys_consts.AR43, sys_consts.PAL)
-
-        cell_coords, message = self._calc_layout(
-            num_buttons=len(self.dvd_setup.input_videos),
-            button_aspect_ratio=4 / 3,
-            dvd_dims=dvd_dims,
-            border_top=10 + 25,
-        )
-
-        if not cell_coords:
-            return -1, message
-
+        
+        self._dvd_timestamp = f"{self.dvd_setup.timestamp_prefix} : {datetime.datetime.now().strftime('%x %Y %H:%M')}"
+                
         error_no, error_message = self._build_working_folders()
 
         if error_no == -1:
@@ -638,7 +688,7 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        debug = True
+        debug = False
 
         dvd_dims = dvdarch_utils.get_dvd_dims(
             self.dvd_setup.menu_aspect_ratio, self.dvd_setup.video_standard
@@ -654,12 +704,24 @@ class DVD:
 
         if menu_title_height == -1:
             return -1, "Failed To Get Menu Title Dimensions"
+        
+        _, timestamp_height = dvdarch_utils.get_text_dims(
+            text=self._dvd_timestamp,
+            font=self.dvd_setup.timestamp_font,
+            pointsize=self.dvd_setup.timestamp_font_point_size,
+        )
+
+        if timestamp_height == -1:
+            return -1, "Failed To Get Timstamp Dimensions"
 
         cell_coords, message = self._calc_layout(
             num_buttons=len(self.dvd_setup.input_videos),
             button_aspect_ratio=4 / 3,
             dvd_dims=dvd_dims,
             border_top=10 + menu_title_height,
+            border_bottom=10 + timestamp_height,
+            border_left=10, #+ timestamp_height,
+            border_right=10 #+ timestamp_height,
         )
 
         if not cell_coords:
@@ -1012,6 +1074,29 @@ class DVD:
                 opacity=0.9,
             )
 
+            if result == -1:
+                return -1, message
+
+        if self.dvd_setup.timestamp_font and self._dvd_timestamp:
+            _ ,timestamp_height = dvdarch_utils.get_text_dims(
+                text=self._dvd_timestamp,
+                font=self.dvd_setup.timestamp_font,
+                pointsize=self.dvd_setup.timestamp_font_point_size,
+            )
+
+            if timestamp_height == -1:
+                return -1, "Failed to get timestamp height"
+
+            result, message = dvdarch_utils.write_text_on_file(input_file=self._background_canvas_file,
+                                            text=self._dvd_timestamp,
+                                            x=self._dvd_timestamp_x_offset,
+                                            y=height - timestamp_height,
+                                            pointsize=self.dvd_setup.timestamp_font_point_size,
+                                            color=self.dvd_setup.menu_font_color,
+                                            font=self.dvd_setup.timestamp_font
+
+            )
+            
             if result == -1:
                 return -1, message
             

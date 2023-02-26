@@ -50,23 +50,21 @@ class DVD_Archiver:
         self._file_control = file_control()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
         self._menu_title_font_size = 24
+        self._timestamp_font_point_size = 9
+        self._default_font = "IBMPlexMono-SemiBold.ttf" # Packaged with DVD Archiver
 
-        if not self._db_settings.setting_exist("menu_background_color"):
-            print("DBG A")
+        if not self._db_settings.setting_exist("menu_background_color"):            
             self._db_settings.setting_set("menu_background_color", "blue")
 
-        if not self._db_settings.setting_exist("menu_font_color"):
-            print("DBG B")
+        if not self._db_settings.setting_exist("menu_font_color"):            
             self._db_settings.setting_set("menu_font_color", "yellow")
 
-        if not self._db_settings.setting_exist("menu_font_point_size"):
-            print("DBG C")
+        if not self._db_settings.setting_exist("menu_font_point_size"):            
             self._db_settings.setting_set("menu_font_point_size", 24)
 
-        if not self._db_settings.setting_exist("menu_font"):
-            print("DBG D")
+        if not self._db_settings.setting_exist("menu_font"):            
             self._db_settings.setting_set(
-                "menu_font", "/IBM-Plex-Mono/IBMPlexMono-SemiBold.ttf"
+                "menu_font", self._default_font
             )
 
     def event_handler(self, event: qtg.Action):
@@ -270,6 +268,9 @@ class DVD_Archiver:
                 dvd_config.menu_font = font_combo.value_get().data
                 dvd_config.menu_font_color = text_color_combo.value_get().data
                 dvd_config.menu_font_point_size = self._menu_title_font_size
+
+                dvd_config.timestamp_font = self._default_font
+                dvd_config.timestamp_font_point_size = self._timestamp_font_point_size
 
                 dvd_title:str = event.value_get(container_tag="dvd_properties", tag="dvd_title")
                 

@@ -401,6 +401,7 @@ def overlay_text(
     text_pointsize: int,
     text_color: str,
     position: str = "bottom",
+    justification:str = "center",
     background_color: str = "grey",
     opacity: float = 0.5,
     x_offset: int = 0,
@@ -416,6 +417,7 @@ def overlay_text(
         text_pointsize (int): The font size to use for the text.
         text_color (str): The color to use for the text.
         position (str, optional): The position of the text on the image. Defaults to "bottom".
+        justification (str, optional): The justification of the text on the image. Defaults to "center".
         background_color (str, optional): The color of the background for the text. Defaults to "grey".
         opacity (float, optional): The opacity of the background for the text. Defaults to 0.5.
             0.0 is fully transparent and 1.0 is fully opaque.
@@ -438,11 +440,12 @@ def overlay_text(
     assert (
         isinstance(text_color, str) and text_color in colors
     ), f"{text_color=} must be a string"
-    assert position in [
+    assert position.lower() in [
         "top",
         "bottom",
         "center",
     ], f"{position=} must be 'top', 'bottom', or 'center'"
+    assert justification.lower() in ["left", "center", "right"], f"{justification=} must be 'left', 'center', 'right' "
     assert isinstance(background_color, str), f"{background_color=} must be a string"
     assert 0 <= opacity <= 1, f"{opacity=} must be a value between 0 and 1"
     assert isinstance(x_offset, int), f"{x_offset=}. Must be int"
@@ -458,7 +461,8 @@ def overlay_text(
     if not os.path.exists(in_file):
         return -1, f"{in_file} Does Not Exist "
 
-    gravity = {"top": "North", "bottom": "South", "center": "Center"}[position]
+    gravity = {"top": "North", "bottom": "South", "center": "Center"}[position.lower()]
+    justification = {"left": "West", "center": "Center", "right": "East"}[justification.lower()]
 
     background_color_hex = get_hex_color(background_color)
 
@@ -499,7 +503,7 @@ def overlay_text(
         "-fill",
         text_hex,
         "-gravity",
-        "center",
+        justification,
         "-font",
         text_font,
         "-pointsize",
@@ -556,7 +560,7 @@ def write_text_on_file(
         return -1, f"{input_file} Does Not Exist!"
 
     command = [
-        "convert",
+        sys_consts.CONVERT,
         input_file,
         "-fill",
         color,
@@ -610,7 +614,7 @@ def get_text_dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
             "-format",
             "%[fx:w]x%[fx:h]",
             "info:",
-        ]
+        ]        
     )
 
     if result == -1:
