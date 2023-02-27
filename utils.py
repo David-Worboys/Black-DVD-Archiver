@@ -1087,7 +1087,6 @@ class File:
             isinstance(file_path, str) and file_path.strip() != ""
         ), f"{file_path=}. Must be a non-empty str"
 
-        
         path = pathlib.Path(file_path)
         path.mkdir(parents=True, exist_ok=False)
 

@@ -22,6 +22,7 @@
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+import appdirs
 import datetime
 import dvdarch_utils
 import qtgui as qtg
@@ -46,26 +47,138 @@ class DVD_Archiver:
             height=768,
             width=1024,
         )
+
         self._startup = True
+
+        self._data_path: str = appdirs.user_data_dir(sys_consts.PROGRAM_NAME)
+
         self._file_control = file_control()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
+
+        # A problem in the next 3 lines can shutdown startup as daabase initialization failed
+        if self._db_settings.error_code == -1:
+            raise RuntimeError(
+                f"Failed To Start {sys_consts.PROGRAM_NAME} - {self._db_settings.error_message}"
+            )
+        self._app_db = self.db_init()
+        self._db_tables_create()
+
+        if self._db_settings.setting_get("First_Run"):
+            # Do stuff that the application only ever needs to do once on first
+            # startup of new installation
+            self._db_settings.setting_set("First_Run", False)
+
         self._menu_title_font_size = 24
         self._timestamp_font_point_size = 9
-        self._default_font = "IBMPlexMono-SemiBold.ttf" # Packaged with DVD Archiver
+        self._default_font = "IBMPlexMono-SemiBold.ttf"  # Packaged with DVD Archiver
 
-        if not self._db_settings.setting_exist("menu_background_color"):            
+        self._dvd = DVD()  # Needs DB config to be completed before calling this
+
+        if not self._db_settings.setting_exist("menu_background_color"):
             self._db_settings.setting_set("menu_background_color", "blue")
 
-        if not self._db_settings.setting_exist("menu_font_color"):            
+        if not self._db_settings.setting_exist("menu_font_color"):
             self._db_settings.setting_set("menu_font_color", "yellow")
 
-        if not self._db_settings.setting_exist("menu_font_point_size"):            
+        if not self._db_settings.setting_exist("menu_font_point_size"):
             self._db_settings.setting_set("menu_font_point_size", 24)
 
-        if not self._db_settings.setting_exist("menu_font"):            
-            self._db_settings.setting_set(
-                "menu_font", self._default_font
+        if not self._db_settings.setting_exist("menu_font"):
+            self._db_settings.setting_set("menu_font", self._default_font)
+
+    def db_init(self) -> sqldb.SQLDB:
+        """
+        Initializes the application database and returns a SQLDB object.
+
+        Returns:
+            sqldb.SQLDB: A SQLDB object representing the application database.
+
+        Raises:
+            RuntimeError: If the application data folder cannot be created or the database cannot be initialized.
+        """
+        file_handler = utils.File()
+
+        if not file_handler.path_exists(self._data_path):
+            print(f"*** Need To Create {self._data_path}")
+            file_handler.make_dir(self._data_path)
+
+            if not file_handler.path_exists(self._data_path):
+                raise RuntimeError(
+                    f"Failed To Create {sys_consts.PROGRAM_NAME} Data Folder"
+                )
+
+        app_database = sqldb.SQLDB(
+            appname=sys_consts.PROGRAM_NAME,
+            dbpath=self._data_path,
+            dbfile=sys_consts.PROGRAM_NAME,
+            suffix=".db",
+            dbpassword="666evil",
+        )
+
+        error_status = app_database.get_error_status()
+
+        if error_status.code == -1:
+            raise RuntimeError(
+                f"Failed To Start {sys_consts.PROGRAM_NAME} - {error_status.message}"
             )
+        return app_database
+
+    def _db_tables_create(self):
+        """Create a database tables used by the DVD Archiver in the SQL database using sqldb.
+
+        If the tables already exists, this method does nothing.  If an error occurs during table creation
+        or initialization, a RuntimeError is raised with an error message.
+
+        Raises:
+            RuntimeError: If an error occurs during table creation or initialization.
+
+        Returns:
+            None.
+        """
+        if not self._app_db.table_exists(sys_consts.PRODUCT_LINE):
+            product_line_def = (
+                sqldb.ColDef(
+                    name="id",
+                    description="pk_id",
+                    data_type=sqldb.SQL.INTEGER,
+                    primary_key=True,
+                ),
+                sqldb.ColDef(
+                    name="code",
+                    description="Product Line Code",
+                    data_type=sqldb.SQL.VARCHAR,
+                    size=5,
+                ),
+                sqldb.ColDef(
+                    name="description",
+                    description="Description of DVD Product Line",
+                    data_type=sqldb.SQL.VARCHAR,
+                    size=80,
+                ),
+            )
+
+            if (
+                self._app_db.table_create(
+                    table_name=sys_consts.PRODUCT_LINE, col_defs=product_line_def
+                )
+                == -1
+            ):
+                error_status = self._app_db.get_error_status()
+
+                raise RuntimeError(
+                    f"Failed To Create {sys_consts.PROGRAM_NAME} Database - {error_status.message}"
+                )
+            # Load a default product line
+            self._app_db.sql_update(
+                col_dict={"code": "HV", "description": "Home Video"},
+                table_str=sys_consts.PRODUCT_LINE,
+            )
+
+            error_status = self._app_db.get_error_status()
+            if error_status.code == -1:
+                raise RuntimeError(
+                    f"Failed To Initialise {sys_consts.PROGRAM_NAME} Database - {error_status.message}"
+                )
 
     def event_handler(self, event: qtg.Action):
         """Handles  application events
@@ -89,7 +202,6 @@ class DVD_Archiver:
                     "menu_font_point_size"
                 )
                 menu_font = self._db_settings.setting_get("menu_font")
-                # menu_font = f".{file_handler.ossep}{menu_font}"
 
                 font_name = file_handler.split_head_tail(menu_font)[1]
 
@@ -260,10 +372,31 @@ class DVD_Archiver:
         with qtg.sys_cursor(qtg.CURSOR.hourglass):
             if video_file_defs:
                 dvd_config = DVD_Config()
-                dvd_config.menu_title = "Archive Test"
+
+                dvd_title: str = event.value_get(
+                    container_tag="dvd_properties", tag="dvd_title"
+                )
+                # TODO: Move this to the GUI, currently the following is guaranteed as set in DB when created
+                sql_result = self._app_db.sql_select(
+                    col_str="code,description",
+                    table_str=sys_consts.PRODUCT_LINE,
+                    where_str="code='HV'",
+                )
+
+                if sql_result:  # Expect only one result
+                    product_code = sql_result[0][0]
+                    product_description = sql_result[0][1]
+
+                    dvd_serial_number = self._dvd.generate_dvd_serial_number(
+                        product_code=product_code,
+                        product_description=product_description,
+                    )
+                    dvd_config.serial_number = dvd_serial_number
+
                 dvd_config.input_videos = video_file_defs
                 dvd_config.menu_labels = menu_labels
-                dvd_config.video_standard = self._file_control.project_video_standard
+
+                dvd_config.menu_title = dvd_title
                 dvd_config.menu_background_color = menu_color_combo.value_get().data
                 dvd_config.menu_font = font_combo.value_get().data
                 dvd_config.menu_font_color = text_color_combo.value_get().data
@@ -272,14 +405,14 @@ class DVD_Archiver:
                 dvd_config.timestamp_font = self._default_font
                 dvd_config.timestamp_font_point_size = self._timestamp_font_point_size
 
-                dvd_title:str = event.value_get(container_tag="dvd_properties", tag="dvd_title")
-                
-                dvd = DVD()
-                dvd.dvd_setup = dvd_config
-                dvd.working_folder = dvd_folder
-                dvd.dvd_title = dvd_title
+                dvd_config.video_standard = self._file_control.project_video_standard
 
-                result, error_message = dvd.build()
+                self._dvd.dvd_setup = dvd_config
+                self._dvd.working_folder = dvd_folder
+                self._dvd.application_db = self._app_db
+                self._dvd.dvd_title = dvd_title
+
+                result, error_message = self._dvd.build()
 
         if result == -1:
             qtg.PopError(
@@ -376,7 +509,7 @@ class DVD_Archiver:
             tag="control_buttons",
             align=qtg.ALIGN.LEFT,  # text="DVD Options"
         ).add_row(
-            qtg.FormContainer(tag="dvd_properties",text="DVD Properties").add_row(
+            qtg.FormContainer(tag="dvd_properties", text="DVD Properties").add_row(
                 qtg.Label(
                     tag="project_video_standard",
                     label="Video Standard",

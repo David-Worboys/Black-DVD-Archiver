@@ -401,7 +401,7 @@ def overlay_text(
     text_pointsize: int,
     text_color: str,
     position: str = "bottom",
-    justification:str = "center",
+    justification: str = "center",
     background_color: str = "grey",
     opacity: float = 0.5,
     x_offset: int = 0,
@@ -445,7 +445,11 @@ def overlay_text(
         "bottom",
         "center",
     ], f"{position=} must be 'top', 'bottom', or 'center'"
-    assert justification.lower() in ["left", "center", "right"], f"{justification=} must be 'left', 'center', 'right' "
+    assert justification.lower() in [
+        "left",
+        "center",
+        "right",
+    ], f"{justification=} must be 'left', 'center', 'right' "
     assert isinstance(background_color, str), f"{background_color=} must be a string"
     assert 0 <= opacity <= 1, f"{opacity=} must be a value between 0 and 1"
     assert isinstance(x_offset, int), f"{x_offset=}. Must be int"
@@ -462,7 +466,9 @@ def overlay_text(
         return -1, f"{in_file} Does Not Exist "
 
     gravity = {"top": "North", "bottom": "South", "center": "Center"}[position.lower()]
-    justification = {"left": "West", "center": "Center", "right": "East"}[justification.lower()]
+    justification = {"left": "West", "center": "Center", "right": "East"}[
+        justification.lower()
+    ]
 
     background_color_hex = get_hex_color(background_color)
 
@@ -614,7 +620,7 @@ def get_text_dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
             "-format",
             "%[fx:w]x%[fx:h]",
             "info:",
-        ]        
+        ]
     )
 
     if result == -1:

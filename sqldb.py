@@ -1351,7 +1351,7 @@ class SQLDB:
         transaction_commit: bool = True,
         debug: bool = False,
     ) -> tuple[int, str]:
-        """Update a table in the database - either insert or update depending on transaction_commit.
+        """Update a table in the database - either insert or update depending on if a where clause exists.
 
         Args:
             col_dict (dict): A dictionary of columns/values to be updated.

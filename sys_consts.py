@@ -73,6 +73,9 @@ PPMTOY4M = f".{file_sep}tools{file_sep}ppmtoy4m"
 SPUMUX = f".{file_sep}tools{file_sep}spumux"
 TWOLAME = f".{file_sep}tools{file_sep}twolame"
 
+# Database tables
+PRODUCT_LINE = "product_line"
+
 
 class SPECIAL_PATH(utils.strEnum):
     """Contains a list of strings that represent special paths on the user's computer"""

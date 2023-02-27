@@ -21,8 +21,10 @@
 # fmt: off
 import dataclasses
 import datetime
+import hashlib
 import math
 import os
+from typing import Optional
 import psutil
 import shutil
 import subprocess
@@ -33,6 +35,7 @@ from random import randint
 
 import dvdarch_utils
 import sys_consts
+import sqldb
 import utils
 import xmltodict
 # fmt: on
@@ -126,11 +129,15 @@ class DVD_Config:
     _menu_background_color: str = "wheat"
     _menu_font_color: str = "gold"
     _menu_font_point_size: int = 24
-    _menu_font: str = ""    
+    _menu_font: str = ""
     _menu_aspect_ratio: str = sys_consts.AR43
+    _serial_number: str = ""
     _timestamp_font: str = ""
     _timestamp_font_point_size: int = 9
-    _timestamp_prefix: str = "DVD Image Date:"
+    _timestamp_prefix: str = "DVD Build Date:"
+    _timestamp: str = (
+        f"{_timestamp_prefix} : {datetime.datetime.now().strftime('%x %Y %H:%M')}"
+    )
     _video_standard: str = sys_consts.PAL
 
     @property
@@ -215,16 +222,16 @@ class DVD_Config:
         ), f"{value=}. Must be a non-empty string"
 
         if os.path.exists(value):
-            self._menu_font = value  
+            self._menu_font = value
             return
         else:
-            for font in dvdarch_utils.get_fonts():    
+            for font in dvdarch_utils.get_fonts():
                 if font[0] == value:
                     self._menu_font = font[1]
                     return
-                
-        raise RuntimeError(f"{value=}. Font not found")        
-        
+
+        raise RuntimeError(f"{value=}. Font not found")
+
     @property
     def menu_font_color(self) -> str:
         return self._menu_font_color
@@ -248,6 +255,18 @@ class DVD_Config:
         self._menu_font_point_size = value
 
     @property
+    def serial_number(self) -> str:
+        return self._serial_number
+
+    @serial_number.setter
+    def serial_number(self, value: str):
+        assert (
+            isinstance(value, str) and value.strip() != ""
+        ), f"{value=}. Must be a non-empty string"
+
+        self._serial_number = value
+
+    @property
     def timestamp_font(self) -> str:
         return self._timestamp_font
 
@@ -258,17 +277,15 @@ class DVD_Config:
         ), f"{value=}. Must be a non-empty string"
 
         if os.path.exists(value):
-            self._timestamp_font = value  
+            self._timestamp_font = value
             return
         else:
-            for font in dvdarch_utils.get_fonts():    
+            for font in dvdarch_utils.get_fonts():
                 if font[0] == value:
                     self._timestamp_font = font[1]
                     return
-                
-        raise RuntimeError(f"{value=}. Font not found")        
-        
 
+        raise RuntimeError(f"{value=}. Font not found")
 
     @property
     def timestamp_font_point_size(self) -> int:
@@ -278,7 +295,7 @@ class DVD_Config:
     def timestamp_font_point_size(self, value: int):
         assert isinstance(value, int) and value > 1, f"{value=}. Must be an int > 1"
 
-        self._timestamp_font_point_size = value  
+        self._timestamp_font_point_size = value
 
     @property
     def timestamp_prefix(self) -> str:
@@ -290,7 +307,19 @@ class DVD_Config:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a non-empty string"
 
-        self._timestamp_prefix = value        
+        self._timestamp_prefix = value
+
+    @property
+    def timestamp(self) -> str:
+        return self._timestamp
+
+    @timestamp.setter
+    def timestamp(self, value: str):
+        assert (
+            isinstance(value, str) and value.strip() != ""
+        ), f"{value=}. Must be a non-empty string"
+
+        self._timestamp = value
 
     @property
     def video_standard(self):
@@ -328,12 +357,16 @@ class DVD:
     """Does the grunt work needed to automatically turn video files into a
     DVD Folder/File structure with an auto generated menu"""
 
+    _BACKGROUND_CANVAS_FILE : str = "background_canvas.png"
+
+    # Database
+    _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
+    _application_db: Optional[sqldb.SQLDB] = None
+
     # Internal instance vars
     _dvd_setup: DVD_Config = None
-    _dvd_title: str = ""
-    _dvd_timestamp: str = ""
-    _dvd_timestamp_x_offset: int = 10 # TODO Make user configurable
-    
+    _dvd_timestamp_x_offset: int = 10  # TODO Make user configurable
+
     # folders
     _working_folder: str = ""
     _dvd_working_folder: str = ""
@@ -343,7 +376,7 @@ class DVD:
     _vob_folder: str = ""
 
     # file names
-    _background_canvas_file: str = "background_canvas.png"
+    _background_canvas_file: str = ""
 
     def __post_init__(self):
         pass
@@ -371,16 +404,16 @@ class DVD:
         self._working_folder = value
 
     @property
-    def dvd_title(self):
-        return self._dvd_title
+    def application_db(self) -> sqldb.SQLDB:
+        return self._application_db
 
-    @dvd_title.setter
-    def dvd_title(self, value: str):
+    @application_db.setter
+    def application_db(self, value: sqldb.SQLDB | None):
         assert (
-            isinstance(value, str)
-        ), f"{value=}. Must be str"
+            isinstance(value, sqldb.SQLDB)
+        ) or value is None, f"{value=}. Must be an instance of sqldb.SQLDB or None"
 
-        self._dvd_title = value
+        self._application_db = value
 
     def build(self) -> tuple[int, str]:
         """Builds the  DVD Folder/File structure
@@ -397,9 +430,7 @@ class DVD:
         assert len(self.dvd_setup.input_videos) == len(
             self.dvd_setup.menu_labels
         ), "Input videos and menu_labels must be the same length"
-        
-        self._dvd_timestamp = f"{self.dvd_setup.timestamp_prefix} : {datetime.datetime.now().strftime('%x %Y %H:%M')}"
-                
+
         error_no, error_message = self._build_working_folders()
 
         if error_no == -1:
@@ -426,6 +457,39 @@ class DVD:
             return error_no, error_message
 
         return 1, ""
+
+    def generate_dvd_serial_number(
+        self, product_code: str = "HV", product_description="Home Video"
+    ) -> str:
+        """
+        Generates a DVD serial number with the format "DVD-AB-000001-5"
+
+        Parameters:
+            product_code (str): A string that identifies the product code, e.g. "HV" for home video.
+            product_description (str): A string that describes the product code, e.g. "Home Video" for home video.
+
+        Returns:
+            str: A string containing the generated DVD serial number.
+        """
+        assert isinstance(product_code, str) and product_code.strip() != "", f"{product_code=}. Must be a non-empty string"
+        assert isinstance(product_description,str) and product_description.strip() != "", f"{product_description=}. Must be a non-empty string"
+
+        # Increment the sequential number for each DVD produced
+        if not self._db_settings.setting_exist("serial_number"):
+            self._db_settings.setting_set("serial_number", 0)
+
+        serial_number = self._db_settings.setting_get("serial_number")
+        serial_number += 1
+        self._db_settings.setting_set("serial_number", serial_number)
+
+        # Generate the serial number string
+        serial_number_str = "{:06d}".format(serial_number)
+        serial_number_checksum = hashlib.md5(serial_number_str.encode()).hexdigest()[0]
+        serial_number_str = (
+            f"DVD-{product_code}-{serial_number_str}-{serial_number_checksum}"
+        )
+
+        return serial_number_str
 
     def _build_working_folders(self) -> tuple[int, str]:
         """Builds the working file structure.
@@ -461,7 +525,9 @@ class DVD:
             except OSError as error:
                 return -1, f"{error.errno} {error.strerror}"
 
-        if file_handler.path_exists(self.working_folder) and file_handler.path_writeable(self.working_folder):            
+        if file_handler.path_exists(
+            self.working_folder
+        ) and file_handler.path_writeable(self.working_folder):
             file_handler.make_dir(self._dvd_working_folder)
 
         if file_handler.path_exists(
@@ -494,7 +560,7 @@ class DVD:
 
         # Build mandatory file paths
         self._background_canvas_file = (
-            f"{self._tmp_folder}{file_handler.ossep}{self._background_canvas_file}"
+            f"{self._tmp_folder}{file_handler.ossep}{self._BACKGROUND_CANVAS_FILE}"
         )
 
         return 1, ""
@@ -690,29 +756,35 @@ class DVD:
         """
         debug = False
 
+        menu_title_height = 0
+        timestamp_height = 0
+
         dvd_dims = dvdarch_utils.get_dvd_dims(
             self.dvd_setup.menu_aspect_ratio, self.dvd_setup.video_standard
         )
         if dvd_dims.display_height == -1:
             return -1, "Failed To Get DVD Dimensions"
 
-        _, menu_title_height = dvdarch_utils.get_text_dims(
-            text=self.dvd_setup.menu_title,
-            font=self.dvd_setup.menu_font,
-            pointsize=self.dvd_setup.menu_font_point_size,
-        )
+        if self.dvd_setup.menu_title:
+            _, menu_title_height = dvdarch_utils.get_text_dims(
+                text=self.dvd_setup.menu_title,
+                font=self.dvd_setup.menu_font,
+                pointsize=self.dvd_setup.menu_font_point_size,
+            )
 
-        if menu_title_height == -1:
-            return -1, "Failed To Get Menu Title Dimensions"
-        
-        _, timestamp_height = dvdarch_utils.get_text_dims(
-            text=self._dvd_timestamp,
-            font=self.dvd_setup.timestamp_font,
-            pointsize=self.dvd_setup.timestamp_font_point_size,
-        )
+            if menu_title_height == -1:
+                print(f"DBG {self.dvd_setup.menu_title=}")
+                return -1, "Failed To Get Menu Title Dimensions"
 
-        if timestamp_height == -1:
-            return -1, "Failed To Get Timstamp Dimensions"
+        if self.dvd_setup.timestamp:
+            _, timestamp_height = dvdarch_utils.get_text_dims(
+                text=self.dvd_setup.timestamp,
+                font=self.dvd_setup.timestamp_font,
+                pointsize=self.dvd_setup.timestamp_font_point_size
+            )
+
+            if timestamp_height == -1:            
+                return -1, "Failed To Get TimEstamp Dimensions"
 
         cell_coords, message = self._calc_layout(
             num_buttons=len(self.dvd_setup.input_videos),
@@ -720,8 +792,8 @@ class DVD:
             dvd_dims=dvd_dims,
             border_top=10 + menu_title_height,
             border_bottom=10 + timestamp_height,
-            border_left=10, #+ timestamp_height,
-            border_right=10 #+ timestamp_height,
+            border_left=10,  # + timestamp_height,
+            border_right=10,  # + timestamp_height,
         )
 
         if not cell_coords:
@@ -924,10 +996,10 @@ class DVD:
 
         # TODO Make these values configurable
         buttons_across = 1
-        header_pad = 10        
+        header_pad = 10
         button_padding = 10
 
-        if self.dvd_title == "": #Header pad is only for titles
+        if self.dvd_setup.menu_title == "":  # Header pad is only for titles
             header_pad = 0
 
         # Compute the canvas size and ratio
@@ -1047,7 +1119,7 @@ class DVD:
 
         pointsize = self.dvd_setup.menu_font_point_size
         font = self.dvd_setup.menu_font
-        dvd_title = self.dvd_title
+        menu_title = self.dvd_setup.menu_title
 
         commands = [
             sys_consts.CONVERT,
@@ -1061,11 +1133,11 @@ class DVD:
 
         if result == -1:
             return -1, message
-
-        if dvd_title.strip()!= "":
+        
+        if menu_title.strip() != "":
             result, message = dvdarch_utils.overlay_text(
                 in_file=self._background_canvas_file,
-                text=dvd_title,
+                text=menu_title,
                 text_font=self.dvd_setup.menu_font,
                 text_pointsize=self.dvd_setup.menu_font_point_size,
                 text_color=self.dvd_setup.menu_font_color,
@@ -1076,10 +1148,10 @@ class DVD:
 
             if result == -1:
                 return -1, message
-
-        if self.dvd_setup.timestamp_font and self._dvd_timestamp:
-            _ ,timestamp_height = dvdarch_utils.get_text_dims(
-                text=self._dvd_timestamp,
+        
+        if self.dvd_setup.timestamp_font and self.dvd_setup.timestamp:
+            _, timestamp_height = dvdarch_utils.get_text_dims(
+                text=self.dvd_setup.timestamp,
                 font=self.dvd_setup.timestamp_font,
                 pointsize=self.dvd_setup.timestamp_font_point_size,
             )
@@ -1087,19 +1159,42 @@ class DVD:
             if timestamp_height == -1:
                 return -1, "Failed to get timestamp height"
 
-            result, message = dvdarch_utils.write_text_on_file(input_file=self._background_canvas_file,
-                                            text=self._dvd_timestamp,
-                                            x=self._dvd_timestamp_x_offset,
-                                            y=height - timestamp_height,
-                                            pointsize=self.dvd_setup.timestamp_font_point_size,
-                                            color=self.dvd_setup.menu_font_color,
-                                            font=self.dvd_setup.timestamp_font
+            result, message = dvdarch_utils.write_text_on_file(
+                input_file=self._background_canvas_file,
+                text=self.dvd_setup.timestamp,
+                x=self._dvd_timestamp_x_offset,
+                y=height - timestamp_height,
+                pointsize=self.dvd_setup.timestamp_font_point_size,
+                color=self.dvd_setup.menu_font_color,
+                font=self.dvd_setup.timestamp_font,
+            )
 
+            if result == -1:
+                return -1, message
+        
+        if self.dvd_setup.timestamp_font and self.dvd_setup.serial_number:
+            serial_num_width, serial_num_height = dvdarch_utils.get_text_dims(
+                text=self.dvd_setup.serial_number,
+                font=self.dvd_setup.timestamp_font,
+                pointsize=self.dvd_setup.timestamp_font_point_size,
+            )
+
+            if timestamp_height == -1:
+                return -1, "Failed to get timestamp height"
+
+            result, message = dvdarch_utils.write_text_on_file(
+                input_file=self._background_canvas_file,
+                text=self.dvd_setup.serial_number,
+                x=width - serial_num_width - self._dvd_timestamp_x_offset,
+                y=height - serial_num_height,
+                pointsize=self.dvd_setup.timestamp_font_point_size,
+                color=self.dvd_setup.menu_font_color,
+                font=self.dvd_setup.timestamp_font,
             )
             
             if result == -1:
                 return -1, message
-            
+        
         return 1, ""
 
     def _prepare_buttons(
