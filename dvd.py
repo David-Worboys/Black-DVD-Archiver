@@ -24,20 +24,19 @@ import datetime
 import hashlib
 import math
 import os
-from typing import Optional
-import psutil
 import shutil
 import subprocess
-from collections import Counter
-
-
 from random import randint
+from typing import Optional
+
+import psutil
+import xmltodict
 
 import dvdarch_utils
-import sys_consts
 import sqldb
+import sys_consts
 import utils
-import xmltodict
+
 # fmt: on
 
 # ===== Public API class for class DVD use
@@ -52,7 +51,7 @@ class File_Def:
     _file_info: dict = dataclasses.field(default_factory=dict)
 
     @property
-    def path(self):
+    def path(self) -> str:
         return self._path
 
     @path.setter
@@ -65,11 +64,11 @@ class File_Def:
         self._path = value
 
     @property
-    def file_name(self):
+    def file_name(self) -> str:
         return self._file_name
 
     @file_name.setter
-    def file_name(self, value):
+    def file_name(self, value: str):
         assert (
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a file name"
@@ -77,21 +76,21 @@ class File_Def:
         self._file_name = value
 
     @property
-    def file_info(self):
+    def file_info(self) -> dict:
         return self._file_info
 
     @file_info.setter
-    def file_info(self, value):
+    def file_info(self, value: dict):
         assert isinstance(value, dict), f"{value=}. Must be a dict of file properties"
 
         self._file_info = value
 
     @property
-    def menu_image_file_path(self):
+    def menu_image_file_path(self) -> str:
         return self._mneu_image_file_path
 
     @menu_image_file_path.setter
-    def menu_image_file_path(self, value):
+    def menu_image_file_path(self, value: str):
         assert (
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a file path"
@@ -101,11 +100,11 @@ class File_Def:
         self._mneu_image_file_path = value
 
     @property
-    def menu_image_frame(self):
+    def menu_image_frame(self) -> int:
         return self._menu_image_frame
 
     @menu_image_frame.setter
-    def menu_image_frame(self, value):
+    def menu_image_frame(self, value: int):
         assert (
             isinstance(value, int) and value >= 0
         ), f"{value=}. Must be a non-negative integer"
@@ -133,7 +132,7 @@ class DVD_Config:
     _menu_aspect_ratio: str = sys_consts.AR43
     _serial_number: str = ""
     _timestamp_font: str = ""
-    _timestamp_font_point_size: int = 9
+    _timestamp_font_point_size: int = 11
     _timestamp_prefix: str = "DVD Build Date:"
     _timestamp: str = (
         f"{_timestamp_prefix} : {datetime.datetime.now().strftime('%x %Y %H:%M')}"
@@ -357,7 +356,7 @@ class DVD:
     """Does the grunt work needed to automatically turn video files into a
     DVD Folder/File structure with an auto generated menu"""
 
-    _BACKGROUND_CANVAS_FILE : str = "background_canvas.png"
+    _BACKGROUND_CANVAS_FILE: str = "background_canvas.png"
 
     # Database
     _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
@@ -382,7 +381,7 @@ class DVD:
         pass
 
     @property
-    def dvd_setup(self):
+    def dvd_setup(self) -> DVD_Config:
         return self._dvd_setup
 
     @dvd_setup.setter
@@ -392,7 +391,7 @@ class DVD:
         self._dvd_setup = value
 
     @property
-    def working_folder(self):
+    def working_folder(self) -> str:
         return self._working_folder
 
     @working_folder.setter
@@ -471,8 +470,12 @@ class DVD:
         Returns:
             str: A string containing the generated DVD serial number.
         """
-        assert isinstance(product_code, str) and product_code.strip() != "", f"{product_code=}. Must be a non-empty string"
-        assert isinstance(product_description,str) and product_description.strip() != "", f"{product_description=}. Must be a non-empty string"
+        assert (
+            isinstance(product_code, str) and product_code.strip() != ""
+        ), f"{product_code=}. Must be a non-empty string"
+        assert (
+            isinstance(product_description, str) and product_description.strip() != ""
+        ), f"{product_description=}. Must be a non-empty string"
 
         # Increment the sequential number for each DVD produced
         if not self._db_settings.setting_exist("serial_number"):
@@ -780,10 +783,10 @@ class DVD:
             _, timestamp_height = dvdarch_utils.get_text_dims(
                 text=self.dvd_setup.timestamp,
                 font=self.dvd_setup.timestamp_font,
-                pointsize=self.dvd_setup.timestamp_font_point_size
+                pointsize=self.dvd_setup.timestamp_font_point_size,
             )
 
-            if timestamp_height == -1:            
+            if timestamp_height == -1:
                 return -1, "Failed To Get TimEstamp Dimensions"
 
         cell_coords, message = self._calc_layout(
@@ -1133,7 +1136,7 @@ class DVD:
 
         if result == -1:
             return -1, message
-        
+
         if menu_title.strip() != "":
             result, message = dvdarch_utils.overlay_text(
                 in_file=self._background_canvas_file,
@@ -1148,7 +1151,7 @@ class DVD:
 
             if result == -1:
                 return -1, message
-        
+
         if self.dvd_setup.timestamp_font and self.dvd_setup.timestamp:
             _, timestamp_height = dvdarch_utils.get_text_dims(
                 text=self.dvd_setup.timestamp,
@@ -1171,7 +1174,7 @@ class DVD:
 
             if result == -1:
                 return -1, message
-        
+
         if self.dvd_setup.timestamp_font and self.dvd_setup.serial_number:
             serial_num_width, serial_num_height = dvdarch_utils.get_text_dims(
                 text=self.dvd_setup.serial_number,
@@ -1191,10 +1194,10 @@ class DVD:
                 color=self.dvd_setup.menu_font_color,
                 font=self.dvd_setup.timestamp_font,
             )
-            
+
             if result == -1:
                 return -1, message
-        
+
         return 1, ""
 
     def _prepare_buttons(

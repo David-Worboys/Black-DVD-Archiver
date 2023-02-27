@@ -25,13 +25,11 @@ import os
 import os.path
 import platform
 import pprint
-import subprocess
 import shlex
-from collections import namedtuple
 import subprocess
 from typing import Generator
-import psutil
 
+import psutil
 import xmltodict
 
 import sys_consts
@@ -136,8 +134,7 @@ class dvd_dims:
 
 
 def get_space_available(path: str) -> tuple[int, str]:
-    """
-    Returns the amount of available disk space in bytes for the specified file system path.
+    """Returns the amount of available disk space in bytes for the specified file system path.
 
     Args:
         path (str): A string representing the file system path for which the available disk space is to be determined.
@@ -166,7 +163,7 @@ def get_color_names() -> list:
     return sorted(list(colors.keys()), key=lambda x: x[0].upper())
 
 
-def get_hex_color(color: str):
+def get_hex_color(color: str) -> str:
     """This function returns the hexadecimal value for a given color name.
 
     Args:
@@ -641,19 +638,21 @@ def execute_check_output(
     debug: bool = False,
     shell: bool = False,
 ) -> tuple[int, str]:
-    """_summary_
+    """Executes the given command(s)  with the subprocess.check_output method.
+    This wrapper provides better error and debug handling
 
     Args:
-        commands (list[str]): _description_
-        env (dict, optional): _description_. Defaults to {}.
-        execute_as_string (bool, optional): _description_. Defaults to False.
-        debug (bool, optional): _description_. Defaults to False.
-        shell (bool, optional): _description_. Defaults to False.
+        commands (list[str]): A non-empty list of commands and options to be executed.
+        env (dict, optional): A dictionary of environment variables to be set for the command. Defaults to an empty dictionary.
+        execute_as_string (bool, optional): If True, the commands will be executed as a single string. Defaults to False.
+        debug (bool, optional): If True, debug information will be printed. Defaults to False.
+        shell (bool, optional): If True, the command will be executed using the shell. Defaults to False.
 
     Returns:
-        tuple[int,str]:
-        - arg1: 1 OK, -1 Error,
-        - arg2: Error message ot "" if ok
+        tuple[int, str]: A tuple containing the status code and the output of the command.
+
+        - arg1: 1 if the command is successful, -1 if the command fails.
+        - arg2: "" if the command is successful, if the command fails, an error message.
     """
     assert (
         isinstance(commands, list) and len(commands) > 0
@@ -692,7 +691,7 @@ def execute_check_output(
             print(f"DBG Call Error *** {call_error.returncode=} {call_error=}")
 
         if call_error.returncode == 127:  # Should not happen
-            message = f"{sys_consts.FFMPG} Not Found"
+            message = f"Program Not Found Or Exited Abnormally \n {' '.join(commands)}"
         elif call_error.returncode <= 125:
             message = f" {call_error.returncode} Command Failed!\n {' '.join(commands)}"
         else:
@@ -952,6 +951,8 @@ def get_file_encoding_info(video_file: str) -> dict:
         isinstance(video_file, str) and video_file.strip() != ""
     ), f"{video_file=}. Must bbe a non-empy str"
 
+    debug = False
+
     fmt = "--output=XML"
 
     video_details = {
@@ -982,9 +983,12 @@ def get_file_encoding_info(video_file: str) -> dict:
         ).strip()
 
         video_info = xmltodict.parse(mi)
-        print(f"=========== Video Info Debug {video_file} ===========")
-        pprint.pprint(video_info)
-        print("=========== Video Info Debug ===========")
+
+        if debug:
+            print(f"=========== Video Info Debug {video_file} ===========")
+            pprint.pprint(video_info)
+            print("=========== Video Info Debug ===========")
+
         video_details: dict[str, list[str, int, str]]
         track_info = list(find_keys(video_info, "track"))
 
@@ -1047,7 +1051,7 @@ def resize_image(
     no_dither: bool = False,
     colors: str = "",
     remap: bool = False,
-):
+) -> tuple[int, str]:
     """Resizes an image to a specified size.
 
     Args:

@@ -20,16 +20,18 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import datetime
+
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import appdirs
-import datetime
+
 import dvdarch_utils
 import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
-from dvd import DVD,  DVD_Config, File_Def
+from dvd import DVD, DVD_Config, File_Def
 from video_file_picker import video_file_picker_popup
 
 # fmt: on
@@ -217,10 +219,6 @@ class DVD_Archiver:
                     container_tag="menu_attributes", tag="title_font"
                 )
 
-                print(
-                    f"DBG {menu_background_color=} {menu_font_color=} {menu_font=} {font_name=}"
-                )
-
                 menu_color_combo.select_text(menu_background_color, partial_match=False)
                 text_color_combo.select_text(menu_font_color, partial_match=False)
                 font_combo.select_text(font_name, partial_match=False)
@@ -343,7 +341,7 @@ class DVD_Archiver:
             return None
 
         file_grid: qtg.Grid = event.widget_get(
-            container_tag="control_container",
+            container_tag="video_file_controls",
             tag="video_input_files",
         )
 
@@ -514,7 +512,7 @@ class DVD_Archiver:
                     tag="project_video_standard",
                     label="Video Standard",
                     buddy_control=qtg.Label(
-                        tag="project_duration", label="Duration", width=18
+                        tag="project_duration", label="Duration (H:M:S)", width=18
                     ),
                     width=4,
                 ),
@@ -609,15 +607,52 @@ class file_control:
         self.project_duration = ""
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
 
+    def grid_events(self, event: qtg.Action):
+        """Process Grid Events
+
+        Args:
+            event (Action): Action
+        """
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
+        if event.event == qtg.SYSEVENTS.CLICKED:
+            if event.value.row >= 0 and event.value.col >= 0:
+                # When the user clicks on a row in the grid, toggle the switch in that row
+                file_grid: qtg.Grid = event.widget_get(
+                    container_tag="video_file_controls", tag="video_input_files"
+                )
+
+                if file_grid.checkitemrow_get(event.value.row, col=0):
+                    file_grid.checkitemrow_set(
+                        row=event.value.row, col=0, checked=False
+                    )
+                else:
+                    file_grid.checkitemrow_set(row=event.value.row, col=0, checked=True)
+
     def event_handler(self, event: qtg.Action):
         """Handles  application events
 
         Args:
             event (Action): The triggering event
         """
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
         match event.event:
             case qtg.SYSEVENTS.CLICKED:
                 match event.tag:
+                    case "bulk_select":
+                        file_grid: qtg.Grid = event.widget_get(
+                            container_tag="video_file_controls",
+                            tag="video_input_files",
+                        )
+
+                        file_grid.checkitems_all(
+                            checked=event.value, col_tag="video_file"
+                        )
                     case "select_files":
                         folder = self._db_settings.setting_get("dvd_build_folder")
 
@@ -628,37 +663,44 @@ class file_control:
                             ).show()
                             return None
 
-                        (
-                            self.project_video_standard,
-                            self.project_duration,
-                        ) = self.load_video_input_files(event)
-
-                        event.value_set(
-                            container_tag="control_buttons",
-                            tag="project_video_standard",
-                            value=f"{sys_consts.SDELIM}{self.project_video_standard}{sys_consts.SDELIM}",
-                        )
-                        event.value_set(
-                            container_tag="control_buttons",
-                            tag="project_duration",
-                            value=f"{sys_consts.SDELIM}{self.project_duration}{sys_consts.SDELIM} Minutes",
+                        self.load_video_input_files(event)
+                    case "remove_files":
+                        file_grid: qtg.Grid = event.widget_get(
+                            container_tag="video_file_controls",
+                            tag="video_input_files",
                         )
 
-    def load_video_input_files(self, event: qtg.Action) -> str:
+                        if (
+                            file_grid.row_count > 0
+                            and file_grid.checkitems_get
+                            and qtg.PopYesNo(
+                                title="Remove Checied...",
+                                message="Remove The Checked Files?",
+                            ).show()
+                            == "yes"
+                        ):
+                            for item in reversed(file_grid.checkitems_get):
+                                file_grid.row_delete(item[0])
+
+                        self._set_project_standard_duration(event)
+
+    def load_video_input_files(self, event: qtg.Action):
         """Loads video files into the video input grid
 
         Args:
             event (qtg.Acton) : Calling event
 
-        Returns:
-            str: arg1 : PAL, NTSC or "  if not files loaded, arg2 : duraton hh:mm:ss
         """
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
         selected_files = video_file_picker_popup(title="Choose Video Files").show()
 
         if selected_files.strip() != "":
             file_handler = utils.File()
             file_grid: qtg.Grid = event.widget_get(
-                container_tag="control_container",
+                container_tag="video_file_controls",
                 tag="video_input_files",
             )
 
@@ -671,12 +713,8 @@ class file_control:
                 for file_tuple_str in selected_files.split("|"):
                     file_tuple = file_tuple_str.split(",")
 
-                    if len(file_tuple) != 4:  # Something broke in video_file_picker
-                        continue
-
                     file = file_tuple[2]
                     file_folder = file_tuple[3]
-                    total_duration = 0
 
                     # Check if file already loade in grid
                     for check_row_index in range(file_grid.row_count):
@@ -747,16 +785,13 @@ class file_control:
 
                         row_index += 1
 
-            project_video_standard = ""
-
             if file_grid.row_count > 0:
                 # First file sets project encoding standard - Files Can be PAL or NTSC not both
                 encoding_info = file_grid.userdata_get(row=0, col=4)
                 project_video_standard = encoding_info["video_standard"][1]
 
                 for row_index in reversed(range(file_grid.row_count)):
-                    encoding_info = file_grid.userdata_get(row=row_index, col=4)
-
+                    # encoding_info = file_grid.userdata_get(row=row_index, col=4)
                     video_standard = encoding_info["video_standard"][1]
                     if project_video_standard != video_standard:
                         file = file_grid.value_get(row=row_index, col=4)
@@ -765,18 +800,59 @@ class file_control:
                             f"{sys_consts.SDELIM}{project_video_standard}{sys_consts.SDELIM} \n"
                         )
                         file_grid.row_delete(row_index)
-                    else:
-                        total_duration += encoding_info["video_duration"][1]
+
+            self._set_project_standard_duration(event)
 
             if rejected != "":
                 qtg.PopMessage(
                     title="These Files Are Not Permitted...", message=rejected, width=80
                 ).show()
 
-            return (
-                project_video_standard,
-                str(datetime.timedelta(seconds=total_duration)).split(".")[0],
-            )
+    def _set_project_standard_duration(self, event: qtg.Action):
+        """Sets the  duration and video standard for the current project based on the selected
+        input video files.
+
+        Args:
+            event (qtg.Action): The calling event .
+
+
+        """
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
+        file_grid: qtg.Grid = event.widget_get(
+            container_tag="video_file_controls",
+            tag="video_input_files",
+        )
+        total_duration = 0
+        self.project_video_standard = ""
+        self.project_duration = ""
+
+        if file_grid.row_count > 0:
+            encoding_info = file_grid.userdata_get(row=0, col=4)
+            self.project_video_standard = encoding_info["video_standard"][1]
+
+            for check_row_index in range(file_grid.row_count):
+                encoding_info = file_grid.userdata_get(row=check_row_index, col=4)
+
+                total_duration += encoding_info["video_duration"][1]
+
+            self.project_duration = str(
+                datetime.timedelta(seconds=total_duration)
+            ).split(".")[0]
+
+        event.value_set(
+            container_tag="control_buttons",
+            tag="project_video_standard",
+            value=f"{sys_consts.SDELIM}{self.project_video_standard}{sys_consts.SDELIM}",
+        )
+
+        event.value_set(
+            container_tag="control_buttons",
+            tag="project_duration",
+            value=f"{sys_consts.SDELIM}{self.project_duration}{sys_consts.SDELIM}",
+        )
 
     def layout(self) -> qtg.VBoxContainer:
         """Generates the file handler ui
@@ -785,16 +861,24 @@ class file_control:
             qtg.VBoxContainer: THe container that houses the file handler ui layout
         """
         control_container = qtg.VBoxContainer(
-            tag="control_container", text="Video Input Folder", align=qtg.ALIGN.TOPRIGHT
+            tag="control_container", text="Video Input Files", align=qtg.ALIGN.TOPRIGHT
         )
         button_container = qtg.HBoxContainer(
             tag="control_buttons", align=qtg.ALIGN.RIGHT
         ).add_row(
             qtg.Button(
-                tag="select_files",
-                text="Select Video Files",
+                tag="remove_files",
+                text="Remove Checked",
                 callback=self.event_handler,
-            )
+                tooltip="Remove Checked Files From Video Input Files",
+            ),
+            qtg.Spacer(width=1),
+            qtg.Button(
+                tag="select_files",
+                text="Select Files",
+                callback=self.event_handler,
+                tooltip="Open File Picker Popup To Select Video Files",
+            ),
         )
 
         file_col_def = (
@@ -841,12 +925,27 @@ class file_control:
                 checkable=False,
             ),
         )
-
-        video_input_files = qtg.Grid(
-            tag="video_input_files", noselection=True, height=10, col_def=file_col_def
+        file_control_container = qtg.VBoxContainer(
+            tag="video_file_controls", align=qtg.ALIGN.TOPLEFT
         )
 
-        control_container.add_row(video_input_files, button_container)
+        file_control_container.add_row(
+            qtg.Checkbox(
+                text="Select All",
+                tag="bulk_select",
+                callback=self.event_handler,
+                width=11,
+            ),
+            qtg.Grid(
+                tag="video_input_files",
+                noselection=True,
+                height=10,
+                col_def=file_col_def,
+                callback=self.grid_events,
+            ),
+        )
+
+        control_container.add_row(file_control_container, button_container)
 
         return control_container
 

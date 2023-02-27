@@ -22,7 +22,8 @@ import datetime
 from typing import Callable
 
 import utils
-# fmt: off
+
+# fmt: on
 
 file_sep = utils.File().ossep
 

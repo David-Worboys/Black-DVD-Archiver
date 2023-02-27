@@ -23,6 +23,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
+
 # fmt: on
 
 
@@ -44,7 +45,7 @@ class video_file_picker_popup(qtg.PopContainer):
 
         super().__post_init__()  # This statement must be last
 
-    def control_event(self, event: qtg.Action):
+    def event_handler(self, event: qtg.Action):
         """Handles  form events
 
         Args:
@@ -158,12 +159,12 @@ class video_file_picker_popup(qtg.PopContainer):
             qtg.Button(
                 text="&Select Video Folder",
                 tag="video_import_folder",
-                callback=self.control_event,
+                callback=self.event_handler,
             ),
             qtg.Spacer(width=36),
-            qtg.Button(text="&Ok", tag="ok", callback=self.control_event, width=10),
+            qtg.Button(text="&Ok", tag="ok", callback=self.event_handler, width=10),
             qtg.Button(
-                text="&Cancel", tag="cancel", callback=self.control_event, width=10
+                text="&Cancel", tag="cancel", callback=self.event_handler, width=10
             ),
         )
 
@@ -187,7 +188,10 @@ class video_file_picker_popup(qtg.PopContainer):
 
         file_control_container.add_row(
             qtg.Checkbox(
-                text="Select All", tag="bulk_select", callback=self.control_event
+                text="Select All",
+                tag="bulk_select",
+                callback=self.event_handler,
+                width=11,
             ),
             video_input_files,
         )

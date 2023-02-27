@@ -6034,7 +6034,7 @@ class PopContainer(_qtpyBase_Control):
         ), f"{self.container=}. Must be a container instance or None"
 
         if self.callback is None:
-            self.callback = self.control_event
+            self.callback = self.event_handler
 
         if self.container is None:
             self.container = GridContainer(tag=self.container_tag)
@@ -6077,7 +6077,7 @@ class PopContainer(_qtpyBase_Control):
         """
         self.dialog.closeEvent(event)
 
-    def control_event(self, event: Action) -> int:
+    def event_handler(self, event: Action) -> int:
         """Processes the control events. Override this method to process the control events.
 
         Args:
@@ -6243,7 +6243,7 @@ class PopAbout(PopContainer):
 
         self.container.add_row(container)
 
-    def control_event(self, event: Action):
+    def event_handler(self, event: Action):
         """Handles control event processing for the PopAbout class
 
         Args:
@@ -6293,7 +6293,7 @@ class PopFolderGet(PopContainer):
         folder_buttons = HBoxContainer()
         folder_buttons.add_row(
             Button(
-                callback=self.control_event,
+                callback=self.event_handler,
                 tag="up_folder",
                 height=1,
                 width=1,
@@ -6305,7 +6305,7 @@ class PopFolderGet(PopContainer):
         if self.create_folder:
             folder_buttons.add_row(
                 Button(
-                    callback=self.control_event,
+                    callback=self.event_handler,
                     tag="create_folder",
                     height=1,
                     width=1,
@@ -6318,7 +6318,7 @@ class PopFolderGet(PopContainer):
         folder_container.add_row(
             LineEdit(
                 text=f"{SDELIM}{self.root_dir}{SDELIM}",
-                callback=self.control_event,
+                callback=self.event_handler,
                 tag="folder",
                 width=50,
                 char_length=255,
@@ -6333,7 +6333,7 @@ class PopFolderGet(PopContainer):
         screen_container.add_row(
             FolderView(
                 tag="dir_view",
-                callback=self.control_event,
+                callback=self.event_handler,
                 dir_only=True,
                 root_dir=self.root_dir.strip(),
                 tooltip="Doubleclick On The Folder To Select or Open",
@@ -6346,12 +6346,12 @@ class PopFolderGet(PopContainer):
         self.container.add_row(screen_container)
         self.container.add_row(
             HBoxContainer(align=ALIGN.RIGHT).add_row(
-                Button(text="&Ok", tag="ok", callback=self.control_event),
-                Button(text="&Cancel", tag="cancel", callback=self.control_event),
+                Button(text="&Ok", tag="ok", callback=self.event_handler),
+                Button(text="&Cancel", tag="cancel", callback=self.event_handler),
             )
         )
 
-    def control_event(self, event: Action):
+    def event_handler(self, event: Action):
         """Process control events
 
         The function processes the event, and if the event is a click, double click, or a folder expansion or collapse,
@@ -6685,7 +6685,7 @@ class PopMessage(PopContainer):
         self.container.add_row(container)
         self.container.add_row(button_container)
 
-    def control_event(self, event: Action):
+    def event_handler(self, event: Action):
         """Processes the control events and performs appropriate actions. Sets the _result attribute. Overridden in
         decedent classes
 
@@ -6749,7 +6749,7 @@ class PopOKCancel(PopMessage):
             )
         super().__post_init__()
 
-    def control_event(self, event: Action):
+    def event_handler(self, event: Action):
         """Processes the control events and performs appropriate actions. Sets the _result attribute. Overridden in
         descendants
 
@@ -6805,7 +6805,7 @@ class PopOKCancelApply(PopOKCancel):
             self.apply_callback, Callable
         ), f"{self.apply_callback=}. Must be function | method | lambda"
 
-    def control_event(self, event: Action):
+    def event_handler(self, event: Action):
         """Processes the control events and performs appropriate actions. Sets the _result attribute. Overridden in
         descendants.
 
@@ -6879,7 +6879,7 @@ class PopOptions(PopContainer):
             option_container.add_row(
                 RadioButton(
                     text=f"{SDELIM}{option}{SDELIM}",
-                    callback=self.control_event,
+                    callback=self.event_handler,
                     tag=tag,
                     checked=True if index == 0 else False,
                 )
@@ -6902,7 +6902,7 @@ class PopOptions(PopContainer):
                 width=10,
                 height=1,
                 tune_vsize=7,
-                callback=self.control_event,
+                callback=self.event_handler,
             )
         )
 
@@ -6914,7 +6914,7 @@ class PopOptions(PopContainer):
                 width=10,
                 height=1,
                 tune_vsize=7,
-                callback=self.control_event,
+                callback=self.event_handler,
             )
         )
 
@@ -6922,7 +6922,7 @@ class PopOptions(PopContainer):
         self.container.add_row(Spacer())
         self.container.add_row(button_container)
 
-    def control_event(self, event: Action):
+    def event_handler(self, event: Action):
         """Control event handler for the PopOptions dialogue.
 
         If the user clicks the "ok" button, then the value of the selected option is saved to the _result variable and
@@ -6980,9 +6980,9 @@ class PopTextGet(PopContainer):
     def __post_init__(self):
         """Constructor for the PopTextGet dialogue that checks arguments and sets instance variables."""
         command_buttons = HBoxContainer(align=ALIGN.RIGHT).add_row(
-            Button(text="&Ok", tag="ok", callback=self.control_event),  # , height=1),
+            Button(text="&Ok", tag="ok", callback=self.event_handler),  # , height=1),
             Button(
-                text="&Cancel", tag="cancel", callback=self.control_event
+                text="&Cancel", tag="cancel", callback=self.event_handler
             ),  # , height=1),
         )
 
@@ -7012,7 +7012,7 @@ class PopTextGet(PopContainer):
         # self.container.add_row(Spacer())
         self.container.add_row(command_buttons)
 
-    def control_event(self, event: Action):
+    def event_handler(self, event: Action):
         """Control event handler for the PopTextGet dialogue.
 
         If the user clicks the OK button, the text in the text box is returned and is set in the _result variable.
@@ -7049,7 +7049,7 @@ class PopYesNo(PopMessage):
             )
         super().__post_init__()
 
-    def control_event(self, event: Action):
+    def event_handler(self, event: Action):
         """Control event handler for the PopYesNo dialogue.
 
         Sets the _result variable to the tag of the button that was clicked.
