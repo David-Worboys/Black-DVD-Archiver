@@ -27,7 +27,7 @@ import utils
 
 file_sep = utils.File().ossep
 
-PROGRAM_NAME = "DVD Archiver"
+PROGRAM_NAME = "Black DVD Archiver"
 PROGRAM_VERSION = "0.1"
 AUTHOR = "David Worboys"
 LICENCE = "GNU V3 GPL"
@@ -52,7 +52,9 @@ AR169 = "16:9"
 AR43 = "4:3"
 PAL_FRAMERATE = 25
 NTSC_FRAMERATE = 29.97
-AVERAGE_BITRATE = 5500
+AVERAGE_BITRATE = 5500  # kilobits/sec
+SINGLE_SIDED_DVD_SIZE = 40258730  # kb ~ 4.7GB DVD5
+DOUBLE_SIDED_DVD_SIZE = 72453177  # kb ~ 8.5GB DVD9
 
 VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "VOB")
 

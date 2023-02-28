@@ -36,6 +36,8 @@ from video_file_picker import video_file_picker_popup
 
 # fmt: on
 
+PERCENT_SAFTEY_BUFFER = 1  # Used to limit DVD size so that it never exceeds 100%
+
 
 class DVD_Archiver:
     """
@@ -47,7 +49,8 @@ class DVD_Archiver:
             display_name=sys_consts.PROGRAM_NAME,
             callback=self.event_handler,
             height=768,
-            width=1024,
+            # width=1024,
+            width=800,
         )
 
         self._startup = True
@@ -192,7 +195,17 @@ class DVD_Archiver:
             case qtg.SYSEVENTS.APPINIT:
                 pass
             case qtg.SYSEVENTS.APPCLOSED:
-                pass
+                if (
+                    qtg.PopYesNo(
+                        title="Exit Application...",
+                        message=f"Exit The {sys_consts.SDELIM}{sys_consts.PROGRAM_NAME}?{sys_consts.SDELIM}",
+                    ).show()
+                    == "yes"
+                ):
+                    print(f"{sys_consts.PROGRAM_NAME} App Closed")
+                    return 1
+                else:
+                    return -1
             case qtg.SYSEVENTS.APPPOSTINIT:
                 file_handler = utils.File()
 
@@ -207,16 +220,19 @@ class DVD_Archiver:
 
                 font_name = file_handler.split_head_tail(menu_font)[1]
 
+                if not font_name:
+                    font_name = self._default_font
+
                 menu_color_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="menu_attributes", tag="menu_color"
+                    container_tag="menu_properties", tag="menu_color"
                 )
 
                 text_color_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="menu_attributes", tag="text_color"
+                    container_tag="menu_properties", tag="text_color"
                 )
 
                 font_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="menu_attributes", tag="title_font"
+                    container_tag="menu_properties", tag="title_font"
                 )
 
                 menu_color_combo.select_text(menu_background_color, partial_match=False)
@@ -224,7 +240,7 @@ class DVD_Archiver:
                 font_combo.select_text(font_name, partial_match=False)
 
                 # Hotwire event to reuse
-                event.container_tag = "menu_attributes"
+                event.container_tag = "menu_properties"
                 event.tag = "title_font"
                 event.value = menu_font
                 self._menu_color_combo_change(event)
@@ -235,6 +251,8 @@ class DVD_Archiver:
                 match event.tag:
                     case "dvd_folder_select":
                         self._dvd_folder_select(event)
+                    case "exit_app":
+                        self._DVD_Arch_App.app_exit()
                     case "make_dvd":
                         self._make_dvd(event)
             case qtg.SYSEVENTS.INDEXCHANGED:
@@ -297,7 +315,7 @@ class DVD_Archiver:
             self._db_settings.setting_set("dvd_build_folder", folder)
 
             event.value_set(
-                container_tag="control_buttons",
+                container_tag="dvd_properties",
                 tag="dvd_path",
                 value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
             )
@@ -319,16 +337,27 @@ class DVD_Archiver:
             - The result and error message are used to show an error dialog if the build fails.
 
         """
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event} is not an instance of qtg.Action"
+
+        if self._file_control.dvd_percent_used + PERCENT_SAFTEY_BUFFER >= 100:
+            qtg.PopError(
+                title="DVD Build Error...",
+                message="Selected Files Will Not Fit On A DVD!",
+            ).show()
+            return None
+
         menu_color_combo: qtg.ComboBox = event.widget_get(
-            container_tag="menu_attributes", tag="menu_color"
+            container_tag="menu_properties", tag="menu_color"
         )
 
         text_color_combo: qtg.ComboBox = event.widget_get(
-            container_tag="menu_attributes", tag="text_color"
+            container_tag="menu_properties", tag="text_color"
         )
 
         font_combo: qtg.ComboBox = event.widget_get(
-            container_tag="menu_attributes", tag="title_font"
+            container_tag="menu_properties", tag="title_font"
         )
 
         dvd_folder = self._db_settings.setting_get("dvd_build_folder")
@@ -372,8 +401,9 @@ class DVD_Archiver:
                 dvd_config = DVD_Config()
 
                 dvd_title: str = event.value_get(
-                    container_tag="dvd_properties", tag="dvd_title"
+                    container_tag="menu_properties", tag="menu_title"
                 )
+
                 # TODO: Move this to the GUI, currently the following is guaranteed as set in DB when created
                 sql_result = self._app_db.sql_select(
                     col_str="code,description",
@@ -490,6 +520,10 @@ class DVD_Archiver:
         """
         dvd_build_folder = self._db_settings.setting_get("dvd_build_folder")
 
+        if dvd_build_folder is None or dvd_build_folder.strip() == "":
+            dvd_build_folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            self._db_settings.setting_set("dvd_build_folder", dvd_build_folder)
+
         color_list = [
             qtg.COMBO_ITEM(display=color, data=color, icon=None, user_data=color)
             for color in dvdarch_utils.get_color_names()
@@ -499,98 +533,147 @@ class DVD_Archiver:
             for font in dvdarch_utils.get_fonts()
         ]
 
-        if dvd_build_folder is None or dvd_build_folder.strip() == "":
-            dvd_build_folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
-            self._db_settings.setting_set("dvd_build_folder", dvd_build_folder)
+        info_panel = qtg.HBoxContainer().add_row(
+            qtg.Label(
+                tag="project_duration",
+                label="Duration (H:M:S)",
+                width=8,
+                frame=qtg.Widget_Frame(
+                    frame_style=qtg.FRAMESTYLE.PANEL,
+                    frame=qtg.FRAME.SUNKEN,
+                    line_width=2,
+                ),
+            ),
+            qtg.Label(
+                tag="avg_bitrate",
+                label="Avg Bitrate",
+                text=f"{sys_consts.AVERAGE_BITRATE / 1000:.1f} Mb/s",
+                width=9,
+                frame=qtg.Widget_Frame(
+                    frame_style=qtg.FRAMESTYLE.PANEL,
+                    frame=qtg.FRAME.SUNKEN,
+                    line_width=2,
+                ),
+            ),
+            qtg.Label(
+                tag="percent_of_dvd",
+                label="DVD Used",
+                width=3,
+                frame=qtg.Widget_Frame(
+                    frame_style=qtg.FRAMESTYLE.PANEL,
+                    frame=qtg.FRAME.SUNKEN,
+                    line_width=2,
+                ),
+                buddy_control=qtg.Label(text="%", translate=False, width=6),
+            ),
+        )
 
-        button_container = qtg.FormContainer(
-            tag="control_buttons",
-            align=qtg.ALIGN.LEFT,  # text="DVD Options"
+        dvd_properties = qtg.FormContainer(
+            tag="dvd_properties", text="DVD Properties"
         ).add_row(
-            qtg.FormContainer(tag="dvd_properties", text="DVD Properties").add_row(
-                qtg.Label(
-                    tag="project_video_standard",
-                    label="Video Standard",
-                    buddy_control=qtg.Label(
-                        tag="project_duration", label="Duration (H:M:S)", width=18
-                    ),
-                    width=4,
-                ),
-                qtg.LineEdit(
-                    text=f"{sys_consts.SDELIM}{dvd_build_folder}{sys_consts.SDELIM}",
-                    action="edit_action",
-                    tag="dvd_path",
-                    label=f"DVD Build Folder",
-                    width=80,
-                    tooltip=f"The Folder Where The DVD Image Is Stored",
-                    editable=False,
-                    buddy_control=qtg.Button(
-                        callback=self.event_handler,
-                        tag="dvd_folder_select",
-                        height=1,
-                        width=1,
-                        icon=qtg.SYSICON.dir.get(),
-                        tooltip=f"Select The  DVD Build Folder",
-                    ),
-                ),
-                qtg.LineEdit(
-                    tag="dvd_title", label="DVD Title", width=30, char_length=80
+            qtg.Label(
+                tag="project_video_standard",
+                label="Video Standard",
+                buddy_control=info_panel,
+                width=4,
+                frame=qtg.Widget_Frame(
+                    frame_style=qtg.FRAMESTYLE.PANEL,
+                    frame=qtg.FRAME.SUNKEN,
+                    line_width=2,
                 ),
             ),
-            qtg.Spacer(),
-            qtg.FormContainer(tag="menu_properties", text="Menu Properties").add_row(
-                qtg.HBoxContainer(tag="menu_attributes").add_row(
-                    qtg.ComboBox(
-                        tag="menu_color",
-                        label="Menu Color",
-                        width=15,
-                        callback=self.event_handler,
-                        items=color_list,
-                        display_na=False,
-                        translate=False,
-                    ),
-                    qtg.ComboBox(
-                        tag="text_color",
-                        label="Text Color",
-                        width=15,
-                        callback=self.event_handler,
-                        items=color_list,
-                        display_na=False,
-                        translate=False,
-                    ),
-                    qtg.ComboBox(
-                        tag="title_font",
-                        label="Title Font",
-                        width=30,
-                        callback=self.event_handler,
-                        items=font_list,
-                        display_na=False,
-                        translate=False,
-                        # buddy_control=qtg.Image(
-                        #    tag="title_example", height=2, width=30
-                    ),
-                ),
-                qtg.HBoxContainer(text="Menu Title Example").add_row(
-                    qtg.Image(
-                        tag="title_example",
-                        height=4,
-                        width=20,
-                    ),
+            qtg.LineEdit(
+                text=f"{sys_consts.SDELIM}{dvd_build_folder}{sys_consts.SDELIM}",
+                action="edit_action",
+                tag="dvd_path",
+                label=f"DVD Build Folder",
+                width=66,
+                tooltip=f"The Folder Where The DVD Image Is Stored",
+                editable=False,
+                buddy_control=qtg.Button(
+                    callback=self.event_handler,
+                    tag="dvd_folder_select",
+                    height=1,
+                    width=1,
+                    icon=qtg.SYSICON.dir.get(),
+                    tooltip=f"Select The  DVD Build Folder",
                 ),
             ),
+        )
+
+        menu_config = qtg.HBoxContainer().add_row(
+            qtg.ComboBox(
+                tag="menu_color",
+                label="Color",
+                width=15,
+                callback=self.event_handler,
+                items=color_list,
+                display_na=False,
+                translate=False,
+            ),
+            qtg.ComboBox(
+                tag="text_color",
+                label="Text Color",
+                width=15,
+                callback=self.event_handler,
+                items=color_list,
+                display_na=False,
+                translate=False,
+            ),
+            qtg.ComboBox(
+                tag="title_font",
+                label="Title Font",
+                width=30,
+                callback=self.event_handler,
+                items=font_list,
+                display_na=False,
+                translate=False,
+            ),
+        )
+
+        dvd_menu_properties = qtg.VBoxContainer(
+            tag="menu_properties", text="Menu Properties"
+        ).add_row(
+            qtg.LineEdit(
+                tag="menu_title",
+                label="Title",
+                width=30,
+                char_length=80,
+            ),
+            menu_config,
+            qtg.HBoxContainer(text="Menu Example").add_row(
+                qtg.Image(
+                    tag="title_example",
+                    height=4,
+                    width=20,
+                )
+            ),
+        )
+
+        main_control_container = qtg.VBoxContainer(
+            tag="control_buttons",
+            align=qtg.ALIGN.TOPLEFT,
+            width=60,  # text="DVD Options"
+        ).add_row(
+            dvd_properties,
+            # qtg.Spacer(),
+            dvd_menu_properties,
+            self._file_control.layout(),
+        )
+
+        buttons_container = qtg.HBoxContainer().add_row(
             qtg.Button(
                 tag="make_dvd", text="Make DVD", callback=self.event_handler, width=9
             ),
+            qtg.Spacer(width=90),
+            qtg.Button(
+                tag="exit_app", text="Exit", callback=self.event_handler, width=9
+            ),
         )
 
-        screen_container = qtg.VBoxContainer(tag="main", align=qtg.ALIGN.TOPLEFT)
-        # screen_container.add_row(self.menu_layout())
-        screen_container.add_row(
-            qtg.HBoxContainer().add_row(
-                qtg.Spacer(width=1, tune_hsize=-20), self._file_control.layout()
-            )
-        )
-        screen_container.add_row(button_container)
+        screen_container = qtg.VBoxContainer(
+            tag="main", align=qtg.ALIGN.RIGHT, width=80
+        ).add_row(main_control_container, qtg.Spacer(), buttons_container)
 
         return screen_container
 
@@ -605,6 +688,7 @@ class file_control:
     def __init__(self):
         self.project_video_standard = ""  # PAL or NTSC
         self.project_duration = ""
+        self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
 
     def grid_events(self, event: qtg.Action):
@@ -828,6 +912,7 @@ class file_control:
         total_duration = 0
         self.project_video_standard = ""
         self.project_duration = ""
+        self.dvd_percent_used = 0
 
         if file_grid.row_count > 0:
             encoding_info = file_grid.userdata_get(row=0, col=4)
@@ -841,17 +926,32 @@ class file_control:
             self.project_duration = str(
                 datetime.timedelta(seconds=total_duration)
             ).split(".")[0]
+            self.dvd_percent_used = (
+                round(
+                    (
+                        (sys_consts.AVERAGE_BITRATE * total_duration)
+                        / sys_consts.SINGLE_SIDED_DVD_SIZE
+                    )
+                    * 100
+                )
+                + PERCENT_SAFTEY_BUFFER
+            )
 
         event.value_set(
-            container_tag="control_buttons",
+            container_tag="dvd_properties",
             tag="project_video_standard",
             value=f"{sys_consts.SDELIM}{self.project_video_standard}{sys_consts.SDELIM}",
         )
 
         event.value_set(
-            container_tag="control_buttons",
+            container_tag="dvd_properties",
             tag="project_duration",
             value=f"{sys_consts.SDELIM}{self.project_duration}{sys_consts.SDELIM}",
+        )
+        event.value_set(
+            container_tag="dvd_properties",
+            tag="percent_of_dvd",
+            value=f"{sys_consts.SDELIM}{self.dvd_percent_used}{sys_consts.SDELIM}",
         )
 
     def layout(self) -> qtg.VBoxContainer:

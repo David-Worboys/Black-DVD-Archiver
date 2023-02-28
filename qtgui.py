@@ -2807,7 +2807,7 @@ class _Widget_Registry:
         return False
 
     def widget_get(self, container_tag: str = "", tag: str = "") -> _qtpyBase_Control:
-        """Recursively searches through the widget_dict for the widget with the given tag and container_tag.
+        """Searches through the widget_dict for the widget with the given tag and container_tag.
 
         If it doesn't find it, it raises an AssertionError. If it does find it, it returns the widget.
 
@@ -2817,9 +2817,6 @@ class _Widget_Registry:
 
         Returns:
             _qtpyBase_Control : The wanted widget.
-
-        Raises:
-            AssertionError: If the widget is not found in the widget_dict.
 
         """
         assert (

@@ -1034,9 +1034,10 @@ def get_file_encoding_info(video_file: str) -> dict:
     except OSError as call_error:
         video_details["error"][1] = f"{sys_consts.MEDIAINFO} Failed! To Run\n {fmt}"
 
-    print(f"=========== video_details Debug {video_file} ===========")
-    pprint.pprint(video_details)
-    print("=========== video_details Debug ===========")
+    if debug:
+        print(f"=========== video_details Debug {video_file} ===========")
+        pprint.pprint(video_details)
+        print("=========== video_details Debug ===========")
 
     return video_details
 
