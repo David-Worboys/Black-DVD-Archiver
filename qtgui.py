@@ -1032,7 +1032,7 @@ class _qtpyBase_Control(_qtpyBase):
     icon: Union[None, qtG.QIcon, qtG.QPixmap, str] = None
     translate: bool = True
     text_pad: int = 0
-    frame: Optional[Widget_Frame] = None
+    frame: Optional[FRAME] = None
     enabled: bool = True
     label: str = ""
     label_align: ALIGN = ALIGN.RIGHT
@@ -2784,8 +2784,9 @@ class _Widget_Registry:
         # Perform depth-first search to find the widget
         visited = set()
         stack = [container_tag]
+        max_iterations = len(self._widget_dict)
 
-        while stack:
+        while stack and max_iterations > 0:
             node = stack.pop()
             if node in visited:
                 continue
@@ -2801,6 +2802,7 @@ class _Widget_Registry:
                     continue
                 if isinstance(value.widget, _Container):
                     stack.append(key)
+            max_iterations -= 1
 
         return False
 
@@ -2832,7 +2834,9 @@ class _Widget_Registry:
 
         # Perform a depth-first search to find the widget with the given tag and container_tag
         stack = [container_tag]
-        while stack:
+        max_iterations = len(self._widget_dict)
+
+        while stack and max_iterations > 0:
             current_container_tag = stack.pop()
             current_container = self._widget_dict[current_container_tag]
 
@@ -2842,9 +2846,11 @@ class _Widget_Registry:
                 elif isinstance(value.widget, _Container):
                     stack.append(key)
 
+            max_iterations -= 1
+
         # The widget was not found, try a tag search which might raise an AssertionError
         print(
-            f"Sys Error: Widget with tag {tag} not found in container {container_tag} or its sub-containers\n Trying tag search "
+            f"Sys Error: Widget with tag '{tag}' not found in container '{container_tag}' or its sub-containers\n Trying tag search "
         )
 
         return self._find_widget_by_tag(tag)
@@ -2863,26 +2869,30 @@ class _Widget_Registry:
         """
         widgets = []
         stack = list(self._widget_dict.values())
+        max_iterations = len(self._widget_dict)
 
-        while stack:
+        while stack and max_iterations > 0:
             container = stack.pop()
             for w in container.values():
                 if w.tag == tag:
                     widgets.append(w)
                 if isinstance(w, _Container):
                     stack.append(w.widget_dict)
+            max_iterations -= 1
 
         # The widget was not found, so raise an AssertionError
         if not widgets:
-            self.print_dict(file="widget_dict_dump.txt")  # DBG Use Only
-            raise AssertionError(f"Widget with tag {tag} not found")
+            # self.print_dict(file="widget_dict_dump.txt")  # DBG Use Only
+            raise RuntimeError(f"Widget with tag '{tag}' not found")
 
-        if len(widgets) == 1:
+        if len(widgets) == 1 and max_iterations > 0:
             return widgets[0].widget
         else:
-            self.print_dict(file="widget_dict_dump.txt")  # DBG Use Only
+            # self.print_dict(file="widget_dict_dump.txt")  # DBG Use Only
             container_list = ", ".join([widget.container_tag for widget in widgets])
-            raise AssertionError(f"Widget with tag {tag} found in {container_list}")
+            raise RuntimeError(
+                f"Widget with tag '{tag}' found in these containers '{container_list}'"
+            )
 
     def print_dict(
         self,
@@ -3476,7 +3486,12 @@ class QtPyApp(_qtpyBase):
         Returns:
            _qtpyBase_Control: The widget you are looking for.
         """
-        return self._widget_registry.widget_get(container_tag=container_tag, tag=tag)
+        if self._widget_registry.widget_exist(container_tag=container_tag, tag=tag):
+            return self._widget_registry.widget_get(
+                container_tag=container_tag, tag=tag
+            )
+        else:
+            raise RuntimeError(f"Dev Error {container_tag=} or {tag=} Does Not Exist!")
 
 
 # ----------------------------------------------------------------------------#
