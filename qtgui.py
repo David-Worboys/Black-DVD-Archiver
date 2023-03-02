@@ -94,20 +94,22 @@ class SYSEVENTS(IntEnum):
     INDEXCHANGED = 20  #: The index has changed
     MAXCHARS = 21  #: The maximum number of characters has been reached
     MENUCLICKED = 22  #: The menu has been clicked
-    PRESSED = 23  #: The widget has been pressed
-    RELEASED = 24  #: The widget has been released
-    POPUP = 25  #: The popup has been shown
-    POPCAL = 26  #: The popup calendar has been shown
-    POSTINIT = 27  #: The post init event has been triggered
-    SCROLLH = 28  #: The horizontal scroll bar has been moved
-    SCROLLV = 29  #: The vertical scroll bar has been moved
-    SELECTIONCHANGED = 30  #: The selection has changed
-    TEXTCHANGED = 31  #: The text has changed
-    TEXTEDIT = 32  #: The text has been edited
-    TIMECHANGED = 33  #: The time has changed
-    TOGGLED = 34  #: The widget has been toggled
-    WINDOWCLOSED = 35  #: The window has been closed
-    WINDOWOPEN = 36  #: The window has been opened
+    MOVED = 23  #: A control generated a moved event
+    PRESSED = 24  #: The widget has been pressed
+    RELEASED = 25  #: The widget has been released
+    POPUP = 26  #: The popup has been shown
+    POPCAL = 27  #: The popup calendar has been shown
+    POSTINIT = 28  #: The post init event has been triggered
+    SCROLLH = 29  #: The horizontal scroll bar has been moved
+    SCROLLV = 30  #: The vertical scroll bar has been moved
+    SELECTIONCHANGED = 31  #: The selection has changed
+    TEXTCHANGED = 32  #: The text has changed
+    TEXTEDIT = 33  #: The text has been edited
+    TIMECHANGED = 34  #: The time has changed
+    TOGGLED = 35  #: The widget has been toggled
+    TRIGGERED = 36  #: The widged has triggered
+    WINDOWCLOSED = 37  #: The window has been closed
+    WINDOWOPEN = 38  #: The window has been opened
 
 
 # Tell Black to leave this block alone
@@ -224,43 +226,21 @@ RADIOBUTTON_SIZE = SIZE(height=1, width=10)  # In CHARACTERS
 
 # Widget alignment
 class ALIGN(Enum):
-    LEFT = qtC.Qt.AlignLeft  # 0x0001
-    CENTER = qtC.Qt.AlignCenter  # 0x0004
-    CENTERLEFT = qtC.Qt.AlignCenter | qtC.Qt.AlignLeft  # qtC.Qt.AlignLeft
-    # int(
-    # int("0x0004", 16) + int("0x0001", 16)
-    # )  # qtC.Qt.AlignCenter | qtC.Qt.AlignLeft #pyside 6 complaining about |
-    CENTERRIGHT = qtC.Qt.AlignCenter | qtC.Qt.AlignRight  # qtC.Qt.AlignRight
-    # int(
-    # int("0x0004", 16) + int("0x0002", 16)
-    # )  # qtC.Qt.AlignCenter | qtC.Qt.AlignRight #pyside 6 complaining about |
-    RIGHT = qtC.Qt.AlignRight  # 0x0002
-    TOP = qtC.Qt.AlignTop  # 0x0020
+    LEFT = qtC.Qt.AlignLeft
+    CENTER = qtC.Qt.AlignCenter
+    CENTERLEFT = qtC.Qt.AlignCenter | qtC.Qt.AlignLeft
+    CENTERRIGHT = qtC.Qt.AlignCenter | qtC.Qt.AlignRight
+    RIGHT = qtC.Qt.AlignRight
+    TOP = qtC.Qt.AlignTop
     TOPCENTER = qtC.Qt.AlignTop
-    # int(
-    # int("0x0020", 16) + int("0x0004", 16)
-    # )  # qtC.Qt.AlignTop | qtC.Qt.AlignCenter #pyside 6 complaining about |
     TOPLEFT = qtC.Qt.AlignTop | qtC.Qt.AlignLeft
-    # (int("0x0020", 16) + int("0x0001", 16) )  # qtC.Qt.AlignTop | qtC.Qt.AlignLeft #pyside 6 complaining about |
-    TOPRIGHT = qtC.Qt.AlignTop | qtC.Qt.AlignRight  # qtC.Qt.AlignTop
-    # int(
-    # int("0x0020", 16) + int("0x0002", 16)
-    # )  # qtC.Qt.AlignTop | qtC.Qt.AlignRight #pyside 6 complaining about |
-    BOTTOM = qtC.Qt.AlignBottom  # 0x0040
-    VCENTER = qtC.Qt.AlignVCenter  # 0x0080
-    HCENTER = qtC.Qt.AlignHCenter  # 0x0004
-    BOTTOMCENTER = qtC.Qt.AlignBottom | qtC.Qt.AlignCenter  # qtC.Qt.AlignBottom
-    # int(
-    # int("0x0040", 16) + int("0x0004", 16)
-    # )  # qtC.Qt.AlignBottom | qtC.Qt.AlignCenter #pyside 6 complaining about |
-    BOTTOMLEFT = qtC.Qt.AlignBottom | qtC.Qt.AlignLeft  # qtC.Qt.AlignBottom
-    # int(
-    # int("0x0040", 16) + int("0x0001", 16)
-    # )  # qtC.Qt.AlignBottom | qtC.Qt.AlignLeft #pyside 6 complaining about |
-    BOTTOMRIGHT = qtC.Qt.AlignBottom | qtC.Qt.AlignRight  # qtC.Qt.AlignBottom
-    # int(
-    # int("0x0040", 16) + int("0x0002", 16)
-    # )  # qtC.Qt.AlignBottom | qtC.Qt.AlignRight #pyside 6 complaining about |
+    TOPRIGHT = qtC.Qt.AlignTop | qtC.Qt.AlignRight
+    BOTTOM = qtC.Qt.AlignBottom
+    VCENTER = qtC.Qt.AlignVCenter
+    HCENTER = qtC.Qt.AlignHCenter
+    BOTTOMCENTER = qtC.Qt.AlignBottom | qtC.Qt.AlignCenter
+    BOTTOMLEFT = qtC.Qt.AlignBottom | qtC.Qt.AlignLeft
+    BOTTOMRIGHT = qtC.Qt.AlignBottom | qtC.Qt.AlignRight
 
 
 # Creates a dictionary with the keys being the values of the enum ALIGN and the values being the corresponding CSS
@@ -432,18 +412,23 @@ class SYSICON(Enum):
     @overload
     def get(
         self, iconformat: bool = True, width: int = 48, height: int = 48
-    ) -> qtG.QPixmap:
+    ) -> qtG.QIcon | qtG.QPixmap:
         ...
 
-    def get(self, iconformat: bool = True, width: int = 48, height: int = 48):
-        """
-        Returns the system icon - in either icon format (default) or pixmap .
-        If iconformat is False then width and height of the pixmap can be set.
+    def get(
+        self, iconformat: bool = True, width: int = 48, height: int = 48
+    ) -> qtG.QIcon | qtG.QPixmap:
+        """Returns the system icon - in either icon format (default) or pixmap.
+        If `iconformat` is False, then the `width`and `height` of the pixmap can be set.
 
-        :param iconformat: bool
-        :param width: int
-        :param height: int
-        :return: QtGui.QIcon or QtGui.QPixmap
+        Args:
+            iconformat (bool): A flag indicating whether to return the icon in icon format (default) or pixmap.
+            width (int): The width of the pixmap if `iconformat` is `False`. Defaults to 48.
+            height (int): The height of the pixmap if `iconformat` is `False`. Defaults to 48.
+
+        Returns:
+            Union[qtGui.QIcon, qtG.QPixmap]: The system icon, either as a `QtGui.QIcon` or `QtGui.QPixmap`,
+            depending on the value of the `iconformat` parameter.
         """
         assert isinstance(iconformat, bool), f"{iconformat=}. Must be bool"
         assert isinstance(width, int), f"{width=}. Must be int"
@@ -730,12 +715,18 @@ class Colors(_qtpyBase):
                 color_function_string + " : all arguments must be percent"
             )
 
-    def _process_colour_functions(self, color_function_string):
+    def _process_colour_functions(self, color_function_string: str) -> str:
+        """
+        Parses a CSS-style color function string and validates its format.
+
+        Args:
+            color_function_string (str): The color function string to process.
+
+        Returns:
+            str: The name of the color function if valid, otherwise an empty string.
+
         """
 
-        :param color_function_string:
-        :return:
-        """
         args = []
         hcheck = False
 
@@ -880,17 +871,20 @@ class Validator(_qtpyBase, qtG.QValidator):
 
         self.parent_set(parent)
 
-    def validate(self, s, pos) -> qtG.QValidator.State:
+    def validate(self, s: str, pos: int) -> qtG.QValidator.State:
         """
         The function returns  a QValidator.Acceptable or QValidator.Invalid value depending on whether the string is valid
 
         Args:
-          s: The string to validate
-          pos: The position in the string where the validation is to be performed.
+          s (str): The string to validate
+          pos (int): The position in the string where the validation is to be performed.
 
         Returns:
           qtG.QValidator.State: The return value is a QValidator.Acceptable or QValidator.Invalid.
         """
+        assert isinstance(s, str), f"{s=}. Must be a string"
+        assert isinstance(pos, int), f"{pos=}. Must be an int"
+
         test_ok: bool = self._validate_action(s, pos)
 
         assert isinstance(
@@ -971,7 +965,7 @@ class _Event_Filter(qtC.QObject):
         self._owner_widget = owner_widget
         self._container_tag = container_tag
 
-    def eventFilter(self, obj: qtC.QObject, event: qtC.QEvent):
+    def eventFilter(self, obj: qtC.QObject, event: qtC.QEvent) -> bool:
         """
         The function emits signals when certain events occur.
 
@@ -980,7 +974,7 @@ class _Event_Filter(qtC.QObject):
           event (qtC.QEvent): The event that occurred.
 
         Returns:
-          The return value is a boolean that indicates whether the event was handled (true) or not (false).
+          bool: The return value is a boolean that indicates whether the event was handled (true) or not (false).
         """
         try:
             match event.type():
@@ -1544,6 +1538,38 @@ class _qtpyBase_Control(_qtpyBase):
                     lambda *args: self._event_handler(SYSEVENTS.TOGGLED, args)
                 )
 
+            if hasattr(self._widget, "actionTriggered") and hasattr(
+                self._widget.actionTriggered, "connect"
+            ):
+                self._widget.actionTriggered.connect(
+                    lambda *args: self._event_handler(SYSEVENTS.TRIGGERED, args)
+                )
+
+            if hasattr(self._widget, "sliderMoved") and hasattr(
+                self._widget.sliderMoved, "connect"
+            ):
+                self._widget.sliderMoved.connect(
+                    lambda *args: self._event_handler(SYSEVENTS.MOVED, args)
+                )
+            if hasattr(self._widget, "rangeChanged") and hasattr(
+                self._widget.rangeChanged, "connect"
+            ):
+                self._widget.rangeChanged.connect(
+                    lambda *args: self._event_handler(SYSEVENTS.CHANGED, args)
+                )
+            if hasattr(self._widget, "sliderPressed") and hasattr(
+                self._widget.sliderPressed, "connect"
+            ):
+                self._widget.sliderPressed.connect(
+                    lambda *args: self._event_handler(SYSEVENTS.PRESSED, args)
+                )
+            if hasattr(self._widget, "valueChanged") and hasattr(
+                self._widget.valueChanged, "connect"
+            ):
+                self._widget.valueChanged.connect(
+                    lambda *args: self._event_handler(SYSEVENTS.EDITCHANGED, args)
+                )
+
             # keyPressevent #TODO implement event if needed
             if hasattr(self._widget, "itemExpanded") and hasattr(
                 self._widget.itemExpanded, "connect"
@@ -1643,6 +1669,8 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget = qtW.QRadioButton(self.text, parent)
             case Spacer():
                 self._widget = qtW.QLabel(self.text, parent)
+            case Slider():
+                self._widget = qtW.QSlider(parent)
             case Switch():
                 self._widget = _Switch(parent)
             case Tab():
@@ -2008,6 +2036,54 @@ class _qtpyBase_Control(_qtpyBase):
         return CHAR_PIXEL_SIZE(height=int(height), width=int(width))
 
     def pixel_char_size(
+        self,
+        char_height: int,
+        char_width: int,
+        height_fudge: float = 1.1,
+        width_fudge: float = 1.1,
+        parent_app: Optional["QtPyApp"] = None,
+    ) -> CHAR_PIXEL_SIZE:
+        """Transforms character size (height,width) in pixel size (height, width).
+        Fudge factors allow precise adjustment
+
+        Args:
+            char_height (int) : Character height in chars
+            char_width (int) :  Character width in chars
+            height_fudge (float) :  Fudge factor multiplier to provide height adjustment
+            width_fudge (float) : Fudge factor multiplier to provide width adjustment
+
+        Returns:
+            CHAR_PIXEL_SIZE: CHAR_PIXEL_SIZE instance
+
+        """
+        assert (
+            isinstance(char_height, int) and char_height > 0
+        ), f"Invalid char_height value: {char_height}. Must be an int > 0"
+        assert (
+            isinstance(char_width, int) and char_width > 0
+        ), f"Invalid char_width value: {char_width}. Must be an int > 0"
+        assert (
+            isinstance(height_fudge, float) and height_fudge >= 1
+        ), f"Invalid height_fudge value: {height_fudge}. Must be a float >= 1"
+        assert (
+            isinstance(width_fudge, float) and width_fudge >= 1
+        ), f"Invalid width_fudge value: {width_fudge}. Must be a float >= 1"
+
+        if self.guiwidget_get is None:
+            raise AssertionError(f"guiwidget_get is not set: {self.guiwidget_get}")
+
+        font = self.guiwidget_get.font()
+        assert isinstance(
+            font, qtG.QFont
+        ), f"Invalid font type: {type(font)}. Must be a QFont instance."
+
+        font_metrics = qtG.QFontMetrics(font)
+        width = font_metrics.horizontalAdvance("W" * char_width)
+        height = font_metrics.height() * char_height * height_fudge
+
+        return CHAR_PIXEL_SIZE(height=int(height), width=int(width))
+
+    def pixel_char_size_old(
         self,
         char_height: int,
         char_width: int,
@@ -2655,53 +2731,6 @@ class _Widget_Registry:
 
         if not self._widget_dict[container_tag]:
             self._widget_dict.pop(container_tag)
-
-    def widget_del_old(self, container_tag: str, tag: str, level: int = 0) -> None:
-        """Deletes a widget from the widget stack. If it is the last widget in the container then the container is
-        deleted
-
-        Args:
-            container_tag (str): The container tag name
-            tag (str): The widget tag name
-            level (int): Used for debug, no need for user to set
-
-        Returns:
-
-        """
-        # Dev Note DAW 2022/12/02: This code is very sensitive to changes..tried half-way to sunday to improve,  but
-        # even the smallest change eventually leads to problems (C++ object not found, segv etc.)
-        if container_tag in self._widget_dict:
-            for item in reversed(tuple(self._widget_dict[container_tag].values())):
-                if item.tag == container_tag:
-                    continue
-
-                if isinstance(item.widget, (_Container, Grid)):
-                    self.widget_del(container_tag=item.tag, tag="-", level=level + 1)
-
-                    if shiboken6.isValid(item.widget._widget):
-                        item.widget._widget.deleteLater()
-
-                    self._widget_dict[container_tag].pop(item.tag)
-
-                elif tag == "-" or container_tag == tag:  # Delete
-                    if shiboken6.isValid(item.widget._widget):
-                        item.widget._widget.deleteLater()
-
-                    self._widget_dict[container_tag].pop(item.tag)
-
-                    continue
-                elif tag == item.tag:  # Delete only this item
-                    if shiboken6.isValid(item.widget._widget):
-                        item.widget._widget.deleteLater()
-
-                    self._widget_dict[container_tag].pop(item.tag)
-
-                    return None
-
-            if len(self._widget_dict[container_tag]) <= 1:
-                self._widget_dict.pop(container_tag)
-
-        return None
 
     def _dump_garbage(self):
         """
@@ -4886,6 +4915,7 @@ class _Container(_qtpyBase_Control):
         "Spacer",
         "RadioButton",
         "Switch",
+        "Slider",
         "Tab",
         "TextEdit",
         "Timeedit",
@@ -8504,9 +8534,13 @@ class Dateedit(_qtpyBase_Control):
     def date_set(self, date: str = "", date_format: str = "", default_text: str = "-"):
         """Sets the date in the control.
 
-        :param date: str : must be formatted y-m-d
-        :param format: str
-        :param default_text: str
+        Args:
+            date (str): A string representing the date to set, formatted as 'y-m-d'.
+            date_format (str): The format of the date string, defaults to an empty string.
+            default_text (str): The default text to use if the date string is empty or equals '-'.
+
+        Returns:
+            None.
         """
         assert isinstance(date, str), f"date <{date}> must be a non-empty string"
         assert isinstance(
@@ -8674,9 +8708,14 @@ class FolderView(_qtpyBase_Control):
         """QFileSystemModel subclass that overrides the headerData method to return the translated text headings"""
 
         def __init__(self, parent_widget: qtW.QWidget, trans_text: tuple):
-            """
+            """Initializes the file system model.
 
-            :param control_def:
+            Args:
+                parent_widget (QWidget): The parent widget.
+                trans_text (tuple): The tuple of translated text strings.
+
+            Returns:
+                None
             """
             self.trans_text = trans_text
             qtW.QFileSystemModel.__init__(self, parent_widget)
@@ -8817,17 +8856,14 @@ class FolderView(_qtpyBase_Control):
         return widget
 
     def _event_handler(self, *args) -> int:
-        """Event handler for file view events
+        """Event handler for file view events.
 
         Args:
-          *args: Default args for the event handler processing treeview events.
+            *args: Default args for the event handler processing treeview events.
 
         Returns:
-          int : 1. If the event is accepted, -1. If the event is rejected
-        """
-        """
+            int: 1. If the event is accepted, -1. If the event is rejected.
 
-        :param selected_index:
         """
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
@@ -8916,10 +8952,11 @@ class FolderView(_qtpyBase_Control):
             return 1
 
     def change_folder(self, folder):
-        """Changes the root folder for the dirview clearing the dirview in thw process.
+        """Changes the root folder for the directory view, clearing the view in the process.
 
-        :param folder: String root folder name (folder must exist)
-        :type fodler: str
+        Args:
+            folder (str): Name of the root folder (folder must exist).
+
         """
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
@@ -10059,6 +10096,10 @@ class Grid(_qtpyBase_Control):
 
         item = self._widget.item(row_index, col_index)
 
+        assert (
+            rowcol_widget is not None and item is not None
+        ), f"Dev Error {rowcol_widget=} {item=}"
+
         item_data = item.data(qtC.Qt.UserRole)
 
         item_data = item_data.replace(
@@ -10074,6 +10115,10 @@ class Grid(_qtpyBase_Control):
         model = self._widget.model()
 
         size = self.pixel_char_size(char_height=1, char_width=1)
+
+        assert (
+            widget.width > 0 and widget.height > 0
+        ), f"Dev Error {widget.width=} {widget.height=} Must be > 0"
 
         rowcol_widget.setFixedSize(
             (widget.width * size.width), (widget.height * size.height)
@@ -11449,9 +11494,9 @@ class Label(_qtpyBase_Control):
         """Creates the label widget
 
         Args:
-          parent_app (QtPyApp): The parent application.
-          parent (qtW.QWidget): The parent widget.
-          container_tag (str): str = ""
+            parent_app (QtPyApp): The parent application.
+            parent (qtW.QWidget): The parent widget.
+            container_tag (str): str = ""
 
         Returns:
             QWidget : The label widget or the container housing it.
@@ -14363,3 +14408,93 @@ class Treeview(_qtpyBase_Control):
         if len(levels) == 1:
             return (True, list(levels)[0], items)
         return (False, list(levels), items)
+
+
+@dataclasses.dataclass
+class Slider(_qtpyBase_Control):
+    """Instantiates a Slider widget and associated properties"""
+
+    range_min: int = 0
+    range_max: int = 100
+    page_step: int = 10
+    single_step: int = 1
+    orientation: str = "horizontal"
+
+    def __post_init__(self):
+        """Initializes the slider object."""
+        assert (
+            isinstance(self.range_min, int) and self.range_min >= 0
+        ), f"{self.range_min=}. Must be an int >= 0"
+        assert (
+            isinstance(self.range_max, int)
+            and self.range_max > 0
+            and self.range_max > self.range_min
+        ), f"{self.range_max=}. Must be an int > 0 and < {self.range_min=}."
+        assert (
+            isinstance(self.page_step, int) and self.page_step > 0
+        ), f"{self.page_step=}. Must be an int > 0"
+        assert (
+            isinstance(self.single_step, int) and self.single_step > 0
+        ), f"{self.single_step=}. Must be an int > 0"
+        assert isinstance(self.orientation, str) and self.orientation in [
+            "horizontal",
+            "vertical",
+        ], f"{self.orientation=}. Must be 'horizontal' or'vertical'"
+
+        super().__post_init__()
+
+    def _create_widget(
+        self, parent_app: QtPyApp, parent: qtW.QWidget, container_tag: str = ""
+    ) -> qtW.QWidget:
+        """Creates a Slider widget.
+
+        Args:
+            parent_app (QtPyApp): The parent app.
+            parent (qtW.QWidget): The parent widget.
+            container_tag (str): The tag of the container that the widget is in.
+
+        Returns:
+            qtW.QWidget : The slider widget
+        """
+        if self.height == -1:
+            self.height = WIDGET_SIZE.height
+
+        if self.width == -1:
+            self.width = WIDGET_SIZE.width
+
+        widget: qtW.QSlider = super()._create_widget(
+            parent_app=parent_app, parent=parent, container_tag=container_tag
+        )
+
+        widget.setMinimum(self.range_min)
+        widget.setMaximum(self.range_max)
+        widget.setPageStep(self.page_step)
+        widget.setSingleStep(self.single_step)
+
+        if self.orientation == "horizontal":
+            widget.setOrientation(qtC.Qt.Horizontal)
+        else:
+            widget.setOrientation(qtC.Qt.Vertical)
+
+        return widget
+
+    def value_get(self) -> int:
+        """Gets the value of the slider.
+
+        Returns:
+            int: The value of the slider.
+        """
+        return self._widget.value()
+
+    def value_set(self, value: int):
+        """Sets the value of the slider.
+
+        Args:
+            value (int): The value to set the slider to.
+        """
+        assert (
+            isinstance(value, int)
+            and value >= self.range_min
+            and value <= self.range_max
+        ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
+        self._widget.setValue(value)
