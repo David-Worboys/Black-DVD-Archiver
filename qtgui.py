@@ -1563,6 +1563,12 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget.sliderPressed.connect(
                     lambda *args: self._event_handler(SYSEVENTS.PRESSED, args)
                 )
+            if hasattr(self._widget, "sliderReleased") and hasattr(
+                self._widget.sliderReleased, "connect"
+            ):
+                self._widget.sliderReleased.connect(
+                    lambda *args: self._event_handler(SYSEVENTS.RELEASED, args)
+                )
             if hasattr(self._widget, "valueChanged") and hasattr(
                 self._widget.valueChanged, "connect"
             ):
