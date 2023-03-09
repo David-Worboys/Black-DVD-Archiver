@@ -28,7 +28,7 @@ import utils
 
 
 @dataclasses.dataclass
-class video_file_picker_popup(qtg.PopContainer):
+class Video_File_Picker_Popup(qtg.PopContainer):
     """This class is a popup that allows the user to select video files"""
 
     title: str = ""
@@ -202,7 +202,7 @@ class video_file_picker_popup(qtg.PopContainer):
         return control_container
 
     def _process_ok(self, event: qtg.Action) -> int:
-        """Processed an ok selection
+        """Processes the ok selection
 
         Args:
             event (qtg.Action): The event that triggered the function.
@@ -239,16 +239,16 @@ class video_file_picker_popup(qtg.PopContainer):
         Args:
             event (Action): Action
         """
-        if event.event == qtg.SYSEVENTS.CLICKED:
+        if event.event == qtg.SYSEVENTS.CLICKED:            
             if event.value.row >= 0 and event.value.col >= 0:
                 # When the user clicks on a row in the grid, toggle the switch in that row
                 file_grid: qtg.Grid = event.widget_get(
                     container_tag="file_controls", tag="video_input_files"
                 )
 
-                if file_grid.checkitemrow_get(event.value.row, col=0):
+                if file_grid.checkitemrow_get(event.value.row, col=0):                    
                     file_grid.checkitemrow_set(
                         row=event.value.row, col=0, checked=False
                     )
-                else:
+                else:                    
                     file_grid.checkitemrow_set(row=event.value.row, col=0, checked=True)
