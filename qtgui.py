@@ -38,7 +38,7 @@ from collections import deque, namedtuple
 from contextlib import contextmanager
 from dataclasses import field
 from enum import Enum, IntEnum
-from typing import Callable, ClassVar, Literal, Optional, Union, cast, overload
+from typing import Callable, ClassVar, Optional, Union, cast, overload
 
 import fs
 import numpy as np
@@ -9030,41 +9030,39 @@ class Grid(_qtpyBase_Control):
         prev_value: any
         tag: str
         user_data: any
-        data_type: Optional[IntEnum]
-        first_time: Optional[bool]
-        widget: Optional[_qtpyBase_Control]
-        orig_row: Optional[int]
+        data_type: IntEnum
+        first_time: bool
+        widget: qtW.QWidget
+        orig_row: int
 
         def replace(
             self,
-            current_value: any = None,
-            original_value: any = None,
-            prev_value: any = None,
+            current_value: Optional[any] = None,
+            original_value: Optional[any] = None,
+            prev_value: Optional[any] = None,
             tag: Optional[str] = None,
-            user_data: any = None,
+            user_data: Optional[any] = None,
             data_type: Optional[IntEnum] = None,
             first_time: Optional[bool] = None,
-            widget: Optional[_qtpyBase_Control] = None,
+            widget: Optional[qtW.QWidget] = None,
             orig_row: Optional[int] = None,
         ) -> "_Item_Data":
-            """Replaces the values of the item properties if the corresponding argument is not None
+            """Replaces the values of the item properties if the corresponding argument is not None.
 
             Args:
-                current_value (any): The current value of the item.
-                original_value (any): The original value of the item.
-                prev_value (any): The value of the item before the current value.
-                tag (str): tag name of an item.
-                user_data (any): user set data values
-                data_type (IntEnum): The type of data that the item is storing. This is used to determine how to display the
-                    data in the table.
-                first_time (bool): Indicates the first time the item used.
-                widget (_qtpyBase_Control): The widget that is being used to display an item.
+                current_value (Any): The current value of the item.
+                original_value (Any): The original value of the item.
+                prev_value (Any): The value of the item before the current value.
+                tag (str): The tag name of an item.
+                user_data (Any): User-set data values.
+                data_type (IntEnum): The type of data that the item is storing. This is used to determine how to display the data in the table.
+                first_time (bool): Indicates whether the item is being used for the first time.
+                widget (qtW.QWidget): The widget that is being used to display an item.
                 orig_row (int): The original row of the item.
 
             Returns:
-                _Item_Data : The Item_Data object itself
+                _Item_Data: The ItemData object itself.
             """
-
             if current_value is not None:
                 self.current_value = current_value
             if original_value is not None:
@@ -9087,6 +9085,8 @@ class Grid(_qtpyBase_Control):
             return self
 
     class _DATA_TYPE(IntEnum):
+        """Enum that represents the data types of items in a grid"""
+
         BOOL = 0
         DATE = 1
         DATETIME = 2
@@ -9096,6 +9096,8 @@ class Grid(_qtpyBase_Control):
 
     @dataclasses.dataclass
     class _Return_Value:
+        """Used to return a value"""
+
         value: any
         user_data: any
         row: int
@@ -9103,24 +9105,23 @@ class Grid(_qtpyBase_Control):
 
     def __post_init__(self):
         """Sets up the grid control. Checks arguments and sets up the grid instance variables"""
+
         super().__post_init__()  # Checks non grid specific arguments
 
         assert isinstance(self.multiselect, bool), f"{self.multiselect=}. Must be bool"
-
         assert isinstance(self.noselection, bool), f"{self.noselection=}. Must be bool"
-
         assert isinstance(
             self.col_def, (list, tuple)
         ), f"{self.col_def=}. Must be List[COL_DEF] | Tuple[COL_DEF]"
-        assert len(self.col_def) > 0
-        f"{self.col_def=}. Must be at least one column definition!"
+        assert (
+            len(self.col_def) > 0
+        ), f"{self.col_def=}. Must be at least one column definition!"
 
         for definition in self.col_def:
-            # definition: COL_DEF
             assert isinstance(definition, COL_DEF), f"{definition=}. Must be COL_DEF"
             assert isinstance(
                 definition.label, str
-            ), f"{definition.label=} Must be str."
+            ), f"{definition.label=}. Must be str."
             assert isinstance(definition.tag, str), f"{definition.tag=}. Must be str."
             assert isinstance(
                 definition.width, int
@@ -9146,6 +9147,14 @@ class Grid(_qtpyBase_Control):
             qtW.QWidget : The grid control
 
         """
+        assert isinstance(
+            parent_app, QtPyApp
+        ), f"{parent_app=}. must be an instance of QtPyApp"
+        assert isinstance(
+            parent, qtW.QWidget
+        ), f"{parent=}. Must be an instance of qtW.QWidget"
+        assert isinstance(container_tag, str), f"{container_tag=}. Must be a string"
+
         widget = cast(
             qtW.QTableWidget,
             super()._create_widget(
@@ -9239,34 +9248,31 @@ class Grid(_qtpyBase_Control):
         return widget
 
     def _event_handler(self, *args) -> int:
-        """Event handler for the grid control
+        """Handles events for the grid control.
 
         Args:
-          *args:  Default args for a grid control
+            *args: Default arguments for a grid control.
 
         Returns:
-          int : 1 if event was handled ok, -1 otherwise
+            int: 1 if the event was handled successfully, -1 otherwise.
         """
-        row = -1
-        col = -1
-        row_prev = -1
-        col_prev = -1
+        # Initialize variables
+        row, col, row_prev, col_prev = -1, -1, -1, -1
         widget_item = None
-        event: Optional[Action] = None
+        event = None
 
+        # Parse arguments
         for index, arg in enumerate(args):
             if index == 0:
-                event: SYSEVENTS = arg
+                event = arg
             else:
                 if isinstance(arg, tuple):
                     if len(arg) == 1:
                         widget_item = arg[0]
                     elif len(arg) == 2:
-                        row = arg[0]
-                        col = arg[1]
+                        row, col = arg
                     elif len(arg) == 4:
-                        row_prev = arg[0]
-                        col_prev = arg[1]
+                        row_prev, col_prev, _, _ = arg
 
         value = None
         user_data = None
@@ -9281,7 +9287,12 @@ class Grid(_qtpyBase_Control):
         if row >= 0 and col >= 0:
             value = self.value_get(row, col)
             user_data = self.userdata_get(row, col)
+        elif widget_item is not None:
+            if hasattr(widget_item, "text"):
+                value = widget_item.text()
+            user_data = None
 
+        # Handle event
         if (
             event is not None
             and self.callback is not None
@@ -9305,61 +9316,57 @@ class Grid(_qtpyBase_Control):
                     container_tag=self.container_tag, tag=self.tag
                 ),
             )
-
         else:
             return 1
 
-    def checkitemrow_get(self, row: int, col: int):
-        """Returns an item tuple of (row index, tag, current value, and user data)  from the row and column specified
-        if the item is checked
+    def checkitemrow_get(self, row: int, col: int) -> Union[namedtuple, tuple]:
+        """Returns an named tuple of (row_index, tag, current_value, and user_data) from the row and column specified
+        if the item is checked or an empty tuple if not checked.
 
         Args:
-          row (int): Grid row index
-          col (int): Grid column index
+            row (int): The index of the row to retrieve the item from.
+            col (int): The index of the column to retrieve the item from.
+
+        Returns:
+            NamedTuple: A named tuple containing the row_index, tag, current_value, and user_data of the checked item.
+            An empty tuple if the item is not checked.
         """
+        assert isinstance(row, int), "row argument must be of type int"
+        assert isinstance(col, int), "col argument must be of type int"
 
-        self._widget: qtW.QTableWidget
+        ItemTuple = namedtuple(
+            "ItemTuple", ["row_index", "tag", "current_value", "user_data"]
+        )
 
-        validated = self._rowcol_validate(row, col)
-
-        row_index = validated[0]
-        col_index = validated[1]
+        row_index, col_index = self._rowcol_validate(row, col)
 
         item = self._widget.item(row_index, col_index)
         item_data = item.data(qtC.Qt.UserRole)
 
         if item.checkState() == qtC.Qt.Checked:
-            return (
-                row_index,
-                item_data.tag,
-                item_data.current_value,
-                item_data.user_data,
+            return ItemTuple(
+                row_index=row_index,
+                tag=item_data.tag,
+                current_value=item_data.current_value,
+                user_data=item_data.user_data,
             )
-
-        return ()
+        else:
+            return ()
 
     def checkitemrow_set(self, checked: bool, row: int, col: int):
-        """Sets the check state of the item at the row and column specified
+        """Sets the check state of the item at the row and column specified.
 
         Args:
-          checked (bool): True, Checked, False, Unchecked
-          row (int): Grid row index
-          col (int): Grid col index
+            checked (bool): True for Checked, False for Unchecked.
+            row (int): The index of the row to set the check state for.
+            col (int): The index of the column to set the check state for.
+
         """
+        assert isinstance(checked, bool), f"{checked=}. Must be of type bool"
+        assert isinstance(row, int), f"{row}. Must be of type int"
+        assert isinstance(col, int), f"{col=}. Must be of type int"
 
-        assert isinstance(checked, bool), f"{checked=}. Must be bool"
-        assert isinstance(row, int), f"{row=}. Must be int"
-        assert isinstance(col, int), f"{col=}. Must be int"
-
-        self._widget: qtW.QTableWidget
-
-        if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
-
-        validated = self._rowcol_validate(row, col)
-
-        row_index = validated[0]
-        col_index = validated[1]
+        row_index, col_index = self._rowcol_validate(row, col)
 
         item = self._widget.item(row_index, col_index)
 
@@ -9369,48 +9376,54 @@ class Grid(_qtpyBase_Control):
             item.setCheckState(qtC.Qt.Unchecked)
 
     def checkitems_all(self, checked: bool = True, col_tag: str = ""):
-        """Checks all items in the grid - if checkable
+        """Checks all items in the grid that are checkable.
 
         Args:
-            checked (bool):  True to check the row, False to uncheck (default: {True})
-            col_tag (str) : THe column tag name
+            checked (bool): Whether to check or uncheck the items. True to check, False to uncheck. Defaults to True.
+            col_tag (str): The column tag name. Only items in this column will be checked/unchecked. Defaults to "".
 
-        Returns:
-            None
+        Raises:
+            ValueError: If col_tag is not a string.
 
         """
+        assert isinstance(checked, bool), "checked argument must be of type bool."
+        assert isinstance(col_tag, str), "col_tag argument must be of type str."
+
         self._widget: qtW.QTableWidget
 
         if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
-
-        assert isinstance(checked, bool), "checked must be bool - True or False"
-        assert isinstance(col_tag, str), f"col_tag <{col_tag}> must be str"
+            raise RuntimeError("Widget is not set.")
 
         col_tag = col_tag.strip()
 
-        for row_index in range(0, self._widget.rowCount()):
-            for definition in self.col_def:
+        for row_index in range(self._widget.rowCount()):
+            if col_tag:
+                col_index = self.colindex_get(col_tag)
+                definition = self.col_def[col_index]
                 if definition.checkable:
-                    col_index = self.colindex_get(col_tag)
                     self.checkitemrow_set(checked, row_index, col_index)
+            else:
+                for col_index, definition in enumerate(self.col_def):
+                    if definition.checkable:
+                        self.checkitemrow_set(checked, row_index, col_index)
 
     @property
-    def checkitems_get(self):
-        """Returns a tuple of checked items
+    def checkitems_get(self) -> tuple:
+        """Get the checked items.
 
         Returns:
-            tuple : (column_tag,current_value,user_data)
+            tuple: A tuple of named tuples with the following fields:
+                - row_index
+                - tag
+                - current_value
+                - user_data
         """
-        self._widget: qtW.QTableWidget
-
-        if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
+        assert self._widget is not None, f"{self._widget=} not set"
 
         checked_items = []
 
-        for row_index in range(0, self._widget.rowCount()):
-            for col_index in range(0, self._widget.columnCount()):
+        for row_index in range(self._widget.rowCount()):
+            for col_index in range(self._widget.columnCount()):
                 item = self._widget.item(row_index, col_index)
                 item_data = item.data(qtC.Qt.UserRole)
 
@@ -9429,76 +9442,56 @@ class Grid(_qtpyBase_Control):
         self._widget.setRowCount(0)
 
     def colindex_get(self, column_tag: str) -> int:
-        """Returns the column index for a given column tag name
+        """Returns the column index for a given column tag name.
 
         Args:
-            column_tag (str): The column tag name
+            column_tag (str): The column tag name.
 
         Returns:
-            int: The column index for a column tag name
-
-        Raises:
-              AssertionError : If the column tag is invalid
+            int: The column index for a column tag name.
 
         """
-        self._widget: qtW.QTableWidget
-
-        if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
-
         assert (
-            isinstance(column_tag, str) and column_tag.strip() != ""
-        ), "column_tag must be a non-empty str"
+            isinstance(column_tag, str) and column_tag.strip()
+        ), "column_tag must be a non-empty string"
 
-        col_count = self._widget.columnCount()
-
-        for col_index in range(0, col_count):
-            item = self._widget.horizontalHeaderItem(col_index)
-
-            item_data = item.data(qtC.Qt.UserRole)
-
+        for col_index in range(self._widget.columnCount()):
+            item_data = self._widget.horizontalHeaderItem(col_index).data(
+                qtC.Qt.UserRole
+            )
             if item_data.tag == column_tag:
                 return col_index
-        raise AssertionError(f"{column_tag=}. Does Not Exist!")
+
+        raise AssertionError(f"{column_tag=}. Does not exist!")
 
     def coltag_get(self, column_index: int) -> str:
-        """Returns the column tag name for a given column index
+        """Returns the column tag name for a given column index.
 
         Args:
-            column_index (int): The column index reference
+            column_index (int): The column index reference.
 
         Returns:
-            str : The column tag name
+            str: The column tag name.
 
         Raises:
-              AssertionError : If the column index os invalid
+            AssertionError: If the column index is invalid.
         """
-        self._widget: qtW.QTableWidget
-
-        if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
-
+        assert isinstance(column_index, int), "column_index must be an integer."
         assert (
-            isinstance(column_index, int)
-            and 0 <= column_index <= self._widget.columnCount()
-        ), "column_index must be an int >= 0 and <= " + str(self._widget.columnCount())
+            0 <= column_index < self._widget.columnCount()
+        ), "column_index is out of range."
 
-        col_count = self._widget.columnCount()
+        item = self._widget.horizontalHeaderItem(column_index)
+        item_data = item.data(qtC.Qt.UserRole)
 
-        for col_index in range(0, col_count):
-            item = self._widget.horizontalHeaderItem(col_index)
-            item_data = item.data(qtC.Qt.UserRole)
-
-            if col_index == column_index:
-                return item_data.tag
-
-        raise AssertionError(f"{column_index=}. Does Not Exist!")
+        return item_data.tag
 
     @property
     def selected_row(self) -> int:
         """Gets the currently selected row
 
         Returns:
+            int: The currently selected row
 
         """
         self._widget: qtW.QTableWidget
@@ -9519,65 +9512,65 @@ class Grid(_qtpyBase_Control):
         ignore_header: bool = True,
         delimiter: str = ",",
     ) -> int:
-        """Loads a CSV file into the grid
+        """Loads data from a CSV file into the grid.
 
         Args:
-            file_name (str) : Name of CSV file (can contain the path)
-            display_col (str): Grid column displaying value
-            select_text (str) : Text to select in combo-box after load
-            text_index (int) : col in file to load into display (default: {1})
-            line_start (int) : line in file to start loading from (default: {1})
-            data_index (int) : col in file to load into user data (default: {1})
-            ignore_header {bool} : Set True if the CSV file has a header row (default: {True})
-            delimiter (str) : CSV field separator (default: {","})
+            file_name (str): The name of the CSV file.
+            display_col (Union[int, str]): The column in the grid that will display the loaded data.
+            select_text (str, optional): The text to select in the combo-box after the data is loaded. Defaults to "".
+            text_index (int, optional): The column index in the CSV file containing the text to display in the grid. Defaults to 1.
+            line_start (int, optional): The line number in the CSV file to start loading data from. Defaults to 1.
+            data_index (int, optional): The column index in the CSV file containing the user data to associate with the loaded data. Defaults to 1.
+            ignore_header (bool, optional): Set to True if the CSV file has a header row that should be ignored. Defaults to True.
+            delimiter (str, optional): The field separator used in the CSV file. Defaults to ",".
 
         Returns:
-            int: Length of maximum item
-        """
+            int: The length of the maximum item loaded or -1 if there is a problem with the file.
 
+        """
         assert (
-            isinstance(file_name, str) and file_name.strip() != ""
+            isinstance(file_name, str) and file_name.strip()
         ), f"{file_name=}. Must be a non-empty string"
         assert isinstance(
             display_col, (str, int)
-        ), f"{display_col=}. Must be col tag name or index"
-        assert isinstance(select_text, str), f"f{select_text=}. Must be str"
+        ), f"{display_col=}. Must be a non-empty string or int"
+        assert isinstance(
+            select_text, str
+        ), f"{select_text=}. Must be a non-empty string"
         assert (
             isinstance(text_index, int) and text_index > 0
-        ), f"{text_index=}. Must be int > 0"
+        ), f"{text_index=}. Must be an int > 0"
         assert (
             isinstance(line_start, int) and line_start > 0
-        ), f"{line_start=}. Must be int > 0"
+        ), f"{line_start=}. Must be an int > 0"
         assert (
             isinstance(data_index, int) and data_index > 0
-        ), f"{data_index=}. Must be int > 0"
+        ), f"{data_index=}. Must be an int > 0"
         assert isinstance(ignore_header, bool), f"{ignore_header=}. Must be bool"
         assert (
             isinstance(delimiter, str) and len(delimiter) == 1
-        ), f"{delimiter=} must be a single char"
+        ), f"{delimiter=}. Must be str and 1 char long"
 
         rowcol = self._rowcol_validate(row=self.row_count, col=display_col)
 
-        if select_text == "":
+        if not select_text:
             select_text = self.text
 
-        assert os.path.isfile(file_name) and os.access(
-            file_name, os.R_OK
-        ), f"File {file_name} doesn't exist or is not readable"
+        if not os.path.isfile(file_name) and not os.access(file_name, os.R_OK):
+            return -1
 
         max_len = 0
 
         with open(file_name, "r") as csv_file:
-            for line_no, line in enumerate(csv_file.readlines()):
-                if line_no == 0 and ignore_header:
+            for i, line in enumerate(csv_file.readlines()):
+                if i == 0 and ignore_header:
                     continue
-                elif line_no + 1 < line_start:
+                elif i + 1 < line_start:
                     continue
 
                 line_split = line.strip().split(delimiter)
-                col_count = len(line_split)
 
-                if col_count < (text_index - 1) or col_count < (data_index - 1):
+                if len(line_split) < max(text_index, data_index):
                     continue
 
                 if len(line_split[text_index - 1]) > max_len:
@@ -9589,9 +9582,6 @@ class Grid(_qtpyBase_Control):
                     col=rowcol[1],
                     user_data=line_split[data_index - 1],
                 )
-
-        # if select_text != "":
-        #    self.select_text(select_text)
 
         return max_len
 
@@ -9734,18 +9724,19 @@ class Grid(_qtpyBase_Control):
         return -1
 
     def row_insert(self, row: int, scroll_to: bool = True):
-        """Inserts a row at the given row index. If row is > number of rows then a new row is inserted
+        """Inserts a row at the given row index. If row is > number of rows then a new row is inserted.
 
         Args:
-            row (int) : Row index in the grid
-            scroll_to (bool) : scroll to inserted row
+            row (int): The row index in the grid.
+            scroll_to (bool): Whether to scroll to the inserted row.
+
         """
         self._widget: qtW.QTableWidget
 
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
 
-        assert isinstance(row, int) and row > 0, "row must must be > 0"
+        assert isinstance(row, int) and row > 0, f"{row=} must be an int > 0"
 
         if row > self._widget.rowCount():
             row = self.row_append
@@ -9756,143 +9747,119 @@ class Grid(_qtpyBase_Control):
             self.row_scroll_to(row=row)
 
     def row_scroll_to(self, row: int):
-        """Scrolls to the row
+        """Scrolls to the row.
 
         Args:
-            row (int): Row index in the grid
+            row (int): The row index in the grid.
+
+        Raises:
+            RuntimeError: If the widget is not set.
+            ValueError: If row is not an integer or is outside the valid range of row indices.
         """
         self._widget: qtW.QTableWidget
 
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
 
+        assert isinstance(row, int), "row must be an integer"
         assert (
-            isinstance(row, int) and 0 <= row < self._widget.rowCount()
+            0 <= row < self._widget.rowCount()
         ), f"{row=}. Must be >= 0 and < {self._widget.rowCount()}"
 
         index = self._widget.model().index(row, 0)
         self._widget.scrollTo(index)
 
     def userdata_get(self, row: int = -1, col: int = -1) -> any:
-        """Returns the user data stored on the given column referred to by row and col.
-        Default returns current row and current column
+        """
+        Returns the user data stored on the given column referred to by row and col.
+        If row or col is not specified, it returns user data stored in the current row or column.
+        If no user data is stored, returns None.
 
         Args:
-            row (int): row index reference (default {-1})
-            col (int):  col index reference (default {-1})
+            row (int): Row index reference (default {-1})
+            col (int): Column index reference (default {-1})
 
         Returns:
-            any: user data stored in column referred to by row and col
-
+            any: User data stored in column referred to by row and col
         """
-        assert (
-            isinstance(row, int) and row == -1 or row >= 0
-        ), f"{row=}. Must be an int == -1 or int >= 0"
-        assert (
-            isinstance(col, int) and col == -1 or col >= 0
-        ), f"{col=}. Must be an int == -1 or int >= 0"
+        assert row == -1 or row >= 0, f"{row=} must be an int == -1 or int >= 0"
+        assert col == -1 or col >= 0, f"{col=} must be an int == -1 or int >= 0"
 
         self._widget: qtW.QTableWidget
 
         if row == -1:
             row = self._widget.currentRow()
-
         if col == -1:
             col = self._widget.currentColumn()
-
-        if row == -1:
-            row = 0
-        if col == -1:
-            col = 0
 
         row_index, col_index = self._rowcol_validate(row, col)
 
         item = self._widget.item(row_index, col_index)
         item_data = item.data(qtC.Qt.UserRole)
 
-        if item_data is None:
-            return None
-        else:
-            return item_data.user_data
+        return item_data.user_data if item_data is not None else None
 
-    def value_get(self, row=-1, col=-1) -> any:
-        """Returns the current value stored in the given column referred to by row and col.
-        Default returns current row and current column
+    def value_get(self, row: int = -1, col: int = -1) -> any:
+        """
+        Returns the current value stored in the given column referred to by row and col.
+        If row or col is not specified, the current row or current column is used as default.
 
         Args:
-            row (int): row index reference (default {-1})
-            col (int):  col index reference (default {-1})
+            row (int): The row index reference (default: -1).
+            col (int): The column index reference (default: -1).
 
         Returns:
-            any: value stored in column referred to by row and col
+            any: The value stored in the column referred to by row and col.
+                Returns None if the item or item data is None.
         """
-        assert (
-            isinstance(row, int) and row == -1 or row >= 0
-        ), f"{row=}. Must be an int == -1 or int >= 0"
-        assert (
-            isinstance(col, int) and col == -1 or col >= 0
-        ), f"{col=}. Must be an int == -1 or int >= 0"
+        assert isinstance(row, int) and row >= -1, f"{row=} must be an int >= -1"
+        assert isinstance(col, int) and col >= -1, f"{col=} must be an int >= -1"
 
-        self._widget: qtW.QTableWidget
-
-        if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
+        widget = self._widget
+        if widget is None:
+            raise RuntimeError(f"{widget=} not set")
 
         if row == -1:
-            row = self._widget.currentRow()
-
+            row = widget.currentRow()
         if col == -1:
-            col = self._widget.currentColumn()
+            col = widget.currentColumn()
 
-        if row == -1:
-            row = 0
-        if col == -1:
-            col = 0
-
-        validated = self._rowcol_validate(row, col)
-
-        row_index = validated[0]
-        col_index = validated[1]
-
-        item = self._widget.item(row_index, col_index)
+        row, col = self._rowcol_validate(row, col)
+        item = widget.item(row, col)
 
         if item is None:
             return None
 
         item_data = item.data(qtC.Qt.UserRole)
-
         if item_data is None:
             return None
-        else:
-            return item_data.current_value
 
-    def valueorig_get(self, row, col):
+        return item_data.current_value
+
+    def valueorig_get(self, row: int = -1, col: int = -1) -> any:
         """Returns the original value stored in the given column referred to by row and col.
         Default returns current row and current column
 
         Args:
-            row (int): row index reference (default {-1})
-            col (int):  col index reference (default {-1})
+            row (int): Row index reference (default {-1})
+            col (int): Column index reference (default {-1})
 
         Returns:
-            any: The original value stored in column referred to by row and col
+            any: The original value stored in the column referred to by row and col
         """
         self._widget: qtW.QTableWidget
 
-        assert (
-            isinstance(row, int) and row == -1 or row >= 0
+        assert isinstance(row, int) and (
+            row == -1 or row >= 0
         ), f"{row=}. Must be an int == -1 or int >= 0"
-        assert (
-            isinstance(col, int) and col == -1 or col >= 0
+        assert isinstance(col, int) and (
+            col == -1 or col >= 0
         ), f"{col=}. Must be an int == -1 or int >= 0"
 
         if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
+            raise RuntimeError(f"{self._widget=} not set")
 
-        validated = self._rowcol_validate(row, col)
-
-        row_index = validated[0]
-        col_index = validated[1]
+        row_index, col_index = self._rowcol_validate(row, col)
 
         item = self._widget.item(row_index, col_index)
         item_data = item.data(qtC.Qt.UserRole)
@@ -9902,33 +9869,30 @@ class Grid(_qtpyBase_Control):
         else:
             return item_data.original_value
 
-    def valueprev_get(self, row, col):
-        """Returns the previous value stored in the given column referred to by row and col.
-        Default returns current row and current column
+    def get_previous_value(self, row: int = -1, col: int = -1) -> Optional[any]:
+        """Returns the previous value stored in the given column referred to by row and col. Default returns current row
+        and current column
 
         Args:
             row (int): Row index reference (default {-1})
-            col (int):  Col index reference (default {-1})
+            col (int): Col index reference (default {-1})
 
         Returns:
             any: The previous value stored in column referred to by row and col
         """
         self._widget: qtW.QTableWidget
 
-        assert (
-            isinstance(row, int) and row == -1 or row >= 0
+        assert isinstance(row, int) and (
+            row == -1 or row >= 0
         ), f"{row=}. Must be an int == -1 or int >= 0"
-        assert (
-            isinstance(col, int) and col == -1 or col >= 0
+        assert isinstance(col, int) and (
+            col == -1 or col >= 0
         ), f"{col=}. Must be an int == -1 or int >= 0"
 
         if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
+            raise RuntimeError(f"{self._widget=} Not set")
 
-        validated = self._rowcol_validate(row, col)
-
-        row_index = validated[0]
-        col_index = validated[1]
+        row_index, col_index = self._rowcol_validate(row, col)
 
         item = self._widget.item(row_index, col_index)
         item_data = item.data(qtC.Qt.UserRole)
@@ -9938,52 +9902,55 @@ class Grid(_qtpyBase_Control):
         else:
             return item_data.previous_value
 
-    def value_set(self, value: any, row: int, col: int, user_data: any):
-        """Sets a display value (and user data if supplied) at a given row and column
+    def value_set(self, value: any, row: int, col: int, user_data: any) -> None:
+        """
+        Sets a display value (and user data if supplied) at a given row and column.
 
         Args:
-            value (any): The value to be displayed
-            row (int):  Row index reference
-            col (int):  Column index reference
-            user_data (any): User data to be stored
+            value (any): The value to be displayed.
+            row (int): Row index reference.
+            col (int): Column index reference.
+            user_data (any): User data to be stored.
 
         Returns:
-            None:
+            None.
         """
         self._widget: qtW.QTableWidget
 
-        assert (
-            isinstance(row, int) and row == -1 or row >= 0
+        assert isinstance(row, int) and (
+            row == -1 or row >= 0
         ), f"{row=}. Must be an int == -1 or int >= 0"
-        assert (
-            isinstance(col, int) and col == -1 or col >= 0
+        assert isinstance(col, int) and (
+            col == -1 or col >= 0
         ), f"{col=}. Must be an int == -1 or int >= 0"
 
         if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
+            raise RuntimeError(f"{self._widget=} not set")
+
+        # Append a new row if the specified row is out of range
+        if row >= self._widget.rowCount():
+            row_index = self.row_append
+            row = row_index
 
         row_index, col_index = self._rowcol_validate(row, col)
 
-        # Need to convert some datatypes -TODO maybe more!
-        if type(value) == datetime.date:
+        # Convert date and datetime objects to Qt-compatible formats
+        if isinstance(value, datetime.date):
             locale = qtC.QLocale()
             value = qtC.QDate.fromString(
                 str(value), locale.dateFormat(qtC.QLocale.ShortFormat)
             )
-        elif type(value) == datetime.datetime:
+        elif isinstance(value, datetime.datetime):
             locale = qtC.QLocale()
             value = qtC.QDateTime.fromString(
                 str(value), locale.dateTimeFormat(qtC.QLocale.ShortFormat)
             )
 
-        if row >= self._widget.rowCount():
-            row_index = self.row_append
-
         item = self._widget.item(row_index, col_index)
 
         item_data = item.data(qtC.Qt.UserRole)
 
-        item.setText(value)
+        item.setText(str(value))
 
         if item_data.first_time:
             item_data = item_data.replace(
@@ -10007,9 +9974,10 @@ class Grid(_qtpyBase_Control):
         item.setData(qtC.Qt.UserRole, item_data)
 
     def row_widget_get(
-        self, row: int, col: int, container_tag="", tag: str = "-"
+        self, row: int, col: int, container_tag: str = "", tag: str = "-"
     ) -> Optional[_qtpyBase_Control]:
-        """Returns the widget at the specified row and column
+        """
+        Returns the widget at the specified row and column
 
         Args:
             row (int): Grid row index. If -1, the current row is used.
@@ -10022,13 +9990,12 @@ class Grid(_qtpyBase_Control):
         """
         self._widget: qtW.QTableWidget
 
-        assert (
-            isinstance(row, int) and row == -1 or row >= 0
+        assert isinstance(row, int) and (
+            row == -1 or row >= 0
         ), f"{row=}. Must be an int == -1 or int >= 0"
-        assert (
-            isinstance(col, int) and col == -1 or col >= 0
+        assert isinstance(col, int) and (
+            col == -1 or col >= 0
         ), f"{col=}. Must be an int == -1 or int >= 0"
-
         assert isinstance(tag, str) and (
             tag.strip() != "" or tag == "-"
         ), f"{tag=}. Must be a non-empty str or '-'"
@@ -10065,10 +10032,10 @@ class Grid(_qtpyBase_Control):
         """Sets the widget at the specified row and column
 
         Args:
-          row (int): The row index of the cell you want to set the widget for.
-          col (int): The column index of the cell to set the widget for.
-          widget (_qtpyBase_Control): The widget to be inserted into the grid
-          group_text (str): The text that will be displayed in the group box
+            row (int): The row index of the cell you want to set the widget for.
+            col (int): The column index of the cell to set the widget for.
+            widget (_qtpyBase_Control): The widget to be inserted into the grid
+            group_text (str): The text that will be displayed in the group box
         """
         self._widget: qtW.QTableWidget
 
@@ -10086,7 +10053,6 @@ class Grid(_qtpyBase_Control):
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
 
-        # TODO Make this method work
         row_index, col_index = self._rowcol_validate(row, col)
 
         if row_index >= self._widget.rowCount():
@@ -10139,44 +10105,38 @@ class Grid(_qtpyBase_Control):
     #      Class Private Methods                                                  #
     # ----------------------------------------------------------------------------#
     def _rowcol_validate(self, row: int, col: Union[str, int]) -> tuple[int, int]:
-        """Validates the row and column references in the grid
+        """
+        Validates the row and column references in the grid.
 
         Args:
             row (int): Row index reference
-            col (Union[str,int]): Column index or tag reference
+            col (Union[str, int]): Column index or tag reference
 
         Returns:
-            tuple : (row_index:int,col_index:int)
+            tuple[int, int]: The validated row and column indices
 
-        Raises:
-            AssertionError : f row or column are the wrong type or if the row/col index is out of bounds
         """
         if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
+            raise RuntimeError("_widget is not set")
 
         col_index = -1
 
-        if isinstance(row, int):
-            if row < 0 or row > self._widget.rowCount():
-                raise AssertionError(
-                    f"{row=}. Must be >= 0 and <= {self._widget.rowCount()}"
-                )
-        else:
-            raise AssertionError(f"{row=}. Must be int")
+        assert (
+            isinstance(row, int) and row == -1 or (0 <= row <= self._widget.rowCount())
+        ), f"row must be an int == -1 or between 0 and {self._widget.rowCount()}"
 
         if isinstance(col, int):
             col_index = col
         elif isinstance(col, str):
             col_index = self.colindex_get(col)
         else:
-            raise AssertionError(f"{col=}. Must be int or str")
+            raise AssertionError("col must be an int or a str")
 
-        if col_index < 0 or col_index > self._widget.columnCount():
-            raise AssertionError(
-                f"{col=}. Must be >= 0 and <= {self._widget.columnCount()}"
-            )
+        assert (
+            -1 <= col_index < self._widget.columnCount()
+        ), f"col must be an int == -1 or between 0 and {self._widget.columnCount()}"
 
-        return (row, col_index)
+        return row, col_index
 
     @overload
     def _data_type_decode(self, data_type: _DATA_TYPE, value: str) -> int:
