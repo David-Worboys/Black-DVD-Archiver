@@ -1017,6 +1017,13 @@ def get_file_encoding_info(video_file: str) -> dict:
                 video_details["video_width"][1] / video_details["video_height"][1]
             ) * video_details["video_par"][1]
 
+        ar = str(video_details["video_ar"][1])
+
+        if ar.startswith("1.33"):  # 4:3
+            video_details["video_dar"][1] = sys_consts.AR43
+        else:
+            video_details["video_dar"][1] = sys_consts.AR169
+
     except subprocess.CalledProcessError as call_error:
         video_details["error"][1] = f"{call_error}"
         print(f"{call_error=}")
