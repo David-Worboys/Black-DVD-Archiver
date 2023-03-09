@@ -6062,10 +6062,10 @@ class PopContainer(_qtpyBase_Control):
     title: str = ""
     container: Optional[_Container] = None
     dialog: _Dialog = None
+    parent_app: QtPyApp = None  # Changed to public 2023/03/05 because of a very occasional focus_out erroe
 
     # private instance variables
     _allow_close: bool = False
-    _parent_app: QtPyApp = None
     _result: str = ""
 
     def __post_init__(self):
@@ -6089,7 +6089,7 @@ class PopContainer(_qtpyBase_Control):
 
         assert g_application is not None, f"{g_application=} is bad"
 
-        self._parent_app = cast(QtPyApp, g_application)  # TODO avoid global!
+        self.parent_app = cast(QtPyApp, g_application)  # TODO avoid global!
 
         if self.height <= 0:
             self.height = 5
@@ -6098,7 +6098,7 @@ class PopContainer(_qtpyBase_Control):
             self.width = 20
 
         self.dialog: _Dialog = _Dialog(
-            parent_app=self._parent_app,
+            parent_app=self.parent_app,
             owner=self,
             callback=self.callback,
             container_tag=self.container_tag,
@@ -6177,7 +6177,7 @@ class PopContainer(_qtpyBase_Control):
                 self.callback.__code__.co_argcount <= 2
             ), "open callback has 1 argument - Action"
 
-            handler = _Event_Handler(parent_app=self._parent_app, parent=self)
+            handler = _Event_Handler(parent_app=self.parent_app, parent=self)
 
             if callable(self.callback):
                 result = handler.event(
@@ -6187,7 +6187,7 @@ class PopContainer(_qtpyBase_Control):
                     tag=self.tag,
                     event=SYSEVENTS.WINDOWOPEN,
                     value=None,
-                    widget_dict=self._parent_app.widget_dict_get(
+                    widget_dict=self.parent_app.widget_dict_get(
                         container_tag=self.container_tag
                     ),
                     control_name=self.__class__.__name__,
