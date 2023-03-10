@@ -152,12 +152,22 @@ class CHAR_PIXEL_SIZE:
     height: int
     width: int
 
+    def _post_init(self):
+        # Checking the arguments passed to the constructor are of the correct type.
+        assert isinstance(self.height, int) and self.height >= 0,f"{self.height=}. Must be int >= 0"
+        assert isinstance(self.width, int) and self.width >= 0,f"{self.width=}. Must be int >= 0"
+
 
 @dataclasses.dataclass(slots=True)
 # `SIZE` is a class used by widget controls that has two attributes, `height` and `width`
 class SIZE:
     height: int
     width: int
+
+    def _post_init(self):
+        # Checking the arguments passed to the constructor are of the correct type.
+        assert isinstance(self.height, int) and self.height >= 0,f"{self.height=}. Must be int >= 0"
+        assert isinstance(self.width, int) and self.width >= 0,f"{self.width=}. Must be int >= 0"
 
 
 @dataclasses.dataclass(slots=True)
@@ -169,6 +179,14 @@ class COL_DEF:
     editable: bool
     checkable: bool
 
+    def _post_init(self):
+        # Checking the arguments passed to the constructor are of the correct type.
+        assert isinstance(self.label,str),f"{self.label=}. Must be a str"
+        assert isinstance(self.tag,str),f"{self.tag=}. Must be a str"
+        assert isinstance(self.width,int),f"{self.width=}. Must be a int"
+        assert isinstance(self.editable,bool),f"{self.editable=}. Must be bool"
+        assert isinstance(self.checkable,bool),f"{self.checkable=}. Must be bool"
+
 
 @dataclasses.dataclass(slots=True)
 # `COMBO_DATA` is a class used by combo boxes that contains an index, a display string, and a data value
@@ -177,6 +195,13 @@ class COMBO_DATA:
     display: str
     data: None | str | int | float | bytes | bool
     user_data: None | str | int | float | bytes | bool
+
+    def _post_init(self):
+        # Checking the arguments passed to the constructor are of the correct type.
+        assert isinstance(self.index,int) and self.index >= 0,f'{self.index=}. Must be int >= 0'
+        assert isinstance(self.display,str), f"{self.display=}. Must be str"
+        assert isinstance(self.data,(str,int,float,bytes,bool)) or self.data is None,f"{self.data=}. Must be None | str | int | float | bytes | bool"
+        assert isinstance(self.user_data,(str,int,float,bytes,bool)) or self.user_data is None,f"{self.user_data=}. Must be None | str | int | float | bytes | bool"
 
 
 @dataclasses.dataclass(slots=True)
@@ -187,12 +212,25 @@ class COMBO_ITEM:
     icon: None | str | qtG.QPixmap | qtG.QIcon
     user_data: None | str | int | float | bytes | bool
 
+    def _post_init(self):
+        # Checking the arguments passed to the constructor are of the correct type.        
+        assert isinstance(self.display,str), f"{self.display=}. Must be str"
+        assert isinstance(self.data,(str,int,float,bytes,bool)) or self.data is None,f"{self.data=}. Must be None | str | int | float | bytes | bool"
+        assert isinstance(self.icon,(str , qtG.QPixmap , qtG.QIcon)) or self.icon is None,f"{self.icon=}. Must be None | str | qtG.QPixmap | qtG.QIcon"
+        assert isinstance(self.user_data,(str,int,float,bytes,bool)) or self.user_data is None,f"{self.user_data=}. Must be None | str | int | float | bytes | bool"
+
 
 @dataclasses.dataclass(slots=True)
 # `RECT_CHANGED` is a class used byy rectangles to that has two attributes, `rect_id` and `coords`
 class RECT_CHANGED:
     rect_id: str
     coords: Coords
+
+    def _post_init(self):
+        # Checking the arguments passed to the constructor are of the correct type.        
+        assert isinstance(self.rect_id,str) and self.rect_id.strip() != "",f"{self.rect_id=}. Must be a non-empty string"
+        assert isinstance(self.coords,Coords),f"{self.coords=}. Must be a an of type Coords"
+
 
 
 @dataclasses.dataclass(slots=True)
@@ -454,7 +492,7 @@ def sys_cursor(cursor: CURSOR):
     Sets the cursor to the cursor passed in, and then restores the cursor to the original cursor.
 
     Args:
-      cursor (CURSOR): CURSOR
+        cursor (CURSOR): CURSOR
     """
     assert isinstance(cursor, CURSOR), f"{cursor=}. Must Be CURSOR"
     try:
@@ -469,7 +507,7 @@ def cursor_on(cursor: CURSOR):
     Sets the cursor to the specified cursor type
 
     Args:
-      cursor (CURSOR): CURSOR
+        cursor (CURSOR): CURSOR
     """
     assert isinstance(cursor, CURSOR), f"{cursor=}. Must Be CURSOR"
     if qtW.QApplication is not None and qtW.QApplication.instance() is not None:
@@ -478,7 +516,7 @@ def cursor_on(cursor: CURSOR):
 
 def cursor_off():
     """
-    Restores the cursor to its default state
+        Restores the cursor to its default state
     """
     if qtW.QApplication is not None and qtW.QApplication.instance() is not None:
         qtW.QApplication.restoreOverrideCursor()
@@ -492,6 +530,12 @@ class tags:
     value: any
     valid: bool
 
+    def _post_init(self):
+        # Checking the arguments passed to the constructor are of the correct type.
+        assert isinstance(self.container_tag,str) and self.container_tag.strip() != "",f"{self.container_tag=}. Must be a non-empty str"        
+        assert isinstance(self.tag,str) and self.tag.strip() != "",f"{self.tag=}. Must be a non-empty str"                
+        assert isinstance(self.valid,bool),f"{self.valid=}. Must bool"
+
 
 @dataclasses.dataclass(slots=True)
 # Used by _Container to store the data for scroll widgets
@@ -499,13 +543,24 @@ class widget_def:
     widget: "_qtpyBase_Control"
     gui_widget: qtW.QWidget
 
+    def _post_init(self):
+        # Checking the arguments passed to the constructor are of the correct type.
+        assert isinstance(self.widget, _qtpyBase_Control),f"{self.widget=}. Must be type _qtpyBase_Control"
+        assert isinstance(self.gui_widget, qtW.QWidget),f"{self.gui_widget=}. Must be type qtW.QWidget"
 
+    
 @dataclasses.dataclass(slots=True)
 # Used by _Dateedit to store the data.
 class _Date_Tuple:
     year: int
     month: int
     day: int
+
+    def _post_init(self):
+        # Checking the arguments passed to the constructor are of the correct type.
+        assert isinstance(self.year, int) and self.year > 0,f"{self.year=}. Must be an int > 0"
+        assert isinstance(self.month, int) and  1 >= self.month <= 12,f"{self.month=}. Must be an int between 1 and 12"
+        assert isinstance(self.day, int) and 1 >= self.day  <= 28 if self.month == 2 else 1 >= self.day  <= 31,f"{self.day=}. Must be an int between 1 and 28/31 depending on month"
 
 
 @dataclasses.dataclass(slots=True)
@@ -515,6 +570,11 @@ class _Snapshot_Modified_Values:
     snap1_valid: bool
     snap2: any
     snap2_valid: bool
+
+    def _post_init(self):
+        # Checking the arguments passed to the constructor are of the correct type.
+        assert isinstance(self.snap1_valid, bool),f"{self.snap1_valid=}. Must be bool"
+        assert isinstance(self.snap2_valid, bool),f"{self.snap2_valid=}. Must be bool"
 
 
 class _qtpyBase:
@@ -549,7 +609,7 @@ class _qtpyBase:
         If the object has a parent, return the parent. Otherwise, return None
 
         Returns:
-          The parent of the object.
+            The parent of the object.
         """
         if hasattr(self, "_parent"):
             return self._parent
@@ -619,7 +679,7 @@ class Colors(_qtpyBase):
         `print_colour` function
 
         Returns:
-          str: A string of all the legal colours.
+            str: A string of all the legal colours.
         """
 
         legal_colours = "<"
@@ -631,12 +691,12 @@ class Colors(_qtpyBase):
 
         return legal_colours
 
-    def color_string_get(self, color: Union[str, tuple, list]):
+    def color_string_get(self, color: Union[str, tuple, list])->str:
         """This function returns a colour string  that can be used in the `colour` arguments/parameters
 
 
         Args:
-          color (Union[str, tuple, list]): The color to be processed.
+            color (Union[str, tuple, list]): The color to be processed.
         """
 
         match color:
@@ -662,6 +722,7 @@ class Colors(_qtpyBase):
                 text = ""
 
                 assert text != "", str(color) + " Not A Valid Color Format"
+        return text        
 
     def _process_colour_args(
         self, color_function_string: str, args: list, hsvcheck: bool
@@ -876,11 +937,11 @@ class Validator(_qtpyBase, qtG.QValidator):
         The function returns  a QValidator.Acceptable or QValidator.Invalid value depending on whether the string is valid
 
         Args:
-          s (str): The string to validate
-          pos (int): The position in the string where the validation is to be performed.
+            s (str): The string to validate
+            pos (int): The position in the string where the validation is to be performed.
 
         Returns:
-          qtG.QValidator.State: The return value is a QValidator.Acceptable or QValidator.Invalid.
+            qtG.QValidator.State: The return value is a QValidator.Acceptable or QValidator.Invalid.
         """
         assert isinstance(s, str), f"{s=}. Must be a string"
         assert isinstance(pos, int), f"{pos=}. Must be an int"
@@ -936,7 +997,10 @@ class Font(_qtpyBase):
         assert isinstance(
             self.style, FONTSTYLE
         ), f"{self.style=}. Is not a valid FONTSTYLE"
-
+        assert isinstance(self.backcolor,str), f"{self.backcolor=}. Must be str"
+        assert isinstance(self.forecolor,str), f"{self.forecolor=}. Must be str"
+        assert isinstance(self.selectback,str), f"{self.selectback=}. Must be str"
+        assert isinstance(self.selectfore,str), f"{self.selectfore=}. Must be str"
 
 class _qtpyBaseFrame(qtW.QMainWindow, _qtpyBase):
     """The _qtyBaseFrame class is a base class for SDI aND MDI frames # TODO: Add MDI support"""
@@ -970,11 +1034,11 @@ class _Event_Filter(qtC.QObject):
         The function emits signals when certain events occur.
 
         Args:
-          obj (qtC.QObject): The object that the event is being sent to.
-          event (qtC.QEvent): The event that occurred.
+            obj (qtC.QObject): The object that the event is being sent to.
+            event (qtC.QEvent): The event that occurred.
 
         Returns:
-          bool: The return value is a boolean that indicates whether the event was handled (true) or not (false).
+            bool: The return value is a boolean that indicates whether the event was handled (true) or not (false).
         """
         try:
             match event.type():
@@ -1238,7 +1302,7 @@ class _qtpyBase_Control(_qtpyBase):
             If the widget is not created yet, raise an error
 
         Returns:
-          qtW.QWidget : The QT GUI widget.
+            qtW.QWidget : The QT GUI widget.
         """
         if self._widget is None:
             raise RuntimeError(
@@ -1247,15 +1311,15 @@ class _qtpyBase_Control(_qtpyBase):
 
         return self._widget
 
-    def guiwidget_set(self, widget: Union[qtW.QWidget, qtG.QAction]):
+    def guiwidget_set(self, widget: qtW.QWidget | qtG.QAction):
         """Sets the QT GUI widget
 
         Args:
-          widget (Union[qtW.QWidget, qtG.QAction]): The QT GUI widget.
+            widget (qtW.QWidget | qtG.QAction): The QT GUI widget.
         """
         assert isinstance(
             widget, (qtG.QAction, qtW.QWidget)
-        ), f"{widget=}. Must be qtW.QAction | QWidget"
+        ), f"{widget=}. Must be type qtW.QAction | QWidget"
 
         self._widget = widget
 
@@ -1577,6 +1641,7 @@ class _qtpyBase_Control(_qtpyBase):
                 )
 
             # keyPressevent #TODO implement event if needed
+
             if hasattr(self._widget, "itemExpanded") and hasattr(
                 self._widget.itemExpanded, "connect"
             ):
@@ -1640,8 +1705,7 @@ class _qtpyBase_Control(_qtpyBase):
         label_widget: Optional[qtW.QLabel] = None
 
         label_height = 0
-        buddy_height = 0
-
+        
         match self:
             case Button():
                 self._widget = qtW.QPushButton(self.text, parent)
@@ -1773,16 +1837,7 @@ class _qtpyBase_Control(_qtpyBase):
 
         if self.frame is not None:
             self.frame_style_set(self.frame)
-
-        # Hook these up to fire events
-        # self._widget.focusInEvent = types.MethodType(
-        #   self.focusInEvent, self.guiwidget_get
-        # )
-
-        # self._widget.focusOutEvent = types.MethodType(
-        #    self.focusOutEvent, self.guiwidget_get
-        # )
-
+        
         if self.tooltip.strip() != "":
             self.tooltip_set(self.tooltip)
         if hasattr(self._widget, "enabled"):
@@ -1803,12 +1858,7 @@ class _qtpyBase_Control(_qtpyBase):
             height = label_height + self.tune_vsize
         else:
             height = pixel_size.height
-
-        # if buddy_height > height:
-        #    height = buddy_height + self.tune_vsize
-        # else:
-        #    height = pixel_size.height
-
+        
         self._install_event_handlers()
 
         if self.pixel_unit:
@@ -1831,7 +1881,6 @@ class _qtpyBase_Control(_qtpyBase):
                 )
 
         self.visible_set(self.visible)
-
         self.ediitable_set(self.editable)
 
         if buddy_widget is not None:
@@ -1853,15 +1902,15 @@ class _qtpyBase_Control(_qtpyBase):
         """Set the buddy text for the widget.
 
         Args:
-          value (str): The text to set on the buddy widget.
+            value (str): The text to set on the buddy widget.
         """
 
         def _label_set(widget: _qtpyBase_Control, value: str):
             """Set the label text on the buddy widget.
 
             Args:
-              widget (_qtpyBase_Control): The buddy widget to set the label on.
-              value (str): The value to set the label to.
+                widget (_qtpyBase_Control): The buddy widget to set the label on.
+                value (str): The value to set the label to.
             """
             if isinstance(widget, Label):
                 widget.value_set(value)
@@ -1876,7 +1925,7 @@ class _qtpyBase_Control(_qtpyBase):
         """Set the editable state of the widget.
 
         Args:
-          editable (bool): bool = False. Defaults to False
+            editable (bool): bool = False. Defaults to False
         """
 
         assert isinstance(editable, bool), f"{editable=}. Must be bool"
@@ -1911,7 +1960,7 @@ class _qtpyBase_Control(_qtpyBase):
         currentIndex as the argument
 
         Args:
-          gui_event: The event that was triggered.
+            gui_event: The event that was triggered.
         """
 
         for control in self.parent_app.widget_dict_get(self.container_tag).values():
@@ -1944,18 +1993,15 @@ class _qtpyBase_Control(_qtpyBase):
                         gui_event[0] if isinstance(gui_event, tuple) else gui_event
                     )
 
-    def focusOutEvent(self, gui_event):
+    def focusOutEvent(self, gui_event: "Action"):
         """Focus out event of the widget.
 
         If the widget is a FolderView or ComboBox, then call the event handler with the selectedIndexes or currentIndex as
         the argument
 
         Args:
-          gui_event: The event that was triggered.
+            gui_event (Action): The event that was triggered.
         """
-        # print(f"====>FO {gui_event=} {self.tag}")
-
-        # if option_arg is None:
         if isinstance(self, FolderView):  # Bit poxy, have to watch this
             result = self._event_handler(
                 SYSEVENTS.FOCUSOUT, self.guiwidget_get.selectedIndexes()
@@ -1966,8 +2012,6 @@ class _qtpyBase_Control(_qtpyBase):
             )
         else:
             result = self._event_handler(SYSEVENTS.FOCUSOUT)
-        # else:
-        #    result = self._event_handler(SYSEVENTS.FOCUSOUT,option_arg)
 
         if result == -1:
             gui_event[0].ignore()
@@ -1984,7 +2028,7 @@ class _qtpyBase_Control(_qtpyBase):
 
 
         Returns:
-          bool: The enable value of the widget.
+            bool: The enable value of the widget.
         """
         if self.guiwidget_get is not None and hasattr(self.guiwidget_get, "isEnabled"):
             return self.guiwidget_get.isEnabled()
@@ -1995,10 +2039,10 @@ class _qtpyBase_Control(_qtpyBase):
         """Set the enable state of the widget.
 
         Args:
-          enable (bool): bool
+            enable (bool): bool
 
         Returns:
-          int: 1 - set ok, -1 - set failed
+            int: 1 - set ok, -1 - set failed
         """
         assert isinstance(enable, bool), f"{enable=}. Must be bool"
 
@@ -2013,10 +2057,10 @@ class _qtpyBase_Control(_qtpyBase):
         Returns the pixel size of a string.
 
         Args:
-          text (str): str
+            text (str): str
 
         Returns:
-          CHAR_PIXEL_SIZE : The pixel size of the string in  CHAR_PIXEL_SIZE instance   .
+            CHAR_PIXEL_SIZE : The pixel size of the string in  CHAR_PIXEL_SIZE instance   .
         """
         assert isinstance(text, str), f"{text=}. Must be str"
 
@@ -2085,101 +2129,18 @@ class _qtpyBase_Control(_qtpyBase):
 
         font_metrics = qtG.QFontMetrics(font)
         width = font_metrics.horizontalAdvance("W" * char_width)
-        height = font_metrics.height() * char_height * height_fudge
+        height = round(font_metrics.height() * char_height * height_fudge)
 
-        return CHAR_PIXEL_SIZE(height=int(height), width=int(width))
-
-    def pixel_char_size_old(
-        self,
-        char_height: int,
-        char_width: int,
-        height_fudge: float = 1.1,
-        width_fudge: float = 1.1,
-        parent_app: Optional["QtPyApp"] = None,
-    ) -> CHAR_PIXEL_SIZE:
-        """Transforms character size (height,width) in pixel size (height, width).
-           Fudge factors allow precise adjustment
-
-        Args:
-            char_height (int) : Character height in chars
-            char_width (int) :  Character width in chars
-            height_fudge (float) :  Fudge factor multiplier to provide height adjustment
-            width_fudge (float) : Fudge factor multiplier to provide width adjustment
-
-        Returns:
-            CHAR_PIXEL_SIZE: CHAR_PIXEL_SIZE instance
-
-        """
-        assert (
-            isinstance(char_height, int) and char_height > 0
-        ), f"{char_height=}. Must ba an int > 0"
-        assert (
-            isinstance(char_width, int) and char_width > 0
-        ), f"{char_width=}. Must ba an int > 0"
-        assert (
-            isinstance(height_fudge, float) and height_fudge >= 1
-        ), f"{height_fudge=}. Must be an float >= 1"
-        assert (
-            isinstance(width_fudge, float) and width_fudge >= 0
-        ), f"{width_fudge=}. Must be an float >= 1"
-
-        if self.guiwidget_get is not None:
-            font = self.guiwidget_get.font()
-        else:
-            # if parent_app is not None:
-            #    font = parent_app.app_font
-            # else:
-            raise AssertionError(f"{self.guiwidget_get=}. Not Set")
-
-        assert isinstance(font, qtG.QFont), f"{font=}. Must be a QFont instance "
-
-        if font is None:
-            font = self.parent_app.app_get.font()
-            font_metrics = qtG.QFontMetrics(font)
-        else:
-            font_metrics = qtG.QFontMetrics(font)
-
-        width = 0
-
-        for text_char in "W" * qtG.QFontMetrics.averageCharWidth(
-            font_metrics
-        ):  # W or M should be widest
-            # if (
-            #        ignore_ampersand and text_char == "&"
-            # ):  # Ampersand ("&") used in control strings is speed-key and not displayed
-            #    continue
-
-            # Tried lots of ways to get accurate length, this works best
-            width += math.ceil(font_metrics.horizontalAdvance(text_char))
-
-        # width = round(width * width_fudge)
-
-        # width = font_metrics.averageCharWidth() * char_width + width_fudge
-        height = (font_metrics.height() * char_height) * height_fudge
-
-        label = char_width * "="
-
-        # width = font_metrics.boundingRect(label).width()
-        # width = qtG.QFontMetrics.boundingRect(font_metrics,label).width()
-        # width = font_metrics.maxWidth() * char_width
-
-        # width = font_metrics.boundingRect("l").width()
-        # width = width * char_width
-
-        # width = font_metrics.averageCharWidth() * char_width
-
-        width = qtG.QFontMetrics.averageCharWidth(font_metrics) * char_width
-
-        return CHAR_PIXEL_SIZE(height=int(height), width=int(width))
-
+        return CHAR_PIXEL_SIZE(height=height, width=width)
+    
     def text_pixel_size(self, text: str) -> tuple[int, int]:
         """Returns the height and width of a string of text in pixels
 
         Args:
-          text (str): The text to be measured.
+            text (str): The text to be measured.
 
         Returns:
-          tuple[int, int] : The height and width of the text in pixels.
+            tuple[int, int] : The height and width of the text in pixels.
         """
 
         if self.guiwidget_get is None:
@@ -2195,7 +2156,7 @@ class _qtpyBase_Control(_qtpyBase):
         """Returns a tuple of all the fonts available on the system.
 
         Returns:
-          tuple[str] : A tuple of faont name strings.
+            tuple[str] : A tuple of faont name strings.
         """
 
         available_fonts = tuple(qtG.QFontDatabase().families())
@@ -2272,9 +2233,7 @@ class _qtpyBase_Control(_qtpyBase):
             widget_font.selectfore = colour.color_string_get(widget_font.selectfore)
 
         system_fonts = self.fonts_available_get
-
-        # print(f"B==> {self.tag} {app_font=} {widget_font=}") #Debug
-
+        
         if widget_font.font_name not in system_fonts:
             print(
                 f"\\n{self.tag=}\nwidget_font <{widget_font=}>  is not available on this system.\n\n"
@@ -2365,10 +2324,10 @@ class _qtpyBase_Control(_qtpyBase):
         """Returns the system font.
 
         Args:
-          fixed (bool): bool = True. Defaults to True
+            fixed (bool): bool = True. Defaults to True
 
         Returns:
-          qtG.QFont : A QFont object.
+            qtG.QFont : A QFont object.
         """
         if fixed:
             return qtG.QFontDatabase().systemFont(qtG.QFontDatabase.FixedFont)
@@ -2379,7 +2338,7 @@ class _qtpyBase_Control(_qtpyBase):
         """Sets the frame style.
 
         Args:
-          frame (Frame): Frame definition object.
+            frame (Frame): Frame definition object.
         """
 
         if self._widget is None:
@@ -2406,7 +2365,7 @@ class _qtpyBase_Control(_qtpyBase):
         set the icon using setPixmap. Otherwise, set the icon using setIcon
 
         Args:
-          icon (Optional[Union[str, qtG.QPixmap, qtG.QIcon]]): Icon definition object.
+            icon (Optional[Union[str, qtG.QPixmap, qtG.QIcon]]): Icon definition object.
         """
         if self._widget is None:
             raise AssertionError(f"{self._widget=}. Not set. Programmer goof")
@@ -2441,42 +2400,56 @@ class _qtpyBase_Control(_qtpyBase):
         """Returns the widget's tooltip
 
         Returns:
-          str: The tooltip text.
+            str: The tooltip text.
         """
         if self._widget is None:
             return ""
         else:
             return self._widget.toolTip()
 
-    def tooltip_set(self, tooltip: str, width: int = 75):
-        """Sets the tooltip for a widget
+    def tooltip_set(self, tooltip: str, width: int = 400, txt_color: str = "black", bg_color: str = "wheat", border: str = "1px solid #000000"):
+        """Sets the tooltip for a widget. 
+
+        Note: Width setting is still being ignored TODO Find Fix
 
         Args:
-          tooltip (str): The text to display in the tooltip.
-          width (int): The width of the tooltip in pixels. Defaults to 75
+            tooltip (str): The text to display in the tooltip.
+            width (int): The width of the tooltip in pixels. Defaults to 200 - currently 400 for testing.
+            txt_color (str): The color of the tooltip text. Defaults to black.
+            bg_color (str): The background color of the tooltip. Defaults to white.
+            border (str): The border style of the tooltip. Defaults to "1px solid #000000".
         """
-        assert (
-            isinstance(tooltip, str) and tooltip.strip() != ""
-        ), f"{tooltip=}. Must be a non-empty str"
+        assert isinstance(tooltip, str) and tooltip.strip() != "", f"{tooltip=} must be a non-empty str"        
+        assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
+        assert isinstance(txt_color, str), f"{txt_color=} must be a string"        
+        assert isinstance(bg_color, str), f"{bg_color=} must be a string"        
+        assert isinstance(border, str), f"{border=} must be a string"
+        assert border in {"none", ""} or re.match(r"\d+px .+ .+", border), f"{border=} must be a valid CSS border style"
 
-        if self._widget is None:
-            raise AssertionError(f"{self._widget=}. Not set!")
+        color_handler = Colors(self)
+                
+        assert color_handler.color_string_get(txt_color), f" {txt_color=} Not an HTML color"        
+        assert color_handler.color_string_get(bg_color), f" {bg_color} Not an HTML color"
+                
+        # Use HTML formatting to set the style of the tooltip, including its width, text color, background color, and border style
+        trans_tip = f'<div style="max-width: {width}px !important; color: {txt_color}; background-color: {bg_color}; border: {border}">{self.trans_str(tooltip)}</div>'
 
-        trans_tip = self.trans_str(tooltip)
+        # Set a stylesheet on the widget to customize the style of the tooltip
+        self._widget.setStyleSheet("QToolTip { max-width: 800px; }")
 
-        # TODO Need to figure out how to handle width - HTML formatting did not work
-
-        self._widget.setToolTip(trans_tip)  # self.trans_str(tooltip))
+        # Set the tooltip text
+        self._widget.setToolTip(trans_tip)
 
         if isinstance(self, _Menu_Entry):
             self._widget.parent().setToolTipsVisible(True)
+
 
     @property
     def tooltipsvisible_get(self) -> bool:
         """Returns a boolean value indicating whether the tooltips are visible or not
 
         Returns:
-          bool : True - visible, False - not visible.
+            bool : True - visible, False - not visible.
         """
         if self._widget is None:
             raise AssertionError(f"{self._widget=}. Not set!")
@@ -2487,7 +2460,7 @@ class _qtpyBase_Control(_qtpyBase):
         """Sets the tooltips visibility of the widget
 
         Args:
-          visible (bool): True - Visible, False - not visible.
+            visible (bool): True - Visible, False - not visible.
         """
         assert isinstance(visible, bool), f"{visible=}. Must be bool"
 
@@ -2501,7 +2474,7 @@ class _qtpyBase_Control(_qtpyBase):
         """Returns the value of the translate attribute of the object
 
         Returns:
-          bool: True - translate, False - do not translate
+            bool: True - translate, False - do not translate
         """
         return self.translate
 
@@ -2519,11 +2492,11 @@ class _qtpyBase_Control(_qtpyBase):
         """Takes a string, and if the translate flag is set, it returns the translated string
 
         Args:
-          text (str): The text to be translated.
-          force_translate (bool): bool = False. Defaults to False
+            text (str): The text to be translated.
+            force_translate (bool): bool = False. Defaults to False
 
         Returns:
-          str : The translated text.
+            str : The translated text.
         """
         assert isinstance(text, str), f"{text=}. Must be str"
 
@@ -4953,7 +4926,7 @@ class _Container(_qtpyBase_Control):
             return None
 
         widget_list = []
-
+        
         if self.scroll and self.scroll_controls_get:
             for index, widget in enumerate(self.scroll_controls_get):
                 widget_list.append(widget)
@@ -4970,7 +4943,7 @@ class _Container(_qtpyBase_Control):
                     widget.guiwidget_get
                 ):
                     widget.guiwidget_get.setVisible(False)
-
+                
                 self._parent_app.widget_del(
                     container_tag=widget.container_tag, tag=widget.tag
                 )
@@ -9684,9 +9657,10 @@ class Grid(_qtpyBase_Control):
         for widget in widgets:
             if widget is not None and isinstance(widget, _Container):
                 for item in widget.tags_gather():
-                    self.parent_app.widget_del(
-                        container_tag=item.container_tag, tag=item.tag
-                    )
+                    if self.tag != item.tag:
+                        self.parent_app.widget_del(
+                            container_tag=item.container_tag, tag=item.tag
+                        )
 
     def row_widget_tag_delete(
         self, widget_row: int, tag: str = "", container_tag: str = ""
