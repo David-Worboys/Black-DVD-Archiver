@@ -154,8 +154,12 @@ class CHAR_PIXEL_SIZE:
 
     def _post_init(self):
         # Checking the arguments passed to the constructor are of the correct type.
-        assert isinstance(self.height, int) and self.height >= 0,f"{self.height=}. Must be int >= 0"
-        assert isinstance(self.width, int) and self.width >= 0,f"{self.width=}. Must be int >= 0"
+        assert (
+            isinstance(self.height, int) and self.height >= 0
+        ), f"{self.height=}. Must be int >= 0"
+        assert (
+            isinstance(self.width, int) and self.width >= 0
+        ), f"{self.width=}. Must be int >= 0"
 
 
 @dataclasses.dataclass(slots=True)
@@ -166,8 +170,12 @@ class SIZE:
 
     def _post_init(self):
         # Checking the arguments passed to the constructor are of the correct type.
-        assert isinstance(self.height, int) and self.height >= 0,f"{self.height=}. Must be int >= 0"
-        assert isinstance(self.width, int) and self.width >= 0,f"{self.width=}. Must be int >= 0"
+        assert (
+            isinstance(self.height, int) and self.height >= 0
+        ), f"{self.height=}. Must be int >= 0"
+        assert (
+            isinstance(self.width, int) and self.width >= 0
+        ), f"{self.width=}. Must be int >= 0"
 
 
 @dataclasses.dataclass(slots=True)
@@ -181,11 +189,11 @@ class COL_DEF:
 
     def _post_init(self):
         # Checking the arguments passed to the constructor are of the correct type.
-        assert isinstance(self.label,str),f"{self.label=}. Must be a str"
-        assert isinstance(self.tag,str),f"{self.tag=}. Must be a str"
-        assert isinstance(self.width,int),f"{self.width=}. Must be a int"
-        assert isinstance(self.editable,bool),f"{self.editable=}. Must be bool"
-        assert isinstance(self.checkable,bool),f"{self.checkable=}. Must be bool"
+        assert isinstance(self.label, str), f"{self.label=}. Must be a str"
+        assert isinstance(self.tag, str), f"{self.tag=}. Must be a str"
+        assert isinstance(self.width, int), f"{self.width=}. Must be a int"
+        assert isinstance(self.editable, bool), f"{self.editable=}. Must be bool"
+        assert isinstance(self.checkable, bool), f"{self.checkable=}. Must be bool"
 
 
 @dataclasses.dataclass(slots=True)
@@ -198,10 +206,17 @@ class COMBO_DATA:
 
     def _post_init(self):
         # Checking the arguments passed to the constructor are of the correct type.
-        assert isinstance(self.index,int) and self.index >= 0,f'{self.index=}. Must be int >= 0'
-        assert isinstance(self.display,str), f"{self.display=}. Must be str"
-        assert isinstance(self.data,(str,int,float,bytes,bool)) or self.data is None,f"{self.data=}. Must be None | str | int | float | bytes | bool"
-        assert isinstance(self.user_data,(str,int,float,bytes,bool)) or self.user_data is None,f"{self.user_data=}. Must be None | str | int | float | bytes | bool"
+        assert (
+            isinstance(self.index, int) and self.index >= 0
+        ), f"{self.index=}. Must be int >= 0"
+        assert isinstance(self.display, str), f"{self.display=}. Must be str"
+        assert (
+            isinstance(self.data, (str, int, float, bytes, bool)) or self.data is None
+        ), f"{self.data=}. Must be None | str | int | float | bytes | bool"
+        assert (
+            isinstance(self.user_data, (str, int, float, bytes, bool))
+            or self.user_data is None
+        ), f"{self.user_data=}. Must be None | str | int | float | bytes | bool"
 
 
 @dataclasses.dataclass(slots=True)
@@ -213,11 +228,18 @@ class COMBO_ITEM:
     user_data: None | str | int | float | bytes | bool
 
     def _post_init(self):
-        # Checking the arguments passed to the constructor are of the correct type.        
-        assert isinstance(self.display,str), f"{self.display=}. Must be str"
-        assert isinstance(self.data,(str,int,float,bytes,bool)) or self.data is None,f"{self.data=}. Must be None | str | int | float | bytes | bool"
-        assert isinstance(self.icon,(str , qtG.QPixmap , qtG.QIcon)) or self.icon is None,f"{self.icon=}. Must be None | str | qtG.QPixmap | qtG.QIcon"
-        assert isinstance(self.user_data,(str,int,float,bytes,bool)) or self.user_data is None,f"{self.user_data=}. Must be None | str | int | float | bytes | bool"
+        # Checking the arguments passed to the constructor are of the correct type.
+        assert isinstance(self.display, str), f"{self.display=}. Must be str"
+        assert (
+            isinstance(self.data, (str, int, float, bytes, bool)) or self.data is None
+        ), f"{self.data=}. Must be None | str | int | float | bytes | bool"
+        assert (
+            isinstance(self.icon, (str, qtG.QPixmap, qtG.QIcon)) or self.icon is None
+        ), f"{self.icon=}. Must be None | str | qtG.QPixmap | qtG.QIcon"
+        assert (
+            isinstance(self.user_data, (str, int, float, bytes, bool))
+            or self.user_data is None
+        ), f"{self.user_data=}. Must be None | str | int | float | bytes | bool"
 
 
 @dataclasses.dataclass(slots=True)
@@ -227,10 +249,13 @@ class RECT_CHANGED:
     coords: Coords
 
     def _post_init(self):
-        # Checking the arguments passed to the constructor are of the correct type.        
-        assert isinstance(self.rect_id,str) and self.rect_id.strip() != "",f"{self.rect_id=}. Must be a non-empty string"
-        assert isinstance(self.coords,Coords),f"{self.coords=}. Must be a an of type Coords"
-
+        # Checking the arguments passed to the constructor are of the correct type.
+        assert (
+            isinstance(self.rect_id, str) and self.rect_id.strip() != ""
+        ), f"{self.rect_id=}. Must be a non-empty string"
+        assert isinstance(
+            self.coords, Coords
+        ), f"{self.coords=}. Must be a an of type Coords"
 
 
 @dataclasses.dataclass(slots=True)
@@ -516,7 +541,7 @@ def cursor_on(cursor: CURSOR):
 
 def cursor_off():
     """
-        Restores the cursor to its default state
+    Restores the cursor to its default state
     """
     if qtW.QApplication is not None and qtW.QApplication.instance() is not None:
         qtW.QApplication.restoreOverrideCursor()
@@ -532,9 +557,13 @@ class tags:
 
     def _post_init(self):
         # Checking the arguments passed to the constructor are of the correct type.
-        assert isinstance(self.container_tag,str) and self.container_tag.strip() != "",f"{self.container_tag=}. Must be a non-empty str"        
-        assert isinstance(self.tag,str) and self.tag.strip() != "",f"{self.tag=}. Must be a non-empty str"                
-        assert isinstance(self.valid,bool),f"{self.valid=}. Must bool"
+        assert (
+            isinstance(self.container_tag, str) and self.container_tag.strip() != ""
+        ), f"{self.container_tag=}. Must be a non-empty str"
+        assert (
+            isinstance(self.tag, str) and self.tag.strip() != ""
+        ), f"{self.tag=}. Must be a non-empty str"
+        assert isinstance(self.valid, bool), f"{self.valid=}. Must bool"
 
 
 @dataclasses.dataclass(slots=True)
@@ -545,10 +574,14 @@ class widget_def:
 
     def _post_init(self):
         # Checking the arguments passed to the constructor are of the correct type.
-        assert isinstance(self.widget, _qtpyBase_Control),f"{self.widget=}. Must be type _qtpyBase_Control"
-        assert isinstance(self.gui_widget, qtW.QWidget),f"{self.gui_widget=}. Must be type qtW.QWidget"
+        assert isinstance(
+            self.widget, _qtpyBase_Control
+        ), f"{self.widget=}. Must be type _qtpyBase_Control"
+        assert isinstance(
+            self.gui_widget, qtW.QWidget
+        ), f"{self.gui_widget=}. Must be type qtW.QWidget"
 
-    
+
 @dataclasses.dataclass(slots=True)
 # Used by _Dateedit to store the data.
 class _Date_Tuple:
@@ -558,9 +591,17 @@ class _Date_Tuple:
 
     def _post_init(self):
         # Checking the arguments passed to the constructor are of the correct type.
-        assert isinstance(self.year, int) and self.year > 0,f"{self.year=}. Must be an int > 0"
-        assert isinstance(self.month, int) and  1 >= self.month <= 12,f"{self.month=}. Must be an int between 1 and 12"
-        assert isinstance(self.day, int) and 1 >= self.day  <= 28 if self.month == 2 else 1 >= self.day  <= 31,f"{self.day=}. Must be an int between 1 and 28/31 depending on month"
+        assert (
+            isinstance(self.year, int) and self.year > 0
+        ), f"{self.year=}. Must be an int > 0"
+        assert (
+            isinstance(self.month, int) and 1 >= self.month <= 12
+        ), f"{self.month=}. Must be an int between 1 and 12"
+        assert (
+            isinstance(self.day, int) and 1 >= self.day <= 28
+            if self.month == 2
+            else 1 >= self.day <= 31
+        ), f"{self.day=}. Must be an int between 1 and 28/31 depending on month"
 
 
 @dataclasses.dataclass(slots=True)
@@ -573,8 +614,8 @@ class _Snapshot_Modified_Values:
 
     def _post_init(self):
         # Checking the arguments passed to the constructor are of the correct type.
-        assert isinstance(self.snap1_valid, bool),f"{self.snap1_valid=}. Must be bool"
-        assert isinstance(self.snap2_valid, bool),f"{self.snap2_valid=}. Must be bool"
+        assert isinstance(self.snap1_valid, bool), f"{self.snap1_valid=}. Must be bool"
+        assert isinstance(self.snap2_valid, bool), f"{self.snap2_valid=}. Must be bool"
 
 
 class _qtpyBase:
@@ -691,7 +732,7 @@ class Colors(_qtpyBase):
 
         return legal_colours
 
-    def color_string_get(self, color: Union[str, tuple, list])->str:
+    def color_string_get(self, color: Union[str, tuple, list]) -> str:
         """This function returns a colour string  that can be used in the `colour` arguments/parameters
 
 
@@ -722,7 +763,7 @@ class Colors(_qtpyBase):
                 text = ""
 
                 assert text != "", str(color) + " Not A Valid Color Format"
-        return text        
+        return text
 
     def _process_colour_args(
         self, color_function_string: str, args: list, hsvcheck: bool
@@ -997,10 +1038,11 @@ class Font(_qtpyBase):
         assert isinstance(
             self.style, FONTSTYLE
         ), f"{self.style=}. Is not a valid FONTSTYLE"
-        assert isinstance(self.backcolor,str), f"{self.backcolor=}. Must be str"
-        assert isinstance(self.forecolor,str), f"{self.forecolor=}. Must be str"
-        assert isinstance(self.selectback,str), f"{self.selectback=}. Must be str"
-        assert isinstance(self.selectfore,str), f"{self.selectfore=}. Must be str"
+        assert isinstance(self.backcolor, str), f"{self.backcolor=}. Must be str"
+        assert isinstance(self.forecolor, str), f"{self.forecolor=}. Must be str"
+        assert isinstance(self.selectback, str), f"{self.selectback=}. Must be str"
+        assert isinstance(self.selectfore, str), f"{self.selectfore=}. Must be str"
+
 
 class _qtpyBaseFrame(qtW.QMainWindow, _qtpyBase):
     """The _qtyBaseFrame class is a base class for SDI aND MDI frames # TODO: Add MDI support"""
@@ -1705,7 +1747,7 @@ class _qtpyBase_Control(_qtpyBase):
         label_widget: Optional[qtW.QLabel] = None
 
         label_height = 0
-        
+
         match self:
             case Button():
                 self._widget = qtW.QPushButton(self.text, parent)
@@ -1837,7 +1879,7 @@ class _qtpyBase_Control(_qtpyBase):
 
         if self.frame is not None:
             self.frame_style_set(self.frame)
-        
+
         if self.tooltip.strip() != "":
             self.tooltip_set(self.tooltip)
         if hasattr(self._widget, "enabled"):
@@ -1858,7 +1900,7 @@ class _qtpyBase_Control(_qtpyBase):
             height = label_height + self.tune_vsize
         else:
             height = pixel_size.height
-        
+
         self._install_event_handlers()
 
         if self.pixel_unit:
@@ -2132,7 +2174,7 @@ class _qtpyBase_Control(_qtpyBase):
         height = round(font_metrics.height() * char_height * height_fudge)
 
         return CHAR_PIXEL_SIZE(height=height, width=width)
-    
+
     def text_pixel_size(self, text: str) -> tuple[int, int]:
         """Returns the height and width of a string of text in pixels
 
@@ -2233,7 +2275,7 @@ class _qtpyBase_Control(_qtpyBase):
             widget_font.selectfore = colour.color_string_get(widget_font.selectfore)
 
         system_fonts = self.fonts_available_get
-        
+
         if widget_font.font_name not in system_fonts:
             print(
                 f"\\n{self.tag=}\nwidget_font <{widget_font=}>  is not available on this system.\n\n"
@@ -2407,8 +2449,15 @@ class _qtpyBase_Control(_qtpyBase):
         else:
             return self._widget.toolTip()
 
-    def tooltip_set(self, tooltip: str, width: int = 400, txt_color: str = "black", bg_color: str = "wheat", border: str = "1px solid #000000"):
-        """Sets the tooltip for a widget. 
+    def tooltip_set(
+        self,
+        tooltip: str,
+        width: int = 400,
+        txt_color: str = "black",
+        bg_color: str = "wheat",
+        border: str = "1px solid #000000",
+    ):
+        """Sets the tooltip for a widget.
 
         Note: Width setting is still being ignored TODO Find Fix
 
@@ -2419,18 +2468,26 @@ class _qtpyBase_Control(_qtpyBase):
             bg_color (str): The background color of the tooltip. Defaults to white.
             border (str): The border style of the tooltip. Defaults to "1px solid #000000".
         """
-        assert isinstance(tooltip, str) and tooltip.strip() != "", f"{tooltip=} must be a non-empty str"        
+        assert (
+            isinstance(tooltip, str) and tooltip.strip() != ""
+        ), f"{tooltip=} must be a non-empty str"
         assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
-        assert isinstance(txt_color, str), f"{txt_color=} must be a string"        
-        assert isinstance(bg_color, str), f"{bg_color=} must be a string"        
+        assert isinstance(txt_color, str), f"{txt_color=} must be a string"
+        assert isinstance(bg_color, str), f"{bg_color=} must be a string"
         assert isinstance(border, str), f"{border=} must be a string"
-        assert border in {"none", ""} or re.match(r"\d+px .+ .+", border), f"{border=} must be a valid CSS border style"
+        assert border in {"none", ""} or re.match(
+            r"\d+px .+ .+", border
+        ), f"{border=} must be a valid CSS border style"
 
         color_handler = Colors(self)
-                
-        assert color_handler.color_string_get(txt_color), f" {txt_color=} Not an HTML color"        
-        assert color_handler.color_string_get(bg_color), f" {bg_color} Not an HTML color"
-                
+
+        assert color_handler.color_string_get(
+            txt_color
+        ), f" {txt_color=} Not an HTML color"
+        assert color_handler.color_string_get(
+            bg_color
+        ), f" {bg_color} Not an HTML color"
+
         # Use HTML formatting to set the style of the tooltip, including its width, text color, background color, and border style
         trans_tip = f'<div style="max-width: {width}px !important; color: {txt_color}; background-color: {bg_color}; border: {border}">{self.trans_str(tooltip)}</div>'
 
@@ -2442,7 +2499,6 @@ class _qtpyBase_Control(_qtpyBase):
 
         if isinstance(self, _Menu_Entry):
             self._widget.parent().setToolTipsVisible(True)
-
 
     @property
     def tooltipsvisible_get(self) -> bool:
@@ -4926,7 +4982,7 @@ class _Container(_qtpyBase_Control):
             return None
 
         widget_list = []
-        
+
         if self.scroll and self.scroll_controls_get:
             for index, widget in enumerate(self.scroll_controls_get):
                 widget_list.append(widget)
@@ -4943,7 +4999,7 @@ class _Container(_qtpyBase_Control):
                     widget.guiwidget_get
                 ):
                     widget.guiwidget_get.setVisible(False)
-                
+
                 self._parent_app.widget_del(
                     container_tag=widget.container_tag, tag=widget.tag
                 )
