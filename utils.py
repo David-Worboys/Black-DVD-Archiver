@@ -30,6 +30,7 @@ import math
 import os
 import pathlib
 import random
+import shutil
 import string
 import struct
 import sys
@@ -963,7 +964,7 @@ class File:
         return os.path.sep
 
     @staticmethod
-    def file_exists(path: str, file: str, suffix: str) -> bool:
+    def file_exists(path: str, file: str = "", suffix: str = "") -> bool:
         """Determines if a file exists and is a regular file
 
         Args:
@@ -977,14 +978,14 @@ class File:
         assert (
             isinstance(path, str) and path.strip() != ""
         ), f"{path=}. Must be a non-empty str"
-        assert (
-            isinstance(file, str) and file.strip() != ""
-        ), f"{file=}. Must be a non-empty str"
-        assert (
-            isinstance(suffix, str) and suffix.strip() != ""
-        ), f"{suffix=}. Must be a non-empty str"
+        assert (isinstance(file, str), f"{file=}. Must be a str")
+        assert isinstance(suffix, str), f"{suffix=}. Must be a  str"
 
-        # Changed from pahlib to OS becuase on some filels pathlib failed!
+        if file == "" or suffix == "":
+            file_handler = File()
+            path, file, suffix = file_handler.split_file_path(path)
+
+        # Changed from pahlib to OS becuase on some filel pathlib failed!
         file_suffix = (
             suffix if suffix.startswith(".") or file.endswith(".") else f".{suffix}"
         )
@@ -1077,11 +1078,13 @@ class File:
             )
 
     @staticmethod
-    def make_dir(file_path: str) -> None:
+    def make_dir(file_path: str) -> int:
         """Makes a directory (folder) in the file path
 
         Args:
             file_path (str): The file path housing the new folder
+        Returns:
+            int : 1 Ok, -1 Failed To Create Directory
         """
         assert (
             isinstance(file_path, str) and file_path.strip() != ""
@@ -1089,6 +1092,11 @@ class File:
 
         path = pathlib.Path(file_path)
         path.mkdir(parents=True, exist_ok=False)
+
+        if File.path_exists(file_path):
+            return 1
+        else:
+            return -1
 
     @staticmethod
     def path_exists(file_path: str) -> bool:
@@ -1120,7 +1128,7 @@ class File:
         """Checks if a file path can be written to
 
         Args:
-           file_path (str): The file path to check for write ability
+            file_path (str): The file path to check for write ability
 
         Returns:
             bool : True - Can write to file path, False - Cannot Write to file path
@@ -1135,6 +1143,8 @@ class File:
 
     def split_head_tail(self, file_path_name: str) -> tuple[str, str]:
         """Takes a full file path - including the file name and splits it into the file path and the file name
+
+        Note: Deprecated use split_file_path
 
         Args:
             file_path_name (str): The full file path - including the file name
@@ -1157,10 +1167,75 @@ class File:
             if self.file_exists(path=path, file=file_prefix, suffix=file_suffix):
                 return (path, file)
             else:
-                print(f"DBG Whoo[s {path=} {file_prefix=} {file_suffix=}")
                 return ("", "")
 
         return ("", "")
+
+    def split_file_path(self, file_path_name: str) -> tuple[str, str, str]:
+        """Splits a file path into its directory path, file name with prefix, and file extension.
+
+        Args:
+            file_path_name (str): The file path to split.
+
+        Returns:
+            tuple: A tuple of three strings - directory path, file name with prefix, and file extension.
+
+        Raises:
+            AssertionError: If the file_path_name is not a non-empty string.
+
+        """
+        assert (
+            isinstance(file_path_name, str) and file_path_name.strip() != ""
+        ), f"{file_path_name=}. Must be a non-empty str"
+
+        if os.path.isdir(file_path_name):
+            return (file_path_name, "", "")
+        elif os.path.isfile(file_path_name):
+            path, file = os.path.split(file_path_name)
+            _, extension = os.path.splitext(file)
+
+            file_prefix, file_suffix = os.path.splitext(file)
+            if self.file_exists(path=path, file=file_prefix, suffix=file_suffix):
+                return (path, file_prefix, extension)
+            else:
+                return ("", "", "")
+
+        return ("", "", "")
+
+    def remove_dir_contents(self, file_path_name: str) -> tuple[int, str]:
+        """Removes all contents within a directory specified by file_path_name.
+
+        Args:
+            file_path_name (str): The file path of the directory to be removed.
+
+        Returns:
+            tuple[int,str]:
+            - arg1 1: ok, -1: fail
+            - arg2: error message or "" if ok
+
+        """
+
+        assert (
+            isinstance(file_path_name, str) and file_path_name.strip() != ""
+        ), f"{file_path_name=}. Must be a non-empty str"
+
+        if self.path_exists(file_path_name) and self.path_writeables(file_path_name):
+            try:
+                with os.scandir(file_path_name) as entries:
+                    for entry in entries:
+                        if entry.is_dir() and not entry.is_symlink():
+                            shutil.rmtree(entry.path)
+                        else:
+                            os.remove(entry.path)
+
+                    shutil.rmtree(self._dvd_working_folder)
+
+            except OSError as error:
+                return -1, f"{error.errno} {error.strerror}"
+        else:
+            return -1, f"{file_path_name} Does Not Exist Or Can Not Be Written To"
+
+        return 1, ""
 
 
 def country_date_formatmask(country_or_format: str = "") -> tuple[str, str]:
