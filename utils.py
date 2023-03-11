@@ -188,10 +188,10 @@ class strEnum(str, Enum):
         This is a function that takes a class as an argument and returns a list of strings
 
         Args:
-          cls: The class that the method is being called on.
+            cls: The class that the method is being called on.
 
         Returns:
-          A list of strings.
+            A list of strings.
         """
 
         str_list: list[str] = []
@@ -222,8 +222,7 @@ def App_Path(file_name: str = "") -> str:
         file_name (str, optional): Defaults to "". file name that needs to be prepended with the app path
 
     Returns:
-        str: Expanded app directory path if the file name is supplied.
-             The app directory path if the file name is not supplied
+        str: Expanded app directory path if the file name is supplied. The app directory path if the file name is not supplied
     """
 
     assert isinstance(file_name, str), f"file_name <{file_name}> must be str"
@@ -685,7 +684,7 @@ def Get_Unique_Id() -> str:
     """Generate a random string of characters that is guaranteed to be unique
 
     Returns:
-      str : A random string of 96 characters.
+        str : A random string of 96 characters.
     """
     # Note the 48 random bits replaces the hardware MAC address from uuid1 generation
     unique_str = list(
@@ -701,7 +700,7 @@ def Is_Complied() -> bool:
     """Returns True if the current python interpreter is complied.
 
     Returns:
-      bool :A boolean value.
+        bool :A boolean value.
     """
     if globals().get("__compiled__", False):
         # print("Nuitka compiled")
@@ -754,14 +753,14 @@ def Is_HTMLXML(instring: str) -> bool:
 
 def Lcm(x: int, y: int) -> int:
     """
-    "Return the smallest number that is evenly divisible by both x and y."
+    "Returns the smallest number that is evenly divisible by both x and y."
 
     Args:
-      x (int): int
-      y (int): int
+        x (int): int
+        y (int): int
 
     Returns:
-      int: The lowest common multiple of x and y
+        int: The lowest common multiple of x and y
     """
     assert isinstance(x, int), f"{x=}. Must be int"
     assert isinstance(y, int), f"{y=}. Must be int"
@@ -1171,31 +1170,33 @@ class File:
 
         return ("", "")
 
-    def split_file_path(self, file_path_name: str) -> tuple[str, str, str]:
+    def split_file_path(
+        self, file_path_name: str, no_path_check: bool = False
+    ) -> tuple[str, str, str]:
         """Splits a file path into its directory path, file name with prefix, and file extension.
 
         Args:
             file_path_name (str): The file path to split.
+            no_path_check (bool): Processes file_path_name without checking if it exists. Assumes it is a file name!
 
         Returns:
             tuple: A tuple of three strings - directory path, file name with prefix, and file extension.
-
-        Raises:
-            AssertionError: If the file_path_name is not a non-empty string.
-
+        
         """
         assert (
             isinstance(file_path_name, str) and file_path_name.strip() != ""
         ), f"{file_path_name=}. Must be a non-empty str"
 
-        if os.path.isdir(file_path_name):
+        if not no_path_check and os.path.isdir(file_path_name):
             return (file_path_name, "", "")
-        elif os.path.isfile(file_path_name):
+        elif not no_path_check or os.path.isfile(file_path_name):
             path, file = os.path.split(file_path_name)
             _, extension = os.path.splitext(file)
 
             file_prefix, file_suffix = os.path.splitext(file)
-            if self.file_exists(path=path, file=file_prefix, suffix=file_suffix):
+            if not no_path_check or self.file_exists(
+                path=path, file=file_prefix, suffix=file_suffix
+            ):
                 return (path, file_prefix, extension)
             else:
                 return ("", "", "")
@@ -1656,18 +1657,18 @@ def json_deep_copy(data: any):
     Takes a data  object and returns a JSON deep copy of it. This will work for any object that can be serialized.
 
     Args:
-      data (any): The data to be copied.
+        data (any): The data to be copied.
 
     Returns:
-      A copy of the data that is passed in.
+        A copy of the data that is passed in.
     """
 
     def update_dict(data_copy: dict, data: dict):
         """Updates a dictionary with the values of another dictionary.
 
         Args:
-          data_copy (dict): the dictionary that we want to update
-          data (dict): The data that you want to update.
+            data_copy (dict): the dictionary that we want to update
+            data (dict): The data that you want to update.
         """
         for k, v in data_copy.values():
             if v != data[k]:
@@ -1682,8 +1683,8 @@ def json_deep_copy(data: any):
         """Updates a list with the values of another list.
 
         Args:
-          data_copy (list): The list that we are going to update.
-          data (list): The data to be updated.
+            data_copy (list): The list that we are going to update.
+            data (list): The data to be updated.
         """
         for i, value in enumerate(data_copy):
             if value != data[i]:
