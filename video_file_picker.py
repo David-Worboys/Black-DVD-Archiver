@@ -239,16 +239,16 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         Args:
             event (Action): Action
         """
-        if event.event == qtg.SYSEVENTS.CLICKED:            
+        if event.event == qtg.SYSEVENTS.CLICKED:
             if event.value.row >= 0 and event.value.col >= 0:
                 # When the user clicks on a row in the grid, toggle the switch in that row
                 file_grid: qtg.Grid = event.widget_get(
                     container_tag="file_controls", tag="video_input_files"
                 )
 
-                if file_grid.checkitemrow_get(event.value.row, col=0):                    
+                if file_grid.checkitemrow_get(event.value.row, col=0):
                     file_grid.checkitemrow_set(
                         row=event.value.row, col=0, checked=False
                     )
-                else:                    
+                else:
                     file_grid.checkitemrow_set(row=event.value.row, col=0, checked=True)
