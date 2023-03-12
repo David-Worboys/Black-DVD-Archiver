@@ -6140,7 +6140,7 @@ class PopContainer(_qtpyBase_Control):
         """Closes the dialog and sets the result to the value of the _result variable
 
         Returns:
-          bool : Result of the close operation
+            bool : Result of the close operation
         """
 
         self.dialog._result = self._result
@@ -6150,7 +6150,7 @@ class PopContainer(_qtpyBase_Control):
         """Method called when the dialog is closed.
 
         Args:
-           QCloseEvent: This is the event that is being passed to the function.
+            QCloseEvent: This is the event that is being passed to the function.
         """
         self.dialog.closeEvent(event)
 
@@ -6158,10 +6158,10 @@ class PopContainer(_qtpyBase_Control):
         """Processes the control events. Override this method to process the control events.
 
         Args:
-          event (Action): The event that was triggered.
+            event (Action): The event that was triggered.
 
         Returns:
-          int : 1 if the event was processed ok, -1 if not.
+            int : 1 if the event was processed ok, -1 if not.
         """
         return 1
 
@@ -6169,7 +6169,7 @@ class PopContainer(_qtpyBase_Control):
         """Opens and displays the dialogue window and returns the result of using the dialogue as a string.
 
         Returns:
-          str : The value set in the _result variable
+            str : The value set in the _result variable
         """
         return self.dialog.show()
 
@@ -6178,15 +6178,25 @@ class PopContainer(_qtpyBase_Control):
         """Gets the value of the allow close state of the dialogue .
 
         Returns:
-          bool : True can close the dialog, False cannot close the dialog.
+            bool : True can close the dialog, False cannot close the dialog.
         """
         return self._allow_close
+
+    @property
+    def get_result(self) -> str:
+        """Gets the result value stored in the _result variable .
+
+        Returns:
+            str : The value set in the _result variable
+        """
+
+        return self.dialog._result
 
     def set_result(self, result: str):
         """Sets the result of the dialogs operations into the _result variable.
 
         Args:
-          result (str): The result of using the dialog.
+            result (str): The result of using the dialog.
         """
         assert isinstance(result, str), f"{result=}. Must be str!"
 
@@ -6196,8 +6206,8 @@ class PopContainer(_qtpyBase_Control):
         """Opens the sheet and returns the result of attempting to open the sheet
 
         Returns:
-          int : The result of the callback when an attempt is made to open the dialogue. 1 Ok, -1 if dialogue can not be
-          opened.
+            int : The result of the callback when an attempt is made to open the dialogue. 1 Ok, -1 if dialogue can not be
+                opened.
         """
         result = 1
 
