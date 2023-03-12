@@ -27,7 +27,7 @@ import platform
 import pprint
 import shlex
 import subprocess
-from typing import Generator
+from typing import Generator, Optional
 
 import psutil
 import xmltodict
@@ -131,6 +131,100 @@ class dvd_dims:
     storage_height: int = -1
     display_width: int = -1
     display_height: int = -1
+
+
+def concatenate_videos(
+    temp_files: list[str],
+    output_file: str,
+    audio_codec: str = "",
+    delete_temp_files: bool = False,
+) -> tuple[int, str]:
+    """
+    Concatenates video files using ffmpeg.
+
+    Args:
+        temp_files (list[str]): List of input video files to be concatenated
+        output_file (str): The output file name
+        audio_codec (str, optional): The audio codec to checked against (aac is special)
+        delete_temp_files (bool, optional): Whether or not to delete the temp files, defaults to False
+
+    Returns:
+        tuple[int, str]:
+            - arg 1: 1 if success, -1 if error
+            - arg 2: "" if success otherwise and error message
+    """
+    assert isinstance(
+        temp_files, list
+    ), f"{temp_files} Must be a list of input video files"
+    assert all(
+        isinstance(file, str) for file in temp_files
+    ), "all elements in temp_files must str"
+    assert isinstance(output_file, str), f"{output_file=}. Must be str"
+    assert isinstance(audio_codec, str), f"{audio_codec=}. Must be a str"
+    assert isinstance(delete_temp_files, bool), f"{delete_temp_files=}. Must be a bool"
+
+    file_handler = utils.File()
+    out_path, _, _ = file_handler.split_file_path(output_file)
+    file_list_txt = f"{out_path}{file_handler.ossep}file_list.txt"
+
+    if not file_handler.path_writeable(out_path):
+        return -1, f"Can Not Be Write To {out_path}!"
+
+    # Generate a file list for ffmpeg
+    result, message = file_handler.write_list_to_txt_file(
+        str_list=[f"file '{file}'" for file in temp_files], text_file=file_list_txt
+    )
+
+    if result == -1:
+        return -1, message
+
+    aac_audio = []
+    if audio_codec == "aac":
+        aac_audio = [
+            "-bsf:a",
+            "aac_adtstoasc",
+        ]
+
+    # Concatenate the video files using ffmpeg
+    result, message = execute_check_output(
+        commands=[
+            sys_consts.FFMPG,
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            file_list_txt,
+            "-c",
+            "copy",
+        ]
+        + aac_audio
+        + [
+            "-map_metadata",
+            "-1",
+            "-movflags",
+            "+faststart",
+            output_file,
+            "-y",
+        ],
+        debug=False,
+    )
+
+    if result == -1:
+        file_handler.remove_file(file_list_txt)
+        return -1, message
+
+    # Remove the file list and temp files
+    if file_handler.remove_file(file_list_txt) == -1:
+        return -1, f"Failed to delete text file: {file_list_txt}"
+
+    if delete_temp_files:
+        for file in temp_files:
+            if file_handler.file_exists(file):
+                if file_handler.remove_file(file) == -1:
+                    return -1, f"Failed to delete temp file: {file}"
+
+    return 1, ""
 
 
 def get_space_available(path: str) -> tuple[int, str]:
@@ -629,6 +723,171 @@ def get_text_dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
     height = int(dimensions[1])
 
     return width, height
+
+
+def get_codec(input_file: str) -> tuple[int, str]:
+    """
+    Get the codec name of the video file using FFprobe.
+
+    Args:
+        input_file (str): Path to the input video file.
+
+    Returns:
+        tuple[int, str]:
+        - arg 1: Status code. Returns 1 if the codec name was obtained successfully, -1 otherwise.
+        - arg 2: Codec name if obtained successfully, otherwisr error message
+
+    """
+    assert (
+        isinstance(input_file, str) and input_file.strip() != ""
+    ), "Input file must be a string."
+
+    commands = [
+        sys_consts.FFPROBE,
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=codec_name",
+        "-of",
+        "default=nokey=1:noprint_wrappers=1",
+        input_file,
+    ]
+
+    result, output = execute_check_output(commands)
+
+    if result == -1:
+        return -1, "Failed To Get Codec Name!"
+
+    return 1, output.strip()
+
+
+def stream_optimise(output_file: str) -> tuple[int, str]:
+    """Optimizes a video file for streaming.
+
+    Args:
+        output_file (str): The path to the video file to be optimized.
+
+    Returns:
+        tuple[int, str]:
+        - arg 1:  1 if if the optimization was successful, and -1 otherwise
+        - arg 2: If the optimization fails, the message will contain an error otherwise "".
+    """
+    assert (
+        isinstance(output_file, str) and output_file.strip() != ""
+    ), f"{output_file=}. Must be a non-empty string."
+
+    command = [
+        sys_consts.FFMPG,
+        "-y",
+        "-i",
+        output_file,
+        "-c",
+        "copy",
+        "-movflags",
+        "+faststart",
+    ]
+
+    # Run the FFmpeg command
+    result, message = execute_check_output(command)
+
+    if result == -1:
+        return -1, message
+
+    return 1, ""
+
+
+def get_codec(input_file: str):
+    commands = [
+        sys_consts.FFPROBE,
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=codec_name",
+        "-of",
+        "default=nokey=1:noprint_wrappers=1",
+        input_file,
+    ]
+    result, output = execute_check_output(commands)
+
+    if result == -1:
+        return -1, "Failed To Get Code!"
+
+    return 1, output.strip()
+
+
+def get_nearest_key_frame(
+    input_file: str, time: float, direction: str
+) -> tuple[int, Optional[float]]:
+    """
+    Uses FFprobe to get the position of the nearest key frame before or after the given time.
+
+    Args:
+        input_file (str): Path to input video file.
+        time (float): Time in seconds for which the nearest key frame is to be found.
+        direction (str): Direction of search. "prev" for nearest key frame before time, "next" for after time.
+
+    Returns:
+        tuple[int, Optional[float]]: tuple containing result code and
+        - arg 1: Result code 1 indicates success and -1 indicates failure.
+        - arg 2: Position of nearest key frame if there is one or None if there is no key frame. If error None
+    """
+    assert (
+        isinstance(input_file, str) and input_file.strip() != ""
+    ), "Input file path must be a string."
+    assert isinstance(time, float), "Time must be a float."
+    assert isinstance(direction, str) and direction in [
+        "prev",
+        "next",
+    ], "Direction must be either 'prev' or 'next'."
+
+    # Use FFprobe to get the position of the nearest key frame before or after the given time
+    commands = [
+        sys_consts.FFPROBE,
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-skip_frame",
+        "nokey",
+        "-show_entries",
+        "frame=pkt_pts_time",
+        "-of",
+        "csv=print_section=0",
+        input_file,
+    ]
+
+    result, output = execute_check_output(commands, debug=False)
+
+    if result == -1:
+        return -1, None
+
+    lines = [line.strip().replace("\n", "") for line in output.split("\n")]
+
+    if lines:
+        if lines[0] == "":
+            return 1, None
+
+    output = output.strip()
+
+    key_frames = [float(t) for t in output.split("\n")]
+
+    if direction == "prev":
+        key_frames_before = [t for t in key_frames if t < time]
+        if key_frames_before:
+            return 1, max(key_frames_before)
+        else:
+            return -1, None
+
+    elif direction == "next":
+        key_frames_after = [t for t in key_frames if t > time]
+        if key_frames_after:
+            return 1, min(key_frames_after)
+        else:
+            return -1, None
 
 
 def execute_check_output(
