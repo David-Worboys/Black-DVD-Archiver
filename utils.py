@@ -927,8 +927,8 @@ class Crypt:
 
 # The File class provides an easy-to-use wrapper around file info/manipulation calls
 class File:
-    RESULT = NamedTuple(
-        "RESULT",
+    File_Result = NamedTuple(
+        "File_Result",
         [
             ("files", list[str]),
             ("path", str),
@@ -963,113 +963,97 @@ class File:
         return os.path.sep
 
     @staticmethod
-    def file_exists(path: str, file: str = "", suffix: str = "") -> bool:
+    def file_exists(
+        directory_path: str, file_name: str = "", file_extension: str = ""
+    ) -> bool:
         """Determines if a file exists and is a regular file
 
         Args:
-            path (str): The path to the files
-            file (str): The file name
-            suffix (str):  The file extension
+            directory_path (str): The path to the directory containing the file
+            file_name (str): The name of the file
+            file_extension (str): The extension of the file
 
         Returns:
             bool: True if file exists, False if not
         """
         assert (
-            isinstance(path, str) and path.strip() != ""
-        ), f"{path=}. Must be a non-empty str"
-        assert (isinstance(file, str), f"{file=}. Must be a str")
-        assert isinstance(suffix, str), f"{suffix=}. Must be a  str"
+            isinstance(directory_path, str) and directory_path.strip() != ""
+        ), f"{directory_path=} must be a non-empty str"
+        assert isinstance(file_name, str), f"{file_name=} must be a str"
+        assert isinstance(file_extension, str), f"{file_extension=} must be a str"
 
-        if file == "" or suffix == "":
+        if file_name == "" or file_extension == "":
             file_handler = File()
-            path, file, suffix = file_handler.split_file_path(path)
+            directory_path, file_name, file_extension = file_handler.split_file_path(
+                directory_path
+            )
 
-        # Changed from pahlib to OS becuase on some filel pathlib failed!
         file_suffix = (
-            suffix if suffix.startswith(".") or file.endswith(".") else f".{suffix}"
+            "." + file_extension
+            if not file_extension.startswith(".")
+            else file_extension
         )
+        file_path = os.path.join(directory_path, file_name + file_suffix)
 
-        file_name = f"{path}{os.sep}{file}{file_suffix}"
-
-        return os.path.exists(file_name) and os.path.isfile(file_name)
-
-    def filelist_gen(self, path: str, extensions: Union[list[str], tuple[str, ...]]):
         try:
-            result = self.RESULT(
-                files=[],
-                path=path,
-                error_code=self.Path_Error.OK,
-                error_message="",
-            )
-            for index, file in enumerate(os.listdir(path)):
-                if os.path.isfile(os.path.join(path, file)):
-                    if os.path.splitext(file)[1] in extensions:
-                        result.files.append(file)
-                        if index % 10 == 0:
-                            yield result
-
-        except Exception as error:
-            return self.RESULT(
-                files=[],
-                path=path,
-                error_code=self.Path_Error.EXCEPTION,
-                error_message=str(error),
-            )
+            return os.path.isfile(file_path)
+        except Exception as e:
+            return False
+        return False
 
     def filelist(
-        self, path: str, extensions: Union[list[str], tuple[str, ...]]
-    ) -> RESULT:
-        """Returns a list of files found in the path location.  If the path is a file then all files matching the
-        extension(s) in that files directory are returned
+        self, path: str, extensions: list[str] | tuple[str, ...]
+    ) -> File_Result:
+        """
+        Returns a list of files found in the path location. If the path is a file then all files matching the
+        extension(s) in that files directory are returned.
 
         Args:
-            path (str)  : File system path
-            extensions (Union[list[str], tuple[str, ...]): A list or tuple of file extensions
+            path (str): File system path.
+            extensions (list[str] | tuple[str, ...]): A list or tuple of file extensions.
 
         Returns:
-            RESULT: The RESULT named tuple which contains a list of files, the path and any errors if encountered
+            File_Result: A named tuple containing a list of files, the path, and any errors encountered.
         """
-        assert (
-            isinstance(path, str) and path.strip() != ""
-        ), f"{path=} must be a non-empty str"
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError(f"path='{path}' must be a non-empty str")
 
-        assert isinstance(
-            extensions, (list, tuple)
-        ), f"{extensions=}. Must be a list or tuple of str"
+        if not isinstance(extensions, (list, tuple)):
+            raise TypeError(f"extensions={extensions} must be a list or tuple of str")
 
         for extension in extensions:
-            assert isinstance(extension, str), f"{extension=} must be a str"
-
-        no_extentions = len(extensions)
+            if not isinstance(extension, str):
+                raise TypeError(f"extension={extension} must be a str")
 
         try:
-            if pathlib.Path(path).exists():
-                path_ptr = pathlib.Path(path)
+            if os.path.exists(path):
+                path_ptr = os.path.abspath(path)
 
-                if path_ptr.is_file():  # Want files in containing directory
-                    path_ptr = pathlib.Path(path).parent
+                if os.path.isfile(path_ptr):
+                    path_ptr = os.path.dirname(path_ptr)
+
                 file_list = [
-                    file.name
-                    for file in path_ptr.iterdir()
-                    if file.is_file()
-                    and (file.suffix[1:] in extensions or no_extentions == 0)
+                    file
+                    for file in os.listdir(path_ptr)
+                    if os.path.isfile(os.path.join(path_ptr, file))
+                    and (not extensions or os.path.splitext(file)[1][1:] in extensions)
                 ]
 
-                return self.RESULT(
+                return self.File_Result(
                     files=file_list,
-                    path=str(path_ptr),
+                    path=path_ptr,
                     error_code=self.Path_Error.OK,
                     error_message="",
                 )
 
-            return self.RESULT(
+            return self.File_Result(
                 files=[],
                 path=path,
                 error_code=self.Path_Error.NOTEXIST,
                 error_message=self.Error_Dict[self.Path_Error.NOTEXIST],
             )
-        except Exception as error:
-            return self.RESULT(
+        except OSError as error:
+            return self.File_Result(
                 files=[],
                 path=path,
                 error_code=self.Path_Error.EXCEPTION,
@@ -1082,19 +1066,20 @@ class File:
 
         Args:
             file_path (str): The file path housing the new folder
+
         Returns:
-            int : 1 Ok, -1 Failed To Create Directory
+            int : 1 if successful, -1 if failed to create directory
         """
         assert (
             isinstance(file_path, str) and file_path.strip() != ""
-        ), f"{file_path=}. Must be a non-empty str"
+        ), f"{file_path=} must be a non-empty str"
 
-        path = pathlib.Path(file_path)
-        path.mkdir(parents=True, exist_ok=False)
-
-        if File.path_exists(file_path):
+        try:
+            os.makedirs(file_path)
             return 1
-        else:
+        except FileExistsError:
+            return 1  # folder already exists
+        except Exception as e:
             return -1
 
     @staticmethod
@@ -1105,21 +1090,23 @@ class File:
             file_path (str): The file path to check
 
         Returns:
-            bool: True - The file path exists, False - it does snot
+            bool: True - The file path exists, False - it does not
 
         """
         assert (
             isinstance(file_path, str) and file_path.strip() != ""
-        ), f"{file_path=}. Must be a non-empty str"
+        ), f"{file_path=} must be a non-empty str"
 
         try:
             path = pathlib.Path(file_path)
 
             if path.is_dir():
                 return True
-        except:
-            return False
 
+            return False
+        except Exception as e:
+            if isinstance(e, (FileNotFoundError, PermissionError)):
+                return False
         return False
 
     @staticmethod
@@ -1163,7 +1150,9 @@ class File:
             path, file = os.path.split(file_path_name)
 
             file_prefix, file_suffix = os.path.splitext(file)
-            if self.file_exists(path=path, file=file_prefix, suffix=file_suffix):
+            if self.file_exists(
+                directory_path=path, file_name=file_prefix, file_extension=file_suffix
+            ):
                 return (path, file)
             else:
                 return ("", "")
@@ -1181,7 +1170,7 @@ class File:
 
         Returns:
             tuple: A tuple of three strings - directory path, file name with prefix, and file extension.
-        
+
         """
         assert (
             isinstance(file_path_name, str) and file_path_name.strip() != ""
@@ -1237,6 +1226,53 @@ class File:
             return -1, f"{file_path_name} Does Not Exist Or Can Not Be Written To"
 
         return 1, ""
+
+    def remove_file(self, file_path: str) -> int:
+        """Removes a file at the specified path.
+
+        Args:
+            file_path (str): The path of the file to remove.
+
+        Returns:
+            int: 1 if the file was successfully removed, -1 otherwise.
+        """
+        assert (
+            isinstance(file_path, str) and file_path.strip() != ""
+        ), f"{file_path=} must be a non-empty string."
+        try:
+            os.remove(file_path)
+            return 1
+        except Exception as e:
+            return -1
+
+    def write_list_to_txt_file(
+        self, str_list: list[str], text_file: str
+    ) -> tuple[int, str]:
+        """Writes a list of strings to a text file.
+
+        Args:
+            str_list (List[str]): The list of strings to write to the text file.
+            text_file (str): The file path to the text file.
+
+        Returns:
+            tuple[int, str]: A tuple containing an integer status code and a string error message, if any.
+                The status code is 1 if the write was successful, and -1 if there was an error.
+
+        """
+        assert isinstance(str_list, list) and all(
+            isinstance(item, str) for item in str_list
+        ), f"{str_list=} must be a list of str"
+        assert (
+            isinstance(text_file, str) and text_file.strip() != ""
+        ), f"{text_file=} must be a non-empty str"
+
+        try:
+            with open(text_file, "w") as f:
+                for text in str_list:
+                    f.write(f"{text}\n")
+            return 1, ""
+        except IOError as e:
+            return -1, f"Error writing file list to {text_file}: {e}"
 
 
 def country_date_formatmask(country_or_format: str = "") -> tuple[str, str]:
