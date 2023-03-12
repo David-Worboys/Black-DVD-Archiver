@@ -797,28 +797,6 @@ def stream_optimise(output_file: str) -> tuple[int, str]:
 
     return 1, ""
 
-
-def get_codec(input_file: str):
-    commands = [
-        sys_consts.FFPROBE,
-        "-v",
-        "error",
-        "-select_streams",
-        "v:0",
-        "-show_entries",
-        "stream=codec_name",
-        "-of",
-        "default=nokey=1:noprint_wrappers=1",
-        input_file,
-    ]
-    result, output = execute_check_output(commands)
-
-    if result == -1:
-        return -1, "Failed To Get Code!"
-
-    return 1, output.strip()
-
-
 def get_nearest_key_frame(
     input_file: str, time: float, direction: str
 ) -> tuple[int, Optional[float]]:
