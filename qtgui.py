@@ -10060,8 +10060,11 @@ class Grid(_qtpyBase_Control):
                             container_tag=f"{row_index}{container_tag}", tag=tag
                         )
                 else:
+                    print(
+                        f'{self.parent_app.widget_exist(item_data.widget.container_tag, tag=f"{row_index}{tag}")=}'
+                    )
                     return self.parent_app.widget_get(
-                        item_data.widget.container_tag, tag=f"{row_index}{tag}"
+                        item_data.widget.container_tag, tag=tag
                     )
 
         return None
