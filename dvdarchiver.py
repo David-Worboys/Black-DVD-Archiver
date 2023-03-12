@@ -21,6 +21,7 @@
 """
 
 import datetime
+import os
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
@@ -32,7 +33,8 @@ import sqldb
 import sys_consts
 import utils
 from dvd import DVD, DVD_Config, File_Def
-from video_file_picker import video_file_picker_popup
+from video_cutter import Video_Cutter_Popup
+from video_file_picker import Video_File_Picker_Popup
 
 # fmt: on
 
@@ -671,8 +673,9 @@ class DVD_Archiver:
             ),
         )
 
-        screen_container = qtg.VBoxContainer(
-            tag="main", align=qtg.ALIGN.RIGHT, width=80
+        screen_container = qtg.FormContainer(
+            tag="main",
+            align=qtg.ALIGN.RIGHT,  # width=80
         ).add_row(main_control_container, qtg.Spacer(), buttons_container)
 
         return screen_container
@@ -702,7 +705,40 @@ class file_control:
         ), f"{event=}. Must be an instance of qtg.Action"
 
         if event.event == qtg.SYSEVENTS.CLICKED:
-            if event.value.row >= 0 and event.value.col >= 0:
+            if event.tag.startswith("grid_button"):
+                dvd_folder = self._db_settings.setting_get("dvd_build_folder")
+
+                if dvd_folder is None or dvd_folder.strip() == "":
+                    qtg.PopError(
+                        title="DVD Build Folder Error...",
+                        message="A DVD Build Folder Must Be Entered Before Making A Video Edit!",
+                    ).show()
+                    return None
+
+                tool_button: qtg.Button = event.widget_get(
+                    container_tag=event.container_tag, tag=event.tag
+                )
+                user_data = tool_button.userdata_get()
+
+                file_folder = user_data[0]
+                file_name = user_data[1]
+                encoding_info = user_data[2]
+
+                print(f"DBG {encoding_info=}")
+
+                file = f"{file_folder}{os.path.sep}{file_name}"
+
+                result = Video_Cutter_Popup(
+                    title="Video File Cutter/Setings",
+                    aspect_ratio=encoding_info["video_dar"][1],
+                    input_file=file,
+                    output_folder=dvd_folder,
+                    encoding_info=encoding_info,
+                ).show()
+
+                print(f"DBG {result=}")
+
+            elif event.value.row >= 0 and event.value.col >= 0:
                 # When the user clicks on a row in the grid, toggle the switch in that row
                 file_grid: qtg.Grid = event.widget_get(
                     container_tag="video_file_controls", tag="video_input_files"
@@ -779,7 +815,7 @@ class file_control:
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        selected_files = video_file_picker_popup(title="Choose Video Files").show()
+        selected_files = Video_File_Picker_Popup(title="Choose Video Files").show()
 
         if selected_files.strip() != "":
             file_handler = utils.File()
@@ -812,6 +848,19 @@ class file_control:
                     else:  # File not in grid already
                         encoding_info = dvdarch_utils.get_file_encoding_info(
                             f"{file_folder}{file_handler.ossep}{file}"
+                        )
+
+                        toolbox = qtg.HBoxContainer(height=1, width=3).add_row(
+                            qtg.Button(
+                                tag=f"grid_button|{rows_loaded + row_index}|{6}",
+                                height=1,
+                                width=1,
+                                tune_vsize=-5,
+                                callback=self.grid_events,
+                                user_data=(file_folder, file, encoding_info),
+                                icon="wrench.svg",
+                                tooltip="Cut Video or Change Settings",
+                            )
                         )
 
                         if encoding_info["video_tracks"][1] == 0:
@@ -867,6 +916,10 @@ class file_control:
                             user_data=encoding_info,
                         )
 
+                        file_grid.row_widget_set(
+                            row=rows_loaded + row_index, col=6, widget=toolbox
+                        )
+
                         row_index += 1
 
             if file_grid.row_count > 0:
@@ -889,7 +942,7 @@ class file_control:
 
             if rejected != "":
                 qtg.PopMessage(
-                    title="These Files Are Not Permitted...", message=rejected, width=80
+                    title="These Files Are Not Permitted...", message=rejected
                 ).show()
 
     def _set_project_standard_duration(self, event: qtg.Action):
@@ -985,28 +1038,28 @@ class file_control:
             qtg.COL_DEF(
                 label="Video File",
                 tag="video_file",
-                width=70,
+                width=69,
                 editable=False,
                 checkable=True,
             ),
             qtg.COL_DEF(
                 label="Width",
                 tag="width",
-                width=7,
+                width=6,
                 editable=False,
                 checkable=False,
             ),
             qtg.COL_DEF(
                 label="Height",
                 tag="height",
-                width=7,
+                width=6,
                 editable=False,
                 checkable=False,
             ),
             qtg.COL_DEF(
-                label="Encoder",
+                label="Enc",
                 tag="encoder",
-                width=7,
+                width=5,
                 editable=False,
                 checkable=False,
             ),
@@ -1021,6 +1074,13 @@ class file_control:
                 label="Duration",
                 tag="Duration",
                 width=7,
+                editable=False,
+                checkable=False,
+            ),
+            qtg.COL_DEF(
+                label="Set",
+                tag="settings",
+                width=4,
                 editable=False,
                 checkable=False,
             ),
