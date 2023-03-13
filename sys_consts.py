@@ -56,7 +56,12 @@ AVERAGE_BITRATE = 5500  # kilobits/sec
 SINGLE_SIDED_DVD_SIZE = 40258730  # kb ~ 4.7GB DVD5
 DOUBLE_SIDED_DVD_SIZE = 72453177  # kb ~ 8.5GB DVD9
 
-VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "VOB")
+# fmt: off
+VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp", 
+                    "3g2", "mj2","mkv","mpg","mpeg","ts", "m2ts", "mts","qt",
+                    "wmv", "asf","flv","f4v","ogg","ogv","rm", "rmvb","divx","mxf",
+                    "dv")
+# fmt: on
 
 EMPTYPALVIDEO = f".{file_sep}audio{file_sep}empty_pal_ac3.mpg"
 EMPTYNTSCVIDEO = f".{file_sep}audio{file_sep}empty_ntsc_ac3.mpg"
@@ -68,6 +73,7 @@ CONVERT = f".{file_sep}tools{file_sep}magick"
 DD = f".{file_sep}tools{file_sep}dd"
 DVDAUTHOR = f".{file_sep}tools{file_sep}dvdauthor"
 FFMPG = f".{file_sep}tools{file_sep}ffmpeg"
+FFPROBE = f".{file_sep}tools{file_sep}ffprobe"
 IDENTIFY = f".{file_sep}tools{file_sep}identify"
 MEDIAINFO = f".{file_sep}tools{file_sep}mediainfo"
 MPEG2ENC = f".{file_sep}tools{file_sep}mpeg2enc"
