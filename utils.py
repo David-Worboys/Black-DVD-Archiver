@@ -30,6 +30,7 @@ import math
 import os
 import pathlib
 import random
+import re
 import shutil
 import string
 import struct
@@ -962,6 +963,85 @@ class File:
         """
         return os.path.sep
 
+    def extract_title(
+        self,
+        name: str,
+        date_regex: str = r"\d{4}[^\d\s]*\d{0,2}[^\d\s]*\d{0,2}",
+        name_parts_regex: str = r"([^\W\d_]+|\d+)",
+        excluded_words: list[str] = [
+            "home",
+            "videos",
+            "dvd",
+            "archiver",
+            "video",
+            "editor",
+            "edits",
+            "trimmed",
+        ],
+        exclude_trailing_numeric: bool = True,
+    ) -> str:
+        """
+        Extracts a meaningful title string from a file/folder name.
+
+        Args:
+            name (str): The name of the file/folder.
+            date_regex (str, optional): A regular expression pattern for matching a date in the name. Defaults to r"\d{4}[^\d\s]*\d{0,2}[^\d\s]*\d{0,2}".
+            name_parts_regex (str, optional): A regular expression pattern for matching individual name parts. Defaults to r"([^\W\d_]+|\d+)".
+            excluded_words (list[str], optional): A list of words to exclude from the extracted title. Defaults to ["home", "videos", "dvd", "archiver", "video", "editor", "edits", "trimmed"].
+            exclude_trailing_numeric (bool, optional): Whether to exclude a trailing numeric character from the extracted title. Defaults to True.
+
+        Returns:
+            str: The extracted title, or "" if no meaningful title could be extracted.
+        """
+        assert isinstance(name, str), "The input name must be a string"
+        assert isinstance(date_regex, str), "The date_regex parameter must be a string"
+        assert isinstance(
+            name_parts_regex, str
+        ), "The name_parts_regex parameter must be a string"
+        assert isinstance(
+            excluded_words, list
+        ), "The excluded_words parameter must be a list"
+        assert all(
+            isinstance(word, str) for word in excluded_words
+        ), "All elements in the excluded_words list must be strings"
+        assert isinstance(
+            exclude_trailing_numeric, bool
+        ), "The exclude_trailing_numeric parameter must be a boolean"
+
+        # Split the file name on whitespace
+        words = name.split()
+
+        # Initialize variables for the title and date
+        title = ""
+        date = ""
+
+        # Loop through the words
+        for word in words:
+            # Exclude any words in the exclude_words list
+            if excluded_words and word.lower() in excluded_words:
+                continue
+
+            # Check if the word contains any digits
+            if any(char.isdigit() for char in word):
+                # Remove any non-digits from the word
+                digits = re.sub(r"\D", "", word)
+                # Try to parse the digits as a date
+                try:
+                    date = datetime.datetime.strptime(digits, "%Y%m%d").strftime(
+                        "%Y %b"
+                    )
+                except ValueError:
+                    pass
+            else:
+                # Add the word to the title
+                title += word.capitalize() + " "
+
+        # Remove any extra spaces
+        title = re.sub(r"\s+", " ", title.strip())
+
+        # Return the title and date
+        return f"{date} - {title}".strip()
+
     @staticmethod
     def file_exists(
         directory_path: str, file_name: str = "", file_extension: str = ""
@@ -1014,16 +1094,12 @@ class File:
 
         Returns:
             File_Result: A named tuple containing a list of files, the path, and any errors encountered.
-        """
-        if not isinstance(path, str) or not path.strip():
-            raise ValueError(f"path='{path}' must be a non-empty str")
-
-        if not isinstance(extensions, (list, tuple)):
-            raise TypeError(f"extensions={extensions} must be a list or tuple of str")
-
-        for extension in extensions:
-            if not isinstance(extension, str):
-                raise TypeError(f"extension={extension} must be a str")
+        """        
+        assert isinstance(path, str) and path.strip() != "", f"{path=}. Must be a non-empty str"
+        assert isinstance(extensions, (list, tuple)), f"{extensions=}. Must be a list or tuple of str"
+        assert all(isinstance(extension, str) for extension in extensions), f"All elements must be str"
+                    
+        file_extensions = [extension.lower() for extension in extensions]
 
         try:
             if os.path.exists(path):
@@ -1036,7 +1112,7 @@ class File:
                     file
                     for file in os.listdir(path_ptr)
                     if os.path.isfile(os.path.join(path_ptr, file))
-                    and (not extensions or os.path.splitext(file)[1][1:] in extensions)
+                    and (not file_extensions or os.path.splitext(file)[1][1:].lower() in file_extensions)
                 ]
 
                 return self.File_Result(
