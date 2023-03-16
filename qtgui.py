@@ -16,7 +16,8 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-# TODO Split file into multiple files
+# TODO Split file into multiple files - well this is bigger than Ben Hur now, needs its own git project,
+# doco, examples etc. Code needs review as well...sigh, where to find the time!
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
@@ -24,7 +25,6 @@ import copy
 import dataclasses
 import datetime
 import functools
-import gc
 import math
 import os
 import pathlib
@@ -65,8 +65,62 @@ MAX_CHARS = 32767
 MENU_SEPERATOR = "---"
 
 
+def get_window_id(
+    parent_app: "QtPyApp",
+    parent: qtW.QWidget | qtW.QFrame | None,
+    self_item: Union[
+        "_Container", "_qtpyBase_Control", "_qtpySDI_Frame", "_Dialog", None
+    ],
+) -> int:
+    """
+    Get the window id (winId) of the parent Qt widget.
+
+    Args:
+        - parent_app (QtPyApp): The parent QtPy application object.
+        - parent (qtW.QWidget | qtW.QFrame | None): The parent widget/frame of the target widget.
+        - self_item (Union["_Container" , "_qtpyBase_Control","_qtpySDI_Frame", "_Dialog", None]):
+        The target widget to get the winId from.
+
+    Returns:
+        int: The winId of the target widget.
+
+    """
+    assert isinstance(
+        parent_app, QtPyApp
+    ), f"{parent_app=}. {type(parent_app)=}. Must be a QtPyApp object"
+    assert parent is None or isinstance(
+        parent, (qtW.QWidget, qtW.QFrame)
+    ), f"{parent=}. {type(parent)=}. Must be a None, QWidget or QFrame object"
+    assert self_item is None or isinstance(
+        self_item, (_Dialog, _Container, _qtpyBase_Control, _qtpySDI_Frame)
+    ), f"{self_item=}. {type(self_item)=}.  Must be a None, _Container or _qtpyBase_Control object"
+
+    if self_item is not None and hasattr(self_item, "dialog"):
+        window_id = self_item.dialog.window().winId()
+    elif self_item is not None and hasattr(self_item, "window"):
+        window_id = self_item.window().winId()
+    elif (
+        self_item is not None
+        and hasattr(self_item, "_widget")
+        and self_item._widget is not None
+    ):  # Cannot use guiwidget_get in the if because if it is None then a runtime error is triggered
+        window_id = self_item.guiwidget_get.window().winId()
+    elif parent is not None and hasattr(parent, "dialog"):
+        window_id = parent.dialog.window().winId()
+    elif parent is not None and hasattr(parent, "window"):
+        window_id = parent.window().winId()
+    elif (
+        parent is not None and hasattr(parent, "_widget") and parent._widget is not None
+    ):  # Cannot use guiwidget_get in the if because if it is None then a runtime error is triggered
+        window_id = parent.guiwidget_get.window().winId()
+    else:
+        window_id = parent_app.main_frame_window_id
+
+    return window_id
+
+
 # An enumeration of all the application events that can be handled by the GUI.
-class SYSEVENTS(IntEnum):
+class Sys_Events(IntEnum):
     """This is used to determine which event handler type is ro be passed to the event handler call when a GUI event is
     triggered.
     """
@@ -117,29 +171,29 @@ class SYSEVENTS(IntEnum):
 # A set of HTML colours.
 TEXT_COLORS = \
     ("Aliceblue", "Antiquewhite", "Aqua", "Aquamarine", "Azure", "Beige", "Bisque", "Black", "BlanchedAlmond",
-     "Blue", "BlueViolet", "Brown", "BurlyWood", "CadetBlue", "Chartreuse", "Chocolate", "Coral", "CornflowerBlue",
-     "Cornsilk", "Crimson", "Cyan", "DarkBlue", "DarkCyan", "DarkGoldenRod", "DarkGray", "DarkGrey", "DarkGreen",
-     "DarkKhaki", "DarkMagenta", "DarkOliveGreen", "DarkOrange", "DarkOrchid", "DarkRed", "DarkSalmon",
-     "DarkSeaGreen", "DarkSlateBlue", "DarkSlateGray", "DarkSlateGrey", "DarkTurquoise", "DarkViolet", "DeepPink",
-     "DeepSkyBlue", "DimGray", "DimGrey", "DodgerBlue", "FireBrick", "FloralWhite", "ForestGreen", "Fuchsia",
-     "Gainsboro", "GhostWhite", "Gold", "GoldenRod", "Gray", "Grey", "Green", "GreenYellow", "HoneyDew", "HotPink",
-     "IndianRed", "Indigo", "Ivory", "Khaki", "Lavender", "LavenderBlush", "LawnGreen", "LemonChiffon", "LightBlue",
-     "LightCoral", "LightCyan", "LightGoldenRodYellow", "LightGray", "LightGrey", "LightGreen", "LightPink",
-     "LightSalmon", "LightSeaGreen", "LightSkyBlue", "LightSlateGray", "LightSlateGrey", "LightSteelBlue",
-     "LightYellow", "Lime", "LimeGreen", "Linen", "Magenta", "Maroon", "MediumAquaMarine", "MediumBlue",
-     "MediumOrchid", "MediumPurple", "MediumSeaGreen", "MediumSlateBlue", "MediumSpringGreen", "MediumTurquoise",
-     "MediumVioletRed", "MidnightBlue", "MintCream", "MistyRose", "Moccasin", "NavajoWhite", "Navy", "OldLace",
-     "Olive", "OliveDrab", "Orange", "OrangeRed", "Orchid", "PaleGoldenRod", "PaleGreen", "PaleTurquoise",
-     "PaleVioletRed", "PapayaWhip", "PeachPuff", "Peru", "Pink", "Plum", "PowderBlue", "Purple", "Red", "RosyBrown",
-     "RoyalBlue", "SaddleBrown", "Salmon", "SandyBrown", "SeaGreen", "SeaShell", "Sienna", "Silver", "SkyBlue",
-     "SlateBlue", "SlateGray", "SlateGrey", "Snow", "SpringGreen", "SteelBlue", "Tan", "Teal", "Thistle", "Tomato",
-     "Turquoise", "Violet", "Wheat", "White", "WhiteSmoke", "Yellow", "YellowGreen"
-     )
+        "Blue", "BlueViolet", "Brown", "BurlyWood", "CadetBlue", "Chartreuse", "Chocolate", "Coral", "CornflowerBlue",
+        "Cornsilk", "Crimson", "Cyan", "DarkBlue", "DarkCyan", "DarkGoldenRod", "DarkGray", "DarkGrey", "DarkGreen",
+        "DarkKhaki", "DarkMagenta", "DarkOliveGreen", "DarkOrange", "DarkOrchid", "DarkRed", "DarkSalmon",
+        "DarkSeaGreen", "DarkSlateBlue", "DarkSlateGray", "DarkSlateGrey", "DarkTurquoise", "DarkViolet", "DeepPink",
+        "DeepSkyBlue", "DimGray", "DimGrey", "DodgerBlue", "FireBrick", "FloralWhite", "ForestGreen", "Fuchsia",
+        "Gainsboro", "GhostWhite", "Gold", "GoldenRod", "Gray", "Grey", "Green", "GreenYellow", "HoneyDew", "HotPink",
+        "IndianRed", "Indigo", "Ivory", "Khaki", "Lavender", "LavenderBlush", "LawnGreen", "LemonChiffon", "LightBlue",
+        "LightCoral", "LightCyan", "LightGoldenRodYellow", "LightGray", "LightGrey", "LightGreen", "LightPink",
+        "LightSalmon", "LightSeaGreen", "LightSkyBlue", "LightSlateGray", "LightSlateGrey", "LightSteelBlue",
+        "LightYellow", "Lime", "LimeGreen", "Linen", "Magenta", "Maroon", "MediumAquaMarine", "MediumBlue",
+        "MediumOrchid", "MediumPurple", "MediumSeaGreen", "MediumSlateBlue", "MediumSpringGreen", "MediumTurquoise",
+        "MediumVioletRed", "MidnightBlue", "MintCream", "MistyRose", "Moccasin", "NavajoWhite", "Navy", "OldLace",
+        "Olive", "OliveDrab", "Orange", "OrangeRed", "Orchid", "PaleGoldenRod", "PaleGreen", "PaleTurquoise",
+        "PaleVioletRed", "PapayaWhip", "PeachPuff", "Peru", "Pink", "Plum", "PowderBlue", "Purple", "Red", "RosyBrown",
+        "RoyalBlue", "SaddleBrown", "Salmon", "SandyBrown", "SeaGreen", "SeaShell", "Sienna", "Silver", "SkyBlue",
+        "SlateBlue", "SlateGray", "SlateGrey", "Snow", "SpringGreen", "SteelBlue", "Tan", "Teal", "Thistle", "Tomato",
+        "Turquoise", "Violet", "Wheat", "White", "WhiteSmoke", "Yellow", "YellowGreen"
+        )
 # fmt: on
 
 
-# `LAYOUT` is an enumeration of the possible layout types for a `Form` or `Grid` object
-class LAYOUT(IntEnum):
+# `Layout` is an enumeration of the possible layout types for a `Form` or `Grid` object
+class Layout(IntEnum):
     FORM = 0
     GRID = 1
     HORZ = 2
@@ -147,8 +201,8 @@ class LAYOUT(IntEnum):
 
 
 @dataclasses.dataclass(slots=True)
-# A CHAR_PIXEL_SIZE is a class that used by widgets to determine char size, it has two attributes: height and width
-class CHAR_PIXEL_SIZE:
+# A Char_Pixel_Size is a class that used by widgets to determine char size, it has two attributes: height and width
+class Char_Pixel_Size:
     height: int
     width: int
 
@@ -163,8 +217,8 @@ class CHAR_PIXEL_SIZE:
 
 
 @dataclasses.dataclass(slots=True)
-# `SIZE` is a class used by widget controls that has two attributes, `height` and `width`
-class SIZE:
+# `Size` is a class used by widget controls that has two attributes, `height` and `width`
+class Size:
     height: int
     width: int
 
@@ -179,8 +233,8 @@ class SIZE:
 
 
 @dataclasses.dataclass(slots=True)
-# `COL_DEF` is a class used by combo boxes that has four attributes: `label`, `tag`, `width`, and `editable`
-class COL_DEF:
+# `Col_Def` is a class used by combo boxes that has four attributes: `label`, `tag`, `width`, and `editable`
+class Col_Def:
     label: str
     tag: str
     width: int
@@ -197,8 +251,8 @@ class COL_DEF:
 
 
 @dataclasses.dataclass(slots=True)
-# `COMBO_DATA` is a class used by combo boxes that contains an index, a display string, and a data value
-class COMBO_DATA:
+# `Combo_Data` is a class used by combo boxes that contains an index, a display string, and a data value
+class Combo_Data:
     index: int
     display: str
     data: None | str | int | float | bytes | bool
@@ -221,7 +275,7 @@ class COMBO_DATA:
 
 @dataclasses.dataclass(slots=True)
 # `COMBO_ITEM` is a class used by combo boxes that holds a display string, a data value, an icon, and a user data value.
-class COMBO_ITEM:
+class Combo_Item:
     display: str
     data: None | str | int | float | bytes | bool
     icon: None | str | qtG.QPixmap | qtG.QIcon
@@ -243,8 +297,8 @@ class COMBO_ITEM:
 
 
 @dataclasses.dataclass(slots=True)
-# `RECT_CHANGED` is a class used byy rectangles to that has two attributes, `rect_id` and `coords`
-class RECT_CHANGED:
+# `Rect_Changed` is a class used byy rectangles to that has two attributes, `rect_id` and `coords`
+class Rect_Changed:
     rect_id: str
     coords: Coords
 
@@ -279,16 +333,16 @@ class Overlap_Rect:
 
 
 # By default, widgets are 10 chars wide by 1 char high
-WIDGET_SIZE = SIZE(height=1, width=10)  # In CHARACTERS
-BUTTON_SIZE = SIZE(height=2, width=10)  # In CHARACTERS
-CHECKBOX_SIZE = SIZE(height=1, width=10)  # In CHARACTERS
-COMBOBOX_SIZE = SIZE(height=2, width=10)  # In CHARACTERS
-LINEEDIT_SIZE = SIZE(height=1, width=19)  # In CHARACTERS
-RADIOBUTTON_SIZE = SIZE(height=1, width=10)  # In CHARACTERS
+WIDGET_SIZE = Size(height=1, width=10)  # In CHARACTERS
+BUTTON_SIZE = Size(height=2, width=10)  # In CHARACTERS
+CHECKBOX_SIZE = Size(height=1, width=10)  # In CHARACTERS
+COMBOBOX_SIZE = Size(height=2, width=10)  # In CHARACTERS
+LINEEDIT_SIZE = Size(height=1, width=19)  # In CHARACTERS
+RADIOBUTTON_SIZE = Size(height=1, width=10)  # In CHARACTERS
 
 
 # Widget alignment
-class ALIGN(Enum):
+class Align(Enum):
     LEFT = qtC.Qt.AlignLeft
     CENTER = qtC.Qt.AlignCenter
     CENTERLEFT = qtC.Qt.AlignCenter | qtC.Qt.AlignLeft
@@ -308,17 +362,17 @@ class ALIGN(Enum):
 
 # Creates a dictionary with the keys being the values of the enum ALIGN and the values being the corresponding CSS
 # values.
-ALIGN_SS_TEXT = {
-    ALIGN.LEFT: "text-align:left",
-    ALIGN.CENTER: "text-align:center",
-    ALIGN.RIGHT: "text-align:right",
-    ALIGN.TOP: "text-align:top",
-    ALIGN.BOTTOM: "text-align:bottom",
+Align_SS_Text = {
+    Align.LEFT: "text-align:left",
+    Align.CENTER: "text-align:center",
+    Align.RIGHT: "text-align:right",
+    Align.TOP: "text-align:top",
+    Align.BOTTOM: "text-align:bottom",
 }
 
 
 # Font Properties
-class FONTWEIGHT(Enum):
+class Font_Weight(Enum):
     THIN = qtG.QFont.Thin
     EXTRALIGHT = qtG.QFont.ExtraLight
     LIGHT = qtG.QFont.Light
@@ -331,35 +385,35 @@ class FONTWEIGHT(Enum):
 
 
 # Creating a dictionary that maps the font weight to a string.
-FONTWEIGHT_TEXT = {
-    FONTWEIGHT.THIN: "thin",
-    FONTWEIGHT.EXTRALIGHT: "extralight",
-    FONTWEIGHT.LIGHT: "light",
-    FONTWEIGHT.NORMAL: "normal",
-    FONTWEIGHT.MEDIUM: "medium",
-    FONTWEIGHT.DEMIBOLD: "demibold",
-    FONTWEIGHT.BOLD: "bold",
-    FONTWEIGHT.EXTRABOLD: "extrabold",
-    FONTWEIGHT.BLACK: "black",
+Font_Weight_Text = {
+    Font_Weight.THIN: "thin",
+    Font_Weight.EXTRALIGHT: "extralight",
+    Font_Weight.LIGHT: "light",
+    Font_Weight.NORMAL: "normal",
+    Font_Weight.MEDIUM: "medium",
+    Font_Weight.DEMIBOLD: "demibold",
+    Font_Weight.BOLD: "bold",
+    Font_Weight.EXTRABOLD: "extrabold",
+    Font_Weight.BLACK: "black",
 }
 
 
 # The `FONTSTYLE` class is an enumeration of the possible font styles
-class FONTSTYLE(IntEnum):
+class Font_Style(IntEnum):
     NORMAL = 0
     ITALIC = 1
     OBLIQUE = 2
 
 
 # Widget frame appearance
-class FRAME(Enum):
+class Frame(Enum):
     PLAIN = qtW.QFrame.Plain
     RAISED = qtW.QFrame.Raised
     SUNKEN = qtW.QFrame.Sunken
 
 
 # Widget frame style
-class FRAMESTYLE(Enum):
+class Frame_Style(Enum):
     BOX = qtW.QFrame.Box
     PANEL = qtW.QFrame.Panel
     HLINE = qtW.QFrame.HLine
@@ -370,7 +424,7 @@ class FRAMESTYLE(Enum):
 
 
 # The `CURSOR` class is an enumeration of the different types of cursors that can be used in a `Qt` application
-class CURSOR(Enum):
+class Cursor(Enum):
     arrow = qtC.Qt.ArrowCursor
     arrowup = qtC.Qt.UpArrowCursor
     bitmap = qtC.Qt.BitmapCursor
@@ -396,7 +450,7 @@ class CURSOR(Enum):
 
 
 # `SYSICON` is a class that contains all the system icons that can be used in a `a `Qt` application
-class SYSICON(Enum):
+class Sys_Icon(Enum):
     arrowback = qtW.QStyle.SP_ArrowBack
     arrowdown = qtW.QStyle.SP_ArrowDown
     arrowforward = qtW.QStyle.SP_ArrowForward
@@ -512,14 +566,14 @@ class SYSICON(Enum):
 
 
 @contextmanager
-def sys_cursor(cursor: CURSOR):
+def sys_cursor(cursor: Cursor):
     """
     Sets the cursor to the cursor passed in, and then restores the cursor to the original cursor.
 
     Args:
         cursor (CURSOR): CURSOR
     """
-    assert isinstance(cursor, CURSOR), f"{cursor=}. Must Be CURSOR"
+    assert isinstance(cursor, Cursor), f"{cursor=}. Must Be CURSOR"
     try:
         qtW.QApplication.setOverrideCursor(qtG.QCursor(cursor.value))
         yield
@@ -527,14 +581,14 @@ def sys_cursor(cursor: CURSOR):
         qtW.QApplication.restoreOverrideCursor()
 
 
-def cursor_on(cursor: CURSOR):
+def cursor_on(cursor: Cursor):
     """
     Sets the cursor to the specified cursor type
 
     Args:
         cursor (CURSOR): CURSOR
     """
-    assert isinstance(cursor, CURSOR), f"{cursor=}. Must Be CURSOR"
+    assert isinstance(cursor, Cursor), f"{cursor=}. Must Be CURSOR"
     if qtW.QApplication is not None and qtW.QApplication.instance() is not None:
         qtW.QApplication.setOverrideCursor(qtG.QCursor(cursor.value))
 
@@ -636,6 +690,7 @@ class _qtpyBase:
             raise RuntimeError(f"{parent=} is not an instance of _qtpyBase")
 
         self._parent = parent
+        window_id = -1
 
     def dump(self) -> None:
         """Prints all the attributes of an object"""
@@ -922,8 +977,8 @@ class Colors(_qtpyBase):
 class Widget_Frame(_qtpyBase):
     """Widget_Frame` is a class that defines the style of the frame around a widget"""
 
-    frame_style: FRAMESTYLE = FRAMESTYLE.WPANEL
-    frame: FRAME = FRAME.SUNKEN
+    frame_style: Frame_Style = Frame_Style.WPANEL
+    frame: Frame = Frame.SUNKEN
     line_width: int = 3
     midline_width: int = 0
 
@@ -933,10 +988,10 @@ class Widget_Frame(_qtpyBase):
         correct type and that the values of `line_width` and `midline_width` are greater than or equal to zero
         """
         assert isinstance(
-            self.frame_style, FRAMESTYLE
+            self.frame_style, Frame_Style
         ), f"frame_style <{self.frame_style}> must be of type FRAMESTYLE"
         assert isinstance(
-            self.frame, FRAME
+            self.frame, Frame
         ), f"frame <{self.frame}> must be of type FRAME"
 
         assert (
@@ -1015,8 +1070,8 @@ class Font(_qtpyBase):
 
     font_name: str = ""
     size: int = DEFAULT_FONT_SIZE
-    weight: FONTWEIGHT = FONTWEIGHT.NORMAL
-    style: FONTSTYLE = FONTSTYLE.NORMAL
+    weight: Font_Weight = Font_Weight.NORMAL
+    style: Font_Style = Font_Style.NORMAL
     backcolor: str = ""
     forecolor: str = ""
     selectback: str = ""
@@ -1032,11 +1087,11 @@ class Font(_qtpyBase):
         ), f"{self.size=}. Must be int > 0"
 
         assert isinstance(
-            self.weight, FONTWEIGHT
+            self.weight, Font_Weight
         ), f"{self.weight=}. Is not a valid FONTWEIGHT"  # and self.weight in FONTWEIGHT
 
         assert isinstance(
-            self.style, FONTSTYLE
+            self.style, Font_Style
         ), f"{self.style=}. Is not a valid FONTSTYLE"
         assert isinstance(self.backcolor, str), f"{self.backcolor=}. Must be str"
         assert isinstance(self.forecolor, str), f"{self.forecolor=}. Must be str"
@@ -1044,11 +1099,234 @@ class Font(_qtpyBase):
         assert isinstance(self.selectfore, str), f"{self.selectfore=}. Must be str"
 
 
+# Private Classes
 class _qtpyBaseFrame(qtW.QMainWindow, _qtpyBase):
     """The _qtyBaseFrame class is a base class for SDI aND MDI frames # TODO: Add MDI support"""
 
     def __init__(self):
         super().__init__()
+
+
+# TODO MDI frame
+class _qtpyFrame(_qtpyBaseFrame):
+    """A class that creates an ancestral frame that can be used to create a GUI with either an SDI or MDI frame."""
+
+    parent_app: "QtPyApp"
+    title: str = ""
+    callback: Optional[Callable] = None
+    tag: str = ""
+    max_height: int = 1080
+    max_width: int = 1920
+    maximized: bool = False
+
+    def __init__(
+        self,
+        parent_app: "QtPyApp",
+        title: str = "",
+        callback: Optional[Callable] = None,
+        tag: str = "",
+        max_height: int = 1080,
+        max_width: int = 1920,
+        maximized: bool = False,
+    ):
+        """
+        A constructor for the class that performs suitable argument checks.
+
+        Args:
+            parent_app (QtPyApp): The parent app that this frame is a part of.
+            title (str): str = ""
+            callback (Optional[Callable]): This method is called when some event is propagated to the frame.
+            tag (str): str = ""
+            max_height (int): int = 1080,. Defaults to 1080
+            max_width (int): int = 1920,. Defaults to 1920
+            maximized (bool): bool = False. Defaults to False
+        """
+        self.parent_app = parent_app
+        self.title = title
+        self.callback = callback
+        self.tag = tag
+        self.max_height = max_height
+        self.max_width = max_width
+        self.maximized = maximized
+
+        super().__init__()
+
+        assert isinstance(
+            self.parent_app, QtPyApp
+        ), f"{self.parent_app=}. Must be an instance of QtPyApp"
+
+        _qtpyBase.__init__(self, parent=self.parent_app)
+
+        assert (
+            isinstance(self.title, str) and self.title.strip() != ""
+        ), f"{self.title=}. Must be a non-empty str"
+
+        assert (
+            isinstance(self.callback, Callable) or self.callback is None
+        ), f"{self.callback=}. Must be None | types.FunctionType, types.LambdaType, types.MethodType"
+
+        assert isinstance(self.tag, str), f"{self.tag=}. Must be str"
+
+        assert isinstance(self.max_height, int), f"{self.max_height=}. Must be int"
+        assert isinstance(self.max_width, int), f"{self.max_width=}. Must be int"
+        assert isinstance(self.maximized, bool), f"{self.maximized=}. Must be bool"
+
+        self.parent_app.available_width = self.screen().availableSize().width()
+        self.parent_app.available_height = self.screen().availableSize().height()
+
+        # Force frame to fit on available screen
+        if self.screen().availableSize().width() <= self.max_width:
+            self.max_width = self.screen().availableSize().width()
+
+        if self.screen().availableSize().height() <= self.max_height:
+            self.max_height = self.screen().availableSize().height()
+
+        if self.maximized:
+            self.showMaximized()
+
+        # TODO Needs modifying for resizing
+        self.setMaximumHeight(self.max_height)
+        self.setMaximumWidth(self.max_width)
+        self.setMinimumHeight(self.max_height)
+        self.setMinimumWidth(self.max_width)
+        self.resize(self.max_width, self.max_height)
+
+    def closeEvent(self, event: QCloseEvent):
+        """
+        The function is called when the sheet is closed. Overrides the closeEvent method of QWidget.
+
+        - If the window has a callback method, then the callback function is called.
+        - If the callback method returns 1, then the window is closed.
+        - If the callback method returns 0, then the window is not closed.
+        - If the window does not have a callback method, then the window is closed.
+
+        Args:
+          event (QCloseEvent): The event that was trigger of the closeEvent.
+        """
+        if self.callback is not None:
+            qtpyevent: Sys_Events = Sys_Events.APPCLOSED
+
+            assert (
+                self.callback.__code__.co_argcount <= 2
+            ), "action events have 1 argument - action"
+
+            window_id = get_window_id(self.parent_app, None, self)
+
+            result = _Event_Handler(parent_app=self.parent_app).event(
+                window_id=window_id,
+                callback=self.callback,
+                container_tag="",
+                tag=self.tag,
+                event=qtpyevent,
+                action=self.callback.__name__,
+                value=None,
+                widget_dict=self.parent_app.widget_dict_get(
+                    window=window_id, container_tag=self.title
+                ),
+                parent=self.parent_get,
+                control_name=self.__class__.__name__,
+            )
+
+            if result == 1:  # Allow window to close
+                event.accept()
+            else:
+                event.ignore()
+
+        else:
+            event.accept()
+
+    def open_sheet(
+        self,
+        main_frame: "_qtpyFrame",
+        sheet_layout: "_qtpyBase_Control",
+        callback: list[types.FunctionType | types.MethodType | types.LambdaType] = None,
+    ):
+        """Called when a sheet is opened and creates a widget from the sheet layout.
+
+        Args: main_frame ("_qtpyFrame"): The main frame that the sheet will be attached to.
+        sheet_layout (_qtpyBase_Control): _Container callback types.FunctionType | types.MethodType | types.LambdaType:
+            This is a method that is called when the sheet is opened.
+        """
+        assert isinstance(
+            main_frame, _qtpyFrame
+        ), f"{main_frame=}>. Must be an instance of _qtpyBaseFrame"
+
+        assert isinstance(
+            sheet_layout, _Container
+        ), f"{sheet_layout=}. Must be an instance of VBoxContainer, HBoxContainer,GridContainer"
+
+        assert callback is None or callable(
+            callback
+        ), f"{callback=} is a <function|method|labda> called when a sheet opens"
+
+        widget = sheet_layout._create_widget(
+            parent_app=self.parent_app,
+            parent=self,
+            container_tag=str(uuid.uuid1()) if self.tag.strip() == "" else self.tag,
+        )
+
+
+class _qtpySDI_Frame(_qtpyFrame):
+    """A subclass of the _qtpyFrame class. It is used to create a single document interface (SDI) window."""
+
+    def __init__(
+        self,
+        parent_app: "QtPyApp",
+        title: str = "",
+        callback: Optional[Callable] = None,
+        tag: str = "",
+        max_height: int = 1000,
+        max_width: int = 1920,
+        maximized: bool = False,
+    ):
+        """Constructor for the class. It performs a correctness checks on the input parameters and sets innstance
+        variables as needed.
+
+        Args:
+            parent_app (QtPyApp): The parent application.
+            title (str): The title of the window.
+            callback (Optional[Callable]): This is the method that will be called when an event is passed to the frame.
+            tag (str): tag name of the SDI window.
+            max_height (int): int = 1000,. Defaults to 1000
+            max_width (int): int = 1920,. Defaults to 1920
+            maximized (bool): bool = False,. Defaults to False
+        """
+        assert isinstance(
+            parent_app, QtPyApp
+        ), f"{parent_app=}. Must be an instance of QtPyApp"
+        assert isinstance(title, str), f"{title=}. Must be str"
+        assert callback is None or isinstance(
+            callback, Callable
+        ), f"{callback=}. Must be None|func|method|lambda"
+        assert isinstance(tag, str), f"{tag=}. Must be str"
+        assert (
+            isinstance(max_height, int) and max_height > 0
+        ), f"{max_height=}. Must be int > 0"
+        assert (
+            isinstance(max_width, int) and max_width > 0
+        ), f"{max_height=}. Must be int > 0"
+        assert isinstance(maximized, bool), f"{maximized=}. Must be bool"
+
+        super().__init__(
+            parent_app=parent_app,
+            title=title,
+            callback=callback,
+            tag=tag,
+            max_height=max_height,
+            max_width=max_width,
+            maximized=maximized,
+        )
+
+        parent_app.main_frame_window_id = self.window().winId()
+
+        self.setWindowTitle(self.title)
+
+        self.parent_app.widget_add(
+            window=parent_app.main_frame_window_id,
+            container_tag=title,
+            tag=tag,
+            widget=self,
+        )
 
 
 class _Event_Filter(qtC.QObject):
@@ -1112,6 +1390,355 @@ class _Event_Filter(qtC.QObject):
         return False
 
 
+@dataclasses.dataclass(slots=True)
+# Using slots for better performance. But had to remove some inheritance to do so
+class _Widget_Registry:
+    """Widget Registry Class: Stores a reference to all Qtpy GUI widgets"""
+
+    # ===== Helper Class
+    @dataclasses.dataclass(slots=True)
+    class _widget_entry:
+        # `_widget_entry` is a class that stores the widget details.
+        container_tag: str
+        tag: str
+        widget: _qtpyBase
+
+    # ===== Main
+    _widget_dict: dict = field(default_factory=dict)
+
+    def __init__(self):
+        """Sets up the _Widget_Registry class instance"""
+        self._widget_dict = {}
+
+    def widget_add(
+        self, window_id: int, container_tag: str, tag: str, widget: _qtpyBase
+    ):
+        """Adds a widget to the container
+        Args:
+            window_id (int): The WinId (Window Id) of the window housing the widget
+            container_tag (str): Tag name of container
+            tag (str): Tag name of Tag
+            widget (_qtpyBase_Control): Parent widget that the new widget will be assigned to
+        """
+        assert (
+            isinstance(window_id, int) and window_id > 0
+        ), f"{window_id=}. Must be int > 0"
+        assert (
+            isinstance(container_tag, str) and container_tag.strip() != ""
+        ), f"{container_tag=}. Must be a non-empty str"
+        assert (
+            isinstance(tag, str) and tag.strip() != ""
+        ), f"{tag=}. Must be a non-empty str"
+        assert issubclass(
+            type(widget), (_qtpyBase)
+        ), f"widget <{widget}> <{type(widget)}> must be a sub_class of _qtpyBase"
+
+        container_tag = f"{window_id}_{container_tag}"
+
+        if container_tag in self._widget_dict:
+            if tag in self._widget_dict[container_tag]:
+                self.widget_del(container_tag, tag)
+
+        if container_tag not in self._widget_dict:
+            self._widget_dict[container_tag] = {}
+
+        self._widget_dict[container_tag].update(
+            {
+                tag: self._widget_entry(
+                    container_tag=container_tag, tag=tag, widget=widget
+                )
+            }
+        )
+
+    def widget_del(
+        self, window_id: int, container_tag: str, tag: str, level: int = 0
+    ) -> None:
+        """Deletes a widget from the widget stack. If it is the last widget in the container then the container is
+        deleted
+        Args:
+            window_id (int): The WinId (Window Id) of the window housing the widget
+            container_tag (str): The container tag name
+            tag (str): The widget tag name
+            level (int): Used for debug, no need for user to set
+        Returns:
+        """
+
+        assert (
+            isinstance(window_id, int) and window_id >= 0
+        ), f"{window_id=}.Must be int > 0"
+        assert (
+            isinstance(container_tag, str) and container_tag.strip() != ""
+        ), f"{container_tag=}. Must be a non-empty str"
+        assert (
+            isinstance(tag, str) and tag.strip() != ""
+        ), f"{tag=}. Must be a non-empty str"
+
+        container_tag = f"{window_id}_{container_tag}"
+
+        # Dev Note DAW 2022/12/02: This code is very sensitive to changes..tried half-way to sunday to improve,  but
+        # even the smallest change eventually leads to problems (C++ object not found, segv etc.)
+        if container_tag in self._widget_dict:
+            for item in reversed(tuple(self._widget_dict[container_tag].values())):
+                if f"{window_id}_{item.tag}" == container_tag:
+                    continue
+
+                if isinstance(item.widget, (_Container, Grid)):
+                    # Down the rabbit hole and and blow it all away
+                    self.widget_del(
+                        window_id=window_id,
+                        container_tag=item.tag,
+                        tag="-",
+                        level=level + 1,
+                    )
+
+                    if shiboken6.isValid(item.widget._widget):
+                        item.widget._widget.deleteLater()
+
+                    self._widget_dict[container_tag].pop(item.tag)
+
+                elif tag == "-" or container_tag == tag:  # Delete every item
+                    if shiboken6.isValid(item.widget._widget):
+                        item.widget._widget.deleteLater()
+                    self._widget_dict[container_tag].pop(item.tag)
+
+                    continue
+                elif tag == item.tag:  # Delete only this item
+                    if shiboken6.isValid(item.widget._widget):
+                        item.widget._widget.deleteLater()
+
+                    self._widget_dict[container_tag].pop(item.tag)
+
+                    return None
+
+            if len(self._widget_dict[container_tag]) <= 1:
+                self._widget_dict.pop(container_tag)
+
+        return None
+
+    def widget_gui_controls_get(
+        self, window_id: int, container_tag: str
+    ) -> list["_qtpyBase_Control"]:
+        """Returns a list of all _qtpyBase_Control widgets in a given container.
+
+        Args:
+            window_id (int): The WinId (Window Id) of the window housing the widget
+            container_tag (str): The tag name of the container to search.
+
+        Returns:
+            list[_qtpyBase_Control]: A list of _qtpyBase_Control widgets that match the container tag.
+
+        Raises:
+            AssertionError: If container_tag is not a non-empty string.
+        """
+
+        assert (
+            isinstance(window_id, int) and window_id >= 0
+        ), f"{window_id=}.Must be int > 0"
+        assert (
+            isinstance(container_tag, str) and container_tag.strip() != ""
+        ), f"{container_tag=}. Must be a non-empty str."
+
+        container_tag = f"{window_id}_{container_tag}"
+
+        if container_tag not in self._widget_dict:
+            return []
+
+        return [
+            item.widget
+            for item in self._widget_dict[container_tag].values()
+            if isinstance(item.widget, _qtpyBase_Control)
+        ]
+
+    def widget_dict_get(
+        self, window_id: int, container_tag: str
+    ) -> dict[str, types.FunctionType | types.LambdaType | types.MethodType]:
+        """Returns the dictionary associated with the provided container tag
+        Args:
+            window_id (int): The WinId (Window Id) of the window housing the widget
+            container_tag (str) : Tag of the container object
+        Returns:
+            Dict (Dict[str, Union[types.FunctionType, types.LambdaType, types.MethodType]]) : Dictionary of container object
+        """
+        assert (
+            isinstance(window_id, int) and window_id >= 0
+        ), f"{window_id=}.Must be int > 0"
+        assert (
+            isinstance(container_tag, str) and container_tag.strip() != ""
+        ), f"{container_tag=}>. Must be a non-empty str"
+
+        container_tag = f"{window_id}_{container_tag}"
+
+        assert (
+            container_tag in self._widget_dict
+        ), f"{container_tag=}> is not in widget_dict! "  # {self.print_dict()}"  # <{self._widget_dict}>"
+
+        return self._widget_dict[container_tag]
+
+    def widget_exist(self, window_id: int, container_tag: str, tag: str) -> bool:
+        """Determines if a widget exists in the container
+        Args:
+            window_id (int): The WinId (Window Id) of the window housing the widget
+            container_tag (str): The container tag of the container widget that you want to check if the widget exists in.
+            tag (str): The tag of the widget to be added.
+        Returns:
+            A boolean value.
+        """
+        assert (
+            isinstance(window_id, int) and window_id >= 0
+        ), f"{window_id=}.Must be int > 0"
+        assert (
+            isinstance(container_tag, str) and container_tag.strip() != ""
+        ), f"{container_tag=}. Must be a non-empty str"
+
+        assert (
+            isinstance(tag, str) and tag.strip() != ""
+        ), f"{tag=}. Must be a non-empty str"
+
+        container_tag = f"{window_id}_{container_tag}"
+
+        if container_tag not in self._widget_dict:
+            return False
+        elif tag in self._widget_dict[container_tag]:
+            return True
+        else:
+            found = any(  # Tag Check
+                value.tag == tag
+                and key != value.container_tag  # Same as container tag, Ignore
+                for key, value in tuple(self._widget_dict[container_tag].items())
+            ) or any(  # Container Check
+                self.widget_exist(window_id=window_id, container_tag=key, tag=tag)
+                for key, value in tuple(self._widget_dict[container_tag].items())
+                if isinstance(value.widget, _Container)
+            )
+
+            if found:
+                return True
+
+        return False
+
+    def widget_get(
+        self, window_id: int, container_tag: str = "", tag: str = ""
+    ) -> "_qtpyBase_Control":
+        """Recursively searches through the widget_dict for the widget with the given tag and container_tag.
+        If it doesn't find it, it raises an AssertionError. If it does find it, it returns the widget.
+
+        Args:
+            window_id (int): The WinId (Window Id) of the window housing the widget
+            container_tag (str): The name of the container that the widget is in.
+            tag (str): The tag name  of the widget you want to get.
+        Returns:
+            _qtpyBase_Control : The wanted widget .
+        """
+        assert (
+            isinstance(window_id, int) and window_id >= 0
+        ), f"{window_id=}.Must be int > 0"
+        assert (
+            isinstance(container_tag, str) and container_tag.strip() != ""
+        ), f"{container_tag=}. Must be a non-empty str"
+        assert (
+            isinstance(tag, str) and tag.strip() != ""
+        ), f"{tag=}. Must be a non-empty str"
+
+        container_tag = f"{window_id}_{container_tag}"
+
+        assert (
+            container_tag in self._widget_dict
+        ), f"{container_tag=} is not in widget_dict! {tag=} "
+
+        if tag in self._widget_dict[container_tag]:
+            return self._widget_dict[container_tag][tag].widget
+        else:
+            # First Search the container and it sub-containers for the tag
+            for key, value in tuple(self._widget_dict[container_tag].items()):
+                if key == value.container_tag:  # Same container, Ignore
+                    continue
+
+                if isinstance(value.widget, _Container):
+                    return self.widget_get(
+                        window_id=window_id, container_tag=key, tag=tag
+                    )
+                else:
+                    if value.tag == tag:
+                        return self._widget_dict[value.container_tag][value.tag]
+
+            # If that fails, ferret through the widget_dict and see if we can find the tag
+            for key in tuple(self._widget_dict.keys()):
+                if key == container_tag:
+                    continue
+
+                if tag in self._widget_dict[key]:
+                    return self._widget_dict[key][tag].widget
+
+        raise AssertionError(
+            f"{container_tag=} {tag=}. {tag=} Not Found In {container_tag=} or sub-containers "
+        )
+
+    def print_dict(
+        self,
+        _widget_items: dict | None = None,
+        _delim: str = "*",
+        file: str = "widget_dict_dump.txt",
+    ) -> str:
+        """Prints the contents of a dictionary, and if the value is a dictionary, it will recursively print the
+        contents of that dictionary. Used for debugging.
+
+        Args:
+            _widget_items (dict | None): This is the dictionary that you want to print. If you don't pass one, it
+                will print the entire widget dictionary.
+            _delim (str): This is the delimiter that will be used to print the dictionary. Defaults to "*".
+            file (str): The name of the file to write the output to. If None, it will only print to the console.
+
+        Returns:
+            str: The output string that was printed or written to a file.
+
+        Raises:
+            AssertionError: If the type of the _widget_items argument is not a dictionary or None, or if the type of the
+                _delim argument is not a string.
+
+        Examples:
+            To print the entire widget dictionary to the console:
+            >>> my_widget = MyWidget()
+            >>> my_widget.print_dict()
+
+            To print a specific dictionary to a file:
+            >>> my_widget = MyWidget()
+            >>> my_dict = {"key1": {"key2": "value1"}, "key3": "value2"}
+            >>> my_widget.print_dict(_widget_items=my_dict, file="output.txt")
+        """
+
+        assert isinstance(
+            _widget_items, (type(None), dict)
+        ), f"{_widget_items=}. Must be a Dict or None"
+        assert isinstance(_delim, str), f"{_delim=}. Must be a str"
+
+        if _widget_items is None:
+            _widget_items = self._widget_dict
+
+        output = ""
+        for key, value in _widget_items.items():
+            if isinstance(value, dict):
+                output += f"{_delim} {key} [\n"
+                output += self.print_dict(
+                    _widget_items=value, _delim=_delim + "*", file=None
+                )
+                output += f"{_delim} ]\n"
+            else:
+                if hasattr(value.widget, "_widget") and shiboken6.isValid(
+                    value.widget._widget
+                ):
+                    output += f"{_delim} {key} : {value}\n"
+                else:
+                    output += f"{_delim} {key} She broken!\n"
+
+        if file:
+            with open(file, "w") as f:
+                f.write(output)
+        else:
+            print(output)
+
+        return output
+
+
 @dataclasses.dataclass
 class _qtpyBase_Control(_qtpyBase):
     """Base control of qypy gui controls"""
@@ -1123,8 +1750,8 @@ class _qtpyBase_Control(_qtpyBase):
     callback: Optional[Callable] = None
     width: int = -1
     height: int = -1
-    align: ALIGN = ALIGN.LEFT
-    txt_align: ALIGN = ALIGN.LEFT
+    align: Align = Align.LEFT
+    txt_align: Align = Align.LEFT
     txt_font: Optional[Font] = None
     txt_fontsize: int = DEFAULT_FONT_SIZE
     tune_vsize: int = 0  # In pixels, 0 is Arbitrary
@@ -1132,10 +1759,10 @@ class _qtpyBase_Control(_qtpyBase):
     icon: Union[None, qtG.QIcon, qtG.QPixmap, str] = None
     translate: bool = True
     text_pad: int = 0
-    frame: Optional[FRAME] = None
+    frame: Optional[Frame] = None
     enabled: bool = True
     label: str = ""
-    label_align: ALIGN = ALIGN.RIGHT
+    label_align: Align = Align.RIGHT
     editable: bool = True
     label_pad: int = -1
     label_font: Optional[Font] = None
@@ -1186,10 +1813,10 @@ class _qtpyBase_Control(_qtpyBase):
             isinstance(self.height, int) and self.height > 0 or self.height == -1
         ), f"{self.height=}  <{self.height}> must be int > 0"
 
-        assert isinstance(self.align, ALIGN), f"{self.align=}. Must be of type ALIGN"
+        assert isinstance(self.align, Align), f"{self.align=}. Must be of type ALIGN"
 
         assert isinstance(
-            self.txt_align, ALIGN
+            self.txt_align, Align
         ), f"{self.txt_align=}. Must be of type ALIGN"
 
         assert (
@@ -1238,7 +1865,7 @@ class _qtpyBase_Control(_qtpyBase):
         assert isinstance(self.label, str), f"{self.label=}. Must be str"
         assert isinstance(self.editable, bool), f"{self.editable=}. Must be bool"
         assert isinstance(
-            self.label_align, ALIGN
+            self.label_align, Align
         ), f"{self.label_align=}. Must be of type ALIGN"
         assert isinstance(
             self.label_font, (type(None), Font)
@@ -1306,16 +1933,22 @@ class _qtpyBase_Control(_qtpyBase):
         Returns (int): 1 OK, -1 Issue
 
         """
-        event: SYSEVENTS = args[0]
+        event: Sys_Events = args[0]
+        window_id = get_window_id(self.parent_app, self.parent, self)
 
         # Check if widget exists as it sometimes is destroyed before event is fired
         if callable(self.callback) and self.parent_app.widget_exist(
-            self.container_tag, self.tag
+            window=window_id,
+            container_tag=self.container_tag,
+            tag=self.tag,
         ):
             if self.parent_app.widget_exist(
-                container_tag=self.container_tag, tag=self.tag
+                window=window_id,
+                container_tag=self.container_tag,
+                tag=self.tag,
             ):
                 result = _Event_Handler(parent_app=self.parent_app, parent=self).event(
+                    window_id=window_id,
                     callback=self.callback,
                     action=event.name,
                     container_tag=self.container_tag,
@@ -1323,7 +1956,7 @@ class _qtpyBase_Control(_qtpyBase):
                     event=event,
                     value=self.value_get(),
                     widget_dict=self.parent_app.widget_dict_get(
-                        container_tag=self.container_tag
+                        window=window_id, container_tag=self.container_tag
                     ),
                     control_name=self.__class__.__name__,
                     parent=self,
@@ -1373,103 +2006,103 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget.clicked, "connect"
             ):
                 self._widget.clicked.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CLICKED, args)
+                    lambda *args: self._event_handler(Sys_Events.CLICKED, args)
                 )
             if hasattr(self._widget, "cellActivated") and hasattr(
                 self._widget.cellActivated, "connect"
             ):
                 self._widget.cellActivated.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.ACTIVATED, args)
+                    lambda *args: self._event_handler(Sys_Events.ACTIVATED, args)
                 )
             if hasattr(self._widget, "cellChanged") and hasattr(
                 self._widget.cellChanged, "connect"
             ):
                 self._widget.cellChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
                 )
             if hasattr(self._widget, "cellClicked") and hasattr(
                 self._widget.cellClicked, "connect"
             ):
                 self._widget.cellClicked.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CLICKED, args)
+                    lambda *args: self._event_handler(Sys_Events.CLICKED, args)
                 )
             if hasattr(self._widget, "cellDoubleClicked") and hasattr(
                 self._widget.cellDoubleClicked, "connect"
             ):
                 self._widget.cellDoubleClicked.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.DOUBLECLICKED, args)
+                    lambda *args: self._event_handler(Sys_Events.DOUBLECLICKED, args)
                 )
             if hasattr(self._widget, "cellEntered") and hasattr(
                 self._widget.cellEntered, "connect"
             ):
                 self._widget.cellEntered.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.ENTERED, args)
+                    lambda *args: self._event_handler(Sys_Events.ENTERED, args)
                 )
             if hasattr(self._widget, "cellPressed") and hasattr(
                 self._widget.cellPressed, "connect"
             ):
                 self._widget.cellPressed.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.PRESSED, args)
+                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
                 )
             if hasattr(self._widget, "collapsed") and hasattr(
                 self._widget.collapsed, "connect"
             ):
                 self._widget.collapsed.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.COLLAPSED, args)
+                    lambda *args: self._event_handler(Sys_Events.COLLAPSED, args)
                 )
             if hasattr(self._widget, "currentCellChanged") and hasattr(
                 self._widget.currentCellChanged, "connect"
             ):
                 self._widget.currentCellChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
                 )
             if hasattr(self._widget, "currentChanged") and hasattr(
                 self._widget.currentChanged, "connect"
             ):
                 self._widget.currentChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
                 )
             if hasattr(self._widget, "currentIndexChanged") and hasattr(
                 self._widget.currentIndexChanged, "connect"
             ):
                 self._widget.currentIndexChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.INDEXCHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.INDEXCHANGED, args)
                 )
             if hasattr(self._widget, "currentTextChanged") and hasattr(
                 self._widget.currentTextChanged, "connect"
             ):
                 self._widget.currentTextChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.TEXTCHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.TEXTCHANGED, args)
                 )
             if hasattr(self._widget, "cursorPositionChanged") and hasattr(
                 self._widget.cursorPositionChanged, "connect"
             ):
                 self._widget.cursorPositionChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CURSORCHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.CURSORCHANGED, args)
                 )
             if hasattr(self._widget, "dateChanged") and hasattr(
                 self._widget.dateChanged, "connect"
             ):
                 self._widget.dateChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.DATECHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.DATECHANGED, args)
                 )
             if hasattr(self._widget, "editTextChanged") and hasattr(
                 self._widget.editTextChanged, "connect"
             ):
                 self._widget.editTextChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.EDITCHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.EDITCHANGED, args)
                 )
             if hasattr(self._widget, "editingFinished") and hasattr(
                 self._widget.editingFinished, "connect"
             ):
                 self._widget.editingFinished.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.EDITCHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.EDITCHANGED, args)
                 )
             if hasattr(self._widget, "expanded") and hasattr(
                 self._widget.expanded, "connect"
             ):
                 self._widget.expanded.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.EXPANDED, args)
+                    lambda *args: self._event_handler(Sys_Events.EXPANDED, args)
                 )
             if hasattr(self._event_filter, "focusIn") and hasattr(
                 self._event_filter.focusIn, "connect"
@@ -1489,72 +2122,72 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget.highlighted, "connect"
             ):
                 self._widget.highlighted.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.HIGHLIGHTED, args)
+                    lambda *args: self._event_handler(Sys_Events.HIGHLIGHTED, args)
                 )
             if hasattr(self._widget, "inputRejected"):
                 if hasattr(self._widget.inputRejected, "connect"):
                     self._widget.inputRejected.connect(
-                        lambda *args: self._event_handler(SYSEVENTS.BADINPUT, args)
+                        lambda *args: self._event_handler(Sys_Events.BADINPUT, args)
                     )
             if hasattr(self._widget, "itemActivated") and hasattr(
                 self._widget.itemActivated, "connect"
             ):
                 self._widget.itemActivated.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.ACTIVATED, args)
+                    lambda *args: self._event_handler(Sys_Events.ACTIVATED, args)
                 )
             if hasattr(self._widget, "itemCollapsed") and hasattr(
                 self._widget.itemCollapsed, "connect"
             ):
                 self._widget.itemCollapsed.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.COLLAPSED, args)
+                    lambda *args: self._event_handler(Sys_Events.COLLAPSED, args)
                 )
             if hasattr(self._widget, "itemChanged") and hasattr(
                 self._widget.itemChanged, "connect"
             ):
                 self._widget.itemChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
                 )
             if hasattr(self._widget, "itemClicked") and hasattr(
                 self._widget.itemClicked, "connect"
             ):
                 self._widget.itemClicked.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CLICKED, args)
+                    lambda *args: self._event_handler(Sys_Events.CLICKED, args)
                 )
             if hasattr(self._widget, "itemDoubleClicked") and hasattr(
                 self._widget.itemDoubleClicked, "connect"
             ):
                 self._widget.itemDoubleClicked.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.DOUBLECLICKED, args)
+                    lambda *args: self._event_handler(Sys_Events.DOUBLECLICKED, args)
                 )
             if hasattr(self._widget, "itemEntered") and hasattr(
                 self._widget.itemEntered, "connect"
             ):
                 self._widget.itemEntered.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.ENTERED, args)
+                    lambda *args: self._event_handler(Sys_Events.ENTERED, args)
                 )
             if hasattr(self._widget, "itemExpanded") and hasattr(
                 self._widget.itemExpanded, "connect"
             ):
                 self._widget.itemExpanded.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.EXPANDED, args)
+                    lambda *args: self._event_handler(Sys_Events.EXPANDED, args)
                 )
             if hasattr(self._widget, "itemPressed") and hasattr(
                 self._widget.itemPressed, "connect"
             ):
                 self._widget.itemPressed.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.PRESSED, args)
+                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
                 )
             if hasattr(self._widget, "itemSelectionChanged") and hasattr(
                 self._widget.itemSelectionChanged, "connect"
             ):
                 self._widget.itemSelectionChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.SELECTIONCHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.SELECTIONCHANGED, args)
                 )
             if hasattr(self._event_filter, "mousePressed") and hasattr(
                 self._event_filter.mousePressed, "connect"
             ):
                 self._event_filter.mousePressed.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.PRESSED, args)
+                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
                 )
 
             # if hasattr(self._widget, "popupSignal"):
@@ -1569,117 +2202,117 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget.pressed, "connect"
             ):
                 self._widget.pressed.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.PRESSED, args)
+                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
                 )
             if hasattr(self._widget, "released") and hasattr(
                 self._widget.released, "connect"
             ):
                 self._widget.released.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.RELEASED, args)
+                    lambda *args: self._event_handler(Sys_Events.RELEASED, args)
                 )
             if hasattr(self._widget, "returnPressed") and hasattr(
                 self._widget.returnPressed, "connect"
             ):
                 self._widget.returnPressed.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.PRESSED, args)
+                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
                 )
             if hasattr(self._event_filter, "returnPressed") and hasattr(
                 self._event_filter.mousePressed, "connect"
             ):
                 self._event_filter.returnPressed.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.PRESSED, args)
+                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
                 )
             if hasattr(self._widget, "selectionChanged") and hasattr(
                 self._widget.selectionChanged, "connect"
             ):
                 self._widget.selectionChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.SELECTIONCHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.SELECTIONCHANGED, args)
                 )
             if hasattr(self._widget, "stateChanged") and hasattr(
                 self._widget.stateChanged, "connect"
             ):
                 self._widget.stateChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
                 )
             if hasattr(self._widget, "tabBarClicked") and hasattr(
                 self._widget.tabBarClicked, "connect"
             ):
                 self._widget.tabBarClicked.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CLICKED, args)
+                    lambda *args: self._event_handler(Sys_Events.CLICKED, args)
                 )
             if hasattr(self._widget, "tabBarDoubleClicked") and hasattr(
                 self._widget.tabBarDoubleClicked, "connect"
             ):
                 self._widget.tabBarDoubleClicked.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.DOUBLECLICKED, args)
+                    lambda *args: self._event_handler(Sys_Events.DOUBLECLICKED, args)
                 )
             if hasattr(self._widget, "tabCloseRequested") and hasattr(
                 self._widget.tabCloseRequested, "connect"
             ):
                 self._widget.tabCloseRequested.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CLOSED, args)
+                    lambda *args: self._event_handler(Sys_Events.CLOSED, args)
                 )
             if hasattr(self._widget, "textChanged") and hasattr(
                 self._widget.textChanged, "connect"
             ):
                 self._widget.textChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.TEXTCHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.TEXTCHANGED, args)
                 )
             if hasattr(self._widget, "textEdited") and hasattr(
                 self._widget.textEdited, "connect"
             ):
                 self._widget.textEdited.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.TEXTEDIT, args)
+                    lambda *args: self._event_handler(Sys_Events.TEXTEDIT, args)
                 )
             if hasattr(self._widget, "timeChanged") and hasattr(
                 self._widget.timeChanged, "connect"
             ):
                 self._widget.toggled.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.TIMECHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.TIMECHANGED, args)
                 )
             if hasattr(self._widget, "toggled") and hasattr(
                 self._widget.toggled, "connect"
             ):
                 self._widget.toggled.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.TOGGLED, args)
+                    lambda *args: self._event_handler(Sys_Events.TOGGLED, args)
                 )
 
             if hasattr(self._widget, "actionTriggered") and hasattr(
                 self._widget.actionTriggered, "connect"
             ):
                 self._widget.actionTriggered.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.TRIGGERED, args)
+                    lambda *args: self._event_handler(Sys_Events.TRIGGERED, args)
                 )
 
             if hasattr(self._widget, "sliderMoved") and hasattr(
                 self._widget.sliderMoved, "connect"
             ):
                 self._widget.sliderMoved.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.MOVED, args)
+                    lambda *args: self._event_handler(Sys_Events.MOVED, args)
                 )
             if hasattr(self._widget, "rangeChanged") and hasattr(
                 self._widget.rangeChanged, "connect"
             ):
                 self._widget.rangeChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.CHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
                 )
             if hasattr(self._widget, "sliderPressed") and hasattr(
                 self._widget.sliderPressed, "connect"
             ):
                 self._widget.sliderPressed.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.PRESSED, args)
+                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
                 )
             if hasattr(self._widget, "sliderReleased") and hasattr(
                 self._widget.sliderReleased, "connect"
             ):
                 self._widget.sliderReleased.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.RELEASED, args)
+                    lambda *args: self._event_handler(Sys_Events.RELEASED, args)
                 )
             if hasattr(self._widget, "valueChanged") and hasattr(
                 self._widget.valueChanged, "connect"
             ):
                 self._widget.valueChanged.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.EDITCHANGED, args)
+                    lambda *args: self._event_handler(Sys_Events.EDITCHANGED, args)
                 )
 
             # keyPressevent #TODO implement event if needed
@@ -1688,7 +2321,7 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget.itemExpanded, "connect"
             ):
                 self._widget.itemExpanded.connect(
-                    lambda *args: self._event_handler(SYSEVENTS.EXPANDED, args)
+                    lambda *args: self._event_handler(Sys_Events.EXPANDED, args)
                 )
         # if isinstance(self, Dateedit):
         #     pass
@@ -1736,7 +2369,11 @@ class _qtpyBase_Control(_qtpyBase):
             isinstance(container_tag, str) and container_tag.strip() != ""
         ), f"{container_tag=}. Must be a non-empty str"
 
-        parent_app.widget_add(container_tag=container_tag, tag=self.tag, widget=self)
+        window_id = get_window_id(parent_app, parent, self)
+
+        parent_app.widget_add(
+            window=window_id, container_tag=container_tag, tag=self.tag, widget=self
+        )
 
         self.parent_app = parent_app
         self.parent = parent
@@ -1751,7 +2388,7 @@ class _qtpyBase_Control(_qtpyBase):
         match self:
             case Button():
                 self._widget = qtW.QPushButton(self.text, parent)
-                self._widget.setStyleSheet(ALIGN_SS_TEXT[self.txt_align])
+                self._widget.setStyleSheet(Align_SS_Text[self.txt_align])
             case Checkbox():
                 self._widget = qtW.QCheckBox(self.text, parent)
             case ComboBox():
@@ -1772,7 +2409,7 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget = qtW.QLabel(self.text.replace("\00", ""), parent)
             case LCD():
                 self._widget = qtW.QLCDNumber(parent)
-                self._widget.setStyleSheet(ALIGN_SS_TEXT[self.txt_align])
+                self._widget.setStyleSheet(Align_SS_Text[self.txt_align])
             case LineEdit():
                 self._widget = _Line_Edit(
                     parent, self
@@ -2004,8 +2641,11 @@ class _qtpyBase_Control(_qtpyBase):
         Args:
             gui_event: The event that was triggered.
         """
+        window_id = get_window_id(self.parent_app, self.parent, self)
 
-        for control in self.parent_app.widget_dict_get(self.container_tag).values():
+        for control in self.parent_app.widget_dict_get(
+            window=window_id, container_tag=self.container_tag
+        ).values():
             if (
                 hasattr(control.widget, "guiwidget_get")
                 and hasattr(control.widget.guiwidget_get, "IsDefault")
@@ -2017,14 +2657,14 @@ class _qtpyBase_Control(_qtpyBase):
 
         if isinstance(self, FolderView):  # Bit poxy, have to watch this
             result = self._event_handler(
-                SYSEVENTS.FOCUSIN, self.guiwidget_get.selectedIndexes()
+                Sys_Events.FOCUSIN, self.guiwidget_get.selectedIndexes()
             )
         elif isinstance(self, ComboBox):  # Bit poxy, have to watch this
             result = self._event_handler(
-                SYSEVENTS.FOCUSIN, self.guiwidget_get.currentIndex()
+                Sys_Events.FOCUSIN, self.guiwidget_get.currentIndex()
             )
         else:
-            result = self._event_handler(SYSEVENTS.FOCUSIN)
+            result = self._event_handler(Sys_Events.FOCUSIN)
 
         if result == -1:
             gui_event[0].ignore()
@@ -2046,14 +2686,14 @@ class _qtpyBase_Control(_qtpyBase):
         """
         if isinstance(self, FolderView):  # Bit poxy, have to watch this
             result = self._event_handler(
-                SYSEVENTS.FOCUSOUT, self.guiwidget_get.selectedIndexes()
+                Sys_Events.FOCUSOUT, self.guiwidget_get.selectedIndexes()
             )
         elif isinstance(self, ComboBox):  # Bit poxy, have to watch this
             result = self._event_handler(
-                SYSEVENTS.FOCUSOUT, self._widget.currentIndex()
+                Sys_Events.FOCUSOUT, self._widget.currentIndex()
             )
         else:
-            result = self._event_handler(SYSEVENTS.FOCUSOUT)
+            result = self._event_handler(Sys_Events.FOCUSOUT)
 
         if result == -1:
             gui_event[0].ignore()
@@ -2094,7 +2734,7 @@ class _qtpyBase_Control(_qtpyBase):
 
         return -1
 
-    def pixel_str_size(self, text: str) -> CHAR_PIXEL_SIZE:
+    def pixel_str_size(self, text: str) -> Char_Pixel_Size:
         """
         Returns the pixel size of a string.
 
@@ -2125,7 +2765,7 @@ class _qtpyBase_Control(_qtpyBase):
         width = font_metrics.boundingRect(text).width()
         height = font_metrics.boundingRect(text).height()
 
-        return CHAR_PIXEL_SIZE(height=int(height), width=int(width))
+        return Char_Pixel_Size(height=int(height), width=int(width))
 
     def pixel_char_size(
         self,
@@ -2134,7 +2774,7 @@ class _qtpyBase_Control(_qtpyBase):
         height_fudge: float = 1.1,
         width_fudge: float = 1.1,
         parent_app: Optional["QtPyApp"] = None,
-    ) -> CHAR_PIXEL_SIZE:
+    ) -> Char_Pixel_Size:
         """Transforms character size (height,width) in pixel size (height, width).
         Fudge factors allow precise adjustment
 
@@ -2173,7 +2813,7 @@ class _qtpyBase_Control(_qtpyBase):
         width = font_metrics.horizontalAdvance("W" * char_width)
         height = round(font_metrics.height() * char_height * height_fudge)
 
-        return CHAR_PIXEL_SIZE(height=height, width=width)
+        return Char_Pixel_Size(height=height, width=width)
 
     def text_pixel_size(self, text: str) -> tuple[int, int]:
         """Returns the height and width of a string of text in pixels
@@ -2297,11 +2937,11 @@ class _qtpyBase_Control(_qtpyBase):
         control_font.setWeight(widget_font.weight.value)
         control_font.setPointSize(widget_font.size)
 
-        if widget_font.style == FONTSTYLE.NORMAL:
+        if widget_font.style == Font_Style.NORMAL:
             pass
-        elif widget_font.style == FONTSTYLE.ITALIC:
+        elif widget_font.style == Font_Style.ITALIC:
             control_font.setItalic(True)
-        elif widget_font.style == FONTSTYLE.UNDERLINE:
+        elif widget_font.style == Font_Style.UNDERLINE:
             control_font.setUnderline(True)
 
         if hasattr(widget_instance, "setFont"):
@@ -2581,7 +3221,7 @@ class _qtpyBase_Control(_qtpyBase):
         subclasses.
 
         Returns:
-          any : The value of the widget.
+            any : The value of the widget.
         """
         if hasattr(self, "value"):
             return self._widget.value()
@@ -2592,7 +3232,7 @@ class _qtpyBase_Control(_qtpyBase):
         """Returns the user data. Maybe overridden by subclasses.
 
         Returns:
-          The user_data
+            The user_data
         """
         return self.user_data
 
@@ -2600,7 +3240,7 @@ class _qtpyBase_Control(_qtpyBase):
         """Sets the user data of the widget. Maybe overridden by subclasses.
 
         Args:
-          user_data (any): any
+            user_data (any): any
         """
         self.user_data = user_data
 
@@ -2613,7 +3253,7 @@ class _qtpyBase_Control(_qtpyBase):
         ...
 
     @overload
-    def value_set(self, value: COMBO_DATA):
+    def value_set(self, value: Combo_Data):
         ...
 
     # @overload
@@ -2683,344 +3323,7 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget.setVisible(visible)
 
 
-# @dataclasses.dataclass()
-# `_widget_entry` is a class that stores the widget details.
-@dataclasses.dataclass(slots=True)
-class _widget_entry:
-    container_tag: str
-    tag: str
-    widget: _qtpyBase
-
-
-# Private Classes
-@dataclasses.dataclass(slots=True)
-# Using slots for better performance. But had to remove some inheritance to do so
-class _Widget_Registry:
-    """Widget Registry Class: Stores a reference to all Qtpy GUI widgets"""
-
-    _widget_dict: dict = field(default_factory=dict)
-
-    def __init__(self):
-        """Sets up the _Widget_Registry class instance"""
-        self._widget_dict = {}
-
-    def widget_add(self, container_tag: str, tag: str, widget: _qtpyBase):
-        """Adds a widget to a container with the given tag names.
-
-        Args:
-            container_tag (str): The tag name of the container.
-            tag (str): The tag name of the widget to add.
-            widget (_qtpyBase): The widget to add to the container.
-
-        Raises:
-            AssertionError: If container_tag or tag are not non-empty strings, or if widget is not a subclass of _qtpyBase.
-        """
-
-        assert (
-            isinstance(container_tag, str) and container_tag.strip() != ""
-        ), f"{container_tag=}. Must be a non-empty str"
-        assert (
-            isinstance(tag, str) and tag.strip() != ""
-        ), f"{tag=}. Must be a non-empty str"
-        assert issubclass(
-            type(widget), _qtpyBase
-        ), f"{widget=} {type(widget)=}. Must be a subclass of _qtpyBase."
-
-        if (
-            container_tag in self._widget_dict
-            and tag in self._widget_dict[container_tag]
-        ):
-            self.widget_del(container_tag, tag)
-
-        self._widget_dict.setdefault(container_tag, {})
-        self._widget_dict[container_tag][tag] = _widget_entry(
-            container_tag=container_tag, tag=tag, widget=widget
-        )
-
-    def widget_del(self, container_tag: str, tag: str, level: int = 0) -> None:
-        """Deletes a widget from the widget stack. If it is the last widget in the container then the container is
-        deleted
-
-        Args:
-            container_tag (str): The container tag name
-            tag (str): The widget tag name
-            level (int): Used for debug, no need for user to set
-
-        Returns:
-
-        """
-        if container_tag not in self._widget_dict:
-            return None
-
-        to_remove = [
-            item.tag
-            for item in self._widget_dict[container_tag].values()
-            if tag in (item.tag, "-") or isinstance(item.widget, (_Container, Grid))
-        ]
-
-        for tag in to_remove:
-            item = self._widget_dict[container_tag].pop(tag)
-
-            if shiboken6.isValid(item.widget._widget):
-                item.widget._widget.deleteLater()
-
-        if not self._widget_dict[container_tag]:
-            self._widget_dict.pop(container_tag)
-
-    def _dump_garbage(self):
-        """
-        show us what the garbage is about
-        """
-        # Force collection
-        gc.collect()
-
-        print("\nDUMP GARBAGE OBJECTS:")
-        for x in gc.garbage:
-            s = str(x)
-            if len(s) > 80:
-                s = s[:77] + "..."
-            print(type(x), "\n  ", s)
-        print("\nDUMP DONE GARBAGE OBJECTS:")
-
-    def widget_gui_controls_get(self, container_tag: str) -> list[_qtpyBase_Control]:
-        """Returns a list of all _qtpyBase_Control widgets in a given container.
-
-        Args:
-            container_tag (str): The tag name of the container to search.
-
-        Returns:
-            list[_qtpyBase_Control]: A list of _qtpyBase_Control widgets that match the container tag.
-
-        Raises:
-            AssertionError: If container_tag is not a non-empty string.
-        """
-
-        assert (
-            isinstance(container_tag, str) and container_tag.strip() != ""
-        ), f"{container_tag=}. Must be a non-empty str."
-
-        if container_tag not in self._widget_dict:
-            return []
-
-        return [
-            item.widget
-            for item in self._widget_dict[container_tag].values()
-            if isinstance(item.widget, _qtpyBase_Control)
-        ]
-
-    def widget_dict_get(
-        self, container_tag: str
-    ) -> dict[str, Union[types.FunctionType, types.LambdaType, types.MethodType]]:
-        """Returns the dictionary associated with the provided container tag
-
-        Args:
-            container_tag (str) : Tag of the container object
-
-        Returns:
-            Dict (Dict[str, Union[types.FunctionType, types.LambdaType, types.MethodType]]) : Dictionary of container object
-
-        """
-        assert (
-            isinstance(container_tag, str) and container_tag.strip() != ""
-        ), f"{container_tag=}>. Must be a non-empty str"
-
-        assert (
-            container_tag in self._widget_dict
-        ), f"{container_tag=}> is not in widget_dict! {self.print_dict()}"  # <{self._widget_dict}>"
-
-        return self._widget_dict[container_tag]
-
-    def widget_exist(self, container_tag: str, tag: str) -> bool:
-        """Determines if a widget exists in the container
-
-        Args:
-        container_tag (str): The container tag of the container widget that you want to check if the widget exists in.
-        tag (str): The tag of the widget to be added.
-
-        Returns:
-        A boolean value.
-        """
-        assert (
-            isinstance(container_tag, str) and container_tag.strip()
-        ), f"{container_tag=}. Must be a non-empty str"
-        assert isinstance(tag, str) and tag.strip(), f"{tag=}. Must be a non-empty str"
-
-        # Perform depth-first search to find the widget
-        visited = set()
-        stack = [container_tag]
-        max_iterations = len(self._widget_dict)
-
-        while stack and max_iterations > 0:
-            node = stack.pop()
-            if node in visited:
-                continue
-            visited.add(node)
-
-            # Check if the widget is in the current container
-            if tag in self._widget_dict.get(node, {}):
-                return True
-
-            # Add the child containers to the stack
-            for key, value in tuple(self._widget_dict.get(node, {}).items()):
-                if key == value.container_tag:  # Same container, Ignore
-                    continue
-                if isinstance(value.widget, _Container):
-                    stack.append(key)
-            max_iterations -= 1
-
-        return False
-
-    def widget_get(self, container_tag: str = "", tag: str = "") -> _qtpyBase_Control:
-        """Searches through the widget_dict for the widget with the given tag and container_tag.
-
-        If it doesn't find it, it raises an AssertionError. If it does find it, it returns the widget.
-
-        Args:
-            container_tag (str): The name of the container that the widget is in.
-            tag (str): The tag name of the widget you want to get.
-
-        Returns:
-            _qtpyBase_Control : The wanted widget.
-
-        """
-        assert (
-            isinstance(container_tag, str) and container_tag.strip()
-        ), f"{container_tag=} must be a non-empty string"
-        assert (
-            isinstance(tag, str) and tag.strip()
-        ), f"{tag=} must be a non-empty string"
-        assert (
-            container_tag in self._widget_dict
-        ), f"{container_tag=} is not in widget_dict!"
-
-        # Perform a depth-first search to find the widget with the given tag and container_tag
-        stack = [container_tag]
-        max_iterations = len(self._widget_dict)
-
-        while stack and max_iterations > 0:
-            current_container_tag = stack.pop()
-            current_container = self._widget_dict[current_container_tag]
-
-            for key, value in current_container.items():
-                if key == tag:
-                    return value.widget
-                elif isinstance(value.widget, _Container):
-                    stack.append(key)
-
-            max_iterations -= 1
-
-        # The widget was not found, try a tag search which might raise an AssertionError
-        print(
-            f"Sys Error: Widget with tag '{tag}' not found in container '{container_tag}' or its sub-containers\n Trying tag search "
-        )
-
-        return self._find_widget_by_tag(tag)
-
-    def _find_widget_by_tag(self, tag: str) -> _qtpyBase_Control:
-        """Find a widget with the given tag name and raise an error if multiple widgets are found.
-
-        Args:
-            tag (str): The tag name of the widget to find.
-
-        Returns:
-            _qtpyBase_Control: The widget with the given tag name.
-
-        Raises:
-            AssertionError: If no widgets with the given tag name are found or if multiple widgets are found.
-        """
-        widgets = []
-        stack = list(self._widget_dict.values())
-        max_iterations = len(self._widget_dict)
-
-        while stack and max_iterations > 0:
-            container = stack.pop()
-            for w in container.values():
-                if w.tag == tag:
-                    widgets.append(w)
-                if isinstance(w, _Container):
-                    stack.append(w.widget_dict)
-            max_iterations -= 1
-
-        # The widget was not found, so raise an AssertionError
-        if not widgets:
-            # self.print_dict(file="widget_dict_dump.txt")  # DBG Use Only
-            raise RuntimeError(f"Widget with tag '{tag}' not found")
-
-        if len(widgets) == 1 and max_iterations > 0:
-            return widgets[0].widget
-        else:
-            # self.print_dict(file="widget_dict_dump.txt")  # DBG Use Only
-            container_list = ", ".join([widget.container_tag for widget in widgets])
-            raise RuntimeError(
-                f"Widget with tag '{tag}' found in these containers '{container_list}'"
-            )
-
-    def print_dict(
-        self,
-        _widget_items: dict | None = None,
-        _delim: str = "*",
-        file: str = None,
-    ) -> str:
-        """Prints the contents of a dictionary, and if the value is a dictionary, it will recursively print the
-        contents of that dictionary. Used for debugging.
-
-        Args:
-            _widget_items (dict | None): This is the dictionary that you want to print. If you don't pass one, it
-                will print the entire widget dictionary.
-            _delim (str): This is the delimiter that will be used to print the dictionary. Defaults to "*".
-            file (str): The name of the file to write the output to. If None, it will only print to the console.
-
-        Returns:
-            str: The output string that was printed or written to a file.
-
-        Raises:
-            AssertionError: If the type of the _widget_items argument is not a dictionary or None, or if the type of the
-                _delim argument is not a string.
-
-        Examples:
-            To print the entire widget dictionary to the console:
-            >>> my_widget = MyWidget()
-            >>> my_widget.print_dict()
-
-            To print a specific dictionary to a file:
-            >>> my_widget = MyWidget()
-            >>> my_dict = {"key1": {"key2": "value1"}, "key3": "value2"}
-            >>> my_widget.print_dict(_widget_items=my_dict, file="output.txt")
-        """
-
-        assert isinstance(
-            _widget_items, (type(None), dict)
-        ), f"{_widget_items=}. Must be a Dict or None"
-        assert isinstance(_delim, str), f"{_delim=}. Must be a str"
-
-        if _widget_items is None:
-            _widget_items = self._widget_dict
-
-        output = ""
-        for key, value in _widget_items.items():
-            if isinstance(value, dict):
-                output += f"{_delim} {key} [\n"
-                output += self.print_dict(
-                    _widget_items=value, _delim=_delim + "*", file=None
-                )
-                output += f"{_delim} ]\n"
-            else:
-                if hasattr(value.widget, "_widget") and shiboken6.isValid(
-                    value.widget._widget
-                ):
-                    output += f"{_delim} {key} : {value}\n"
-                else:
-                    output += f"{_delim} {key} She broken!\n"
-
-        if file:
-            with open(file, "w") as f:
-                f.write(output)
-        else:
-            print(output)
-
-        return output
-
-
+# Public classes
 class QtPyApp(_qtpyBase):
     """This class implements application level functionality for a qtgui application. Basically sets the application
     up and running
@@ -3066,6 +3369,7 @@ class QtPyApp(_qtpyBase):
 
         self.available_height: int = -1
         self.available_width: int = -1
+        self.main_frame_window_id = -1
 
         self.frozen = Is_Complied()
 
@@ -3277,14 +3581,18 @@ class QtPyApp(_qtpyBase):
         # check if the app has registered to receive system events
         if self.callback is not None:
             result = _Event_Handler(parent_app=self).event(
+                window_id=self.main_frame_window_id,
                 callback=self.callback,
                 container_tag="",
                 tag="",
-                event=SYSEVENTS.APPEXIT,
+                event=Sys_Events.APPEXIT,
                 action=self.callback.__name__,
                 value=None,
-                widget_dict=self.widget_dict_get(self.app_get.applicationDisplayName()),
-                parent=self.parent_get,
+                widget_dict=self.widget_dict_get(
+                    window=self.main_frame_window_id,
+                    container_tag=self.app_get.applicationDisplayName(),
+                ),
+                parent=self._main_frame,  # self.parent_get,
                 control_name=self.__class__.__name__,
             )
 
@@ -3297,7 +3605,7 @@ class QtPyApp(_qtpyBase):
         """Returns the display name of the app
 
         Returns:
-          str : The display name of the app.
+            str : The display name of the app.
         """
         return self.display_name
 
@@ -3313,10 +3621,11 @@ class QtPyApp(_qtpyBase):
             self._fire_appost_init = False
 
             result = _Event_Handler(parent_app=self).event(
+                window_id=self.main_frame_window_id,
                 callback=self.callback,
                 container_tag="",
                 tag="",
-                event=SYSEVENTS.APPPOSTINIT,  # type: ignore
+                event=Sys_Events.APPPOSTINIT,  # type: ignore
                 action=self.callback.__name__,
                 value=None,
                 widget_dict={},  # No widgets registered at this time
@@ -3334,11 +3643,11 @@ class QtPyApp(_qtpyBase):
         """Returns the font of the application.
 
         Returns:
-          qtG.QFont : The font of the application.
+            qtG.QFont : The font of the application.
         """
         return self.app_get.font()  # type: ignore
 
-    def char_pixel_size(self, font_path: str = "") -> CHAR_PIXEL_SIZE:
+    def char_pixel_size(self, font_path: str = "") -> Char_Pixel_Size:
         """Returns the pixel size of a character in the current font
 
         Args:
@@ -3364,9 +3673,9 @@ class QtPyApp(_qtpyBase):
 
         height = font_metrics.height()
 
-        return CHAR_PIXEL_SIZE(height=height, width=width)
+        return Char_Pixel_Size(height=height, width=width)
 
-    def char_pixel_size_old(self) -> CHAR_PIXEL_SIZE:
+    def char_pixel_size_old(self) -> Char_Pixel_Size:
         """Returns the pixel size of a character in the current font
 
         Returns:
@@ -3385,7 +3694,7 @@ class QtPyApp(_qtpyBase):
         height = font_metrics.height() * 1
         width = qtG.QFontMetrics.averageCharWidth(font_metrics) * 1
 
-        return CHAR_PIXEL_SIZE(height=int(height), width=int(width))
+        return Char_Pixel_Size(height=int(height), width=int(width))
 
     def run(
         self,
@@ -3402,10 +3711,11 @@ class QtPyApp(_qtpyBase):
 
         if callable(self.callback):
             result = _Event_Handler(parent_app=self).event(
+                window_id=self.main_frame_window_id,
                 callback=self.callback,
                 container_tag="",
                 tag="",
-                event=SYSEVENTS.APPINIT,  # type: ignore
+                event=Sys_Events.APPINIT,  # type: ignore
                 action=self.callback.__name__,
                 value=None,
                 widget_dict={},  # No widgets registered at this time
@@ -3466,43 +3776,66 @@ class QtPyApp(_qtpyBase):
 
         sys.exit(self._app.exec())
 
-    def widget_add(self, container_tag: str, tag: str, widget: _qtpyBase):
+    def widget_add(self, window: int, container_tag: str, tag: str, widget: _qtpyBase):
         """Adds a widget to the widget registry
 
         Args:
-          container_tag (str): This is the container tag name of the container widget that you want to add the widget to.
-          tag (str): This is the name of the widget.
-          widget (_qtpyBase): the widget to add to the container
+            container_tag (str): This is the container tag name of the container widget that you want to add the widget to.
+            tag (str): This is the name of the widget.
+            widget (_qtpyBase): the widget to add to the container
         """
+        assert isinstance(window, int) and window >= 0, f"{window=}. Must be int > 0"
+        assert (
+            isinstance(container_tag, str) and container_tag.strip() != ""
+        ), f"{container_tag=}. Must be str"
+        assert isinstance(tag, str) and tag.strip() != "", f"{tag=}. Must be str"
+        assert isinstance(
+            widget, _qtpyBase
+        ), f"{widget=}. Must be an instance of _qtpyBase"
 
         self._widget_registry.widget_add(
-            container_tag=container_tag, tag=tag, widget=widget
+            window_id=window, container_tag=container_tag, tag=tag, widget=widget
         )
 
-    def widget_gui_controls_get(self, container_tag: str) -> list[_qtpyBase_Control]:
+    def widget_gui_controls_get(
+        self, window: int, container_tag: str
+    ) -> list[_qtpyBase_Control]:
         """Returns a list of all the controls in the container with the given tag
 
         Args:
-          container_tag (str): The tag name of the container widget.
+            container_tag (str): The tag name of the container widget.
 
         Returns:
-          A list of _qtpyBase_Control objects.
+            A list of _qtpyBase_Control objects.
         """
+        assert isinstance(window, int) and window >= 0, f"{window=}. Must be int > 0"
+        assert (
+            isinstance(container_tag, str) and container_tag.strip() != ""
+        ), f"{container_tag=}. Must be str"
+
         return self._widget_registry.widget_gui_controls_get(
-            container_tag=container_tag
+            window_id=window, container_tag=container_tag
         )
 
-    def widget_del(self, container_tag: str, tag: str):
+    def widget_del(self, window: int, container_tag: str, tag: str):
         """Deletes a widget from the registry
 
         Args:
-          container_tag (str): The tag name of the container widget.
-          tag (str): The tag name of the widget to be deleted.
+            container_tag (str): The tag name of the container widget.
+            tag (str): The tag name of the widget to be deleted.
         """
-        self._widget_registry.widget_del(container_tag=container_tag, tag=tag)
+        assert isinstance(window, int) and window >= 0, f"{window=}. Must be int > 0"
+        assert (
+            isinstance(container_tag, str) and container_tag.strip() != ""
+        ), f"{container_tag=}. Must be str"
+        assert isinstance(tag, str) and tag.strip() != "", f"{tag=}. Must be str"
+
+        self._widget_registry.widget_del(
+            window_id=window, container_tag=container_tag, tag=tag
+        )
 
     def widget_dict_get(
-        self, container_tag: str
+        self, window: int, container_tag: str
     ) -> dict[str, types.FunctionType | types.MethodType | types.LambdaType]:
         """Returns a dictionary of all the widgets in the container with the given tag
 
@@ -3513,267 +3846,69 @@ class QtPyApp(_qtpyBase):
         in the container with the given tag  name
 
         """
-        return self._widget_registry.widget_dict_get(container_tag=container_tag)
+        assert isinstance(window, int) and window >= 0, f"{window=}. Must be int > 0"
+        assert (
+            isinstance(container_tag, str) and container_tag.strip() != ""
+        ), f"{container_tag=}. Must be str"
+
+        return self._widget_registry.widget_dict_get(
+            window_id=window, container_tag=container_tag
+        )
 
     def widget_dict_print(self):
         """Prints the contents of the widget registry to console. Used for debugging"""
         return self._widget_registry.print_dict()
 
-    def widget_exist(self, container_tag: str, tag: str) -> bool:
+    def widget_exist(self, window: int, container_tag: str, tag: str) -> bool:
         """Returns True if a widget with the given container_tag and tag name exists
 
         Args:
-          container_tag (str): The tag name of the container widget that the widget is in.
-          tag (str): The tag name of the widget you want to check.
+            container_tag (str): The tag name of the container widget that the widget is in.
+            tag (str): The tag name of the widget you want to check.
 
         Returns:
-          bool : True if the widget exists, False otherwise.
+            bool : True if the widget exists, False otherwise.
 
         """
+        assert isinstance(window, int) and window >= 0, f"{window=}. Must be int > 0"
         assert (
             isinstance(container_tag, str) and container_tag.strip() != ""
         ), f"{container_tag=}. Must be str"
         assert isinstance(tag, str) and tag.strip() != "", f"{tag=}. Must be str"
 
-        return self._widget_registry.widget_exist(container_tag=container_tag, tag=tag)
+        return self._widget_registry.widget_exist(
+            window_id=window, container_tag=container_tag, tag=tag
+        )
 
-    def widget_get(self, container_tag: str, tag: str) -> _qtpyBase_Control:
+    def widget_get(
+        self, window: int, container_tag: str, tag: str
+    ) -> _qtpyBase_Control:
         """Returns a widget from the widget registry
 
         Args:
-          container_tag (str): The tag name of the container widget.
-          tag (str): The tag name of the widget you want to get.
+            container_tag (str): The tag name of the container widget.
+            tag (str): The tag name of the widget you want to get.
 
         Returns:
-           _qtpyBase_Control: The widget you are looking for.
+            _qtpyBase_Control: The widget you are looking for.
         """
-        if self._widget_registry.widget_exist(container_tag=container_tag, tag=tag):
+
+        if self._widget_registry.widget_exist(
+            window_id=window, container_tag=container_tag, tag=tag
+        ):
             return self._widget_registry.widget_get(
-                container_tag=container_tag, tag=tag
+                window_id=window, container_tag=container_tag, tag=tag
             )
         else:
-            raise RuntimeError(f"Dev Error {container_tag=} or {tag=} Does Not Exist!")
-
-
-# ----------------------------------------------------------------------------#
-#              Private Base Class _QtPy_Frame                                 #
-# ----------------------------------------------------------------------------#
-
-
-# TODO MDI frame
-class _qtpyFrame(_qtpyBaseFrame):
-    """A class that creates an ancestral frame that can be used to create a GUI with either an SDI or MDI frame."""
-
-    parent_app: QtPyApp
-    title: str = ""
-    callback: Optional[Callable] = None
-    tag: str = ""
-    max_height: int = 1080
-    max_width: int = 1920
-    maximized: bool = False
-
-    def __init__(
-        self,
-        parent_app: QtPyApp,
-        title: str = "",
-        callback: Optional[Callable] = None,
-        tag: str = "",
-        max_height: int = 1080,
-        max_width: int = 1920,
-        maximized: bool = False,
-    ):
-        """
-        A constructor for the class that performs suitable argument checks.
-
-        Args:
-          parent_app (QtPyApp): The parent app that this frame is a part of.
-          title (str): str = ""
-          callback (Optional[Callable]): This method is called when some event is propagated to the frame.
-          tag (str): str = ""
-          max_height (int): int = 1080,. Defaults to 1080
-          max_width (int): int = 1920,. Defaults to 1920
-          maximized (bool): bool = False. Defaults to False
-        """
-        self.parent_app = parent_app
-        self.title = title
-        self.callback = callback
-        self.tag = tag
-        self.max_height = max_height
-        self.max_width = max_width
-        self.maximized = maximized
-
-        super().__init__()
-
-        assert isinstance(
-            self.parent_app, QtPyApp
-        ), f"{self.parent_app=}. Must be an instance of QtPyApp"
-
-        _qtpyBase.__init__(self, parent=self.parent_app)
-
-        assert (
-            isinstance(self.title, str) and self.title.strip() != ""
-        ), f"{self.title=}. Must be a non-empty str"
-
-        assert (
-            isinstance(self.callback, Callable) or self.callback is None
-        ), f"{self.callback=}. Must be None | types.FunctionType, types.LambdaType, types.MethodType"
-
-        assert isinstance(self.tag, str), f"{self.tag=}. Must be str"
-
-        assert isinstance(self.max_height, int), f"{self.max_height=}. Must be int"
-        assert isinstance(self.max_width, int), f"{self.max_width=}. Must be int"
-        assert isinstance(self.maximized, bool), f"{self.maximized=}. Must be bool"
-
-        self.parent_app.available_width = self.screen().availableSize().width()
-        self.parent_app.available_height = self.screen().availableSize().height()
-
-        # Force frame to fit on available screen
-        if self.screen().availableSize().width() <= self.max_width:
-            self.max_width = self.screen().availableSize().width()
-
-        if self.screen().availableSize().height() <= self.max_height:
-            self.max_height = self.screen().availableSize().height()
-
-        if self.maximized:
-            self.showMaximized()
-
-        # TODO Needs modifying for resizing
-        self.setMaximumHeight(self.max_height)
-        self.setMaximumWidth(self.max_width)
-        self.setMinimumHeight(self.max_height)
-        self.setMinimumWidth(self.max_width)
-        self.resize(self.max_width, self.max_height)
-
-    def closeEvent(self, event: QCloseEvent):
-        """
-        The function is called when the sheet is closed. Overrides the closeEvent method of QWidget.
-
-        - If the window has a callback method, then the callback function is called.
-        - If the callback method returns 1, then the window is closed.
-        - If the callback method returns 0, then the window is not closed.
-        - If the window does not have a callback method, then the window is closed.
-
-        Args:
-          event (QCloseEvent): The event that was trigger of the closeEvent.
-        """
-        if self.callback is not None:
-            qtpyevent: SYSEVENTS = SYSEVENTS.APPCLOSED
-
-            assert (
-                self.callback.__code__.co_argcount <= 2
-            ), "action events have 1 argument - action"
-
-            result = _Event_Handler(parent_app=self.parent_app).event(
-                callback=self.callback,
-                container_tag="",
-                tag=self.tag,
-                event=qtpyevent,
-                action=self.callback.__name__,
-                value=None,
-                widget_dict=self.parent_app.widget_dict_get(self.title),
-                parent=self.parent_get,
-                control_name=self.__class__.__name__,
-            )
-
-            if result == 1:  # Allow window to close
-                event.accept()
-            else:
-                event.ignore()
-
-        else:
-            event.accept()
-
-    def open_sheet(
-        self,
-        main_frame: "_qtpyFrame",
-        sheet_layout: _qtpyBase_Control,
-        callback: list[types.FunctionType | types.MethodType | types.LambdaType] = None,
-    ):
-        """Called when a sheet is opened and creates a widget from the sheet layout.
-
-        Args: main_frame ("_qtpyFrame"): The main frame that the sheet will be attached to.
-        sheet_layout (_qtpyBase_Control): _Container callback types.FunctionType | types.MethodType | types.LambdaType:
-            This is a method that is called when the sheet is opened.
-        """
-        assert isinstance(
-            main_frame, _qtpyFrame
-        ), f"{main_frame=}>. Must be an instance of _qtpyBaseFrame"
-
-        assert isinstance(
-            sheet_layout, _Container
-        ), f"{sheet_layout=}. Must be an instance of VBoxContainer, HBoxContainer,GridContainer"
-
-        assert callback is None or callable(
-            callback
-        ), f"{callback=} is a <function|method|labda> called when a sheet opens"
-
-        widget = sheet_layout._create_widget(
-            parent_app=self.parent_app,
-            parent=self,
-            container_tag=str(uuid.uuid1()) if self.tag.strip() == "" else self.tag,
-        )
-
-
-class _qtpySDI_Frame(_qtpyFrame):
-    """A subclass of the _qtpyFrame class. It is used to create a single document interface (SDI) window."""
-
-    def __init__(
-        self,
-        parent_app: QtPyApp,
-        title: str = "",
-        callback: Optional[Callable] = None,
-        tag: str = "",
-        max_height: int = 1000,
-        max_width: int = 1920,
-        maximized: bool = False,
-    ):
-        """Constructor for the class. It performs a correctness checks on the input parameters and sets innstance
-        variables as needed.
-
-        Args:
-          parent_app (QtPyApp): The parent application.
-          title (str): The title of the window.
-          callback (Optional[Callable]): This is the method that will be called when an event is passed to the frame.
-          tag (str): tag name of the SDI window.
-          max_height (int): int = 1000,. Defaults to 1000
-          max_width (int): int = 1920,. Defaults to 1920
-          maximized (bool): bool = False,. Defaults to False
-        """
-        assert isinstance(
-            parent_app, QtPyApp
-        ), f"{parent_app=}. Must be an instance of QtPyApp"
-        assert isinstance(title, str), f"{title=}. Must be str"
-        assert callback is None or isinstance(
-            callback, Callable
-        ), f"{callback=}. Must be None|func|method|lambda"
-        assert isinstance(tag, str), f"{tag=}. Must be str"
-        assert (
-            isinstance(max_height, int) and max_height > 0
-        ), f"{max_height=}. Must be int > 0"
-        assert (
-            isinstance(max_width, int) and max_width > 0
-        ), f"{max_height=}. Must be int > 0"
-        assert isinstance(maximized, bool), f"{maximized=}. Must be bool"
-
-        super().__init__(
-            parent_app=parent_app,
-            title=title,
-            callback=callback,
-            tag=tag,
-            max_height=max_height,
-            max_width=max_width,
-            maximized=maximized,
-        )
-
-        self.setWindowTitle(self.title)
-
-        self.parent_app.widget_add(container_tag=title, tag=tag, widget=self)
+            print(f" DBG :-( {window=} {container_tag=} {tag=}")
+            return None
 
 
 @dataclasses.dataclass
 class Action(_qtpyBase):
     """A subclass of the _qtpyBase_Control class. It is used to implement event handling"""
 
+    window_id: int
     parent_app: QtPyApp
     container_tag: str
     tag: str
@@ -3789,7 +3924,9 @@ class Action(_qtpyBase):
 
     def __post_init__(self):
         """Checks the types of the arguments passed to the class and sets instance variable as needed."""
-
+        assert (
+            isinstance(self.window_id, int) and self.window_id > 0
+        ), f"{self.window_id=}. Must be int > 0"
         assert isinstance(
             self.parent_app, QtPyApp
         ), f"{self.parent_app=}. Must ba an instance of QtPyApp"
@@ -3798,7 +3935,7 @@ class Action(_qtpyBase):
         ), f"{self.container_tag=}. Must be a str"
         assert isinstance(self.tag, (str)), f"{self.tag=}. Must be a str"
         assert isinstance(
-            self.event, SYSEVENTS
+            self.event, Sys_Events
         ), f"{self.event=}. Must be an entry in SYSEVENTS"
         assert isinstance(self.action, str), f"{self.action=}. Must be str"
         assert isinstance(
@@ -3820,10 +3957,10 @@ class Action(_qtpyBase):
         It takes a string, translates it, and returns the translated string
 
         Args:
-          text (str): The text to be translated.
+            text (str): The text to be translated.
 
         Returns:
-          str: The translated text.
+            str: The translated text.
         """
         return self._lang_tran.translate(text, SDELIM)
 
@@ -3831,11 +3968,11 @@ class Action(_qtpyBase):
         """Returns the value sourced from a widget
 
         Args:
-          container_tag (str): The tag name of the container that the widget is in.
-          tag (str): The tag name of the widget you want to get the value of.
+            container_tag (str): The tag name of the container that the widget is in.
+            tag (str): The tag name of the widget you want to get the value of.
 
         Returns:
-          any : The value of the widget.
+            any : The value of the widget.
         """
         assert (
             isinstance(container_tag, str) and container_tag.strip() != ""
@@ -3857,9 +3994,9 @@ class Action(_qtpyBase):
         """Sets the value of a widget
 
         Args:
-          container_tag (str): The tag name of the container widget that the widget is in.
-          tag (str): The tag name of the widget you want to set the value of.
-          value (any): The value to set the widget to.
+            container_tag (str): The tag name of the container widget that the widget is in.
+            tag (str): The tag name of the widget you want to set the value of.
+            value (any): The value to set the widget to.
         """
         assert (
             isinstance(container_tag, str) and container_tag.strip() != ""
@@ -3877,12 +4014,16 @@ class Action(_qtpyBase):
                 f"{container_tag=} {tag=} Does Not Have A value_set method"
             )
 
+    def print_widget_dict(self):
+        """Debug use prints the widget dictionary"""
+        self.parent_app.widget_dict_print()
+
     def widget_del(self, container_tag: str, tag: str):
         """Deletes a widget from a container
 
         Args:
-          container_tag (str): The tag name of the container widget that the widget to be deleted is in.
-          tag (str): The tag name of the widget to be deleted.
+            container_tag (str): The tag name of the container widget that the widget to be deleted is in.
+            tag (str): The tag name of the widget to be deleted.
 
         Returns:
 
@@ -3894,17 +4035,19 @@ class Action(_qtpyBase):
             isinstance(tag, str) and tag.strip() != ""
         ), f"{tag=}. Must be a non-empty str"
 
-        return self.parent_app.widget_del(container_tag=container_tag, tag=tag)
+        return self.parent_app.widget_del(
+            window=self.window_id, container_tag=container_tag, tag=tag
+        )
 
     def widget_exist(self, container_tag: str = "", tag: str = "") -> bool:
         """Returns True if the widget with the given tag name exists in the given container
 
         Args:
-          container_tag (str): The tag name of the container widget that contains the widget you want to check.
-          tag (str): The tag name of the widget you want to check for.
+            container_tag (str): The tag name of the container widget that contains the widget you want to check.
+            tag (str): The tag name of the widget you want to check for.
 
         Returns:
-          bool : True if the widget exists, False otherwise.
+            bool : True if the widget exists, False otherwise.
         """
         assert (
             isinstance(container_tag, str) and container_tag.strip() != ""
@@ -3913,7 +4056,11 @@ class Action(_qtpyBase):
             isinstance(tag, str) and tag.strip() != ""
         ), f"{tag=}. Must be a non-empty str"
 
-        return self.parent_app.widget_exist(container_tag=container_tag, tag=tag)
+        widget = self.parent_app.widget_exist(
+            window=self.window_id, container_tag=container_tag, tag=tag
+        )
+
+        return widget
 
     @overload
     def widget_get(self, container_tag: str = "", tag: str = "") -> _qtpyBase_Control:
@@ -3974,6 +4121,8 @@ class Action(_qtpyBase):
     def widget_get(self, container_tag: str = "", tag: str = "") -> _qtpyBase_Control:
         """Returns a widget from the parent app's widget dictionary.
 
+        Assumes widget exists. Please use widget_exist call before calling this method
+
         Args:
             container_tag (str): The tag name of the container widget that holds the widget you want to get. Default: "".
             tag (str): The tag name of the widget to get. Default: "".
@@ -3993,27 +4142,31 @@ class Action(_qtpyBase):
             isinstance(tag, str) and tag.strip() != ""
         ), f"{tag=}. Must be a non-empty str."
 
-        widget = self.parent_app.widget_get(container_tag=container_tag, tag=tag)
+        widget = None
 
-        assert widget is not None, f"Widget {container_tag=}, {tag=} not found."
+        widget = self.parent_app.widget_get(
+            window=self.window_id, container_tag=container_tag, tag=tag
+        )
+
+        if widget is None:  # Dev Error
+            print(
+                f"DEV Error Shutting Down, Widget Not Found - {self.window_id=} {container_tag=} {tag=}"
+            )
+            self.parent_app.widget_dict_print()
+            sys.exit(1)
 
         return widget
-
-    def window_close(self):
-        """Closes the window"""
-        gui_widget = self.widget_get(self.container_tag, self.tag)
-        gui_widget.guiwidget_get.window().close()
 
 
 class _Event_Handler(_qtpyBase):
     """Used to implement event handling."""
 
-    def __init__(self, parent_app: QtPyApp, parent: Union[None, _qtpyBase] = None):
+    def __init__(self, parent_app: QtPyApp, parent: None | _qtpyBase = None):
         """Constructor for the Event_Handler class. Checks the arguments and sets instance variables
 
         Args:
             parent_app (QtPyApp): The parent application. This is an instance of QtPyApp.
-            parent (Union[None, _qtpyBase]): The parent widget. If no parent is given, the parent will be the parent_app.
+            parent (None |_qtpyBase): The parent widget. If no parent is given, the parent will be the parent_app.
         """
 
         assert isinstance(
@@ -4032,6 +4185,7 @@ class _Event_Handler(_qtpyBase):
 
     def event(
         self,
+        window_id: int,
         callback: Callable,
         container_tag: str,
         tag: str,
@@ -4058,13 +4212,14 @@ class _Event_Handler(_qtpyBase):
             control_name (str): The name of the control that the event is coming from.
 
         Returns:
-          int : 1.  If the event is accepted, -1. If the event is rejected
+            int : 1.  If the event is accepted, -1. If the event is rejected
 
         """
 
-        assert isinstance(event, SYSEVENTS), f"{event=} <{event}> must be of SYSEVENTS"
+        assert isinstance(event, Sys_Events), f"{event=} <{event}> must be of SYSEVENTS"
 
         event_action = Action(
+            window_id=window_id,
             parent_app=self._parent_app,
             container_tag=container_tag,
             tag=tag,
@@ -4107,7 +4262,7 @@ class _Event_Handler(_qtpyBase):
 class _Container(_qtpyBase_Control):
     """The _Container class handles the creation and layout of child widgets and containers."""
 
-    align: ALIGN = ALIGN.LEFT
+    align: Align = Align.LEFT
     colpad: bool = True
     scroll: bool = False
     controls_enabled: bool = True
@@ -4138,6 +4293,7 @@ class _Container(_qtpyBase_Control):
 
     def __post_init__(self):
         """Sets up the class variables and makes sure that the variables are of the correct type"""
+
         super().__post_init__()
         self._snapshots: dict = {}
 
@@ -4165,12 +4321,12 @@ class _Container(_qtpyBase_Control):
 
         if self.scroll_frame_off is None:
             self.scroll_frame_off: Widget_Frame = Widget_Frame(
-                frame_style=FRAMESTYLE.NONE
+                frame_style=Frame_Style.NONE
             )
 
         if self.scroll_frame_on is None:
             self.scroll_frame_on: Widget_Frame = Widget_Frame(
-                frame_style=FRAMESTYLE.BOX
+                frame_style=Frame_Style.BOX
             )
 
     def _create_widget(
@@ -4303,6 +4459,7 @@ class _Container(_qtpyBase_Control):
                     if isinstance(col_control, _Container):
                         alignment = col_control.align.value
                         self.controls_enabled = col_control.controls_enabled
+
                         widget = col_control._create_widget(
                             parent_app=parent_app,
                             parent=parent if self._widget is None else self._widget,
@@ -4353,8 +4510,11 @@ class _Container(_qtpyBase_Control):
                         col_ptr += 1
 
         # ===== Main
+        window_id = get_window_id(parent_app, parent, self)
 
-        parent_app.widget_add(container_tag=container_tag, tag=self.tag, widget=self)
+        parent_app.widget_add(
+            window=window_id, container_tag=container_tag, tag=self.tag, widget=self
+        )
 
         container = self
         self.container_tag = container_tag
@@ -4374,10 +4534,10 @@ class _Container(_qtpyBase_Control):
         if self.scroll:
             self._scroll_container = qtW.QScrollArea(parent)
             self._scroll_container.verticalScrollBar().valueChanged.connect(
-                lambda *args: self._scroll_handler(SYSEVENTS.SCROLLV, args)
+                lambda *args: self._scroll_handler(Sys_Events.SCROLLV, args)
             )
             self._scroll_container.horizontalScrollBar().valueChanged.connect(
-                lambda *args: self._scroll_handler(SYSEVENTS.SCROLLH, args)
+                lambda *args: self._scroll_handler(Sys_Events.SCROLLH, args)
             )
 
         controls_across: int = container.controls_across
@@ -4393,26 +4553,26 @@ class _Container(_qtpyBase_Control):
 
             if debug:
                 widget_group.setStyleSheet(
-                    f"QGroupBox {{border:1px solid cyan;font-weight:{FONTWEIGHT_TEXT[self.txt_font.weight]}}} "
+                    f"QGroupBox {{border:1px solid cyan;font-weight:{Font_Weight_Text[self.txt_font.weight]}}} "
                 )
             else:
                 widget_group.setStyleSheet(
-                    f"QGroupBox {{font-weight:{FONTWEIGHT_TEXT[self.txt_font.weight]}}} "
+                    f"QGroupBox {{font-weight:{Font_Weight_Text[self.txt_font.weight]}}} "
                 )
 
         widget_group.setContentsMargins(0, 0, 0, 0)
 
         # Gets default platform alignment for labels
-        if (align := qtW.QFormLayout().labelAlignment()) == ALIGN.LEFT.value:
-            label_align = ALIGN.LEFT
-        elif align == ALIGN.RIGHT.value:
-            label_align = ALIGN.RIGHT
-        elif align == ALIGN.TOP.value:
-            label_align = ALIGN.TOP
-        elif align == ALIGN.BOTTOM.value:
-            label_align = ALIGN.BOTTOM
+        if (align := qtW.QFormLayout().labelAlignment()) == Align.LEFT.value:
+            label_align = Align.LEFT
+        elif align == Align.RIGHT.value:
+            label_align = Align.RIGHT
+        elif align == Align.TOP.value:
+            label_align = Align.TOP
+        elif align == Align.BOTTOM.value:
+            label_align = Align.BOTTOM
         else:
-            label_align = ALIGN.CENTER
+            label_align = Align.CENTER
 
         if isinstance(self, FormContainer):
             layout = qtW.QFormLayout()
@@ -4492,10 +4652,10 @@ class _Container(_qtpyBase_Control):
         if isinstance(widget_group, qtW.QGroupBox):
             pass
         else:
-            self._widget.setFrameStyle(FRAMESTYLE.NONE.value)
+            self._widget.setFrameStyle(Frame_Style.NONE.value)
 
             if debug:
-                self._widget.setFrameStyle(FRAMESTYLE.BOX.value)  # Debug
+                self._widget.setFrameStyle(Frame_Style.BOX.value)  # Debug
 
         if self.scroll:
             # scroll_container.setFrameStyle(1) #Debug
@@ -4510,7 +4670,7 @@ class _Container(_qtpyBase_Control):
             )
 
             if debug:
-                widget_group.setFrameStyle(FRAMESTYLE.BOX.value)  # Debug
+                widget_group.setFrameStyle(Frame_Style.BOX.value)  # Debug
 
             self._scroll_container.setWidgetResizable(True)
             self._scroll_container.setWidget(widget_group)
@@ -4877,7 +5037,11 @@ class _Container(_qtpyBase_Control):
         if self._parent_app is None:
             self._parent_app = g_application
 
-        return self._parent_app.widget_gui_controls_get(container_tag=self.tag)
+        window_id = get_window_id(self._parent_app, self._parent, self)
+
+        return self._parent_app.widget_gui_controls_get(
+            winodw=window_id, container_tag=self.tag
+        )
 
     def widget_del(self, container_tag: str, tag: str):
         """Deletes a widget from the designated container
@@ -4905,7 +5069,11 @@ class _Container(_qtpyBase_Control):
                 del self._scroll_deque[index]
                 break
 
-        self._parent_app.widget_del(container_tag=container_tag, tag=tag)
+        window_id = get_window_id(self._parent_app, self._parent, self)
+
+        self._parent_app.widget_del(
+            window=window_id, container_tag=container_tag, tag=tag
+        )
 
         return None
 
@@ -4928,7 +5096,11 @@ class _Container(_qtpyBase_Control):
         ), f"{container_tag=}. Must be str"
         assert isinstance(tag, str) and tag.strip() != "", f"{tag=}. Must be str"
 
-        return self._parent_app.widget_exist(container_tag=container_tag, tag=tag)
+        window_id = get_window_id(self._parent_app, self._parent, self)
+
+        return self._parent_app.widget_exist(
+            window=window_id, container_tag=container_tag, tag=tag
+        )
 
     # TODO Keep return type uptodate
     def widget_get(
@@ -4970,7 +5142,11 @@ class _Container(_qtpyBase_Control):
         if self._parent_app is None:
             raise RuntimeError(f"{self._parent_app=}. Not set!")
 
-        return self._parent_app.widget_get(container_tag=container_tag, tag=tag)
+        window_id = get_window_id(self._parent_app, self._parent, self)
+
+        return self._parent_app.widget_get(
+            window=window_id, container_tag=container_tag, tag=tag
+        )
 
     def widgets_clear(self):
         """Clears all the widgets from the container
@@ -4983,13 +5159,17 @@ class _Container(_qtpyBase_Control):
 
         widget_list = []
 
+        window_id = get_window_id(self._parent_app, self._parent, self)
+
         if self.scroll and self.scroll_controls_get:
-            for index, widget in enumerate(self.scroll_controls_get):
+            for widget in self.scroll_controls_get:
                 widget_list.append(widget)
             self._scroll_deque.clear()
             self._scroll_container.resize(self._scroll_width, self._scroll_height)
 
-        for widget in self._parent_app.widget_gui_controls_get(container_tag=self.tag):
+        for widget in self._parent_app.widget_gui_controls_get(
+            window=window_id, container_tag=self.tag
+        ):
             widget_list.append(widget)
 
         for widget in reversed(widget_list):
@@ -5001,7 +5181,7 @@ class _Container(_qtpyBase_Control):
                     widget.guiwidget_get.setVisible(False)
 
                 self._parent_app.widget_del(
-                    container_tag=widget.container_tag, tag=widget.tag
+                    window=window_id, container_tag=widget.container_tag, tag=widget.tag
                 )
 
         # self._scroll_deque.clear()
@@ -5050,10 +5230,10 @@ class _Container(_qtpyBase_Control):
         """
         col_width_max = 0
 
-        for row_index, row_list in enumerate(self.control_list_get):
+        for row_list in self.control_list_get:
             col_width_line_max = 0
 
-            for col_index, col_control in enumerate(row_list):
+            for col_control in row_list:
                 if col_control is None:
                     continue
 
@@ -5104,10 +5284,10 @@ class _Container(_qtpyBase_Control):
         """Saves the current enable state of all widgets in the container"""
         self._current_enable_settings = {}
 
+        window_id = get_window_id(self.parent_app, self.parent, self)
+
         for item in self.tags_gather():
-            widget = self._parent_app.widget_get(
-                container_tag=item.container_tag, tag=item.tag
-            )
+            widget = self._parent_app.widget_get(window=window_id, tag=item.tag)
             if isinstance(widget, _Container):
                 continue
 
@@ -5127,10 +5307,12 @@ class _Container(_qtpyBase_Control):
     def controls_enable_state_restore(self):
         """Restores the enable state of all controls in the container"""
 
+        window_id = get_window_id(self._parent_app, self._parent, self)
+
         for container_tag, items in self._current_enable_settings.items():
             for item_tag, enabled in items.items():
                 widget = self._parent_app.widget_get(
-                    container_tag=container_tag, tag=item_tag
+                    window=window_id, container_tag=container_tag, tag=item_tag
                 )
                 if isinstance(widget, _Container):
                     continue
@@ -5144,16 +5326,18 @@ class _Container(_qtpyBase_Control):
         """Enables or disables all the widgets in the container.
 
         Args:
-          enable (bool): True, controls enabled or False, controls disabled
+            enable (bool): True, controls enabled or False, controls disabled
         """
         assert isinstance(enable, bool), f"{enable=}. Must be bool"
 
         if self._parent_app is None:
             raise AssertionError(f"{self._parent_app=}. Not set!")
 
+        window_id = get_window_id(self._parent_app, self._parent, self)
+
         for item in self.tags_gather():
             widget = self._parent_app.widget_get(
-                container_tag=item.container_tag, tag=item.tag
+                window=window_id, container_tag=item.container_tag, tag=item.tag
             )
             if isinstance(widget, _Container):
                 continue
@@ -5201,10 +5385,10 @@ class _Container(_qtpyBase_Control):
         """Returns a list of all the parent ComboBoxes of the ComboBox referenced by the combobox_tag
 
         Args:
-          combobox_tag (str): The tag name of the ComboBox that we are seeking the parents of
+            combobox_tag (str): The tag name of the ComboBox that we are seeking the parents of
 
         Returns:
-          list[ComboBox] : A list of parent ComboBox objects.
+            list[ComboBox] : A list of parent ComboBox objects.
         """
         combo_dict: dict[str, list[ComboBox]] = {}
         for item in self.tags_gather():
@@ -5228,9 +5412,9 @@ class _Container(_qtpyBase_Control):
         child_tag`.
 
         Args:
-          child_tag: The tag name of the child combobox.
-          combo_list (list["ComboBox"]): list["ComboBox"]: A list of ComboBox objects that are the parents of the child
-            combobox. Passed by reference and updated in the method
+            child_tag: The tag name of the child combobox.
+            combo_list (list["ComboBox"]): list["ComboBox"]: A list of ComboBox objects that are the parents of the child
+                combobox. Passed by reference and updated in the method
         """
         for item in self.tags_gather():
             if item.tag == child_tag:
@@ -5240,14 +5424,14 @@ class _Container(_qtpyBase_Control):
                     if widget.parent_tag != "":
                         self._combobox_parent_gather(widget.parent_tag, combo_list)
 
-    def _scroll_handler(self, event: SYSEVENTS, *args) -> int:
+    def _scroll_handler(self, event: Sys_Events, *args) -> int:
         """Handles scroll events. If the callback function is callable, then it is called and the result returned
 
         Args:
-          event (SYSEVENTS): The event that was triggered.
+            event (SYSEVENTS): The event that was triggered.
 
         Returns:
-          int: The return value that is the result of calling the event handler.
+            int: The return value that is the result of calling the event handler.
         """
         if self._parent_app is None:
             parent_app = g_application
@@ -5260,15 +5444,20 @@ class _Container(_qtpyBase_Control):
             if not widget_def.widget.guiwidget_get.visibleRegion().isEmpty():
                 widgets_visible[widget_def.widget.tag] = widget_def
 
+        window_id = get_window_id(self.parent_app, self.parent, self)
+
         if callable(self.callback):
             result = _Event_Handler(parent_app=parent_app, parent=self).event(
+                window_id=window_id,
                 callback=self.callback,
                 container_tag="",
                 tag=self.tag,
                 event=event,
                 action=self.callback.__name__,
                 value=(widgets_visible, args),
-                widget_dict=parent_app.widget_dict_get(self.container_tag),
+                widget_dict=parent_app.widget_dict_get(
+                    window=window_id, container_tag=self.container_tag
+                ),
                 parent=self,
                 control_name=self.__class__.__name__,
             )
@@ -5285,7 +5474,7 @@ class _Container(_qtpyBase_Control):
         """Returns the current widget in the scroll area
 
         Returns:
-          Optional[_qtpyBase_Control] : The current widget that is being displayed in the scroll area.
+            Optional[_qtpyBase_Control] : The current widget that is being displayed in the scroll area.
         """
         return self._scroll_current_widget
 
@@ -5294,7 +5483,7 @@ class _Container(_qtpyBase_Control):
         """Returns a tuple of containing the widgets in the scroll_deque.
 
         Returns:
-          tuple[_qtpyBase_Control, ...] : A tuple of the widgets in the scroll_deque.
+            tuple[_qtpyBase_Control, ...] : A tuple of the widgets in the scroll_deque.
         """
         return tuple(i.widget for i in self._scroll_deque)
 
@@ -5305,7 +5494,7 @@ class _Container(_qtpyBase_Control):
         widget in the scroll queue, and the frame style of the current widget is set to the scroll frame  attribute
 
         Returns:
-          Optional[_qtpyBase_Control] : The current widget that was scrolled to.
+            Optional[_qtpyBase_Control] : The current widget that was scrolled to.
         """
         if self.scroll and self._scroll_deque:
             if self._scroll_current_widget is not None:
@@ -5327,7 +5516,7 @@ class _Container(_qtpyBase_Control):
         and sets the frame style of the last item to the scroll frame  attribute
 
         Returns:
-          Optional[_qtpyBase_Control] : The last widget in the scroll queue.
+            Optional[_qtpyBase_Control] : The last widget in the scroll queue.
         """
         if self.scroll and len(self._scroll_deque) > 0:
             self._scroll_container.ensureWidgetVisible(
@@ -5348,7 +5537,7 @@ class _Container(_qtpyBase_Control):
         attribute.
 
         Returns:
-          Optional[_qtpyBase_Control] : The current widget that was scrolled to.
+            Optional[_qtpyBase_Control] : The current widget that was scrolled to.
         """
         if self.scroll and len(self._scroll_deque) > 0:
             for index, item in enumerate(self._scroll_deque):
@@ -5384,7 +5573,7 @@ class _Container(_qtpyBase_Control):
 
 
         Returns:
-          Optional[_qtpyBase_Control] : The current widget that was scrolled to.
+            Optional[_qtpyBase_Control] : The current widget that was scrolled to.
         """
         if self.scroll and len(self._scroll_deque) > 0:
             for index, item in enumerate(self._scroll_deque):
@@ -5420,13 +5609,13 @@ class _Container(_qtpyBase_Control):
         """Scrolls to the widget in the scroll area that matches the given container_tag and tag names
 
         Args:
-          container_tag (str): The tag name of the container widget
-          tag (str): The tag name of the widget you want to scroll to.
-          index (int): The index of the widget to scroll to. If -1, then the widget is searched for. If > 0 This
-            overrides the tag and container_tag arguments.
+            container_tag (str): The tag name of the container widget
+            tag (str): The tag name of the widget you want to scroll to.
+            index (int): The index of the widget to scroll to. If -1, then the widget is searched for. If > 0 This
+                overrides the tag and container_tag arguments.
 
         Returns:
-          Optional[_qtpyBase_Control]: The widget that was scrolled to.
+            Optional[_qtpyBase_Control]: The widget that was scrolled to.
         """
         if self.scroll:
             deque_len = len(self._scroll_deque) - 1  # Zero based
@@ -5495,6 +5684,9 @@ class _Container(_qtpyBase_Control):
 
         if container is None:
             container = self
+
+        window_id = get_window_id(self._parent_app, self._parent, self)
+
         for row_list in container.control_list_get:
             for col_control in row_list:
                 if col_control is None:
@@ -5504,10 +5696,14 @@ class _Container(_qtpyBase_Control):
                     self.tags_gather(container=col_control, tag_list=tag_list)
                 else:
                     if self._parent_app is not None and self._parent_app.widget_exist(
-                        container_tag=container.tag, tag=col_control.tag
+                        window=window_id,
+                        container_tag=container.tag,
+                        tag=col_control.tag,
                     ):
                         widget = self._parent_app.widget_get(
-                            container_tag=container.tag, tag=col_control.tag
+                            window=window_id,
+                            container_tag=container.tag,
+                            tag=col_control.tag,
                         )
 
                         if isinstance(widget, _Container):
@@ -5533,9 +5729,12 @@ class _Container(_qtpyBase_Control):
 
     def values_clear(self):
         """Clears the values of all widgets in the container that have a `clear` method"""
+
+        window_id = get_window_id(self.parent_app, self.parent, self)
+
         for item in self.tags_gather():
             widget = self._parent_app.widget_get(
-                container_tag=item.container_tag, tag=item.tag
+                window=window_id, container_tag=item.container_tag, tag=item.tag
             )
             if hasattr(widget, "clear"):
                 widget.clear()
@@ -5616,7 +5815,7 @@ class _Container(_qtpyBase_Control):
             snapshot2 (str): Name of comparison snapshot (Optional: Defaults to current values)
 
         Returns:
-             list[_Snapshot_Modified_Values] : list of _Snapshot_Modified_Values instances [snap1, snap2]
+            list[_Snapshot_Modified_Values] : list of _Snapshot_Modified_Values instances [snap1, snap2]
 
         """
         modified_values = []
@@ -5821,8 +6020,8 @@ class _Container(_qtpyBase_Control):
         )
         print(
             f"{leader}******************** RHT <{container.row_height_total}> RHM <{container.row_height_max}>\
-             CA <{container.controls_across}> CWT <{container.col_width_total}> \
-             CWM <{container.col_width_max}> *******************"
+            CA <{container.controls_across}> CWT <{container.col_width_total}> \
+            CWM <{container.col_width_max}> *******************"
         )
         print(
             f"{leader}******************** End _Container <{container.tag}> Dump *******************"
@@ -5833,7 +6032,7 @@ class _Container(_qtpyBase_Control):
 class Button(_qtpyBase_Control):
     """Instantiates a Button widget and associated properties"""
 
-    txt_align: ALIGN = ALIGN.CENTER
+    txt_align: Align = Align.CENTER
 
     def __post_init__(self):
         """Initializes the button object."""
@@ -5845,12 +6044,12 @@ class Button(_qtpyBase_Control):
         """Creates a Button widget.
 
         Args:
-          parent_app (QtPyApp): The parent app.
-          parent (qtW.QWidget): The parent widget.
-          container_tag (str): The tag of the container that the widget is in.
+            parent_app (QtPyApp): The parent app.
+            parent (qtW.QWidget): The parent widget.
+            container_tag (str): The tag of the container that the widget is in.
 
         Returns:
-          qtW.QWidget : The button widget
+            qtW.QWidget : The button widget
         """
         button_amper_length = amper_length(self.trans_str(self.text))
 
@@ -5891,11 +6090,11 @@ class FormContainer(_Container):
         """Adds a control to the form container.
 
         Args:
-          control (_qtpyBase_Control): _qtpyBase_Control added to the form container.
-          zero_based (bool): bool = False. Defaults to False
+            control (_qtpyBase_Control): _qtpyBase_Control added to the form container.
+            zero_based (bool): bool = False. Defaults to False
 
         Returns:
-          FormContainer : The Form Container instance.
+            FormContainer : The Form Container instance.
         """
         assert isinstance(
             control, _qtpyBase_Control
@@ -5935,13 +6134,13 @@ class _Dialog(qtW.QDialog):
         """Sets up the dialogue box.
 
         Args:
-          parent_app (QtPyApp): The parent application.
-          owner ("PopContainer"): The PopContainer that owns this dialogue box.
-          callback (Callable): This is the method that will be called when the user clicks the a dialogue button.
-          container (_Container): The container that the dialogue box is being called from.
-          container_tag (str): The tag name of the container that the dialogue box creates.
-          tag (str): This is the tag name of the dialogue box container . It's used to identify the dialogue box.
-          title (str): The title of the dialogue box
+            parent_app (QtPyApp): The parent application.
+            owner ("PopContainer"): The PopContainer that owns this dialogue box.
+            callback (Callable): This is the method that will be called when the user clicks the a dialogue button.
+            container (_Container): The container that the dialogue box is being called from.
+            container_tag (str): The tag name of the container that the dialogue box creates.
+            tag (str): This is the tag name of the dialogue box container . It's used to identify the dialogue box.
+            title (str): The title of the dialogue box
         """
 
         super().__init__()
@@ -6004,7 +6203,24 @@ class _Dialog(qtW.QDialog):
         """
         self._allow_close = True
 
+        # event.accept()
+        # return None
+
         if self.callback is not None:
+            window_id = get_window_id(self._parent_app, None, self)
+
+            if self._parent_app.widget_exist(
+                window=window_id,
+                container_tag=self.container_tag,
+                tag=self.container_tag,
+            ):
+                widget_dict = self._parent_app.widget_dict_get(
+                    window_id,
+                    container_tag=self.container_tag,
+                )
+            else:
+                widget_dict = {}
+
             assert (
                 self.callback.__code__.co_argcount <= 2
             ), "open callback has 1 argument - Action"
@@ -6013,15 +6229,14 @@ class _Dialog(qtW.QDialog):
                 result = _Event_Handler(
                     parent_app=self._parent_app, parent=self.owner
                 ).event(
+                    window_id=window_id,
                     callback=self.callback,
-                    action=SYSEVENTS.WINDOWCLOSED.name,
+                    action=Sys_Events.WINDOWCLOSED.name,
                     container_tag=self.container_tag,
                     tag=self.tag,
-                    event=SYSEVENTS.WINDOWCLOSED,
+                    event=Sys_Events.WINDOWCLOSED,
                     value=None,
-                    widget_dict=self._parent_app.widget_dict_get(
-                        container_tag=self.container_tag
-                    ),
+                    widget_dict=widget_dict,
                     control_name=self.__class__.__name__,
                     parent=self.owner,
                 )
@@ -6030,7 +6245,7 @@ class _Dialog(qtW.QDialog):
                     self.container.widgets_clear()
 
                     self.container.widget_del(
-                        container_tag=self.container_tag, tag=self.container_tag
+                        container_tag=self.container_tag, tag=self.tag
                     )
 
                     event.accept()
@@ -6041,13 +6256,16 @@ class _Dialog(qtW.QDialog):
             else:
                 self.container.widgets_clear()
                 self.container.widget_del(
-                    container_tag=self.container_tag, tag=self.container_tag
+                    container_tag=self.container_tag,
+                    tag=self.container_tag,
                 )
                 event.accept()
         else:
             self.container.widgets_clear()
             self.container.widget_del(
-                container_tag=self.container_tag, tag=self.container_tag
+                window=window_id,
+                container_tag=self.container_tag,
+                tag=self.container_tag,
             )
             event.accept()
 
@@ -6057,12 +6275,12 @@ class _Dialog(qtW.QDialog):
         Returns (str) : The value set in the  _result variable
 
         """
+
         layout = qtW.QVBoxLayout()
         layout.setObjectName(self.container_tag)
 
         self.setModal(True)
         self.setWindowTitle(self.owner.trans_str(self.title))
-
         self.setWindowFlags(qtC.Qt.CustomizeWindowHint | qtC.Qt.WindowTitleHint)
 
         self._widget = self.container._create_widget(
@@ -6076,7 +6294,7 @@ class _Dialog(qtW.QDialog):
         self.setFixedSize(self._widget.minimumWidth(), self._widget.minimumHeight())
 
         if self.owner.open_sheet() == 1:
-            self.exec()
+            self.exec()  # Blocks
 
         if self.container is not None and self.container.userdata_get() is not None:
             return self.container.userdata_get()
@@ -6104,6 +6322,8 @@ class PopContainer(_qtpyBase_Control):
 
         if self.container_tag.strip() == "":
             self.container_tag = "pop_container_" + str(uuid.uuid1())
+        if self.tag.strip() == "":
+            self.tag = "pop_container_" + str(uuid.uuid1())
 
         assert isinstance(self.title, str), f"{self.title=}. Must be str"
         assert isinstance(
@@ -6142,7 +6362,11 @@ class PopContainer(_qtpyBase_Control):
         Returns:
             bool : Result of the close operation
         """
+        window_id = get_window_id(self.parent_app, None, self)
 
+        self.parent_app.widget_del(
+            window=window_id, container_tag=self.container_tag, tag=self.container_tag
+        )
         self.dialog._result = self._result
         return self.dialog.close()
 
@@ -6190,7 +6414,7 @@ class PopContainer(_qtpyBase_Control):
             str : The value set in the _result variable
         """
 
-        return self.dialog._result
+        return self._result
 
     def set_result(self, result: str):
         """Sets the result of the dialogs operations into the _result variable.
@@ -6200,7 +6424,7 @@ class PopContainer(_qtpyBase_Control):
         """
         assert isinstance(result, str), f"{result=}. Must be str!"
 
-        self.dialog._result = result
+        self._result = result
 
     def open_sheet(self) -> int:
         """Opens the sheet and returns the result of attempting to open the sheet
@@ -6218,16 +6442,19 @@ class PopContainer(_qtpyBase_Control):
 
             handler = _Event_Handler(parent_app=self.parent_app, parent=self)
 
+            window_id = get_window_id(self.parent_app, None, self)
+
             if callable(self.callback):
                 result = handler.event(
+                    window_id=window_id,
                     callback=self.callback,
-                    action=SYSEVENTS.WINDOWOPEN.name,
+                    action=Sys_Events.WINDOWOPEN.name,
                     container_tag=self.container_tag,
                     tag=self.tag,
-                    event=SYSEVENTS.WINDOWOPEN,
+                    event=Sys_Events.WINDOWOPEN,
                     value=None,
                     widget_dict=self.parent_app.widget_dict_get(
-                        container_tag=self.container_tag
+                        window=window_id, container_tag=self.container_tag
                     ),
                     control_name=self.__class__.__name__,
                     parent=self,
@@ -6279,7 +6506,7 @@ class PopAbout(PopContainer):
 
         container = VBoxContainer(
             tag="app_about",
-            align=ALIGN.CENTER,
+            align=Align.CENTER,
             width=self.width,
             height=self.height,
             colpad=False,
@@ -6291,7 +6518,7 @@ class PopAbout(PopContainer):
                     text=self.app_text,
                     tag="app_text",
                     width=self.width,
-                    txt_align=ALIGN.CENTER,
+                    txt_align=Align.CENTER,
                     txt_font=Font(size=16),
                 )
             )
@@ -6309,7 +6536,7 @@ class PopAbout(PopContainer):
                     width=self.width - 2,
                     height=self.height - 3,
                     editable=False,
-                    txt_align=ALIGN.CENTER,
+                    txt_align=Align.CENTER,
                     txt_font=self.informative_font,
                 )  # border=self.border)
             )
@@ -6334,11 +6561,11 @@ class PopAbout(PopContainer):
         """Handles control event processing for the PopAbout class
 
         Args:
-          event (Action): The event that triggered the control event.
+            event (Action): The event that triggered the control event.
         """
 
         # Closes the dialog box when the user clicks the OK button.
-        if event.event == SYSEVENTS.CLICKED:
+        if event.event == Sys_Events.CLICKED:
             if event.tag == "ok":
                 self._result = event.tag
                 self.dialog.close()
@@ -6384,7 +6611,7 @@ class PopFolderGet(PopContainer):
                 tag="up_folder",
                 height=1,
                 width=1,
-                icon=SYSICON.arrowup.get(),
+                icon=Sys_Icon.arrowup.get(),
                 tooltip="Select The Parent Folder",
             )
         )
@@ -6432,7 +6659,7 @@ class PopFolderGet(PopContainer):
 
         self.container.add_row(screen_container)
         self.container.add_row(
-            HBoxContainer(align=ALIGN.RIGHT).add_row(
+            HBoxContainer(align=Align.RIGHT).add_row(
                 Button(text="&Ok", tag="ok", callback=self.event_handler),
                 Button(text="&Cancel", tag="cancel", callback=self.event_handler),
             )
@@ -6445,13 +6672,13 @@ class PopFolderGet(PopContainer):
         it updates the folder edit widget with the current folder
 
         Args:
-          event (Action): Action
+            event (Action): Action
 
         Returns:
-          int : 1, Ok, -1 is returned to indicate that the event has been handled and should not be processed further.
+            int : 1, Ok, -1 is returned to indicate that the event has been handled and should not be processed further.
         """
         match int(event.event):  # Need int on matches for Nuitka to work
-            case int(SYSEVENTS.CLICKED):
+            case int(Sys_Events.CLICKED):
                 match event.tag:
                     case "ok":
                         folder: str = event.value_get(
@@ -6535,7 +6762,7 @@ class PopFolderGet(PopContainer):
                                 tag="folder",
                                 value=f"{SDELIM}{parent_dir}{SDELIM}",
                             )
-            case int(SYSEVENTS.DOUBLECLICKED):
+            case int(Sys_Events.DOUBLECLICKED):
                 if event.tag == "dir_view":
                     folder = event.value_get(container_tag="folder_edit", tag="folder")
 
@@ -6545,7 +6772,7 @@ class PopFolderGet(PopContainer):
                     self._result = folder.strip()
                     self.close()
 
-            case int(SYSEVENTS.EXPANDED) | int(SYSEVENTS.COLLAPSED):
+            case int(Sys_Events.EXPANDED) | int(Sys_Events.COLLAPSED):
                 if event.tag == "dir_view":
                     folders = ""
                     # Generate folder str, delim by ;. action.value contains list of folder items
@@ -6561,11 +6788,13 @@ class PopFolderGet(PopContainer):
                         value=f"{SDELIM}{folders}{SDELIM}",
                     )
 
-            case int(SYSEVENTS.FOCUSIN):
+            case int(Sys_Events.FOCUSIN):
                 pass
-            case int(SYSEVENTS.FOCUSOUT):
+            case int(Sys_Events.FOCUSOUT):
                 pass
-            case int(SYSEVENTS.PRESSED):  # Currently, not allowing user entry of folder
+            case int(
+                Sys_Events.PRESSED
+            ):  # Currently, not allowing user entry of folder
                 if event.tag == "folder":
                     folderview_widget = event.widget_get(
                         container_tag="dir_container", tag="dir_view"
@@ -6600,7 +6829,7 @@ class PopFolderGet(PopContainer):
         """Creates a folder, via a user entered folder name
 
         Args:
-          event: The action that triggered the callback.
+            event: The action that triggered the callback.
         """
 
         current_folder = event.value_get(container_tag="folder_edit", tag="folder")
@@ -6681,6 +6910,10 @@ class PopMessage(PopContainer):
         text_height = self.height
         text_width = self.width
 
+        if "<" in self.message and ">" in self.message:
+            self.message = self.message.replace("<", SDELIM)
+            self.message = self.message.replace(">", SDELIM)
+
         # Make text fit
         if "\n" in self.message:
             self.message = f"\n".join(
@@ -6691,7 +6924,7 @@ class PopMessage(PopContainer):
 
         # Creates a GUI with a grid container, a text edit and appropriate buttons.
         container = GridContainer(
-            align=ALIGN.CENTER, width=self.width, height=self.height
+            align=Align.CENTER, width=self.width, height=self.height
         )
 
         if self.icon is not None:
@@ -6702,7 +6935,7 @@ class PopMessage(PopContainer):
                     width=48,
                     height=48,
                     pixel_unit=True,
-                    frame=Widget_Frame(frame=FRAME.PLAIN, frame_style=FRAMESTYLE.NONE),
+                    frame=Widget_Frame(frame=Frame.PLAIN, frame_style=Frame_Style.NONE),
                 ),
                 TextEdit(
                     text=self.message,
@@ -6712,7 +6945,7 @@ class PopMessage(PopContainer):
                     height=text_height,
                     editable=False,
                     frame=Widget_Frame(
-                        frame=FRAME.SUNKEN, frame_style=FRAMESTYLE.STYLED
+                        frame=Frame.SUNKEN, frame_style=Frame_Style.STYLED
                     ),
                     # txt_align=ALIGN.CENTER,
                 ),
@@ -6727,13 +6960,13 @@ class PopMessage(PopContainer):
                     height=text_height + 1,
                     editable=False,
                     frame=Widget_Frame(
-                        frame=FRAME.SUNKEN, frame_style=FRAMESTYLE.STYLED
+                        frame=Frame.SUNKEN, frame_style=Frame_Style.STYLED
                     ),
                     # txt_align=ALIGN.CENTER,
                 )
             )
 
-        button_container = HBoxContainer(align=ALIGN.RIGHT, width=self.width)
+        button_container = HBoxContainer(align=Align.RIGHT, width=self.width)
 
         if self.buttons is None:
             button_container.add_row(
@@ -6777,13 +7010,13 @@ class PopMessage(PopContainer):
         decedent classes
 
         Args:
-          event (Action): The event that was triggered.
+            event (Action): The event that was triggered.
 
         Returns:
-          int: 1
+            int: 1
         """
         # Closes the window when the user clicks the OK button.
-        if event.event == SYSEVENTS.CLICKED:
+        if event.event == Sys_Events.CLICKED:
             if event.tag == "ok":
                 self._result = event.tag
                 self.close()
@@ -6804,7 +7037,7 @@ class PopError(PopMessage):
         # Sets the icon of the message box to a critical icon.
         self.icon: Union[
             qtG.QIcon, qtG.QPixmap, str, None
-        ] = SYSICON.messagecritical.get(iconformat=False)
+        ] = Sys_Icon.messagecritical.get(iconformat=False)
         super().__post_init__()
 
 
@@ -6841,10 +7074,10 @@ class PopOKCancel(PopMessage):
         descendants
 
         Args:
-          event (Action): Calling event.
+            event (Action): Calling event.
         """
         match int(event.event):
-            case int(SYSEVENTS.CLICKED):
+            case int(Sys_Events.CLICKED):
                 match event.tag:
                     case "ok":
                         self._result = event.tag
@@ -6897,10 +7130,10 @@ class PopOKCancelApply(PopOKCancel):
         descendants.
 
         Args:
-          event (Action): Calling event.
+            event (Action): Calling event.
         """
         match int(event.event):
-            case int(SYSEVENTS.CLICKED):
+            case int(Sys_Events.CLICKED):
                 match event.tag:
                     case "ok":
                         self._result = event.tag
@@ -6979,7 +7212,7 @@ class PopOptions(PopContainer):
 
         option_container.width = radio_selection_width
         button_container = HBoxContainer(
-            tag="button_container", align=ALIGN.RIGHT, width=self.width
+            tag="button_container", align=Align.RIGHT, width=self.width
         )
         button_container.add_row(
             Button(
@@ -7017,10 +7250,10 @@ class PopOptions(PopContainer):
         variable is set to an empty string
 
         Args:
-          event (Action): Calling event
+            event (Action): Calling event
         """
         match int(event.event):
-            case int(SYSEVENTS.CLICKED):
+            case int(Sys_Events.CLICKED):
                 match event.tag:
                     case "ok":
                         for key, value in self._options.items():
@@ -7066,7 +7299,7 @@ class PopTextGet(PopContainer):
 
     def __post_init__(self):
         """Constructor for the PopTextGet dialogue that checks arguments and sets instance variables."""
-        command_buttons = HBoxContainer(align=ALIGN.RIGHT).add_row(
+        command_buttons = HBoxContainer(align=Align.RIGHT).add_row(
             Button(text="&Ok", tag="ok", callback=self.event_handler),  # , height=1),
             Button(
                 text="&Cancel", tag="cancel", callback=self.event_handler
@@ -7106,9 +7339,9 @@ class PopTextGet(PopContainer):
         If the user clicks the Cancel button, an empty string is returned in the _result variable.
 
         Args:
-          event (Action): Action
+            event (Action): Action
         """
-        if event.event == SYSEVENTS.CLICKED:
+        if event.event == Sys_Events.CLICKED:
             if event.tag == "ok":
                 self._result = event.value_get(container_tag="text", tag="text").strip()
                 self.close()
@@ -7126,7 +7359,7 @@ class PopYesNo(PopMessage):
         if self.icon == None:
             self.icon: Union[
                 qtG.QIcon, qtG.QPixmap, str, None
-            ] = SYSICON.messagequestion.get(iconformat=False)
+            ] = Sys_Icon.messagequestion.get(iconformat=False)
 
         # Add  Yes and No Buttone to the  GUI if none supplied.
         if self.buttons is None:
@@ -7142,10 +7375,10 @@ class PopYesNo(PopMessage):
         Sets the _result variable to the tag of the button that was clicked.
 
         Args:
-          event (Action): Action
+            event (Action): Action
         """
         match int(event.event):
-            case int(SYSEVENTS.CLICKED):
+            case int(Sys_Events.CLICKED):
                 match event.tag:
                     case "yes":
                         self._result = event.tag
@@ -7171,7 +7404,7 @@ class PopWarn(PopYesNo):
         """
         self.icon: Union[
             qtG.QIcon, qtG.QPixmap, str, None
-        ] = SYSICON.messagewarning.get(iconformat=False)
+        ] = Sys_Icon.messagewarning.get(iconformat=False)
 
         assert isinstance(self.yesno, bool), f"{self.yesno=}. Must be bool"
 
@@ -7198,12 +7431,12 @@ class HBoxContainer(_Container):
         """Adds a GUI control to the HBoxContainer
 
         Args:
-          control (_qtpyBase_Control): Adds a sub-classed GUI control of the _qtpyBase_Control to the layout
-          zero_based (bool): If True, the control will be added to the first row. If False, the control will be added to
-          the second row. Defaults to False
+            control (_qtpyBase_Control): Adds a sub-classed GUI control of the _qtpyBase_Control to the layout
+            zero_based (bool): If True, the control will be added to the first row. If False, the control will be added to
+            the second row. Defaults to False
 
         Returns:
-          HBoxContainer : The HBoxContainer object.
+            HBoxContainer : The HBoxContainer object.
         """
         assert isinstance(
             control, _qtpyBase_Control
@@ -7229,11 +7462,11 @@ class VBoxContainer(_Container):
         """Adds a GUI control to the VBoxContainer
 
         Args:
-          control (_qtpyBase_Control): Adds a sub-classed GUI control of the _qtpyBase_Control to the layout
-          zero_based (bool): If True, the first row will be 0. If False, the first row will be 1. Defaults to False
+            control (_qtpyBase_Control): Adds a sub-classed GUI control of the _qtpyBase_Control to the layout
+            zero_based (bool): If True, the first row will be 0. If False, the first row will be 1. Defaults to False
 
         Returns:
-          VBoxContainer : The VBoxContainer instance.
+            VBoxContainer : The VBoxContainer instance.
         """
         assert isinstance(
             control, _qtpyBase_Control
@@ -7267,12 +7500,12 @@ class Checkbox(_qtpyBase_Control):
         """Creates the checkbox widget
 
         Args:
-          parent_app (QtPyApp): The parent application.
-          parent (qtW.QWidget): The parent widget.
-          container_tag (str): This is the tag name that will be used to identify the widget as belonging to a container.
+            parent_app (QtPyApp): The parent application.
+            parent (qtW.QWidget): The parent widget.
+            container_tag (str): This is the tag name that will be used to identify the widget as belonging to a container.
 
         Returns:
-          qtW.QWidget : The checkbox widget
+            qtW.QWidget : The checkbox widget
         """
         if self.height == -1:
             self.height = CHECKBOX_SIZE.height
@@ -7293,7 +7526,7 @@ class Checkbox(_qtpyBase_Control):
         """Returns the checked state of the checkbox.
 
         Returns:
-          bool : The checked state ofthe checkbox.
+            bool : The checked state ofthe checkbox.
         """
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
@@ -7305,7 +7538,7 @@ class Checkbox(_qtpyBase_Control):
         """Toggles the checkbox on or off.
 
         Args:
-          value (bool): True checkbox is checked, False checkbox is unchecked. Defaults to True
+            value (bool): True checkbox is checked, False checkbox is unchecked. Defaults to True
         """
 
         if self._widget is None:
@@ -7321,7 +7554,7 @@ class Checkbox(_qtpyBase_Control):
         """Returns the label text of the checkbox.
 
         Returns:
-          str: The text of the label.
+            str: The text of the label.
         """
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
@@ -7332,7 +7565,7 @@ class Checkbox(_qtpyBase_Control):
         """Returns the current state of the button
 
         Returns:
-          bool : True checked, False not checked
+            bool : True checked, False not checked
         """
 
         return self.button_checked
@@ -7341,7 +7574,7 @@ class Checkbox(_qtpyBase_Control):
         """Toggles the checkbox on or off.
 
         Args:
-          value (bool): True checkbox is checked, False checkbox is unchecked.
+            value (bool): True checkbox is checked, False checkbox is unchecked.
 
         Returns:
 
@@ -7361,8 +7594,8 @@ class ComboBox(_qtpyBase_Control):
     dropdown_width: int = 10
     items: Union[
         str,
-        list[COMBO_ITEM],
-        tuple[COMBO_ITEM, ...],
+        list[Combo_Item],
+        tuple[Combo_Item, ...],
     ] = ()
     num_visible_items: int = 15
     display_na: bool = True
@@ -7379,7 +7612,7 @@ class ComboBox(_qtpyBase_Control):
 
 
         Returns:
-          bool: True if a child of another combo box. False if not.
+            bool: True if a child of another combo box. False if not.
         """
         if self.parent_tag.strip() == "":
             return False
@@ -7403,14 +7636,14 @@ class ComboBox(_qtpyBase_Control):
         ), f"f{self.items=}. Must be a str, list or tuple eg.List[COMBO_ITEM,...]"
 
         if isinstance(self.items, (list, tuple)):
-            item: COMBO_ITEM
+            item: Combo_Item
 
             for item in self.items:
                 assert isinstance(
-                    item, COMBO_ITEM
+                    item, Combo_Item
                 ), f"combo item {item} must be a COMBO_ITEM"
 
-                item: COMBO_ITEM
+                item: Combo_Item
 
                 assert isinstance(
                     item.display, str
@@ -7454,12 +7687,12 @@ class ComboBox(_qtpyBase_Control):
         """Creates a ComboBox widget and loads it with the items specified in the `items` attribute - if provided
 
         Args:
-          parent_app (QtPyApp): The parent application.
-          parent (qtW.QWidget): The parent widget.
-          container_tag (str): The tag name for the widget in the parent container.
+            parent_app (QtPyApp): The parent application.
+            parent (qtW.QWidget): The parent widget.
+            container_tag (str): The tag name for the widget in the parent container.
 
         Returns:
-          QWidget : The widget is being returned.
+            QWidget : The widget is being returned.
         """
 
         self._widget: qtW.QComboBox
@@ -7504,7 +7737,7 @@ class ComboBox(_qtpyBase_Control):
         The function sets the width of the combobox to the width of the text plus the width of the arrow
 
         Args:
-          display_width (int): The number of characters to display in the combobox
+            display_width (int): The number of characters to display in the combobox
         """
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
@@ -7623,7 +7856,7 @@ class ComboBox(_qtpyBase_Control):
                     continue
 
                 line_list.append(
-                    COMBO_ITEM(
+                    Combo_Item(
                         display=line_split[text_index - 1],
                         data=line_split[data_index - 1],
                         icon=None,
@@ -7639,7 +7872,7 @@ class ComboBox(_qtpyBase_Control):
         return max_len
 
     @property
-    def get_items(self) -> list[COMBO_DATA]:
+    def get_items(self) -> list[Combo_Data]:
         """Returns all the items in the combo_box
 
         :return:
@@ -7658,7 +7891,7 @@ class ComboBox(_qtpyBase_Control):
         )
 
         return [
-            COMBO_DATA(
+            Combo_Data(
                 display=self._widget.itemText(i),
                 data=self._widget.itemData(i).data,
                 user_data=self._widget.itemData(i).user_data,
@@ -7671,8 +7904,8 @@ class ComboBox(_qtpyBase_Control):
         self,
         items: Union[
             str,
-            list[COMBO_ITEM],
-            tuple[COMBO_ITEM, ...],
+            list[Combo_Item],
+            tuple[Combo_Item, ...],
         ] = (),
         clear_items: bool = True,
         auto_na: bool = True,
@@ -7715,9 +7948,9 @@ class ComboBox(_qtpyBase_Control):
                 )
 
             for item in items:
-                assert isinstance(item, COMBO_ITEM), f"{item=}. Must be COMBO_ITEM"
+                assert isinstance(item, Combo_Item), f"{item=}. Must be COMBO_ITEM"
 
-                item: COMBO_ITEM
+                item: Combo_Item
 
                 assert isinstance(item.display, str), f"{item.display=}.Must be str"
                 assert isinstance(
@@ -7726,11 +7959,6 @@ class ComboBox(_qtpyBase_Control):
                 assert isinstance(
                     item.icon, (type(None), str, qtG.QIcon, qtG.QPixmap)
                 ), f"{item.icon=}. Must be None| str | QIcon | QPixmap"
-                # assert isinstance(
-                #     item.user_data, (str, float, int, bytes, type(None), list, tuple)
-                # ) or hasattr(
-                #     item.user_data, "__dict__"
-                # ), f"{item.user_data=}. Must be str|float|int|bytes|None|list|tuple)"
 
                 display = self.trans_str(item.display)
 
@@ -7768,7 +7996,7 @@ class ComboBox(_qtpyBase_Control):
         """Scrolls to an index in the combobox and  sets the current index of the widget to the select_index argument
 
         Args:
-          select_index (int): The index of the item to select.
+            select_index (int): The index of the item to select.
         """
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
@@ -7829,7 +8057,7 @@ class ComboBox(_qtpyBase_Control):
 
         return text_index
 
-    def value_get(self, index: int = -1) -> COMBO_DATA:
+    def value_get(self, index: int = -1) -> Combo_Data:
         """Gets the value displayed in the dropdown
 
         Returns
@@ -7856,7 +8084,7 @@ class ComboBox(_qtpyBase_Control):
                 data = None
                 user_data = None
 
-            return COMBO_DATA(
+            return Combo_Data(
                 index=self._widget.currentIndex(),
                 display=self._widget.currentText(),
                 data=data,
@@ -7872,7 +8100,7 @@ class ComboBox(_qtpyBase_Control):
                 data = None
                 user_data = None
 
-            return COMBO_DATA(
+            return Combo_Data(
                 index=index,
                 display=self._widget.itemText(index),
                 data=data,
@@ -7883,7 +8111,7 @@ class ComboBox(_qtpyBase_Control):
         """Remove an item from the combobox a the given index.
 
         Args:
-          index (int): The index of the item to remove.
+            index (int): The index of the item to remove.
         """
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
@@ -7898,7 +8126,7 @@ class ComboBox(_qtpyBase_Control):
 
         self._widget.removeItem(index)
 
-    def value_set(self, value: Union[str, COMBO_DATA]):  # noqa LISKOV != good
+    def value_set(self, value: Union[str, Combo_Data]):  # noqa LISKOV != good
         """Sets a value in the dropdown and scrolls to that value. if COMBO_DATA index is -1 then data and display
         values must match for scroll to happen
 
@@ -7910,18 +8138,18 @@ class ComboBox(_qtpyBase_Control):
         self._widget: qtW.QComboBox
 
         assert isinstance(
-            value, (str, COMBO_DATA)
+            value, (str, Combo_Data)
         ), f"value {value=}. Must be COMBO_DATA | str"
 
-        if isinstance(value, COMBO_DATA):
-            value: COMBO_DATA
+        if isinstance(value, Combo_Data):
+            value: Combo_Data
             combo_value = value
         else:
-            combo_value = COMBO_DATA(
+            combo_value = Combo_Data(
                 display=value, data=value, user_data=value, index=-1
             )
 
-        combo_value: COMBO_DATA
+        combo_value: Combo_Data
         assert combo_value.index == -1 or (
             0 <= combo_value.index <= self._widget.count()
         ), f"index <{combo_value.index}> must be == -1 or >= 0 and <= {self._widget.count()}"
@@ -7966,7 +8194,7 @@ class _calendar_widget(qtW.QCalendarWidget):
         """Constructor for the calendar widget.
 
         Args:
-          parent (Dateedit): The parent widget.
+            parent (Dateedit): The parent widget.
         """
         super().__init__()
 
@@ -7976,7 +8204,7 @@ class _calendar_widget(qtW.QCalendarWidget):
         """Method that is called when the user clicks on a date in the calendar widget
 
         Args:
-          date (qtC.QDate): The date that was clicked on.
+            date (qtC.QDate): The date that was clicked on.
         """
         date_tuple = self._parent.date_get(date_tuple=True)
 
@@ -8009,13 +8237,13 @@ class SimpleDateValidator(qtG.QValidator):
                 return qtG.QValidator.Invalid, text, pos
         years = fmt.count("y")
         if len(text) <= years and text.isdigit():
-            print("C Ok")
+            # print("C Ok")
             return self.qtG.QValidator.Acceptable, text, pos
         if qtC.QDate.fromString(text, fmt).isValid() and qtC.QDate.fromString(
             text, fmt
         ) > qtC.QDate(1, 1, 1):
             return qtG.QValidator.Acceptable, text, pos
-        print("e inter")
+        # print("e inter")
         return qtG.QValidator.Intermediate, text, pos
 
 
@@ -8033,10 +8261,10 @@ class _Custom_Dateedit(qtW.QWidget):
 
     def __init__(self, parent: qtW.QWidget = None):
         """Constructor for the custom date edit widget that validates arguments and sets instance variables.
-         - Sets the input mask for the lineEdit widget to the mask returned by the get_mask() function
+            Sets the input mask for the lineEdit widget to the mask returned by the get_mask() function
 
         Args:
-          parent (qtW.QWidget): The parent widget of the custom date edit widget.
+            parent (qtW.QWidget): The parent widget of the custom date edit widget.
         """
         self.init_done = False
         super().__init__(parent)
@@ -8088,7 +8316,7 @@ class _Custom_Dateedit(qtW.QWidget):
         """Returns the date format of the object
 
         Returns:
-          str: The date format.
+            str: The date format.
         """
         return self._date_format
 
@@ -8096,7 +8324,7 @@ class _Custom_Dateedit(qtW.QWidget):
         """Takes a date format string and sets the date format and edit mask for the date picker
 
         Args:
-          format (str): The date format string.
+            format (str): The date format string.
         """
         assert isinstance(
             format, str
@@ -8117,7 +8345,7 @@ class _Custom_Dateedit(qtW.QWidget):
         """Returns a mask string that can be used to validate the date format
 
         Returns:
-          str : The mask for the date format.
+            str : The mask for the date format.
         """
         return country_date_formatmask(self._date_format)[1]
 
@@ -8125,7 +8353,7 @@ class _Custom_Dateedit(qtW.QWidget):
         """Returns the text in the date widget
 
         Returns:
-          str : The date text in the lineEdit.
+            str : The date text in the lineEdit.
         """
         return self.lineEdit.text()
 
@@ -8133,7 +8361,7 @@ class _Custom_Dateedit(qtW.QWidget):
         """If a date is valid, return it, otherwise return the minimum date
 
         Returns:
-          qtC.QDate : The date.
+            qtC.QDate : The date.
         """
 
         if not self.isValid():
@@ -8150,7 +8378,7 @@ class _Custom_Dateedit(qtW.QWidget):
         """Sets the date of the calendar widget to the date passed in
 
         Args:
-          date (qtC.QDate): The date to be set.
+            date (qtC.QDate): The date to be set.
         """
         assert isinstance(date, qtC.QDate), f"{date=}. Must be QDate"
 
@@ -8178,7 +8406,7 @@ class _Custom_Dateedit(qtW.QWidget):
         """Sets the minimum date for the date picker
 
         Args:
-          min (qtC.QDate): The minimum date that can be selected.
+            min (qtC.QDate): The minimum date that can be selected.
         """
         assert isinstance(min, qtC.QDate), f"{min=}. Must be QDate"
         self.min_date = min
@@ -8187,7 +8415,7 @@ class _Custom_Dateedit(qtW.QWidget):
         """Returns the minimum date for the date picker
 
         Returns:
-          qtC.QDate : The minimum date.
+            qtC.QDate : The minimum date.
         """
         return self.min_date
 
@@ -8197,7 +8425,7 @@ class _Custom_Dateedit(qtW.QWidget):
             Otherwise, clear the text and return False
 
         Returns:
-          bool: True - date is valid, False - date is not valid.
+            bool: True - date is valid, False - date is not valid.
         """
         text = self.text()
         if not text:
@@ -8236,11 +8464,11 @@ class _Custom_Dateedit(qtW.QWidget):
         The eventFilter function is called when the calendar is shown or hidden
 
         Args:
-          source (QWidget): The object that the event is being sent to.
-          event (QEvent): The event that was triggered.
+            source (QWidget): The object that the event is being sent to.
+            event (QEvent): The event that was triggered.
 
         Returns:
-          bool : True - event was handled, False - event was not handled.
+            bool : True - event was handled, False - event was not handled.
         """
         # press or release the button when the calendar is shown/hidden
         if event.type() == qtC.QEvent.Hide:
@@ -8251,11 +8479,11 @@ class _Custom_Dateedit(qtW.QWidget):
 
     def keyPressEvent(self, event: qtC.QEvent):
         """Processes key press events for the date picker.
-         - If the user presses the down arrow or F4, the calendar will pop up. If the user presses the delete or
-         backspace key,the date will be cleared
+            - If the user presses the down arrow or F4, the calendar will pop up. If the user presses the delete or
+            backspace key,the date will be cleared
 
         Args:
-          event (QEvent): The event that was triggered.
+            event (QEvent): The event that was triggered.
         """
         if event.key() in (qtC.Qt.Key_Down, qtC.Qt.Key_F4):
             if not self.calendar.isVisible():
@@ -8366,12 +8594,12 @@ class Dateedit(_qtpyBase_Control):
         """Creates the dateedit widget.
 
         Args:
-          parent_app (QtPyApp): The parent application.
-          parent (qtW.QWidget): The parent widget.
-          container_tag (str): str = ""
+            parent_app (QtPyApp): The parent application.
+            parent (qtW.QWidget): The parent widget.
+            container_tag (str): str = ""
 
         Returns:
-          QWidget : The returned widget is actually a QDateEdit or a frame containing it.
+            QWidget : The returned widget is actually a QDateEdit or a frame containing it.
         """
         if self.height == -1:
             self.height = WIDGET_SIZE.height  # COMBOBOX_SIZE.height
@@ -8407,18 +8635,18 @@ class Dateedit(_qtpyBase_Control):
         """Event handler for the dateedit widget.
 
         Returns:
-          int : 1 is OK, -1 is a problem
+            int : 1 is OK, -1 is a problem
         """
 
         event = cast(Action, args[0])  # type: Action
 
-        if event.event == SYSEVENTS.CLICKED:
+        if event.event == Sys_Events.CLICKED:
             # print(f'{event.tag=} {event.tag.startswith("derase_")}')
             if event.tag.startswith("derase_"):
                 self.clear()
-        elif event.event == SYSEVENTS.FOCUSIN:
+        elif event.event == Sys_Events.FOCUSIN:
             pass
-        elif event.event == SYSEVENTS.FOCUSOUT:
+        elif event.event == Sys_Events.FOCUSOUT:
             date_widget: _Custom_Dateedit = self._widget
 
             if date_widget.date() < self.MINDATE:
@@ -8433,12 +8661,16 @@ class Dateedit(_qtpyBase_Control):
             # also means can not use 100,1,1 as a system date - what are the odds?
             #    if self.guiwidget_get.minimumDate() == qtC.QDate(100, 1, 1):
             #        self.date_set(date_format=self.date_format)
-        elif event.event == SYSEVENTS.POPCAL:
+        elif event.event == Sys_Events.POPCAL:
             self._calandar_activated(event)
 
         if callable(self.callback):
             handler = _Event_Handler(parent_app=self.parent_app, parent=self)
+
+            window_id = get_window_id(self.parent_app, self.parent, self)
+
             return handler.event(
+                window_id=window_id,
                 callback=self.callback,
                 action=event.event.name,
                 container_tag=self.container_tag,
@@ -8446,11 +8678,11 @@ class Dateedit(_qtpyBase_Control):
                 event=event.event,
                 value=self.value_get(date_tuple=True),
                 widget_dict=self.parent_app.widget_dict_get(
-                    container_tag=self.container_tag
+                    window=window_id, container_tag=self.container_tag
                 ),
                 control_name=self.__class__.__name__,
                 parent=self.parent_app.widget_get(
-                    container_tag=self.container_tag, tag=self.tag
+                    window=window_id, container_tag=self.container_tag, tag=self.tag
                 ),
             )
         else:
@@ -8459,10 +8691,10 @@ class Dateedit(_qtpyBase_Control):
     def _calandar_activated(self, event: Action) -> int:
         """Processes calendar activated events
         Args:
-          event (Action): The event that was triggered.
+            event (Action): The event that was triggered.
 
         Returns:
-          int : 1 - OK
+            int : 1 - OK
         """
         date = self._widget.date()
         date_text = self.line_edit.text()
@@ -8629,11 +8861,11 @@ class Dateedit(_qtpyBase_Control):
         """Checks if a date is valid
 
         Args:
-          date (str): date in str format
-          date_format (str): The format of the date string.
+            date (str): date in str format
+            date_format (str): The format of the date string.
 
         Returns:
-          bool : True if date is valid, False otherwise
+            bool : True if date is valid, False otherwise
         """
         assert (
             isinstance(date, str) and date.strip() != ""
@@ -8658,11 +8890,11 @@ class Dateedit(_qtpyBase_Control):
         """Gets the date
 
         Args:
-          date_format (str): date format as str
-          date_tuple (bool): If True, returns a tuple of (year, month, day). Defaults to False
+            date_format (str): date format as str
+            date_tuple (bool): If True, returns a tuple of (year, month, day). Defaults to False
 
         Returns:
-          str | tuple : The date as a str formatted according to date format or a tuple of (year, month, day)
+            str | tuple : The date as a str formatted according to date format or a tuple of (year, month, day)
         """
 
         return self.date_get(date_format, date_tuple)
@@ -8671,11 +8903,11 @@ class Dateedit(_qtpyBase_Control):
         """Sets the date
 
         Args:
-          date (str): date in str format
-          date_format (str): date format as str
+            date (str): date in str format
+            date_format (str): date format as str
 
         Returns:
-          None
+            None
         """
         return self.date_set(date, date_format)
 
@@ -8686,8 +8918,8 @@ class FolderView(_qtpyBase_Control):
 
     width: int = 40  # In Chars
     height: int = 15  # In  lines
-    txt_align: ALIGN = ALIGN.LEFT
-    widget_align: ALIGN = ALIGN.LEFT
+    txt_align: Align = Align.LEFT
+    widget_align: Align = Align.LEFT
     root_dir: str = "\\"
     dir_only: bool = False
     multiselect: bool = False
@@ -8701,9 +8933,9 @@ class FolderView(_qtpyBase_Control):
 
         assert isinstance(self.width, int), f"{self.width=}. Must beint"
         assert isinstance(self.height, int), f"{self.height=}. Must be int"
-        assert isinstance(self.txt_align, ALIGN), f"{self.txt_align=}. Must be ALIGN"
+        assert isinstance(self.txt_align, Align), f"{self.txt_align=}. Must be ALIGN"
         assert isinstance(
-            self.widget_align, ALIGN
+            self.widget_align, Align
         ), f"{self.widget_align=}. Must be ALIGN"
         assert (
             isinstance(self.root_dir, str) and self.root_dir.strip() != ""
@@ -8775,12 +9007,12 @@ class FolderView(_qtpyBase_Control):
             If the orientation is horizontal and the role is display, then return the appropriate translated header text
 
             Args:
-              section (int): The column number.
-              orientation (Union[qtC.Qt.Horizontal , qtC.Qt.Vertical]): Qt.Horizontal or Qt.Vertical header
-              role (ItemDataRole): The role is used to indicate what kind of data is being requested.
+                section (int): The column number.
+                orientation (Union[qtC.Qt.Horizontal , qtC.Qt.Vertical]): Qt.Horizontal or Qt.Vertical header
+                role (ItemDataRole): The role is used to indicate what kind of data is being requested.
 
             Returns:
-              The header data for the model.
+                The header data for the model.
             """
             if orientation == qtC.Qt.Horizontal and role == qtC.Qt.DisplayRole:
                 match section:
@@ -8809,12 +9041,12 @@ class FolderView(_qtpyBase_Control):
         widget to not expand on double click
 
         Args:
-          parent_app (QtPyApp): The parent application object.
-          parent (qtW.QWidget): The parent widget of the widget being created.
-          container_tag (str): str = ""
+            parent_app (QtPyApp): The parent application object.
+            parent (qtW.QWidget): The parent widget of the widget being created.
+            container_tag (str): str = ""
 
         Returns:
-          qtW.QWidget : The configured file treeview widget.
+            qtW.QWidget : The configured file treeview widget.
         """
         if self.height == -1:
             self.height = WIDGET_SIZE.height
@@ -8878,7 +9110,7 @@ class FolderView(_qtpyBase_Control):
         for col_index in range(0, self.file_model.columnCount()):
             width += self._widget.columnWidth(col_index)
 
-        self._widget.header().setDefaultAlignment(ALIGN.CENTER.value)
+        self._widget.header().setDefaultAlignment(Align.CENTER.value)
 
         self.font_set(
             self.header_font, widget_font=self.header_font, widget=self._widget.header()
@@ -8914,7 +9146,7 @@ class FolderView(_qtpyBase_Control):
             raise RuntimeError(f"{self._widget=}. Not set")
         self._widget: qtW.QTreeWidget
 
-        event: SYSEVENTS = args[0]
+        event: Sys_Events = args[0]
 
         if len(args) > 1 and len(args[1]) > 0:
             selected_index = args[1][0]  # It is a tuple
@@ -8923,7 +9155,7 @@ class FolderView(_qtpyBase_Control):
                 "selected_node", "name, path, size, modified, date_modified type, isdir"
             )
 
-            if self.click_expand and event == SYSEVENTS.CLICKED:  # Open node on click
+            if self.click_expand and event == Sys_Events.CLICKED:  # Open node on click
                 if self._widget.isExpanded(selected_index):
                     self._widget.collapse(selected_index)
                 else:
@@ -8931,7 +9163,7 @@ class FolderView(_qtpyBase_Control):
 
             file = []
 
-            if event == SYSEVENTS.EXPANDED or event == SYSEVENTS.COLLAPSED:
+            if event == Sys_Events.EXPANDED or event == Sys_Events.COLLAPSED:
                 date_modified = f"{selected_index.model().lastModified(selected_index).toPython():%Y-%m-%d %H:%M:%S%z}"
 
                 file.append(
@@ -8977,7 +9209,10 @@ class FolderView(_qtpyBase_Control):
             if self.callback is not None:
                 handler = _Event_Handler(parent_app=self.parent_app, parent=self)
 
+                window_id = get_window_id(self.parent_app, self.parent, self)
+
                 return handler.event(
+                    window_id=window_id,
                     callback=self.callback,
                     action=event.name,
                     container_tag=self.container_tag,
@@ -8985,11 +9220,11 @@ class FolderView(_qtpyBase_Control):
                     event=event,
                     value=file,
                     widget_dict=self.parent_app.widget_dict_get(
-                        container_tag=self.container_tag
+                        window=window_id, container_tag=self.container_tag
                     ),
                     control_name=self.__class__.__name__,
                     parent=self.parent_app.widget_get(
-                        container_tag=self.container_tag, tag=self.tag
+                        window=window_id, container_tag=self.container_tag, tag=self.tag
                     ),
                 )
 
@@ -9019,7 +9254,7 @@ class FolderView(_qtpyBase_Control):
         """Returns the expanded on click setting (true == dir node expands when clicked on)
 
         Returns:
-          bool : The expand on click setting (true == dir node expands when clicked on)
+            bool : The expand on click setting (true == dir node expands when clicked on)
         """
         return self.click_expand
 
@@ -9028,7 +9263,7 @@ class FolderView(_qtpyBase_Control):
         Returns the tuple containing the values of the selected row
 
         Returns:
-          tuple : The tuple containing the file values from the selected node
+            tuple : The tuple containing the file values from the selected node
         """
 
         return self._Value
@@ -9056,7 +9291,7 @@ class Grid(_qtpyBase_Control):
     width: int = 1  # BUTTON_SIZE.width
     height: int = BUTTON_SIZE.height
 
-    col_def: list[COL_DEF] | tuple[COL_DEF, ...] = ()
+    col_def: list[Col_Def] | tuple[Col_Def, ...] = ()
     multiselect: bool = False
     noselection: bool = False
 
@@ -9123,7 +9358,7 @@ class Grid(_qtpyBase_Control):
 
             return self
 
-    class _DATA_TYPE(IntEnum):
+    class _Data_Type(IntEnum):
         """Enum that represents the data types of items in a grid"""
 
         BOOL = 0
@@ -9157,7 +9392,7 @@ class Grid(_qtpyBase_Control):
         ), f"{self.col_def=}. Must be at least one column definition!"
 
         for definition in self.col_def:
-            assert isinstance(definition, COL_DEF), f"{definition=}. Must be COL_DEF"
+            assert isinstance(definition, Col_Def), f"{definition=}. Must be COL_DEF"
             assert isinstance(
                 definition.label, str
             ), f"{definition.label=}. Must be str."
@@ -9331,16 +9566,20 @@ class Grid(_qtpyBase_Control):
                 value = widget_item.text()
             user_data = None
 
+        window_id = get_window_id(self.parent_app, self.parent, self)
+
         # Handle event
         if (
             event is not None
             and self.callback is not None
             and self.parent_app.widget_exist(
-                container_tag=self.container_tag, tag=self.tag
+                window=window_id, container_tag=self.container_tag, tag=self.tag
             )
         ):
-            event: SYSEVENTS
+            event: Sys_Events
+
             return _Event_Handler(parent_app=self.parent_app, parent=self).event(
+                window_id=window_id,
                 callback=self.callback,
                 action=event.name,
                 container_tag=self.container_tag,
@@ -9348,11 +9587,11 @@ class Grid(_qtpyBase_Control):
                 event=event,
                 value=self._Return_Value(value, user_data, row, col),
                 widget_dict=self.parent_app.widget_dict_get(
-                    container_tag=self.container_tag
+                    window=window_id, container_tag=self.container_tag
                 ),
                 control_name=self.__class__.__name__,
                 parent=self.parent_app.widget_get(
-                    container_tag=self.container_tag, tag=self.tag
+                    window=window_id, container_tag=self.container_tag, tag=self.tag
                 ),
             )
         else:
@@ -9720,12 +9959,16 @@ class Grid(_qtpyBase_Control):
 
         self._widget.removeRow(row)
 
+        window_id = get_window_id(self.parent_app, self.parent, self)
+
         for widget in widgets:
             if widget is not None and isinstance(widget, _Container):
                 for item in widget.tags_gather():
                     if self.tag != item.tag:
                         self.parent_app.widget_del(
-                            container_tag=item.container_tag, tag=item.tag
+                            winodw=window_id,
+                            container_tag=item.container_tag,
+                            tag=item.tag,
                         )
 
     def row_widget_tag_delete(
@@ -10052,19 +10295,24 @@ class Grid(_qtpyBase_Control):
             if tag == "-":  # Return container/widget
                 return item_data.widget
             else:
+                window_id = get_window_id(self.parent_app, self.parent, self)
+
                 if container_tag != "":
                     if self.parent_app.widget_exist(
-                        container_tag=f"{row_index}{container_tag}", tag=tag
+                        window=window_id,
+                        container_tag=f"{row_index}{container_tag}",
+                        tag=tag,
                     ):
                         return self.parent_app.widget_get(
-                            container_tag=f"{row_index}{container_tag}", tag=tag
+                            window=window_id,
+                            container_tag=f"{row_index}{container_tag}",
+                            tag=tag,
                         )
                 else:
-                    print(
-                        f'{self.parent_app.widget_exist(item_data.widget.container_tag, tag=f"{row_index}{tag}")=}'
-                    )
                     return self.parent_app.widget_get(
-                        item_data.widget.container_tag, tag=tag
+                        window=window_id,
+                        container_tag=item_data.widget.container_tag,
+                        tag=tag,
                     )
 
         return None
@@ -10182,30 +10430,30 @@ class Grid(_qtpyBase_Control):
         return row, col_index
 
     @overload
-    def _data_type_decode(self, data_type: _DATA_TYPE, value: str) -> int:
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> int:
         ...
 
     @overload
-    def _data_type_decode(self, data_type: _DATA_TYPE, value: str) -> float:
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> float:
         ...
 
     @overload
-    def _data_type_decode(self, data_type: _DATA_TYPE, value: str) -> bool:
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> bool:
         ...
 
     @overload
-    def _data_type_decode(self, data_type: _DATA_TYPE, value: str) -> str:
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> str:
         ...
 
     @overload
-    def _data_type_decode(self, data_type: _DATA_TYPE, value: str) -> qtC.QDate:
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> qtC.QDate:
         ...
 
     @overload
-    def _data_type_decode(self, data_type: _DATA_TYPE, value: str) -> qtC.QDateTime:
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> qtC.QDateTime:
         ...
 
-    def _data_type_decode(self, data_type: _DATA_TYPE, value: str):
+    def _data_type_decode(self, data_type: _Data_Type, value: str):
         """Casts a string value to the selected data_type - Ref: _data_type_encode
 
         Args:
@@ -10217,33 +10465,33 @@ class Grid(_qtpyBase_Control):
         """
         assert isinstance(value, str), f"{value=}. Must be a str"
         assert isinstance(
-            data_type, (self._DATA_TYPE, int)
+            data_type, (self._Data_Type, int)
         ), "data_type is enumerated data_type or an int index into data_type"
 
         match data_type:
-            case self._DATA_TYPE.BOOL:  # bool
+            case self._Data_Type.BOOL:  # bool
                 if value == "True" or value == "T":
                     return True
                 else:
                     return False
-            case self._DATA_TYPE.DATE:
+            case self._Data_Type.DATE:
                 locale = qtC.QLocale()
                 return qtC.QDate.fromString(
                     str(value), locale.dateFormat(qtC.QLocale.ShortFormat)
                 )
-            case self._DATA_TYPE.DATETIME:
+            case self._Data_Type.DATETIME:
                 locale = qtC.QLocale()
                 return qtC.QDateTime.fromString(
                     str(value), locale.dateTimeFormat(qtC.QLocale.ShortFormat)
                 )
-            case self._DATA_TYPE.FLOAT:
+            case self._Data_Type.FLOAT:
                 return float(value)
-            case self._DATA_TYPE.INT:
+            case self._Data_Type.INT:
                 return int(value)
-            case self._DATA_TYPE.STR:
+            case self._Data_Type.STR:
                 return value
 
-    def _data_type_encode(self, value: any) -> _DATA_TYPE:
+    def _data_type_encode(self, value: any) -> _Data_Type:
         """Returns an  enumerated data_type (_DATA_TYPE) for a given value - Ref: _data_type_decode
 
         Args:
@@ -10253,17 +10501,17 @@ class Grid(_qtpyBase_Control):
         """
         match value:
             case bool():
-                return self._DATA_TYPE.BOOL
+                return self._Data_Type.BOOL
             case datetime.date():
-                return self._DATA_TYPE.DATE
+                return self._Data_Type.DATE
             case datetime.datetime():
-                return self._DATA_TYPE.DATETIME
+                return self._Data_Type.DATETIME
             case float():
-                return self._DATA_TYPE.FLOAT
+                return self._Data_Type.FLOAT
             case int():
-                return self._DATA_TYPE.INT
+                return self._Data_Type.INT
             case str():
-                return self._DATA_TYPE.STR
+                return self._Data_Type.STR
 
 
 class _Image(qtW.QGraphicsView):
@@ -10780,12 +11028,12 @@ class Image(_qtpyBase_Control):
         """Creates the widget.
 
         Args:
-          parent_app (QtPyApp): The parent application.
-          parent (qtW.QWidget): The parent widget.
-          container_tag (str): str = The tag name of the container.
+            parent_app (QtPyApp): The parent application.
+            parent (qtW.QWidget): The parent widget.
+            container_tag (str): str = The tag name of the container.
 
         Returns:
-          QWidget : The created image widget.
+            QWidget : The created image widget.
         """
 
         # if self.height == -1:
@@ -10844,10 +11092,10 @@ class Image(_qtpyBase_Control):
         """Returns an instance of rect_cords  containing the coordinates of a rectangle, given its id
 
         Args:
-          rect_id (str): The ID of the rectangle.
+            rect_id (str): The ID of the rectangle.
 
         Returns:
-          rect_cords : The coordinates of the rectangle.
+            rect_cords : The coordinates of the rectangle.
                             - rect_id: str
                             - left: int
                             - top: int
@@ -10990,7 +11238,7 @@ class Image(_qtpyBase_Control):
             rectangle: _Resizable_Rectangle = self._user_items[rect_id][0]
             rectangle.setVisible(visible)
 
-    def rectangles_changed(self) -> dict[str, RECT_CHANGED]:
+    def rectangles_changed(self) -> dict[str, Rect_Changed]:
         """Returns a dict of changed rectangles
 
         Returns:
@@ -11002,7 +11250,7 @@ class Image(_qtpyBase_Control):
             rectangle: _Resizable_Rectangle = rect_tuple[0]
 
             if round(rectangle.rect().left()) != round(rect_tuple[1]):
-                changed_rectangles[rect_id] = RECT_CHANGED(
+                changed_rectangles[rect_id] = Rect_Changed(
                     rect_id=rect_id,
                     coords=Coords(
                         left=round(rectangle.rect().left()),
@@ -11012,7 +11260,7 @@ class Image(_qtpyBase_Control):
                     ),
                 )
             elif round(rectangle.rect().top()) != round(rect_tuple[2]):
-                changed_rectangles[rect_id] = RECT_CHANGED(
+                changed_rectangles[rect_id] = Rect_Changed(
                     rect_id=rect_id,
                     coords=Coords(
                         left=round(rectangle.rect().left()),
@@ -11022,7 +11270,7 @@ class Image(_qtpyBase_Control):
                     ),
                 )
             elif round(rectangle.rect().width()) != round(rect_tuple[3]):
-                changed_rectangles[rect_id] = RECT_CHANGED(
+                changed_rectangles[rect_id] = Rect_Changed(
                     rect_id=rect_id,
                     coords=Coords(
                         left=round(rectangle.rect().left()),
@@ -11032,7 +11280,7 @@ class Image(_qtpyBase_Control):
                     ),
                 )
             elif round(rectangle.rect().height()) != round(rect_tuple[4]):
-                changed_rectangles[rect_id] = RECT_CHANGED(
+                changed_rectangles[rect_id] = Rect_Changed(
                     rect_id=rect_id,
                     coords=Coords(
                         left=round(rectangle.rect().left()),
@@ -11159,13 +11407,13 @@ class Image(_qtpyBase_Control):
         """Returns a QPixmap clip of the image at the given coordinates of the given size
 
         Args:
-          x (int): The x coordinate of the left corner of the rectangle to be clipped.
-          y (int): The y coordinate of top of the rectangle to be clipped.
-          width (int): The width of the image to be clipped.
-          height (int): The height of the image to be clipped.
+            x (int): The x coordinate of the left corner of the rectangle to be clipped.
+            y (int): The y coordinate of top of the rectangle to be clipped.
+            width (int): The width of the image to be clipped.
+            height (int): The height of the image to be clipped.
 
         Returns:
-          QPixmap : A QPixmap clipped image.
+            QPixmap : A QPixmap clipped image.
         """
         self._widget: _Image
 
@@ -11560,7 +11808,7 @@ class LCD(_qtpyBase_Control):
     """Instantiates an LCD like number display widget"""
 
     digit_count: int = 8
-    txt_align: ALIGN = ALIGN.RIGHT
+    txt_align: Align = Align.RIGHT
 
     def __post_init__(self):
         """Constructor that checks parameters and sets instance variables"""
@@ -11668,7 +11916,7 @@ class _Line_Edit(qtW.QLineEdit):
                 or event.key() == qtC.Qt.Key_Tab
                 or event.key() == qtC.Qt.Key_Down
             ):
-                result = self.owner_widget._event_handler(SYSEVENTS.PRESSED)
+                result = self.owner_widget._event_handler(Sys_Events.PRESSED)
 
                 if result == -1:
                     return True  # Consumes Event as super not called
@@ -11699,9 +11947,9 @@ class LineEdit(_qtpyBase_Control):
     ] = None
     char_length: int = MAX_CHARS
     label_font: Optional[Font] = None
-    txt_align: ALIGN = ALIGN.LEFT
-    label_align: ALIGN = ALIGN.RIGHT
-    widget_align: ALIGN = ALIGN.LEFT
+    txt_align: Align = Align.LEFT
+    label_align: Align = Align.RIGHT
+    widget_align: Align = Align.LEFT
 
     def __post_init__(self):
         """Constructor that checks parameters and sets instance variables"""
@@ -11718,13 +11966,13 @@ class LineEdit(_qtpyBase_Control):
             self.label_font, Font
         ), f"{self.label_font=}. Must be font"
         assert isinstance(self.char_length, int), f"{self.char_length=}. Must be int"
-        assert isinstance(self.label_align, ALIGN), f"{self.label_align}. Must be ALGN"
+        assert isinstance(self.label_align, Align), f"{self.label_align}. Must be ALGN"
         assert self.validate_callback is None or callable(
             self.validate_callback
         ), f"{self.validate_callback=}. Must be None | Function | Method | Lambda"
 
         if self.label_font is None:
-            self.label_fone = Font(size=DEFAULT_FONT_SIZE, weight=FONTWEIGHT.NORMAL)
+            self.label_fone = Font(size=DEFAULT_FONT_SIZE, weight=Font_Weight.NORMAL)
 
         self.mask = ""
 
@@ -11804,10 +12052,10 @@ class LineEdit(_qtpyBase_Control):
 
         self._widget: _Line_Edit
 
-        event: SYSEVENTS = args[0]
+        event: Sys_Events = args[0]
 
         if self.callback is not None:
-            if event == SYSEVENTS.CURSORCHANGED:
+            if event == Sys_Events.CURSORCHANGED:
                 try:
                     value = (
                         self._widget.cursorPosition(),
@@ -11816,9 +12064,9 @@ class LineEdit(_qtpyBase_Control):
                 except Exception as e:  # Hail Mary Pass
                     # Had very rare errors thrown in Line Edits and this is a fix
                     value = (self._widget.cursorPosition(), " ")
-            elif event == SYSEVENTS.SELECTIONCHANGED:
+            elif event == Sys_Events.SELECTIONCHANGED:
                 value = self._widget.selectedText()
-            elif event == SYSEVENTS.PRESSED:
+            elif event == Sys_Events.PRESSED:
                 if not self._widget.isModified():
                     self.original_value = self.value_get()
                     self._widget.setModified(True)
@@ -11829,8 +12077,10 @@ class LineEdit(_qtpyBase_Control):
                 value = self._widget.text()
 
             if callable(self.callback):
+                window_id = get_window_id(self.parent_app, self.parent, self)
+
                 if self.parent_app.widget_exist(
-                    container_tag=self.container_tag, tag=self.tag
+                    window=window_id, container_tag=self.container_tag, tag=self.tag
                 ):
                     try:
                         return _Event_Handler(
@@ -11843,11 +12093,13 @@ class LineEdit(_qtpyBase_Control):
                             event=event,
                             value=value,
                             widget_dict=self.parent_app.widget_dict_get(
-                                container_tag=self.container_tag
+                                window=window_id, container_tag=self.container_tag
                             ),
                             control_name=self.__class__.__name__,
                             parent=self.parent_app.widget_get(
-                                container_tag=self.container_tag, tag=self.tag
+                                window=window_id,
+                                container_tag=self.container_tag,
+                                tag=self.tag,
                             ),
                         )
                     except Exception as e:
@@ -12061,11 +12313,14 @@ class Menu(_qtpyBase_Control):
             self._widget.setMinimumWidth(parent.width())
             _menu = self._menu_items
 
+        window_id = get_window_id(self.parent_app, self.parent, self)
+
         for key in _menu.keys():
             if _depth == 0:  # Top Level
                 _menu[key].guiwidget_set(self._widget.addMenu(_menu[key].element.text))
 
                 parent_app.widget_add(
+                    window=window_id,
                     container_tag=container_tag,
                     tag=_menu[key].tag,
                     widget=_menu[key],
@@ -12088,6 +12343,7 @@ class Menu(_qtpyBase_Control):
                     )
 
                     parent_app.widget_add(
+                        window=window_id,
                         container_tag=container_tag,
                         tag=menu_item.tag,
                         widget=menu_item,
@@ -12123,6 +12379,7 @@ class Menu(_qtpyBase_Control):
                     )
 
                     parent_app.widget_add(
+                        window=window_id,
                         container_tag=container_tag,
                         tag=menu_item.tag,
                         widget=menu_item,
@@ -12140,14 +12397,16 @@ class Menu(_qtpyBase_Control):
                         menu_item.guiwidget_get.triggered.connect(
                             functools.partial(
                                 event_handler.event,
+                                window_id=window_id,
                                 callback=menu_item.element.callback,
                                 action=menu_item.element.callback.__name__,
                                 container_tag=container_tag,
                                 tag=menu_item.tag,
-                                event=SYSEVENTS.MENUCLICKED,
+                                event=Sys_Events.MENUCLICKED,
                                 value=None,
                                 widget_dict=parent_app.widget_dict_get(
-                                    container_tag=container_tag
+                                    window=window_id,
+                                    container_tag=container_tag,
                                 ),
                                 parent=parent,
                                 control_name=self.__class__.__name__,
@@ -12473,7 +12732,7 @@ class RadioButton(_qtpyBase_Control):
         """Sets the radiobutton to checked or unchecked
 
         Args:
-          value (bool): True - checked. False - not checked.
+            value (bool): True - checked. False - not checked.
 
         """
 
@@ -12534,7 +12793,7 @@ class Switch(_qtpyBase_Control):
     label: str = "&"
     width: int = 4  # RADIOBUTTON_SIZE.width
     height: int = 1  # RADIOBUTTON_SIZE.height
-    widget_align: ALIGN = ALIGN.CENTER
+    widget_align: Align = Align.CENTER
     checked: bool = False
 
     # Pad text with spaces to be all be this size
@@ -12640,7 +12899,7 @@ class Switch(_qtpyBase_Control):
         """Returns the current state of the button
 
         Returns:
-          bool : True - Checked, False - Not Checked.
+            bool : True - Checked, False - Not Checked.
         """
         return self.button_checked
 
@@ -12737,7 +12996,7 @@ class _Switch(qtW.QAbstractButton):
         """Sets offset value.
 
         Args:
-          value: The value of the property.
+            value: The value of the property.
         """
         assert isinstance(value, int), f"{value=} must be int"
 
@@ -12844,7 +13103,7 @@ class _Switch(qtW.QAbstractButton):
         """Handles mouse release event and performs a switch animation when the left button is released.
 
         Args:
-          event (QMouseEvent): The mouse event that triggered the function
+            event (QMouseEvent): The mouse event that triggered the function
         """
         super().mouseReleaseEvent(event)
 
@@ -12862,7 +13121,7 @@ class _Switch(qtW.QAbstractButton):
         Changes the cursor to a pointing hand when the mouse enters the widget.
 
         Args:
-          event (qtG.QEnterEvent): The event the triggered the enterEvent
+            event (qtG.QEnterEvent): The event the triggered the enterEvent
         """
         self.setCursor(qtC.Qt.PointingHandCursor)
         super().enterEvent(event)
@@ -13154,7 +13413,7 @@ class Timeedit(_qtpyBase_Control):
 
         event = args[0]
 
-        if event == SYSEVENTS.FOCUSIN:
+        if event == Sys_Events.FOCUSIN:
             # Set default time to now - not minimum time! Part of hack to clear displayed values
             if self._widget.time() == self._widget.minimumTime():
                 # If time minimumTime matches midnight then first use! Millisecond is dangerous!
@@ -13165,8 +13424,11 @@ class Timeedit(_qtpyBase_Control):
                     self.time_set(now.hour, now.minute, now.second, 1)
 
         if callable(self.callback):
+            window_id = get_window_id(self.parent_app, self.parent, self)
+
             handler = _Event_Handler(parent_app=self.parent_app, parent=self)
             return handler.event(
+                window_id=window_id,
                 callback=self.callback,
                 action=event.name,
                 container_tag=self.container_tag,
@@ -13174,11 +13436,11 @@ class Timeedit(_qtpyBase_Control):
                 event=event,
                 value=self.value_get(),
                 widget_dict=self.parent_app.widget_dict_get(
-                    container_tag=self.container_tag
+                    window=window_id, container_tag=self.container_tag
                 ),
                 control_name=self.__class__.__name__,
                 parent=self.parent_app.widget_get(
-                    container_tag=self.container_tag, tag=self.tag
+                    window=window_id, container_tag=self.container_tag, tag=self.tag
                 ),
             )
 
@@ -13193,7 +13455,7 @@ class Timeedit(_qtpyBase_Control):
         Returns:
             int : 1. If the event is accepted, -1. If the event is rejected
         """
-        if event.event == SYSEVENTS.CLICKED:
+        if event.event == Sys_Events.CLICKED:
             self.clear("-")
 
         return 1
@@ -13461,8 +13723,11 @@ class Tab(_qtpyBase_Control):
             if tag.strip() == "":
                 return 1
 
+            window_id = get_window_id(self.parent_app, self.parent, self)
+
             handler = _Event_Handler(parent_app=self.parent_app, parent=self)
             return handler.event(
+                window_id=window_id,
                 callback=self.callback,
                 action=event.name,
                 container_tag=self.tag,
@@ -13470,11 +13735,11 @@ class Tab(_qtpyBase_Control):
                 event=event,
                 value=self.value_get(),
                 widget_dict=self.parent_app.widget_dict_get(
-                    container_tag=self.container_tag
+                    window=window_id, container_tag=self.container_tag
                 ),
                 control_name=self.__class__.__name__,
                 parent=self.parent_app.widget_get(
-                    container_tag=self.container_tag, tag=self.tag
+                    window=window_id, container_tag=self.container_tag, tag=self.tag
                 ),
             )
         else:
@@ -13722,8 +13987,10 @@ class Tab(_qtpyBase_Control):
             self._tab_pages[tag].index >= 0
         ), f"{self._tab_pages[tag].index=} {self._tab_pages[tag]=}. Page not created!"
 
+        window_id = get_window_id(self.parent_app, self.parent, self)
+
         self._tab_pages[tag].container.widgets_clear()
-        self.parent_app.widget_del(container_tag=self.tag, tag=tag)
+        self.parent_app.widget_del(window=window_id, container_tag=self.tag, tag=tag)
         self._widget.removeTab(self._tab_pages[tag].index)
 
         self._tab_pages.pop(tag)
@@ -13732,7 +13999,7 @@ class Tab(_qtpyBase_Control):
         """Determines the visibility of a tab page
 
         Args:
-          tag (str): tag name of the page to be checked
+            tag (str): tag name of the page to be checked
 
         Returns: `
             bool: True` if the tab page with the given tag name is visible, `False` otherwise
@@ -13757,8 +14024,8 @@ class Tab(_qtpyBase_Control):
         """Sets the visibility of a tab page
 
         Args:
-          tag (str): tag name of the page to be set
-          visible (bool): `True` to make the page visible, `False` to hide it
+            tag (str): tag name of the page to be set
+            visible (bool): `True` to make the page visible, `False` to hide it
 
         """
         assert (
@@ -13813,8 +14080,8 @@ class Tab(_qtpyBase_Control):
         """Sets the tooltip for a tab.
 
         Args:
-          tag (str): tag name of the tab page to set the tooltip text
-          tooltip (str): The tooltip text
+            tag (str): tag name of the tab page to set the tooltip text
+            tooltip (str): The tooltip text
         """
         self._widget: qtW.QTabWidget
 
@@ -13841,7 +14108,7 @@ class Treeview(_qtpyBase_Control):
 
     width: int = 40
     height: int = 15
-    widget_align: ALIGN = ALIGN.LEFT
+    widget_align: Align = Align.LEFT
     multiselect: bool = False
     headers: Union[list[str], tuple[str, ...]] = ()
     header_widths: Union[tuple[int, ...], list[int]] = ()  # Column widths in char
@@ -13984,7 +14251,7 @@ class Treeview(_qtpyBase_Control):
             labels.append(self.trans_str(title))
 
         self._widget.setHeaderLabels(labels)
-        self._widget.header().setDefaultAlignment(ALIGN.CENTER.value)
+        self._widget.header().setDefaultAlignment(Align.CENTER.value)
 
         self.toplevel_add(self.toplevel_items)
 
@@ -14007,7 +14274,7 @@ class Treeview(_qtpyBase_Control):
             *args: Default arguments for the TreeView widget.
 
         Returns:
-          int : 1. If the event is accepted, -1. If the event is rejected
+            int : 1. If the event is accepted, -1. If the event is rejected
         """
         items: list[(str, any)] = []
 
@@ -14037,9 +14304,12 @@ class Treeview(_qtpyBase_Control):
 
         self._value = items
 
+        window_id = get_window_id(self.parent_app, self.parent, self)
+
         if callable(self.callback):
             handler = _Event_Handler(parent_app=self.parent_app, parent=self)
             return handler.event(
+                window_id=window_id,
                 callback=self.callback,
                 action=event.name,
                 container_tag=self.tag,
@@ -14047,11 +14317,11 @@ class Treeview(_qtpyBase_Control):
                 event=event,
                 value=items,
                 widget_dict=self.parent_app.widget_dict_get(
-                    container_tag=self.container_tag
+                    window=window_id, container_tag=self.container_tag
                 ),
                 control_name=self.__class__.__name__,
                 parent=self.parent_app.widget_get(
-                    container_tag=self.container_tag, tag=self.tag
+                    window=window_id, container_tag=self.container_tag, tag=self.tag
                 ),
             )
         else:
@@ -14107,7 +14377,7 @@ class Treeview(_qtpyBase_Control):
         assert isinstance(
             treeview_path, (list, tuple)
         ), f"parent_path <{treeview_path}> is a list | tuple of str. \
-                      Indicating level to insert . E.g. ('level1','level2'..,'leveln')"
+            Indicating level to insert . E.g. ('level1','level2'..,'leveln')"
 
         for label in treeview_path:
             assert (
@@ -14150,8 +14420,8 @@ class Treeview(_qtpyBase_Control):
         """Checks a child node in the treeview
 
         Args:
-          treeview_path (Union[str, list, tuple]): Path from parent to child node
-          checked (bool): True - Checked, False - Unchecked
+            treeview_path (Union[str, list, tuple]): Path from parent to child node
+            checked (bool): True - Checked, False - Unchecked
 
         Returns:
             int : 1 Succeeded, -1 Failed
@@ -14167,7 +14437,7 @@ class Treeview(_qtpyBase_Control):
         assert isinstance(
             treeview_path, (list, tuple)
         ), f"parent_path <{treeview_path}> is a list | tuple of str. \
-                              Indicating level to insert . E.g. ('level1','level2'..,'leveln')"
+                            Indicating level to insert . E.g. ('level1','level2'..,'leveln')"
 
         for label in treeview_path:
             assert (
@@ -14206,7 +14476,7 @@ class Treeview(_qtpyBase_Control):
         """Adds items to the top level of the Tree view.
 
         Args:
-          items (Union[list[str], tuple[str, ...]]): The items to add to the tree widget.
+            items (Union[list[str], tuple[str, ...]]): The items to add to the tree widget.
         """
         self._widget: qtW.QTreeWidget
 
@@ -14253,8 +14523,8 @@ class Treeview(_qtpyBase_Control):
         """Sets the Tree view col value of the current node
 
         Args:
-          value (str): The value to set.
-          col (int): The column to set. Default is 0.
+            value (str): The value to set.
+            col (int): The column to set. Default is 0.
         """
         self._widget: qtW.QTreeWidget
 
@@ -14289,7 +14559,7 @@ class Treeview(_qtpyBase_Control):
         assert isinstance(
             treeview_path, (list, tuple)
         ), f"parent_path <{treeview_path}> is a list | tuple of str. \
-                      Indicating level to insert . E.g. ('level1','level2'..,'leveln')"
+                    Indicating level to insert . E.g. ('level1','level2'..,'leveln')"
 
         for label in treeview_path:
             assert (
@@ -14353,7 +14623,7 @@ class Treeview(_qtpyBase_Control):
             items (Union[str, list, tuple, dict]): The items to display. Can be a list, tuple or dict.
 
         Returns:
-              tuple[list[str], list[any]]: The display strings and user data
+            tuple[list[str], list[any]]: The display strings and user data
         """
         assert isinstance(
             items, (str, list, tuple, dict)
