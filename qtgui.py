@@ -132,38 +132,39 @@ class Sys_Events(IntEnum):
     BADINPUT = 4  #: The input is not valid
     ACTIVATED = 5  #: The widget has been activated
     CHANGED = 6  #: The widget has changed
-    CLICKED = 7  #: The widget has been clicked
-    COLLAPSED = 8  #: A node has been collapsed
-    CLOSED = 9  #: The widget has been closed
-    CURSORCHANGED = 10  #: The cursor has changed
-    DATECHANGED = 11  #: The date has changed
-    EDITCHANGED = 12  #: The text has changed
-    ENTERED = 13  #: The widget has been entered
-    EXPANDED = 14  #: A node has been expanded
-    DOUBLECLICKED = 15  #: The widget has been double-clicked
-    FOCUSIN = 16  #: The widget has gained focus
-    FOCUSOUT = 17  #: The widget has lost focus
-    GROUPINIT = 18  #: The group has been initialised
-    HIGHLIGHTED = 19  #: The widget has been highlighted
-    INDEXCHANGED = 20  #: The index has changed
-    MAXCHARS = 21  #: The maximum number of characters has been reached
-    MENUCLICKED = 22  #: The menu has been clicked
-    MOVED = 23  #: A control generated a moved event
-    PRESSED = 24  #: The widget has been pressed
-    RELEASED = 25  #: The widget has been released
-    POPUP = 26  #: The popup has been shown
-    POPCAL = 27  #: The popup calendar has been shown
+    CLEAR_TYPING_BUFFER = 7  # A Grid widget has is about to cleat the type buffer
+    CLICKED = 8  #: The widget has been clicked
+    COLLAPSED = 9  #: A node has been collapsed
+    CLOSED = 10  #: The widget has been closed
+    CURSORCHANGED = 11  #: The cursor has changed
+    DATECHANGED = 12  #: The date has changed
+    EDITCHANGED = 13  #: The text has changed
+    ENTERED = 14  #: The widget has been entered
+    EXPANDED = 15  #: A node has been expanded
+    DOUBLECLICKED = 16  #: The widget has been double-clicked
+    FOCUSIN = 17  #: The widget has gained focus
+    FOCUSOUT = 18  #: The widget has lost focus
+    GROUPINIT = 19  #: The group has been initialised
+    HIGHLIGHTED = 20  #: The widget has been highlighted
+    INDEXCHANGED = 21  #: The index has changed
+    MAXCHARS = 22  #: The maximum number of characters has been reached
+    MENUCLICKED = 23  #: The menu has been clicked
+    MOVED = 24  #: A control generated a moved event
+    PRESSED = 25  #: The widget has been pressed
+    RELEASED = 26  #: The widget has been released
+    POPUP = 27  #: The popup has been shown
+    POPCAL = 28  #: The popup calendar has been shown
     POSTINIT = 28  #: The post init event has been triggered
-    SCROLLH = 29  #: The horizontal scroll bar has been moved
-    SCROLLV = 30  #: The vertical scroll bar has been moved
-    SELECTIONCHANGED = 31  #: The selection has changed
-    TEXTCHANGED = 32  #: The text has changed
-    TEXTEDIT = 33  #: The text has been edited
-    TIMECHANGED = 34  #: The time has changed
-    TOGGLED = 35  #: The widget has been toggled
-    TRIGGERED = 36  #: The widged has triggered
-    WINDOWCLOSED = 37  #: The window has been closed
-    WINDOWOPEN = 38  #: The window has been opened
+    SCROLLH = 30  #: The horizontal scroll bar has been moved
+    SCROLLV = 31  #: The vertical scroll bar has been moved
+    SELECTIONCHANGED = 32  #: The selection has changed
+    TEXTCHANGED = 33  #: The text has changed
+    TEXTEDIT = 34  #: The text has been edited
+    TIMECHANGED = 35  #: The time has changed
+    TOGGLED = 36  #: The widget has been toggled
+    TRIGGERED = 37  #: The widged has triggered
+    WINDOWCLOSED = 38  #: The window has been closed
+    WINDOWOPEN = 39  #: The window has been opened
 
 
 # Tell Black to leave this block alone
@@ -1377,14 +1378,15 @@ class _Event_Filter(qtC.QObject):
                     self.popupSignal.emit(event)  # type: ignore
                     return True
                 case qtC.QEvent.Type.KeyPress:
-                    # print(f"{obj=} {event.key()= } {type(obj)=} {isinstance(obj,LineEdit)=} ")
-                    # TODO - Matbe tab should be processed separately?
-                    if (
-                        event.key() == qtC.Qt.Key_Return
-                        or event.key() == qtC.Qt.Key_Down
-                    ):
-                        obj.focusNextChild()
-                        return True
+                    if not isinstance(obj, Grid_TableWidget):
+                        # print(f"{obj=} {event.key()= } {type(obj)=} {isinstance(obj,LineEdit)=} ")
+                        # TODO - Matbe tab should be processed separately?
+                        if (
+                            event.key() == qtC.Qt.Key_Return
+                            or event.key() == qtC.Qt.Key_Down
+                        ):
+                            obj.focusNextChild()
+                            return True
         except Exception as e:
             raise AssertionError(f"Event Filter Failed {e=}")
         return False
@@ -2044,6 +2046,14 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget.cellPressed.connect(
                     lambda *args: self._event_handler(Sys_Events.PRESSED, args)
                 )
+            if hasattr(self._widget, "typeBufferCleared") and hasattr(
+                self._widget.typeBufferCleared, "connect"
+            ):
+                self._widget.typeBufferCleared.connect(
+                    lambda *args: self._event_handler(
+                        Sys_Events.CLEAR_TYPING_BUFFER, args
+                    )
+                )
             if hasattr(self._widget, "collapsed") and hasattr(
                 self._widget.collapsed, "connect"
             ):
@@ -2400,7 +2410,7 @@ class _qtpyBase_Control(_qtpyBase):
                 # self._widget = qtW.QDateEdit(parent)
                 self._widget = _Custom_Dateedit(parent)
             case Grid():
-                self._widget = qtW.QTableWidget(parent)
+                self._widget = Grid_TableWidget(parent)  # qtW.QTableWidget(parent)
             case FolderView():
                 self._widget = qtW.QTreeView(parent)
             case Image():
@@ -3654,7 +3664,7 @@ class QtPyApp(_qtpyBase):
             font_path (Optional[str]): Path to a font file to use instead of the current font.
 
         Returns:
-            CHAR_PIXEL_SIZE: CHAR_PIXEL_SIZE instance with the height and width of the font.
+            Char_Pixel_Size: Char_Pixel_Size instance with the height and width of the font.
         """
         assert isinstance(font_path, str), f"{font_path=}. Must be str"
 
@@ -3674,27 +3684,6 @@ class QtPyApp(_qtpyBase):
         height = font_metrics.height()
 
         return Char_Pixel_Size(height=height, width=width)
-
-    def char_pixel_size_old(self) -> Char_Pixel_Size:
-        """Returns the pixel size of a character in the current font
-
-        Returns:
-            CHAR_PIXEL_SIZE : CHAR_PIXEL_SIZE instance with the height and width of the font.
-        """
-        font_metrics = qtG.QFontMetrics(self.app_font)
-
-        width = 0
-
-        for text_char in "W" * qtG.QFontMetrics.averageCharWidth(
-            font_metrics
-        ):  # W or M should be widest
-            # Tried lots of ways to get accurate length, this works best
-            width += math.ceil(font_metrics.horizontalAdvance(text_char))
-
-        height = font_metrics.height() * 1
-        width = qtG.QFontMetrics.averageCharWidth(font_metrics) * 1
-
-        return Char_Pixel_Size(height=int(height), width=int(width))
 
     def run(
         self,
@@ -3776,7 +3765,9 @@ class QtPyApp(_qtpyBase):
 
         sys.exit(self._app.exec())
 
-    def widget_add(self, window_id: int, container_tag: str, tag: str, widget: _qtpyBase):
+    def widget_add(
+        self, window_id: int, container_tag: str, tag: str, widget: _qtpyBase
+    ):
         """Adds a widget to the widget registry
 
         Args:
@@ -3785,7 +3776,9 @@ class QtPyApp(_qtpyBase):
             tag (str): This is the name of the widget.
             widget (_qtpyBase): the widget to add to the container
         """
-        assert isinstance(window_id, int) and window_id >= 0, f"{window_id=}. Must be int > 0"
+        assert (
+            isinstance(window_id, int) and window_id >= 0
+        ), f"{window_id=}. Must be int > 0"
         assert (
             isinstance(container_tag, str) and container_tag.strip() != ""
         ), f"{container_tag=}. Must be str"
@@ -3810,7 +3803,9 @@ class QtPyApp(_qtpyBase):
         Returns:
             A list of _qtpyBase_Control objects.
         """
-        assert isinstance(window_id, int) and window_id >= 0, f"{window_id=}. Must be int > 0"
+        assert (
+            isinstance(window_id, int) and window_id >= 0
+        ), f"{window_id=}. Must be int > 0"
         assert (
             isinstance(container_tag, str) and container_tag.strip() != ""
         ), f"{container_tag=}. Must be str"
@@ -3827,7 +3822,9 @@ class QtPyApp(_qtpyBase):
             container_tag (str): The tag name of the container widget.
             tag (str): The tag name of the widget to be deleted.
         """
-        assert isinstance(window_id, int) and window_id >= 0, f"{window_id=}. Must be int > 0"
+        assert (
+            isinstance(window_id, int) and window_id >= 0
+        ), f"{window_id=}. Must be int > 0"
         assert (
             isinstance(container_tag, str) and container_tag.strip() != ""
         ), f"{container_tag=}. Must be str"
@@ -3850,7 +3847,9 @@ class QtPyApp(_qtpyBase):
         in the container with the given tag  name
 
         """
-        assert isinstance(window_id, int) and window_id >= 0, f"{window_id=}. Must be int > 0"
+        assert (
+            isinstance(window_id, int) and window_id >= 0
+        ), f"{window_id=}. Must be int > 0"
         assert (
             isinstance(container_tag, str) and container_tag.strip() != ""
         ), f"{container_tag=}. Must be str"
@@ -3875,7 +3874,9 @@ class QtPyApp(_qtpyBase):
             bool : True if the widget exists, False otherwise.
 
         """
-        assert isinstance(window_id, int) and window_id >= 0, f"{window_id=}. Must be int > 0"
+        assert (
+            isinstance(window_id, int) and window_id >= 0
+        ), f"{window_id=}. Must be int > 0"
         assert (
             isinstance(container_tag, str) and container_tag.strip() != ""
         ), f"{container_tag=}. Must be str"
@@ -5046,7 +5047,7 @@ class _Container(_qtpyBase_Control):
         window_id = get_window_id(self._parent_app, self._parent, self)
 
         return self._parent_app.widget_gui_controls_get(
-            winodw=window_id, container_tag=self.tag
+            window_id=window_id, container_tag=self.tag
         )
 
     def widget_del(self, container_tag: str, tag: str):
@@ -5187,7 +5188,9 @@ class _Container(_qtpyBase_Control):
                     widget.guiwidget_get.setVisible(False)
 
                 self._parent_app.widget_del(
-                    window_id=window_id, container_tag=widget.container_tag, tag=widget.tag
+                    window_id=window_id,
+                    container_tag=widget.container_tag,
+                    tag=widget.tag,
                 )
 
         # self._scroll_deque.clear()
@@ -6269,7 +6272,6 @@ class _Dialog(qtW.QDialog):
         else:
             self.container.widgets_clear()
             self.container.widget_del(
-                window=window_id,
                 container_tag=self.container_tag,
                 tag=self.container_tag,
             )
@@ -6371,7 +6373,9 @@ class PopContainer(_qtpyBase_Control):
         window_id = get_window_id(self.parent_app, None, self)
 
         self.parent_app.widget_del(
-            window_id=window_id, container_tag=self.container_tag, tag=self.container_tag
+            window_id=window_id,
+            container_tag=self.container_tag,
+            tag=self.container_tag,
         )
         self.dialog._result = self._result
         return self.dialog.close()
@@ -9230,7 +9234,9 @@ class FolderView(_qtpyBase_Control):
                     ),
                     control_name=self.__class__.__name__,
                     parent=self.parent_app.widget_get(
-                        window_id=window_id, container_tag=self.container_tag, tag=self.tag
+                        window_id=window_id,
+                        container_tag=self.container_tag,
+                        tag=self.tag,
                     ),
                 )
 
@@ -9288,6 +9294,151 @@ class FolderView(_qtpyBase_Control):
         # TODO Fix this for a dir view - QTreeWidgetItem.settext
         self._widget: qtW.QTreeWidgetItem
         self._widget.setText(self.trans_str(value))
+
+
+class _ClearTypingBufferEvent(qtC.QEvent):
+    """
+    Event class used for clearing the typing buffer.
+    """
+
+    EVENT_TYPE = qtC.QEvent.Type(qtC.QEvent.registerEventType())
+
+    def __init__(self, data: any):
+        """
+        Constructs a _ClearTypingBufferEvent object.
+
+        Args:
+            data: The data to be cleared from the typing buffer.
+        """
+        super().__init__(_ClearTypingBufferEvent.EVENT_TYPE)
+        self._data = data
+
+    @property
+    def data(self) -> any:
+        """
+        Returns:
+            The data to be cleared from the typing buffer.
+        """
+        return self._data
+
+
+@dataclasses.dataclass(slots=True)
+class Grid_Col_Value:
+    """Used to return a value"""
+
+    value: any
+    user_data: any
+    row: int
+    col: int
+    existing_value: any
+
+
+class Grid_TableWidget(qtW.QTableWidget):
+    typeBufferCleared = qtC.Signal(Grid_Col_Value)
+
+    def __init__(self, *args, **kwargs) -> None:
+        """
+        Initializes a new instance of the Grid_TableWidget class.
+
+        Parameters:
+        *args: tuple
+            Variable length argument list.
+        **kwargs: dict
+            Arbitrary keyword arguments.
+        """
+        super().__init__(*args, **kwargs)
+
+        self.typing_buffer = ""
+        self.setFocusPolicy(qtC.Qt.StrongFocus)
+        self.installEventFilter(self)
+
+    def eventFilter(self, obj: qtC.QObject, event: qtC.QEvent) -> bool:
+        """Filters key press events and modifies cell text accordingly.
+
+        Args:
+            obj (QObject): The object that triggered the event.
+            event (QEvent): The event to filter.
+
+        Returns:
+            bool: True if the event was filtered; otherwise False.
+        """
+        assert isinstance(obj, qtC.QObject), f"{obj=}. Must be QObject."
+        assert isinstance(event, qtC.QEvent), f"{event=}. Must be QEvent"
+
+        if event.type() == qtC.QEvent.KeyPress:
+            key_event = qtG.QKeyEvent(event)
+            key = key_event.key()
+            text = key_event.text()
+
+            item = self.currentItem()
+
+            if not item:
+                return qtW.QTableView.eventFilter(self, obj, event)
+            current_text = item.text()
+            if event.key() in (qtC.Qt.Key_Return, qtC.Qt.Key_Enter):
+                self.typingBufferCleared()
+            elif key == qtC.Qt.Key_Backspace:
+                item.setText(current_text[:-1])
+            elif text:
+                item.setText(current_text + text)
+                self.typing_buffer = current_text + text
+            return True
+        return qtW.QTableView.eventFilter(self, obj, event)
+
+    def focusOutEvent(self, event: qtG.QFocusEvent) -> None:
+        """
+        Overrides the default focusOutEvent to clear the typing buffer.
+
+        Args:
+            event (QFocusEvent): A QFocusEvent object representing the focus out event.
+        """
+        assert isinstance(event, qtG.QFocusEvent), f"{event=}. Must be a QFocusEvent"
+
+        super().focusOutEvent(event)
+        self.typingBufferCleared()
+
+    def focusNextPrevChild(self, next: bool) -> bool:
+        """
+        Overrides the default focusNextPrevChild to clear the typing buffer.
+
+        Args:
+            next (bool): A boolean value indicating whether the focus is moving to the next widget or not.
+
+        Returns:
+            bool: Returns the return value from the base class's focusNextPrevChild.
+        """
+        assert isinstance(next, bool), f"{next=}. Must be bool"
+
+        # Clear typing buffer when tabbing to next cell
+        self.typingBufferCleared()
+
+        return super().focusNextPrevChild(next)
+
+    def typingBufferCleared(self) -> None:
+        """
+        A method to clear the typing buffer and emit a signal with the cleared data.
+        """
+        if self.typing_buffer:
+            item = self.currentItem()
+
+            if item is not None:
+                item_data = item.data(qtC.Qt.UserRole)
+
+                grid_col_value = Grid_Col_Value(
+                    self.typing_buffer,
+                    item_data.user_data if item_data is not None else None,
+                    item.row(),
+                    item.column(),
+                    item_data.current_value if item_data is not None else None,
+                )
+            else:
+                grid_col_value = Grid_Col_Value(self.typing_buffer, None, -1, -1, None)
+
+            typing_buffer_data = self.typing_buffer
+            event = _ClearTypingBufferEvent(typing_buffer_data)
+            qtW.QApplication.postEvent(self, event)
+            self.typing_buffer = ""
+            self.typeBufferCleared.emit(grid_col_value)
 
 
 @dataclasses.dataclass
@@ -9373,15 +9524,6 @@ class Grid(_qtpyBase_Control):
         FLOAT = 3
         INT = 4
         STR = 5
-
-    @dataclasses.dataclass
-    class _Return_Value:
-        """Used to return a value"""
-
-        value: any
-        user_data: any
-        row: int
-        col: int
 
     def __post_init__(self):
         """Sets up the grid control. Checks arguments and sets up the grid instance variables"""
@@ -9529,10 +9671,8 @@ class Grid(_qtpyBase_Control):
 
     def _event_handler(self, *args) -> int:
         """Handles events for the grid control.
-
         Args:
             *args: Default arguments for a grid control.
-
         Returns:
             int: 1 if the event was handled successfully, -1 otherwise.
         """
@@ -9543,7 +9683,7 @@ class Grid(_qtpyBase_Control):
 
         # Parse arguments
         for index, arg in enumerate(args):
-            if index == 0:
+            if index == 0:  # Event type is always first
                 event = arg
             else:
                 if isinstance(arg, tuple):
@@ -9552,26 +9692,12 @@ class Grid(_qtpyBase_Control):
                     elif len(arg) == 2:
                         row, col = arg
                     elif len(arg) == 4:
-                        row_prev, col_prev, _, _ = arg
+                        row_prev, col_prev, row, col = arg
 
+        # print(f"DBG YXXXXY {event=} {args=} {widget_item=}")
         value = None
         user_data = None
         self._widget: qtW.QTableWidget  # Type hinting
-
-        if row == -1:
-            row = self._widget.currentRow()
-
-        if col == -1:
-            col = self._widget.currentColumn()
-
-        if row >= 0 and col >= 0:
-            value = self.value_get(row, col)
-            user_data = self.userdata_get(row, col)
-        elif widget_item is not None:
-            if hasattr(widget_item, "text"):
-                value = widget_item.text()
-            user_data = None
-
         window_id = get_window_id(self.parent_app, self.parent, self)
 
         # Handle event
@@ -9583,6 +9709,23 @@ class Grid(_qtpyBase_Control):
             )
         ):
             event: Sys_Events
+            if event == Sys_Events.CLEAR_TYPING_BUFFER:
+                grid_col_value = widget_item  # Grid_Col_Value
+            else:
+                if row == -1:
+                    row = self._widget.currentRow()
+
+                if col == -1:
+                    col = self._widget.currentColumn()
+
+                if row >= 0 and col >= 0:
+                    value = self.value_get(row, col)
+                    user_data = self.userdata_get(row, col)
+                elif widget_item is not None:
+                    if hasattr(widget_item, "text"):
+                        value = widget_item.text()
+                    user_data = None
+                grid_col_value = Grid_Col_Value(value, user_data, row, col, value)
 
             return _Event_Handler(parent_app=self.parent_app, parent=self).event(
                 window_id=window_id,
@@ -9591,7 +9734,7 @@ class Grid(_qtpyBase_Control):
                 container_tag=self.container_tag,
                 tag=self.tag,
                 event=event,
-                value=self._Return_Value(value, user_data, row, col),
+                value=grid_col_value,
                 widget_dict=self.parent_app.widget_dict_get(
                     window_id=window_id, container_tag=self.container_tag
                 ),
@@ -9898,9 +10041,10 @@ class Grid(_qtpyBase_Control):
             raise RuntimeError(f"{self._widget=}. Not set")
 
         row = self._widget.rowCount()
-        self._widget.insertRow(row)  # zero based is why this works
+        self._widget.insertRow(row)
 
-        for col_index in range(0, self._widget.columnCount()):
+        # add a new QTableWidgetItem to each cell in the new row
+        for col_index in range(self._widget.columnCount()):
             item_data = self._Item_Data(
                 tag=self.col_def[col_index].tag,
                 current_value=None,
@@ -9913,7 +10057,7 @@ class Grid(_qtpyBase_Control):
                 orig_row=row,
             )
 
-            item = qtW.QTableWidgetItem()
+            item = qtW.QTableWidgetItem("")
 
             if self.col_def[col_index].editable:
                 flags = (
@@ -9932,7 +10076,12 @@ class Grid(_qtpyBase_Control):
 
             item.setData(qtC.Qt.UserRole, item_data)
 
-            self._widget.setItem(row, col_index, item)
+            # make sure the QTableWidgetItem is added to the correct cell
+            if self._widget.item(row, col_index) is None:
+                self._widget.setItem(row, col_index, item)
+            else:
+                self._widget.takeItem(row, col_index)
+                self._widget.setItem(row, col_index, item)
 
         self.row_scroll_to(row)
 
@@ -10120,10 +10269,8 @@ class Grid(_qtpyBase_Control):
             return None
 
         item_data = item.data(qtC.Qt.UserRole)
-        if item_data is None:
-            return None
 
-        return item_data.current_value
+        return item_data.current_value if item_data is not None else None
 
     def valueorig_get(self, row: int = -1, col: int = -1) -> any:
         """Returns the original value stored in the given column referred to by row and col.
@@ -10151,12 +10298,13 @@ class Grid(_qtpyBase_Control):
         row_index, col_index = self._rowcol_validate(row, col)
 
         item = self._widget.item(row_index, col_index)
+
+        if item is None:
+            return None
+
         item_data = item.data(qtC.Qt.UserRole)
 
-        if item_data is None:
-            return None
-        else:
-            return item_data.original_value
+        return item_data.original_value if item_data is not None else None
 
     def get_previous_value(self, row: int = -1, col: int = -1) -> Optional[any]:
         """Returns the previous value stored in the given column referred to by row and col. Default returns current row
@@ -10184,12 +10332,13 @@ class Grid(_qtpyBase_Control):
         row_index, col_index = self._rowcol_validate(row, col)
 
         item = self._widget.item(row_index, col_index)
+
+        if item is None:
+            return None
+
         item_data = item.data(qtC.Qt.UserRole)
 
-        if item_data is None:
-            return None
-        else:
-            return item_data.previous_value
+        return item_data.previous_value if item_data is not None else None
 
     def value_set(self, value: any, row: int, col: int, user_data: any) -> None:
         """
