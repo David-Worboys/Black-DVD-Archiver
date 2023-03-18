@@ -32,6 +32,7 @@ import random
 import re
 import string
 import sys
+import time
 import types
 import uuid
 from collections import deque, namedtuple
@@ -2054,6 +2055,12 @@ class _qtpyBase_Control(_qtpyBase):
                         Sys_Events.CLEAR_TYPING_BUFFER, args
                     )
                 )
+            if hasattr(self._widget, "currentItemChanged") and hasattr(
+                self._widget.currentItemChanged, "connect"
+            ):
+                self._widget.typeBufferCleared.connect(
+                    lambda *args: self._event_handler(Sys_Events.TEXTCHANGED, args)
+                )
             if hasattr(self._widget, "collapsed") and hasattr(
                 self._widget.collapsed, "connect"
             ):
@@ -2795,7 +2802,7 @@ class _qtpyBase_Control(_qtpyBase):
             width_fudge (float) : Fudge factor multiplier to provide width adjustment
 
         Returns:
-            CHAR_PIXEL_SIZE: CHAR_PIXEL_SIZE instance
+            Char_Pixel_Size: CHAR_PIXEL_SIZE instance
 
         """
         assert (
@@ -2820,8 +2827,12 @@ class _qtpyBase_Control(_qtpyBase):
         ), f"Invalid font type: {type(font)}. Must be a QFont instance."
 
         font_metrics = qtG.QFontMetrics(font)
-        width = font_metrics.horizontalAdvance("W" * char_width)
-        height = round(font_metrics.height() * char_height * height_fudge)
+
+        # Monspaced all the same width, proportional this might not be quite right
+        width = math.ceil(
+            font_metrics.horizontalAdvance("W" * char_width) * width_fudge
+        )
+        height = math.ceil(font_metrics.height() * char_height * height_fudge)
 
         return Char_Pixel_Size(height=height, width=width)
 
@@ -3290,7 +3301,7 @@ class _qtpyBase_Control(_qtpyBase):
         """Sets the widget value If the widget has a value_set method
 
         Args:
-          value (str): The value to set the widget value to.
+            value (str): The value to set the widget value to.
         """
         if value is not None and isinstance(self, Menu):
             pass  # TODO Is there a a group value to set?
@@ -3308,7 +3319,7 @@ class _qtpyBase_Control(_qtpyBase):
         """Returns the visibility of the widget.
 
         Returns:
-          bool: True - widget visible, False - widget hidden.
+            bool: True - widget visible, False - widget hidden.
         """
         if self._widget is None:
             raise AssertionError(f"{self._widget=}. Not set!")
@@ -3320,7 +3331,7 @@ class _qtpyBase_Control(_qtpyBase):
     def visible_set(self, visible: bool):
         """Sets the visibility of the widget.
         Args:
-          visible (bool): True - widget visible, False - widget hidden.
+            visible (bool): True - widget visible, False - widget hidden.
         """
         assert isinstance(visible, bool), f"{visible=}. Must be bool"
 
@@ -3578,7 +3589,7 @@ class QtPyApp(_qtpyBase):
         """Returns the QApplication object.
 
         Returns:
-          qtW.QApplication: : The QApplication object.
+            qtW.QApplication: : The QApplication object.
         """
         return self._app
 
@@ -3685,18 +3696,21 @@ class QtPyApp(_qtpyBase):
 
         return Char_Pixel_Size(height=height, width=width)
 
-    def run(
-        self,
-        layout: "_Container",
-    ):
+    def run(self, layout: "_Container", windows_ui: bool = False):
         """Creates a main window, sets the title & icon, and then shows the window
 
         Args:
             layout (_Container): The layout container widget.
+            window_ui (bool): Attempt to display the UI as Windows XP looked
         """
         assert isinstance(
             layout, _Container
         ), f"{layout=}. Must be a VBoxContainer, HBoxContainer,GridContainer"
+
+        assert isinstance(windows_ui, bool), f"{windows_ui=}. Must be bool"
+
+        if windows_ui:
+            self.app_get.setStyle(qtW.QStyleFactory.create("Windows"))
 
         if callable(self.callback):
             result = _Event_Handler(parent_app=self).event(
@@ -6303,9 +6317,8 @@ class _Dialog(qtW.QDialog):
 
         if self.owner.open_sheet() == 1:
             self.exec()  # Blocks
-
-        if self.container is not None and self.container.userdata_get() is not None:
-            return self.container.userdata_get()
+            while g_application.app_get.processEvents():
+                time.sleep(0.05)
 
         return self._result
 
@@ -6378,6 +6391,7 @@ class PopContainer(_qtpyBase_Control):
             tag=self.container_tag,
         )
         self.dialog._result = self._result
+
         return self.dialog.close()
 
     def closeEvent(self, event: QCloseEvent):
@@ -9374,7 +9388,9 @@ class Grid_TableWidget(qtW.QTableWidget):
 
             if not item:
                 return qtW.QTableView.eventFilter(self, obj, event)
+
             current_text = item.text()
+
             if event.key() in (qtC.Qt.Key_Return, qtC.Qt.Key_Enter):
                 self.typingBufferCleared()
             elif key == qtC.Qt.Key_Backspace:
@@ -9382,8 +9398,19 @@ class Grid_TableWidget(qtW.QTableWidget):
             elif text:
                 item.setText(current_text + text)
                 self.typing_buffer = current_text + text
-            return True
+            return True                                    
         return qtW.QTableView.eventFilter(self, obj, event)
+    
+    def focusInEvent(self, event: qtG.QFocusEvent):
+        assert isinstance(event, qtG.QFocusEvent), f"{event=} must be a QFocusEvent"
+
+        # This is here to select the text when focus is setinto the cell by row_scroll_to
+        item = self.currentItem()
+        if item is not None and item.isSelected():
+            editor = self.editItem(item)
+            if editor is not None:
+                editor.setSelected(True)
+
 
     def focusOutEvent(self, event: qtG.QFocusEvent) -> None:
         """
@@ -9434,8 +9461,7 @@ class Grid_TableWidget(qtW.QTableWidget):
             else:
                 grid_col_value = Grid_Col_Value(self.typing_buffer, None, -1, -1, None)
 
-            typing_buffer_data = self.typing_buffer
-            event = _ClearTypingBufferEvent(typing_buffer_data)
+            event = _ClearTypingBufferEvent(grid_col_value)
             qtW.QApplication.postEvent(self, event)
             self.typing_buffer = ""
             self.typeBufferCleared.emit(grid_col_value)
@@ -9634,7 +9660,7 @@ class Grid(_qtpyBase_Control):
             self._widget.setHorizontalHeaderItem(col_index, item)
 
             self._widget.setColumnWidth(
-                col_index, self._col_widths[col_index] * char_pixel_size.width
+                col_index, self._col_widths[col_index] * (char_pixel_size.width)
             )
             self._widget.horizontalHeaderItem(col_index).tag = definition.label
 
@@ -9657,7 +9683,7 @@ class Grid(_qtpyBase_Control):
         self._widget.setSortingEnabled(True)
 
         if self.width <= 1:  # Override auto-calculated grid width
-            self.width = grid_width + 2  # Scroll bar space
+            self.width = grid_width + 3  # Scroll bar space
 
         self._widget.setMinimumWidth(
             (self.width * char_pixel_size.width) + self.tune_hsize
@@ -9699,6 +9725,7 @@ class Grid(_qtpyBase_Control):
         user_data = None
         self._widget: qtW.QTableWidget  # Type hinting
         window_id = get_window_id(self.parent_app, self.parent, self)
+        grid_col_value = Grid_Col_Value("", None, row, col, "")
 
         # Handle event
         if (
@@ -9711,6 +9738,8 @@ class Grid(_qtpyBase_Control):
             event: Sys_Events
             if event == Sys_Events.CLEAR_TYPING_BUFFER:
                 grid_col_value = widget_item  # Grid_Col_Value
+            elif event == Sys_Events.TEXTCHANGED:
+                pass                
             else:
                 if row == -1:
                     row = self._widget.currentRow()
@@ -9725,6 +9754,7 @@ class Grid(_qtpyBase_Control):
                     if hasattr(widget_item, "text"):
                         value = widget_item.text()
                     user_data = None
+
                 grid_col_value = Grid_Col_Value(value, user_data, row, col, value)
 
             return _Event_Handler(parent_app=self.parent_app, parent=self).event(
@@ -10184,28 +10214,46 @@ class Grid(_qtpyBase_Control):
         if scroll_to:
             self.row_scroll_to(row=row)
 
-    def row_scroll_to(self, row: int):
+    def row_scroll_to(self, row: int, col=-1):
         """Scrolls to the row.
 
         Args:
             row (int): The row index in the grid.
+            col (int): The column index in the grid (defaults to -1 scroll to row only).
 
         Raises:
             RuntimeError: If the widget is not set.
-            ValueError: If row is not an integer or is outside the valid range of row indices.
+            ValueError: If row or is not an integer or is outside the valid range of row/col indices.
         """
         self._widget: qtW.QTableWidget
 
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
 
-        assert isinstance(row, int), "row must be an integer"
+        assert isinstance(row, int), f"{row=}. Must be int"
+        assert isinstance(col, int), f"{col=}. Must be int"
+
         assert (
             0 <= row < self._widget.rowCount()
         ), f"{row=}. Must be >= 0 and < {self._widget.rowCount()}"
+        assert (
+            col == -1 or 0 <= col < self._widget.columnCount()
+        ), f"{col=}. Must be >= 0 and < {self._widget.columnCount()}"
 
         index = self._widget.model().index(row, 0)
         self._widget.scrollTo(index)
+
+        if not self.noselection:
+            self._widget.selectRow(row)
+
+        if col >= 0:
+            self._widget.setCurrentCell(row, col)
+            item = self._widget.item(row, col)
+
+            if item is not None:
+                item.setSelected(True)
+
+        self._widget.setFocus()
 
     def userdata_get(self, row: int = -1, col: int = -1) -> any:
         """
@@ -10237,7 +10285,18 @@ class Grid(_qtpyBase_Control):
 
         return item_data.user_data if item_data is not None else None
 
-    def value_get(self, row: int = -1, col: int = -1) -> any:
+    def value_get(
+        self, row: int = -1, col: int = -1
+    ) -> (
+        bool
+        | datetime.date
+        | datetime.datetime
+        | datetime.time
+        | float
+        | int
+        | str
+        | None
+    ):
         """
         Returns the current value stored in the given column referred to by row and col.
         If row or col is not specified, the current row or current column is used as default.
@@ -10247,7 +10306,7 @@ class Grid(_qtpyBase_Control):
             col (int): The column index reference (default: -1).
 
         Returns:
-            any: The value stored in the column referred to by row and col.
+            bool| datetime.date| datetime.datetime| datetime.time| float| int| str: The value stored in the column referred to by row and col.
                 Returns None if the item or item data is None.
         """
         assert isinstance(row, int) and row >= -1, f"{row=} must be an int >= -1"
@@ -10272,7 +10331,18 @@ class Grid(_qtpyBase_Control):
 
         return item_data.current_value if item_data is not None else None
 
-    def valueorig_get(self, row: int = -1, col: int = -1) -> any:
+    def valueorig_get(
+        self, row: int = -1, col: int = -1
+    ) -> (
+        bool
+        | datetime.date
+        | datetime.datetime
+        | datetime.time
+        | float
+        | int
+        | str
+        | None
+    ):
         """Returns the original value stored in the given column referred to by row and col.
         Default returns current row and current column
 
@@ -10281,7 +10351,7 @@ class Grid(_qtpyBase_Control):
             col (int): Column index reference (default {-1})
 
         Returns:
-            any: The original value stored in the column referred to by row and col
+            -> bool| datetime.date| datetime.datetime| datetime.time| float| int| str | None: The original value stored in the column referred to by row and col
         """
         self._widget: qtW.QTableWidget
 
@@ -10306,7 +10376,18 @@ class Grid(_qtpyBase_Control):
 
         return item_data.original_value if item_data is not None else None
 
-    def get_previous_value(self, row: int = -1, col: int = -1) -> Optional[any]:
+    def get_previous_value(
+        self, row: int = -1, col: int = -1
+    ) -> (
+        bool
+        | datetime.date
+        | datetime.datetime
+        | datetime.time
+        | float
+        | int
+        | str
+        | None
+    ):
         """Returns the previous value stored in the given column referred to by row and col. Default returns current row
         and current column
 
@@ -10315,7 +10396,7 @@ class Grid(_qtpyBase_Control):
             col (int): Col index reference (default {-1})
 
         Returns:
-            any: The previous value stored in column referred to by row and col
+            bool| datetime.date| datetime.datetime| datetime.time| float| int| str | None: The previous value stored in column referred to by row and col
         """
         self._widget: qtW.QTableWidget
 
@@ -10340,12 +10421,24 @@ class Grid(_qtpyBase_Control):
 
         return item_data.previous_value if item_data is not None else None
 
-    def value_set(self, value: any, row: int, col: int, user_data: any) -> None:
+    def value_set(
+        self,
+        value: bool
+        | datetime.date
+        | datetime.datetime
+        | datetime.time
+        | float
+        | int
+        | str,
+        row: int,
+        col: int,
+        user_data: any,
+    ) -> None:
         """
         Sets a display value (and user data if supplied) at a given row and column.
 
         Args:
-            value (any): The value to be displayed.
+            value (bool | datetime.date | datetime.datetime |datetime.time | float | int |str): The value to be displayed.
             row (int): Row index reference.
             col (int): Column index reference.
             user_data (any): User data to be stored.
@@ -10355,6 +10448,10 @@ class Grid(_qtpyBase_Control):
         """
         self._widget: qtW.QTableWidget
 
+        assert isinstance(
+            value,
+            (bool, datetime.date, datetime.datetime, datetime.time, float, int, str),
+        ), f"{value=}. Must Be base type"
         assert isinstance(row, int) and (
             row == -1 or row >= 0
         ), f"{row=}. Must be an int == -1 or int >= 0"
@@ -12241,6 +12338,7 @@ class LineEdit(_qtpyBase_Control):
                         return _Event_Handler(
                             parent_app=self.parent_app, parent=self
                         ).event(
+                            window_id=window_id,
                             callback=self.callback,
                             action=event.name,
                             container_tag=self.container_tag,
