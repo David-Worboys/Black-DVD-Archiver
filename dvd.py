@@ -506,9 +506,7 @@ class DVD:
         """
         file_handler = utils.File()
 
-        self._dvd_working_folder = (
-            f"{self.working_folder}{file_handler.ossep}{sys_consts.PROGRAM_NAME}"
-        )
+        self._dvd_working_folder = f"{self.working_folder}{file_handler.ossep}{sys_consts.PROGRAM_NAME} DVD Builder"
 
         if file_handler.path_exists(
             self._dvd_working_folder
@@ -914,20 +912,7 @@ class DVD:
             if not os.path.exists(menu_button_file):
                 return -1, f"Video File Does Not Exist : {menu_button_file}"
 
-            # Massage file name to produce a title TODO Make user setable and better
-            menu_text = (
-                "".join(
-                    [
-                        char
-                        for char in file_name
-                        if char.isalpha() or char.isspace() or char in ("_", "-")
-                    ]
-                )
-                .replace("_", " ")
-                .replace("-", " ")
-            )
-
-            menu_text = utils.space_out_capitalised(menu_text).title()
+            menu_text = utils.File().extract_title(file_name)
 
             result, message = dvdarch_utils.overlay_text(
                 in_file=menu_button_file,

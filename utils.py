@@ -26,6 +26,7 @@ import enum
 import getpass
 import hashlib
 import json
+import locale
 import math
 import os
 import pathlib
@@ -41,11 +42,13 @@ from collections.abc import MutableMapping
 from enum import Enum, IntEnum
 from typing import (Any, Dict, Generator, Generic, Literal, NamedTuple, Tuple,
                     Type, TypeVar, Union, cast)
+import dateparser
 
 import dateutil.parser as dateparse
 import netifaces
 from Crypto.Cipher import AES
 from PySide6 import QtCore, QtWidgets
+import titlecase
 
 # fmt: on
 
@@ -963,84 +966,88 @@ class File:
         """
         return os.path.sep
 
-    def extract_title(
-        self,
-        name: str,
-        date_regex: str = r"\d{4}[^\d\s]*\d{0,2}[^\d\s]*\d{0,2}",
-        name_parts_regex: str = r"([^\W\d_]+|\d+)",
-        excluded_words: list[str] = [
-            "home",
-            "videos",
-            "dvd",
-            "archiver",
-            "video",
-            "editor",
-            "edits",
-            "trimmed",
-        ],
-        exclude_trailing_numeric: bool = True,
-    ) -> str:
+    def extract_title(self, name: str, excluded_words: list[str] = []) -> str:
         """
-        Extracts a meaningful title string from a file/folder name.
+        Extracts the title from a given file name by removing the file extension, replacing unwanted characters,
+        and formatting the resulting string into title case. If the file name contains a date, the date is extracted
+        and formatted according to the computer's locale, and is included in the resulting title separated by a dash (-).
 
         Args:
-            name (str): The name of the file/folder.
-            date_regex (str, optional): A regular expression pattern for matching a date in the name. Defaults to r"\d{4}[^\d\s]*\d{0,2}[^\d\s]*\d{0,2}".
-            name_parts_regex (str, optional): A regular expression pattern for matching individual name parts. Defaults to r"([^\W\d_]+|\d+)".
-            excluded_words (list[str], optional): A list of words to exclude from the extracted title. Defaults to ["home", "videos", "dvd", "archiver", "video", "editor", "edits", "trimmed"].
-            exclude_trailing_numeric (bool, optional): Whether to exclude a trailing numeric character from the extracted title. Defaults to True.
+            name (str): The file name to extract the title from.
+            excluded_words (list[str]) : The words to exclude
 
         Returns:
-            str: The extracted title, or "" if no meaningful title could be extracted.
+            str: The extracted title.
+
         """
-        assert isinstance(name, str), "The input name must be a string"
-        assert isinstance(date_regex, str), "The date_regex parameter must be a string"
-        assert isinstance(
-            name_parts_regex, str
-        ), "The name_parts_regex parameter must be a string"
-        assert isinstance(
-            excluded_words, list
-        ), "The excluded_words parameter must be a list"
-        assert all(
-            isinstance(word, str) for word in excluded_words
-        ), "All elements in the excluded_words list must be strings"
-        assert isinstance(
-            exclude_trailing_numeric, bool
-        ), "The exclude_trailing_numeric parameter must be a boolean"
 
-        # Split the file name on whitespace
-        words = name.split()
+        assert (
+            isinstance(name, str) and name.strip() != ""
+        ), f"{name=}. Must be a non-empty str"
+        assert all(isinstance(word, str) for word in excluded_words)
 
-        # Initialize variables for the title and date
-        title = ""
-        date = ""
+        locale.setlocale(locale.LC_ALL, "")
 
-        # Loop through the words
-        for word in words:
-            # Exclude any words in the exclude_words list
-            if excluded_words and word.lower() in excluded_words:
-                continue
+        # Extract date
+        date = dateparser.parse(name)
 
-            # Check if the word contains any digits
-            if any(char.isdigit() for char in word):
-                # Remove any non-digits from the word
-                digits = re.sub(r"\D", "", word)
-                # Try to parse the digits as a date
-                try:
-                    date = datetime.datetime.strptime(digits, "%Y%m%d").strftime(
-                        "%Y %b"
-                    )
-                except ValueError:
-                    pass
-            else:
-                # Add the word to the title
-                title += word.capitalize() + " "
+        # Remove file extension
+        name_without_extension = re.sub(r"\.\w+$", "", name)
 
-        # Remove any extra spaces
-        title = re.sub(r"\s+", " ", title.strip())
+        # Strip timestamps
+        name_without_extension = re.sub(
+            r"\b\d{2}\.\d{2}\.\d{2}\.\d{3}\b|\b\d{2}:\d{2}:\d{2}\b", "", name
+        )
+        name_without_extension = re.sub(
+            r"\d{2}[\.:]\d{2}[\.:]\d{2}[\.:]?\d{0,3}\b", "", name_without_extension
+        )
+        name_without_extension = re.sub(r"\d{8,}", "", name_without_extension)
+        name_without_extension = re.sub(
+            r"\d{4}-\d{2}-\d{2}", "", name_without_extension
+        )
+        name_without_extension = re.sub(
+            r"\b\d{2} \d{2} \d{2} \d{3}\b", "", name_without_extension
+        )
 
-        # Return the title and date
-        return f"{date} - {title}".strip()
+        # Replace unwanted characters
+        name_without_extension = re.sub(r"[^\w\s\-\.,']", "", name_without_extension)
+        name_without_extension = re.sub(
+            r"([A-Z]{2,})", r" \g<1>".lower(), name_without_extension
+        )
+        name_without_extension = name_without_extension.replace("_", " ")
+        name_without_extension = name_without_extension.replace("-", " ")
+        name_without_extension = name_without_extension.replace(".", " ")
+
+        # Fix spaces around numbers
+        name_without_extension = re.sub(r"(\d)\s+", r"\g<1> ", name_without_extension)
+
+        # Fix leading numbers
+        name_without_extension = re.sub(
+            r"(\A\d+)\s+", r"\g<1> ", name_without_extension
+        )
+
+        # Remove extra spaces
+        name_without_extension = re.sub(r" {2,}", " ", name_without_extension.strip())
+
+        # Remove excluded words followed by a number
+        pattern1 = r"\b(?:{})\b\d+".format("|".join(excluded_words))
+        name_without_extension = re.sub(pattern1, "", name_without_extension)
+
+        # Remove excluded words followed by a space and a number
+        pattern2 = r"\b(?:{})\b\s\d+".format("|".join(excluded_words))
+        name_without_extension = re.sub(pattern2, "", name_without_extension)
+
+        # Fix capitalization and formatting
+        title_text = name_without_extension.capitalize()
+        title_text = re.sub(r"([^\w\s])\s+([^\w\s])", r"\g<1>\g<2>", title_text)
+        title_text = titlecase.titlecase(title_text)
+
+        # Add date if present
+        if date:
+            date_string = date.strftime(locale.nl_langinfo(locale.D_FMT))
+            title_text = f"{date_string} - {title_text}"
+
+        return title_text
 
     @staticmethod
     def file_exists(
@@ -1079,7 +1086,44 @@ class File:
             return os.path.isfile(file_path)
         except Exception as e:
             return False
-        return False
+
+    def filename_validate(self, file_name: str) -> bool:
+        """
+        Basic check to see if file name is valid. Might need beefing up later
+
+        Args:
+            file_name (str): The file name to check for validity.
+
+        Returns:
+            bool: True if the file name is valid, False otherwise.
+
+        """
+        assert (
+            isinstance(file_name, str) and file_name.strip() != ""
+        ), f"{file_name=}. Must be a non-empty str"
+
+        # Check if the file name is empty or too long
+        if not file_name or len(file_name) > os.pathconf("/", "PC_NAME_MAX"):
+            return False
+
+        # Check for invalid characters
+        for char in file_name:
+            if char in r'\/:*?"<>|,':
+                return False
+
+        # Check for reserved file names on Windows
+        if os.name == "nt":
+            # fmt: off
+            reserved_names = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3',
+                            'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+                            'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6',
+                            'LPT7', 'LPT8', 'LPT9']
+            # fmt: on
+            if file_name.upper() in reserved_names:
+                return False
+
+        # All checks passed, the file name is valid
+        return True
 
     def filelist(
         self, path: str, extensions: list[str] | tuple[str, ...]
@@ -1094,11 +1138,17 @@ class File:
 
         Returns:
             File_Result: A named tuple containing a list of files, the path, and any errors encountered.
-        """        
-        assert isinstance(path, str) and path.strip() != "", f"{path=}. Must be a non-empty str"
-        assert isinstance(extensions, (list, tuple)), f"{extensions=}. Must be a list or tuple of str"
-        assert all(isinstance(extension, str) for extension in extensions), f"All elements must be str"
-                    
+        """
+        assert (
+            isinstance(path, str) and path.strip() != ""
+        ), f"{path=}. Must be a non-empty str"
+        assert isinstance(
+            extensions, (list, tuple)
+        ), f"{extensions=}. Must be a list or tuple of str"
+        assert all(
+            isinstance(extension, str) for extension in extensions
+        ), f"All elements must be str"
+
         file_extensions = [extension.lower() for extension in extensions]
 
         try:
@@ -1112,7 +1162,10 @@ class File:
                     file
                     for file in os.listdir(path_ptr)
                     if os.path.isfile(os.path.join(path_ptr, file))
-                    and (not file_extensions or os.path.splitext(file)[1][1:].lower() in file_extensions)
+                    and (
+                        not file_extensions
+                        or os.path.splitext(file)[1][1:].lower() in file_extensions
+                    )
                 ]
 
                 return self.File_Result(
