@@ -219,6 +219,48 @@ def alpha_only(text_string: str = "") -> str:
     return "".join([char for char in text_string if char.isalpha()])
 
 
+def Find_Common_Words(word_list: list[str]) -> list[str]:
+    """
+    Finds the words that occur in all lines of words in the word list.
+
+    Args:
+        word_list (list): A list of strings containing lines of words.
+
+    Returns:
+        list: A list of strings representing the common words that occur in all lines of words in the word list.
+
+    """
+    assert isinstance(word_list, list), f"{word_list=}. Must be a list or str "
+    assert all(
+        isinstance(word, str) for word in word_list
+    ), f"{word_list=}. Must be a list of str"
+
+    common_words = []
+
+    for outer_index, word_line in enumerate(word_list):
+        words = re.sub(r"[\W_]+", " ", word_line.lower())
+        words = words.split()
+        words = set(word for word in words if word.isalpha())
+
+        other_words = set()
+
+        for inner_index, match_word_line in enumerate(word_list):
+            if inner_index == outer_index:  # same thing, skip
+                continue
+
+            match_words = re.sub(r"[\W_]+", " ", match_word_line.lower())
+            match_words = match_words.split()
+            match_words = set(word for word in match_words if word.isalpha())
+            other_words |= match_words
+
+        common_words += {word for word in words if word in other_words}
+
+    common_words = list(set(common_words))
+    common_words.sort()
+
+    return common_words
+
+
 def App_Path(file_name: str = "") -> str:
     """Returns the full app directory path for the supplied file_name.  Handles pyinstaller.Nuitka runtime directory
 
