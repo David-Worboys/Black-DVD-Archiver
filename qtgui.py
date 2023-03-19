@@ -1773,6 +1773,8 @@ class _qtpyBase_Control(_qtpyBase):
     buddy_callback: Optional[Callable] = None
     validate_callback: Optional[Callable] = None
     container_tag: str = ""
+    bold: bool = False
+    italic: bool = False
     # available_width:int = g_application.available_width
     # available_height:int = g_application.available_height
 
@@ -1907,6 +1909,9 @@ class _qtpyBase_Control(_qtpyBase):
 
         if self.container_tag == "":
             self.container_tag = f"{id(self)}"
+
+        assert isinstance(self.bold, bool), f"{self.bold=}. Must be bool"
+        assert isinstance(self.italic, bool), f"{self.italic=}. Must be bool"
 
         # print(f"@@A {self.available_width=}")
         # print(f"@@@ {self.available_height=}")
@@ -2468,12 +2473,18 @@ class _qtpyBase_Control(_qtpyBase):
         if self._widget is not None:  # Should not happen, caught above
             self._widget.installEventFilter(self._event_filter)
 
-            self.font_set(
-                app_font=parent_app.app_font_def,
-                widget_font=parent_app.app_font_def
-                if self.txt_font is None
-                else self.txt_font,
+            widget_font = (
+                parent_app.app_font_def if self.txt_font is None else self.txt_font
             )
+            widget_font.size = self.txt_fontsize
+
+            if self.bold:
+                widget_font.weight = Font_Weight.BOLD
+
+            if self.italic:
+                widget_font.style = Font_Style.ITALIC
+
+            self.font_set(app_font=parent_app.app_font_def, widget_font=widget_font)
 
         char_pixel_size = self.pixel_char_size(1, 1)
 
@@ -2536,8 +2547,10 @@ class _qtpyBase_Control(_qtpyBase):
 
         if self.tooltip.strip() != "":
             self.tooltip_set(self.tooltip)
+
         if hasattr(self._widget, "enabled"):
             self.enable_set(self.enabled)
+
         # print(f"DEBUG {self=}")
         pixel_size = self.pixel_char_size(self.height, self.width)
 
@@ -4612,12 +4625,16 @@ class _Container(_qtpyBase_Control):
         else:
             layout = qtW.QVBoxLayout()
             layout.setSpacing(3)
-            layout.setContentsMargins(4, 4, 9, 4)
+            layout.setContentsMargins(9, 4, 9, 4)
 
         # layout.setContentsMargins(0, 0, 0, 0) #Debug
-        layout.setContentsMargins(3, 2, 3, 2)
+        # layout.setContentsMargins(3, 2, 3, 2)
         # layout.setContentsMargins(4, 4, 4, 9)
         # layout.setContentsMargins(4, 4, 4, 4)
+        # if isinstance(self, FormContainer):
+        #    layout.setContentsMargins(4, 4, 4, 4)
+        # else:
+        #    layout.setContentsMargins(9, 4, 9, 4)
 
         widget_group.setLayout(layout)
         self._widget = widget_group
@@ -9398,9 +9415,9 @@ class Grid_TableWidget(qtW.QTableWidget):
             elif text:
                 item.setText(current_text + text)
                 self.typing_buffer = current_text + text
-            return True                                    
+            return True
         return qtW.QTableView.eventFilter(self, obj, event)
-    
+
     def focusInEvent(self, event: qtG.QFocusEvent):
         assert isinstance(event, qtG.QFocusEvent), f"{event=} must be a QFocusEvent"
 
@@ -9410,7 +9427,6 @@ class Grid_TableWidget(qtW.QTableWidget):
             editor = self.editItem(item)
             if editor is not None:
                 editor.setSelected(True)
-
 
     def focusOutEvent(self, event: qtG.QFocusEvent) -> None:
         """
@@ -9739,7 +9755,7 @@ class Grid(_qtpyBase_Control):
             if event == Sys_Events.CLEAR_TYPING_BUFFER:
                 grid_col_value = widget_item  # Grid_Col_Value
             elif event == Sys_Events.TEXTCHANGED:
-                pass                
+                pass
             else:
                 if row == -1:
                     row = self._widget.currentRow()
