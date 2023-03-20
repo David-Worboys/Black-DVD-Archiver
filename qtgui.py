@@ -266,9 +266,11 @@ def Get_Window_ID(
 
     return window_id
 
+
 Grid_Item_Tuple = namedtuple(
-            "Grid_Item_Tuple", ["row_index", "tag", "current_value", "user_data"]
-        )
+    "Grid_Item_Tuple", ["row_index", "tag", "current_value", "user_data"]
+)
+
 
 # An enumeration of all the application events that can be handled by the GUI.
 class Sys_Events(IntEnum):
@@ -9804,7 +9806,11 @@ class Grid(_qtpyBase_Control):
             )
             self._widget.horizontalHeaderItem(col_index).tag = definition.label
 
-        height = self.height * self._widget.verticalHeader().defaultSectionSize()
+        if self.pixel_unit:
+            height = self.height
+        else:    
+            height = self.height * self._widget.verticalHeader().defaultSectionSize()
+
         self._widget.verticalHeader().setVisible(False)
 
         self._widget.setSelectionBehavior(qtW.QTableView.SelectRows)
@@ -9930,7 +9936,7 @@ class Grid(_qtpyBase_Control):
         """
         assert isinstance(row, int), "row argument must be of type int"
         assert isinstance(col, int), "col argument must be of type int"
-        
+
         row_index, col_index = self._rowcol_validate(row, col)
 
         item = self._widget.item(row_index, col_index)
