@@ -1089,7 +1089,7 @@ class File:
             date_string = date.strftime(locale.nl_langinfo(locale.D_FMT))
             title_text = f"{date_string} - {title_text}"
 
-        return title_text
+        return title_text.strip()
 
     @staticmethod
     def file_exists(
@@ -1298,6 +1298,39 @@ class File:
             return True
         return False
 
+    def rename_file(self, old_file_path: str, new_file_path: str):
+        """
+        Renames a file
+
+        Args:
+            old_file_path: A string representing the path of the file to be renamed.
+            new_file_path: A string representing the new path of the renamed file.
+
+        Returns:
+            Returns 1 if the file was successfully renamed, and -1 if an error occurred.
+        """
+        assert (
+            isinstance(old_file_path, str) and old_file_path.strip() != ""
+        ), f"{old_file_path=}. Must be a non-empty str"
+        assert (
+            isinstance(new_file_path, str) and new_file_path.strip() != ""
+        ), f"{new_file_path=}. Must be a non-empty str"
+
+        old_path, old_name, old_extension = self.split_file_path(old_file_path)
+        new_path, _, _ = self.split_file_path(new_file_path)
+
+        if (
+            self.file_exists(old_path, old_name, old_extension)
+            and self.path_exists(new_path)
+            and self.path_writeable(new_path)
+        ):
+            try:
+                os.rename(old_file_path, new_file_path)
+                return 1
+            except OSError as e:
+                return -1
+        return -1
+
     def split_head_tail(self, file_path_name: str) -> tuple[str, str]:
         """Takes a full file path - including the file name and splits it into the file path and the file name
 
@@ -1333,14 +1366,14 @@ class File:
     def split_file_path(
         self, file_path_name: str, no_path_check: bool = False
     ) -> tuple[str, str, str]:
-        """Splits a file path into its directory path, file name with prefix, and file extension.
+        """Splits a file path into its directory path, file name , and file extension.
 
         Args:
             file_path_name (str): The file path to split.
             no_path_check (bool): Processes file_path_name without checking if it exists. Assumes it is a file name!
 
         Returns:
-            tuple: A tuple of three strings - directory path, file name with prefix, and file extension.
+            tuple: A tuple of three strings - directory path, file name , and file extension.
 
         """
         assert (
@@ -1351,13 +1384,12 @@ class File:
             return (file_path_name, "", "")
         elif not no_path_check or os.path.isfile(file_path_name):
             path, file = os.path.split(file_path_name)
-            _, extension = os.path.splitext(file)
 
             file_prefix, file_suffix = os.path.splitext(file)
             if not no_path_check or self.file_exists(
                 path=path, file=file_prefix, suffix=file_suffix
             ):
-                return (path, file_prefix, extension)
+                return (path, file_prefix, file_suffix)
             else:
                 return ("", "", "")
 
