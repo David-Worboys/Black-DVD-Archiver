@@ -54,7 +54,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
 
         match event.event:
-            case qtg.SYSEVENTS.WINDOWOPEN:
+            case qtg.Sys_Events.WINDOWOPEN:
                 video_folder = self._db_settings.setting_get("video_import_folder")
 
                 if video_folder is None or video_folder.strip() == "":
@@ -62,14 +62,14 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                     self._db_settings.setting_set("video_import_folder", video_folder)
 
                 self.load_files(video_folder=video_folder, event=event)
-            case qtg.SYSEVENTS.CLICKED:
+            case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "ok":
                         if self._process_ok(event) == 1:
-                            event.window_close()
+                            super().close()
 
                     case "cancel":
-                        event.window_close()
+                        super().close()
                     case "bulk_select":
                         file_grid: qtg.Grid = event.widget_get(
                             container_tag="file_controls",
@@ -125,7 +125,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
             video_folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
 
         if video_folder.strip() != "":
-            with qtg.sys_cursor(qtg.CURSOR.hourglass):
+            with qtg.sys_cursor(qtg.Cursor.hourglass):
                 result = file_handler.filelist(
                     path=video_folder,
                     extensions=sys_consts.VIDEO_FILE_EXTNS,
@@ -148,28 +148,28 @@ class Video_File_Picker_Popup(qtg.PopContainer):
     def layout(self) -> qtg.VBoxContainer:
         """Generate the form UI layout"""
         control_container = qtg.VBoxContainer(
-            tag="form_controls", align=qtg.ALIGN.TOPRIGHT
+            tag="form_controls", align=qtg.Align.TOPLEFT
         )
-        file_control_container = qtg.VBoxContainer(
-            tag="file_controls", align=qtg.ALIGN.TOPLEFT
+        file_control_container = qtg.FormContainer(
+            tag="file_controls", align=qtg.Align.TOPLEFT
         )
+
         button_container = qtg.HBoxContainer(
-            align=qtg.ALIGN.RIGHT, tag="command_buttons"
+            align=qtg.Align.RIGHT, tag="command_buttons"
         ).add_row(
             qtg.Button(
                 text="&Select Video Folder",
                 tag="video_import_folder",
                 callback=self.event_handler,
             ),
-            qtg.Spacer(width=36),
-            qtg.Button(text="&Ok", tag="ok", callback=self.event_handler, width=10),
-            qtg.Button(
-                text="&Cancel", tag="cancel", callback=self.event_handler, width=10
+            qtg.Spacer(width=37),
+            qtg.Command_Button_Container(
+                ok_callback=self.event_handler, cancel_callback=self.event_handler
             ),
         )
 
         file_col_def = (
-            qtg.COL_DEF(
+            qtg.Col_Def(
                 label="Video File",
                 tag="video_file",
                 width=80,
@@ -194,10 +194,10 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                 width=11,
             ),
             video_input_files,
+            button_container,
         )
 
         control_container.add_row(file_control_container)
-        control_container.add_row(button_container)
 
         return control_container
 
@@ -239,7 +239,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         Args:
             event (Action): Action
         """
-        if event.event == qtg.SYSEVENTS.CLICKED:
+        if event.event == qtg.Sys_Events.CLICKED:
             if event.value.row >= 0 and event.value.col >= 0:
                 # When the user clicks on a row in the grid, toggle the switch in that row
                 file_grid: qtg.Grid = event.widget_get(
