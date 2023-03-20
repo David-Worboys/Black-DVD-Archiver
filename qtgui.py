@@ -266,6 +266,9 @@ def Get_Window_ID(
 
     return window_id
 
+Grid_Item_Tuple = namedtuple(
+            "Grid_Item_Tuple", ["row_index", "tag", "current_value", "user_data"]
+        )
 
 # An enumeration of all the application events that can be handled by the GUI.
 class Sys_Events(IntEnum):
@@ -9913,7 +9916,7 @@ class Grid(_qtpyBase_Control):
         else:
             return 1
 
-    def checkitemrow_get(self, row: int, col: int) -> Union[namedtuple, tuple]:
+    def checkitemrow_get(self, row: int, col: int) -> Grid_Item_Tuple:
         """Returns an named tuple of (row_index, tag, current_value, and user_data) from the row and column specified
         if the item is checked or an empty tuple if not checked.
 
@@ -9922,23 +9925,19 @@ class Grid(_qtpyBase_Control):
             col (int): The index of the column to retrieve the item from.
 
         Returns:
-            NamedTuple: A named tuple containing the row_index, tag, current_value, and user_data of the checked item.
+            Grid_Item_Tuple: A Grid_Item_Tuple tuple containing the row_index, tag, current_value, and user_data of the checked item.
             An empty tuple if the item is not checked.
         """
         assert isinstance(row, int), "row argument must be of type int"
         assert isinstance(col, int), "col argument must be of type int"
-
-        ItemTuple = namedtuple(
-            "ItemTuple", ["row_index", "tag", "current_value", "user_data"]
-        )
-
+        
         row_index, col_index = self._rowcol_validate(row, col)
 
         item = self._widget.item(row_index, col_index)
         item_data = item.data(qtC.Qt.UserRole)
 
         if item.checkState() == qtC.Qt.Checked:
-            return ItemTuple(
+            return Grid_Item_Tuple(
                 row_index=row_index,
                 tag=item_data.tag,
                 current_value=item_data.current_value,
