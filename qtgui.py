@@ -28,6 +28,7 @@ import functools
 import math
 import os
 import pathlib
+import platform
 import random
 import re
 import string
@@ -66,7 +67,153 @@ MAX_CHARS = 32767
 MENU_SEPERATOR = "---"
 
 
-def get_window_id(
+def Command_Button_Container(
+    ok_callback: Callable,
+    cancel_callback: Callable = None,
+    apply_callback: Callable = None,
+    button_width=10,
+) -> "HBoxContainer":
+    """
+    Creates a horizontal box container for buttons, following platform UX guidelines.
+
+    Args:
+        ok_callback (function): Callback function for the "Ok" button.
+        cancel_callback (function, optional): Callback function for the "Cancel" button. Defaults to None.
+        apply_callback (function, optional): Callback function for the "Apply" button. Defaults to None.
+        button_width (int): Width of the command buttons
+
+    Returns:
+        HBoxContainer: A horizontal box container for buttons.
+    """
+
+    # Assert that the callbacks are callable
+    assert ok_callback is None or callable(ok_callback), "Invalid  callback"
+    assert cancel_callback is None or callable(
+        cancel_callback
+    ), "Invalid Cancel callback"
+    assert apply_callback is None or callable(apply_callback), "Invalid Apply callback"
+    assert (
+        isinstance(button_width, int) and button_width >= 7
+    ), f"{button_width=}. Must be int > 7"
+
+    platform_name = platform.system()
+
+    button_container = HBoxContainer(align=Align.RIGHT, tag="command_buttons")
+
+    if platform_name == "Windows":
+        button_container.add_row(
+            Button(text="Ok", tag="ok", callback=ok_callback, width=button_width)
+        )
+
+        if cancel_callback:
+            button_container.add_row(
+                Button(
+                    text="Cancel",
+                    tag="cancel",
+                    callback=cancel_callback,
+                    width=button_width,
+                )
+            )
+
+        if apply_callback:
+            button_container.add_row(
+                Button(
+                    text="Apply",
+                    tag="apply",
+                    callback=apply_callback,
+                    width=button_width,
+                )
+            )
+
+    elif platform_name == "Linux":
+        button_container.add_row(
+            Button(text="Ok", tag="ok", callback=ok_callback, width=button_width)
+        )
+
+        if apply_callback:
+            button_container.add_row(
+                Button(
+                    text="Apply",
+                    tag="apply",
+                    callback=apply_callback,
+                    width=button_width,
+                )
+            )
+
+        if cancel_callback:
+            button_container.add_row(
+                Button(
+                    text="Cancel",
+                    tag="cancel",
+                    callback=cancel_callback,
+                    width=button_width,
+                )
+            )
+
+    elif platform_name == "Darwin":  # macOS
+        if cancel_callback:
+            button_container.add_row(
+                Button(
+                    text="Cancel",
+                    tag="cancel",
+                    callback=cancel_callback,
+                    width=button_width,
+                )
+            )
+
+        if apply_callback:
+            button_container.add_row(
+                Button(
+                    text="Apply",
+                    tag="apply",
+                    callback=apply_callback,
+                    width=button_width,
+                )
+            )
+
+        button_container.add_row(
+            Button(text="Ok", tag="ok", callback=ok_callback, width=button_width)
+        )
+
+    return button_container
+
+
+def Question_Button_Container(
+    yes_callback: Callable, no_callback: Callable
+) -> "HBoxContainer":
+    """
+    Displays a message box with a question prompt, following platform UX guidelines.
+
+    Args:
+        yes_callback (Callable): Callback function for the "Yes" button.
+        no_callback (Callable): Callback function for the "No" button.
+
+    Returns:
+        qtg.HBoxContainer: A horizontal box container for buttons.
+    """
+    assert callable(yes_callback), "Invalid 'yes' callback."
+    assert callable(no_callback), "Invalid 'no' callback."
+
+    button_container = HBoxContainer(align=Align.RIGHT, tag="question_buttons")
+
+    platform_name = platform.system()
+
+    if platform_name == "Windows":
+        button_container.add_row(tag="yes", text="Yes", callback=yes_callback)
+        button_container.add_row(tag="no", text="No", callback=no_callback)
+
+    elif platform_name == "Linux":
+        button_container.add_row(tag="no", text="No", callback=no_callback)
+        button_container.add_row(tag="yes", text="Yes", callback=yes_callback)
+
+    elif platform_name == "Darwin":  # macOS
+        button_container.add_row(tag="yes", text="Yes", callback=yes_callback)
+        button_container.add_row(tag="no", text="No", callback=no_callback)
+
+    return button_container
+
+
+def Get_Window_ID(
     parent_app: "QtPyApp",
     parent: qtW.QWidget | qtW.QFrame | None,
     self_item: Union[
@@ -1212,7 +1359,7 @@ class _qtpyFrame(_qtpyBaseFrame):
                 self.callback.__code__.co_argcount <= 2
             ), "action events have 1 argument - action"
 
-            window_id = get_window_id(self.parent_app, None, self)
+            window_id = Get_Window_ID(self.parent_app, None, self)
 
             result = _Event_Handler(parent_app=self.parent_app).event(
                 window_id=window_id,
@@ -1942,7 +2089,7 @@ class _qtpyBase_Control(_qtpyBase):
 
         """
         event: Sys_Events = args[0]
-        window_id = get_window_id(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         # Check if widget exists as it sometimes is destroyed before event is fired
         if callable(self.callback) and self.parent_app.widget_exist(
@@ -2391,7 +2538,7 @@ class _qtpyBase_Control(_qtpyBase):
             isinstance(container_tag, str) and container_tag.strip() != ""
         ), f"{container_tag=}. Must be a non-empty str"
 
-        window_id = get_window_id(parent_app, parent, self)
+        window_id = Get_Window_ID(parent_app, parent, self)
 
         parent_app.widget_add(
             window_id=window_id, container_tag=container_tag, tag=self.tag, widget=self
@@ -2671,7 +2818,7 @@ class _qtpyBase_Control(_qtpyBase):
         Args:
             gui_event: The event that was triggered.
         """
-        window_id = get_window_id(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         for control in self.parent_app.widget_dict_get(
             window_id=window_id, container_tag=self.container_tag
@@ -4544,7 +4691,7 @@ class _Container(_qtpyBase_Control):
                         col_ptr += 1
 
         # ===== Main
-        window_id = get_window_id(parent_app, parent, self)
+        window_id = Get_Window_ID(parent_app, parent, self)
 
         parent_app.widget_add(
             window_id=window_id, container_tag=container_tag, tag=self.tag, widget=self
@@ -5075,7 +5222,7 @@ class _Container(_qtpyBase_Control):
         if self._parent_app is None:
             self._parent_app = g_application
 
-        window_id = get_window_id(self._parent_app, self._parent, self)
+        window_id = Get_Window_ID(self._parent_app, self._parent, self)
 
         return self._parent_app.widget_gui_controls_get(
             window_id=window_id, container_tag=self.tag
@@ -5107,7 +5254,7 @@ class _Container(_qtpyBase_Control):
                 del self._scroll_deque[index]
                 break
 
-        window_id = get_window_id(self._parent_app, self._parent, self)
+        window_id = Get_Window_ID(self._parent_app, self._parent, self)
 
         self._parent_app.widget_del(
             window_id=window_id, container_tag=container_tag, tag=tag
@@ -5134,7 +5281,7 @@ class _Container(_qtpyBase_Control):
         ), f"{container_tag=}. Must be str"
         assert isinstance(tag, str) and tag.strip() != "", f"{tag=}. Must be str"
 
-        window_id = get_window_id(self._parent_app, self._parent, self)
+        window_id = Get_Window_ID(self._parent_app, self._parent, self)
 
         return self._parent_app.widget_exist(
             window_id=window_id, container_tag=container_tag, tag=tag
@@ -5180,7 +5327,7 @@ class _Container(_qtpyBase_Control):
         if self._parent_app is None:
             raise RuntimeError(f"{self._parent_app=}. Not set!")
 
-        window_id = get_window_id(self._parent_app, self._parent, self)
+        window_id = Get_Window_ID(self._parent_app, self._parent, self)
 
         return self._parent_app.widget_get(
             window_id=window_id, container_tag=container_tag, tag=tag
@@ -5197,7 +5344,7 @@ class _Container(_qtpyBase_Control):
 
         widget_list = []
 
-        window_id = get_window_id(self._parent_app, self._parent, self)
+        window_id = Get_Window_ID(self._parent_app, self._parent, self)
 
         if self.scroll and self.scroll_controls_get:
             for widget in self.scroll_controls_get:
@@ -5324,7 +5471,7 @@ class _Container(_qtpyBase_Control):
         """Saves the current enable state of all widgets in the container"""
         self._current_enable_settings = {}
 
-        window_id = get_window_id(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         for item in self.tags_gather():
             widget = self._parent_app.widget_get(window_id=window_id, tag=item.tag)
@@ -5347,7 +5494,7 @@ class _Container(_qtpyBase_Control):
     def controls_enable_state_restore(self):
         """Restores the enable state of all controls in the container"""
 
-        window_id = get_window_id(self._parent_app, self._parent, self)
+        window_id = Get_Window_ID(self._parent_app, self._parent, self)
 
         for container_tag, items in self._current_enable_settings.items():
             for item_tag, enabled in items.items():
@@ -5373,7 +5520,7 @@ class _Container(_qtpyBase_Control):
         if self._parent_app is None:
             raise AssertionError(f"{self._parent_app=}. Not set!")
 
-        window_id = get_window_id(self._parent_app, self._parent, self)
+        window_id = Get_Window_ID(self._parent_app, self._parent, self)
 
         for item in self.tags_gather():
             widget = self._parent_app.widget_get(
@@ -5484,7 +5631,7 @@ class _Container(_qtpyBase_Control):
             if not widget_def.widget.guiwidget_get.visibleRegion().isEmpty():
                 widgets_visible[widget_def.widget.tag] = widget_def
 
-        window_id = get_window_id(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         if callable(self.callback):
             result = _Event_Handler(parent_app=parent_app, parent=self).event(
@@ -5725,7 +5872,7 @@ class _Container(_qtpyBase_Control):
         if container is None:
             container = self
 
-        window_id = get_window_id(self._parent_app, self._parent, self)
+        window_id = Get_Window_ID(self._parent_app, self._parent, self)
 
         for row_list in container.control_list_get:
             for col_control in row_list:
@@ -5770,7 +5917,7 @@ class _Container(_qtpyBase_Control):
     def values_clear(self):
         """Clears the values of all widgets in the container that have a `clear` method"""
 
-        window_id = get_window_id(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         for item in self.tags_gather():
             widget = self._parent_app.widget_get(
@@ -6247,7 +6394,7 @@ class _Dialog(qtW.QDialog):
         # return None
 
         if self.callback is not None:
-            window_id = get_window_id(self._parent_app, None, self)
+            window_id = Get_Window_ID(self._parent_app, None, self)
 
             if self._parent_app.widget_exist(
                 window_id=window_id,
@@ -6400,7 +6547,7 @@ class PopContainer(_qtpyBase_Control):
         Returns:
             bool : Result of the close operation
         """
-        window_id = get_window_id(self.parent_app, None, self)
+        window_id = Get_Window_ID(self.parent_app, None, self)
 
         self.parent_app.widget_del(
             window_id=window_id,
@@ -6483,7 +6630,7 @@ class PopContainer(_qtpyBase_Control):
 
             handler = _Event_Handler(parent_app=self.parent_app, parent=self)
 
-            window_id = get_window_id(self.parent_app, None, self)
+            window_id = Get_Window_ID(self.parent_app, None, self)
 
             if callable(self.callback):
                 result = handler.event(
@@ -6700,10 +6847,9 @@ class PopFolderGet(PopContainer):
 
         self.container.add_row(screen_container)
         self.container.add_row(
-            HBoxContainer(align=Align.RIGHT).add_row(
-                Button(text="&Ok", tag="ok", callback=self.event_handler),
-                Button(text="&Cancel", tag="cancel", callback=self.event_handler),
-            )
+            Command_Button_Container(
+                ok_callback=self.event_handler, cancel_callback=self.event_handler
+            ),
         )
 
     def event_handler(self, event: Action):
@@ -7252,36 +7398,14 @@ class PopOptions(PopContainer):
             self._options[tag] = option
 
         option_container.width = radio_selection_width
-        button_container = HBoxContainer(
-            tag="button_container", align=Align.RIGHT, width=self.width
-        )
-        button_container.add_row(
-            Button(
-                container_tag=self.container_tag,
-                tag="ok",
-                text="&Ok",
-                width=10,
-                height=1,
-                tune_vsize=7,
-                callback=self.event_handler,
-            )
-        )
-
-        button_container.add_row(
-            Button(
-                container_tag=self.container_tag,
-                tag="cancel",
-                text="&Cancel",
-                width=10,
-                height=1,
-                tune_vsize=7,
-                callback=self.event_handler,
-            )
-        )
 
         self.container.add_row(option_container)
         self.container.add_row(Spacer())
-        self.container.add_row(button_container)
+        self.container.add_row(
+            Command_Button_Container(
+                ok_callback=self.event_handler, cancel_callback=self.event_handler
+            )
+        )
 
     def event_handler(self, event: Action):
         """Control event handler for the PopOptions dialogue.
@@ -7340,13 +7464,6 @@ class PopTextGet(PopContainer):
 
     def __post_init__(self):
         """Constructor for the PopTextGet dialogue that checks arguments and sets instance variables."""
-        command_buttons = HBoxContainer(align=Align.RIGHT).add_row(
-            Button(text="&Ok", tag="ok", callback=self.event_handler),  # , height=1),
-            Button(
-                text="&Cancel", tag="cancel", callback=self.event_handler
-            ),  # , height=1),
-        )
-
         super().__post_init__()
 
         assert isinstance(self.label_above, bool), f"{self.label_above=}. Must be bool"
@@ -7371,7 +7488,11 @@ class PopTextGet(PopContainer):
 
         self.container.add_row(layout_container)
         # self.container.add_row(Spacer())
-        self.container.add_row(command_buttons)
+        self.container.add_row(
+            Command_Button_Container(
+                ok_callback=self.event_handler, cancel_callback=self.event_handler
+            )
+        )
 
     def event_handler(self, event: Action):
         """Control event handler for the PopTextGet dialogue.
@@ -8708,7 +8829,7 @@ class Dateedit(_qtpyBase_Control):
         if callable(self.callback):
             handler = _Event_Handler(parent_app=self.parent_app, parent=self)
 
-            window_id = get_window_id(self.parent_app, self.parent, self)
+            window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
             return handler.event(
                 window_id=window_id,
@@ -9250,7 +9371,7 @@ class FolderView(_qtpyBase_Control):
             if self.callback is not None:
                 handler = _Event_Handler(parent_app=self.parent_app, parent=self)
 
-                window_id = get_window_id(self.parent_app, self.parent, self)
+                window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
                 return handler.event(
                     window_id=window_id,
@@ -9423,7 +9544,7 @@ class Grid_TableWidget(qtW.QTableWidget):
 
         # This is here to select the text when focus is setinto the cell by row_scroll_to
         item = self.currentItem()
-        if item is not None and item.isSelected():
+        if item is not None:  # and item.isSelected():
             editor = self.editItem(item)
             if editor is not None:
                 editor.setSelected(True)
@@ -9740,7 +9861,7 @@ class Grid(_qtpyBase_Control):
         value = None
         user_data = None
         self._widget: qtW.QTableWidget  # Type hinting
-        window_id = get_window_id(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self.parent_app, self.parent, self)
         grid_col_value = Grid_Col_Value("", None, row, col, "")
 
         # Handle event
@@ -10160,7 +10281,7 @@ class Grid(_qtpyBase_Control):
 
         self._widget.removeRow(row)
 
-        window_id = get_window_id(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         for widget in widgets:
             if widget is not None and isinstance(widget, _Container):
@@ -10344,6 +10465,25 @@ class Grid(_qtpyBase_Control):
             return None
 
         item_data = item.data(qtC.Qt.UserRole)
+
+        current_value = item_data.current_value
+        new_value_str = item.text().strip()
+
+        if current_value is None or str(current_value).strip() != new_value_str:
+            if current_value is None:
+                new_value = new_value_str
+            else:
+                new_value = type(current_value)(new_value_str)
+
+            item_data = item_data.replace(
+                current_value=new_value,
+                prev_value=current_value,
+                data_type=self._data_type_encode(new_value),
+                user_data=item_data.user_data,
+                widget=item_data.widget,
+            )
+
+            item.setData(qtC.Qt.UserRole, item_data)
 
         return item_data.current_value if item_data is not None else None
 
@@ -10563,7 +10703,7 @@ class Grid(_qtpyBase_Control):
             if tag == "-":  # Return container/widget
                 return item_data.widget
             else:
-                window_id = get_window_id(self.parent_app, self.parent, self)
+                window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
                 if container_tag != "":
                     if self.parent_app.widget_exist(
@@ -12345,7 +12485,7 @@ class LineEdit(_qtpyBase_Control):
                 value = self._widget.text()
 
             if callable(self.callback):
-                window_id = get_window_id(self.parent_app, self.parent, self)
+                window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
                 if self.parent_app.widget_exist(
                     window_id=window_id, container_tag=self.container_tag, tag=self.tag
@@ -12582,7 +12722,7 @@ class Menu(_qtpyBase_Control):
             self._widget.setMinimumWidth(parent.width())
             _menu = self._menu_items
 
-        window_id = get_window_id(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         for key in _menu.keys():
             if _depth == 0:  # Top Level
@@ -13693,7 +13833,7 @@ class Timeedit(_qtpyBase_Control):
                     self.time_set(now.hour, now.minute, now.second, 1)
 
         if callable(self.callback):
-            window_id = get_window_id(self.parent_app, self.parent, self)
+            window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
             handler = _Event_Handler(parent_app=self.parent_app, parent=self)
             return handler.event(
@@ -13992,7 +14132,7 @@ class Tab(_qtpyBase_Control):
             if tag.strip() == "":
                 return 1
 
-            window_id = get_window_id(self.parent_app, self.parent, self)
+            window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
             handler = _Event_Handler(parent_app=self.parent_app, parent=self)
             return handler.event(
@@ -14256,7 +14396,7 @@ class Tab(_qtpyBase_Control):
             self._tab_pages[tag].index >= 0
         ), f"{self._tab_pages[tag].index=} {self._tab_pages[tag]=}. Page not created!"
 
-        window_id = get_window_id(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         self._tab_pages[tag].container.widgets_clear()
         self.parent_app.widget_del(window_id=window_id, container_tag=self.tag, tag=tag)
@@ -14573,7 +14713,7 @@ class Treeview(_qtpyBase_Control):
 
         self._value = items
 
-        window_id = get_window_id(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         if callable(self.callback):
             handler = _Event_Handler(parent_app=self.parent_app, parent=self)
