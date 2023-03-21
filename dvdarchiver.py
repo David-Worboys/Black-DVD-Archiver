@@ -20,11 +20,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+# Tell Black to leave this block alone (realm of isort)
+# fmt: off
 import datetime
 import os
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import appdirs
 
 import dvdarch_utils
@@ -194,9 +194,9 @@ class DVD_Archiver:
             event (Action): The triggering event
         """
         match event.event:
-            case qtg.SYSEVENTS.APPINIT:
+            case qtg.Sys_Events.APPINIT:
                 pass
-            case qtg.SYSEVENTS.APPCLOSED:
+            case qtg.Sys_Events.APPCLOSED:
                 if (
                     qtg.PopYesNo(
                         title="Exit Application...",
@@ -208,7 +208,7 @@ class DVD_Archiver:
                     return 1
                 else:
                     return -1
-            case qtg.SYSEVENTS.APPPOSTINIT:
+            case qtg.Sys_Events.APPPOSTINIT:
                 file_handler = utils.File()
 
                 menu_background_color: str = self._db_settings.setting_get(
@@ -249,7 +249,7 @@ class DVD_Archiver:
 
                 self._startup = False
 
-            case qtg.SYSEVENTS.CLICKED:
+            case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "dvd_folder_select":
                         self._dvd_folder_select(event)
@@ -257,7 +257,7 @@ class DVD_Archiver:
                         self._DVD_Arch_App.app_exit()
                     case "make_dvd":
                         self._make_dvd(event)
-            case qtg.SYSEVENTS.INDEXCHANGED:
+            case qtg.Sys_Events.INDEXCHANGED:
                 match event.tag:
                     case "menu_color":
                         if not self._startup and event.widget_exist(
@@ -379,7 +379,7 @@ class DVD_Archiver:
         video_file_defs = []
         menu_labels = []
 
-        with qtg.sys_cursor(qtg.CURSOR.hourglass):
+        with qtg.sys_cursor(qtg.Cursor.hourglass):
             for row_index in range(file_grid.row_count):
                 file = file_grid.value_get(row_index, col=0)
                 folder = file_grid.userdata_get(row_index, col=0)
@@ -398,7 +398,7 @@ class DVD_Archiver:
         result = -1
         error_message = ""
 
-        with qtg.sys_cursor(qtg.CURSOR.hourglass):
+        with qtg.sys_cursor(qtg.Cursor.hourglass):
             if video_file_defs:
                 dvd_config = DVD_Config()
 
@@ -475,7 +475,7 @@ class DVD_Archiver:
         Args:
             event (Action): _description_
         """
-        combo_data: qtg.COMBO_DATA = event.value
+        combo_data: qtg.Combo_Data = event.value
 
         menu_color_combo: qtg.ComboBox = event.widget_get(
             container_tag=event.container_tag, tag="menu_color"
@@ -527,11 +527,11 @@ class DVD_Archiver:
             self._db_settings.setting_set("dvd_build_folder", dvd_build_folder)
 
         color_list = [
-            qtg.COMBO_ITEM(display=color, data=color, icon=None, user_data=color)
+            qtg.Combo_Item(display=color, data=color, icon=None, user_data=color)
             for color in dvdarch_utils.get_color_names()
         ]
         font_list = [
-            qtg.COMBO_ITEM(display=font[0], data=font[1], icon=None, user_data=font)
+            qtg.Combo_Item(display=font[0], data=font[1], icon=None, user_data=font)
             for font in dvdarch_utils.get_fonts()
         ]
 
@@ -541,8 +541,8 @@ class DVD_Archiver:
                 label="Duration (H:M:S)",
                 width=8,
                 frame=qtg.Widget_Frame(
-                    frame_style=qtg.FRAMESTYLE.PANEL,
-                    frame=qtg.FRAME.SUNKEN,
+                    frame_style=qtg.Frame_Style.PANEL,
+                    frame=qtg.Frame.SUNKEN,
                     line_width=2,
                 ),
             ),
@@ -552,8 +552,8 @@ class DVD_Archiver:
                 text=f"{sys_consts.AVERAGE_BITRATE / 1000:.1f} Mb/s",
                 width=9,
                 frame=qtg.Widget_Frame(
-                    frame_style=qtg.FRAMESTYLE.PANEL,
-                    frame=qtg.FRAME.SUNKEN,
+                    frame_style=qtg.Frame_Style.PANEL,
+                    frame=qtg.Frame.SUNKEN,
                     line_width=2,
                 ),
             ),
@@ -562,8 +562,8 @@ class DVD_Archiver:
                 label="DVD Used",
                 width=3,
                 frame=qtg.Widget_Frame(
-                    frame_style=qtg.FRAMESTYLE.PANEL,
-                    frame=qtg.FRAME.SUNKEN,
+                    frame_style=qtg.Frame_Style.PANEL,
+                    frame=qtg.Frame.SUNKEN,
                     line_width=2,
                 ),
                 buddy_control=qtg.Label(text="%", translate=False, width=6),
@@ -579,8 +579,8 @@ class DVD_Archiver:
                 buddy_control=info_panel,
                 width=4,
                 frame=qtg.Widget_Frame(
-                    frame_style=qtg.FRAMESTYLE.PANEL,
-                    frame=qtg.FRAME.SUNKEN,
+                    frame_style=qtg.Frame_Style.PANEL,
+                    frame=qtg.Frame.SUNKEN,
                     line_width=2,
                 ),
             ),
@@ -597,7 +597,7 @@ class DVD_Archiver:
                     tag="dvd_folder_select",
                     height=1,
                     width=1,
-                    icon=qtg.SYSICON.dir.get(),
+                    icon=qtg.Sys_Icon.dir.get(),
                     tooltip=f"Select The  DVD Build Folder",
                 ),
             ),
@@ -654,7 +654,7 @@ class DVD_Archiver:
 
         main_control_container = qtg.VBoxContainer(
             tag="control_buttons",
-            align=qtg.ALIGN.TOPLEFT,
+            align=qtg.Align.TOPLEFT,
             width=60,  # text="DVD Options"
         ).add_row(
             dvd_properties,
@@ -667,7 +667,7 @@ class DVD_Archiver:
             qtg.Button(
                 tag="make_dvd", text="Make DVD", callback=self.event_handler, width=9
             ),
-            qtg.Spacer(width=90),
+            qtg.Spacer(width=85),
             qtg.Button(
                 tag="exit_app", text="Exit", callback=self.event_handler, width=9
             ),
@@ -675,24 +675,25 @@ class DVD_Archiver:
 
         screen_container = qtg.FormContainer(
             tag="main",
-            align=qtg.ALIGN.RIGHT,  # width=80
+            align=qtg.Align.RIGHT,  # width=80
         ).add_row(main_control_container, qtg.Spacer(), buttons_container)
 
         return screen_container
 
     def run(self) -> None:
         """Starts the application and gets the show on the road"""
-        self._DVD_Arch_App.run(self.layout())
+        self._DVD_Arch_App.run(layout=self.layout(), windows_ui=False)
 
 
 class file_control:
-    """This class implements the file handling of the Black Archiver ui"""
+    """This class implements the file handling of the Black DVD Archiver ui"""
 
     def __init__(self):
         self.project_video_standard = ""  # PAL or NTSC
         self.project_duration = ""
         self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
+        self.common_words = []
 
     def grid_events(self, event: qtg.Action):
         """Process Grid Events
@@ -704,40 +705,9 @@ class file_control:
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        if event.event == qtg.SYSEVENTS.CLICKED:
+        if event.event == qtg.Sys_Events.CLICKED:
             if event.tag.startswith("grid_button"):
-                dvd_folder = self._db_settings.setting_get("dvd_build_folder")
-
-                if dvd_folder is None or dvd_folder.strip() == "":
-                    qtg.PopError(
-                        title="DVD Build Folder Error...",
-                        message="A DVD Build Folder Must Be Entered Before Making A Video Edit!",
-                    ).show()
-                    return None
-
-                tool_button: qtg.Button = event.widget_get(
-                    container_tag=event.container_tag, tag=event.tag
-                )
-                user_data = tool_button.userdata_get()
-
-                file_folder = user_data[0]
-                file_name = user_data[1]
-                encoding_info = user_data[2]
-
-                print(f"DBG {encoding_info=}")
-
-                file = f"{file_folder}{os.path.sep}{file_name}"
-
-                result = Video_Cutter_Popup(
-                    title="Video File Cutter/Setings",
-                    aspect_ratio=encoding_info["video_dar"][1],
-                    input_file=file,
-                    output_folder=dvd_folder,
-                    encoding_info=encoding_info,
-                ).show()
-
-                print(f"DBG {result=}")
-
+                self._edit_video(event)
             elif event.value.row >= 0 and event.value.col >= 0:
                 # When the user clicks on a row in the grid, toggle the switch in that row
                 file_grid: qtg.Grid = event.widget_get(
@@ -751,6 +721,232 @@ class file_control:
                 else:
                     file_grid.checkitemrow_set(row=event.value.row, col=0, checked=True)
 
+    def _edit_video(self, event: qtg.Action):
+        """
+        Edits a video file.
+
+        Args:
+            event (qtg.Action): The event that triggered the video edit.
+        """
+
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
+        file_handler = utils.File()
+        dvd_folder = self._db_settings.setting_get("dvd_build_folder")
+
+        if dvd_folder is None or dvd_folder.strip() == "":
+            qtg.PopError(
+                title="DVD Build Folder Error...",
+                message="A DVD Build Folder Must Be Entered Before Making A Video Edit!",
+            ).show()
+            return None
+
+        file_grid: qtg.Grid = event.widget_get(
+            container_tag="video_file_controls", tag="video_input_files"
+        )
+
+        tool_button: qtg.Button = event.widget_get(
+            container_tag=event.container_tag, tag=event.tag
+        )
+        user_data = tool_button.userdata_get()
+
+        source_folder = user_data[0]
+        source_file = user_data[1]
+        encoding_info = user_data[2]
+
+        file = f"{source_folder}{os.path.sep}{source_file}"
+
+        result = Video_Cutter_Popup(
+            title="Video File Cutter/Setings",
+            aspect_ratio=encoding_info["video_dar"][1],
+            input_file=file,
+            output_folder=dvd_folder,
+            encoding_info=encoding_info,
+        ).show()
+
+        # All this hairy string stuff to get the file properties is becaue I can only return a str from the
+        # Video Cutter popup
+        if result:
+            if result.endswith("T"):  # Trimmed File
+                # Pretty basic, just a source and a trimmed file
+                input_file, trimmed_file, _ = result.split(",")
+                source_folder, source_file, _ = file_handler.split_file_path(input_file)
+
+                self._processed_trimmed(
+                    file_handler, file_grid, source_folder, source_file, trimmed_file
+                )
+            else:  # Assemble Multiple Files
+                # Splits out the str rows of of the file propertiees; delim '|'
+                edit_file_list = result.split("|")
+                file_str = ""
+
+                # Have to build up a new string containig the file info required to load the file list display
+                for row, edit_file in enumerate(edit_file_list):
+                    # Split the file property str into the appropriate vars; delim ','
+                    (
+                        input_file,
+                        user_entered_file_name,
+                        orig_rename_file_path,
+                        user_rename_file_path,
+                        operation,
+                    ) = edit_file.split(",")
+
+                    # Split the file paths into the components needed
+                    (
+                        source_folder,
+                        source_file,
+                        source_extension,
+                    ) = file_handler.split_file_path(input_file)
+
+                    rename_path, _, rename_extension = file_handler.split_file_path(
+                        user_rename_file_path
+                    )
+
+                    # Assemble the source file name
+                    source_file = f"{source_file}{source_extension}"
+
+                    # This is the target str format for loading the file list display
+                    file_str += f"{row},-,{user_entered_file_name}{rename_extension},{rename_path}|"
+
+                if file_str:  # Assemble Operation
+                    # Strip the trailing "|" delimiter from the file_str
+                    file_str = file_str[:-1]
+
+                    self._processed_assembled(
+                        file_handler, file_grid, source_folder, source_file, file_str
+                    )
+
+    def _processed_assembled(
+        self,
+        file_handler: utils.File,
+        file_grid: qtg.Grid,
+        source_folder: str,
+        source_file: str,
+        file_str: str,
+    ):
+        """Delete the source file from the file grid and insert its children assembled files.
+
+        Args:
+            file_handler (utils.File): An instance of the `File` class.
+            file_grid (qtg.Grid): An instance of the `Grid` class.
+            source_folder (str): A string representing the source folder of the file to be deleted.
+            source_file (str): A string representing the name of the file to be deleted.
+            file_str (str): A string representing the contents of the files to be processed.
+                File Delim '|', Prop delim ','
+
+        """
+        assert isinstance(
+            file_handler, qtg.File
+        ), f"{file_handler=}/ Must be a File instance "
+        assert isinstance(file_grid, qtg.Grid), f"{file_grid}. Must be a Grid instance"
+        assert (
+            isinstance(source_folder, str) and source_folder.strip() != ""
+        ), f"{source_folder=}. Must be a non-empty str"
+        assert (
+            isinstance(source_file, str) and source_file.strip() != ""
+        ), f"{source_file=}. Must be a non-empty str"
+        assert (
+            isinstance(file_str, str) and file_str.strip() != ""
+        ), f"{file_str=}. Must be a non-empty str"
+
+        # Delete Source File as I will be replacing with the aseembled file list
+        for row in range(0, file_grid.row_count):
+            # File data we want is on the button object
+            row_tool_button: qtg.Button = file_grid.row_widget_get(
+                row=row, col=6, tag="grid_button"
+            )
+
+            user_data = row_tool_button.userdata_get()
+
+            if (
+                user_data is not None
+                and isinstance(user_data, tuple)
+                and len(user_data) == 3
+            ):
+                row_file_folder = user_data[0]
+                row_file_name = user_data[1]
+                row_encoding_info = user_data[2]
+
+                if source_folder == row_file_folder and source_file == row_file_name:
+                    file_grid.row_delete(row)
+
+        # Insert Children Assembled Files
+        self._insert_files_into_grid(file_handler, file_grid, file_str)
+
+    def _processed_trimmed(
+        self,
+        file_handler: utils.File,
+        file_grid: qtg.Grid,
+        source_folder: str,
+        source_file: str,
+        trimmed_file: str,
+    ):
+        """
+        Updates the given file_grid with the trimmed_file, if the source_file matches the specified source_folder.
+
+        Args:
+            file_handler (utils.File): The file handler to use.
+            file_grid (qtg.Grid): The grid to update.
+            source_folder (str): The folder to search for the source_file.
+            source_file (str): The name of the source file to match.
+            trimmed_file (str): The trimmed file to update the grid with.
+
+        """
+        assert isinstance(
+            file_handler, utils.File
+        ), f"{file_handler=}. Must be utils.File"
+        assert isinstance(file_grid, qtg.Grid), f"{file_grid=}. Must br qtg.Grid,"
+        assert (
+            isinstance(source_folder, str) and source_folder.strip() != ""
+        ), f"{source_folder=}. Must be a non-empty str"
+        assert (
+            isinstance(source_file, str) and source_file.strip() != ""
+        ), f"{source_file=}. Must be a non-empty str"
+        assert (
+            isinstance(trimmed_file, str) and trimmed_file.strip() != ""
+        ), f"{trimmed_file=}. Must be a non-empty str."
+
+        trimmed_path, trimmed_name, _ = file_handler.split_file_path(trimmed_file)
+
+        # Scan looking for source of trimmed file
+        for row in range(file_grid.row_count):
+            # Data we want is on the button object
+            row_tool_button: qtg.Button = file_grid.row_widget_get(
+                row=row, col=6, tag="grid_button"
+            )
+
+            user_data = row_tool_button.userdata_get()
+
+            if (
+                user_data is not None
+                and isinstance(user_data, tuple)
+                and len(user_data) == 3
+            ):
+                row_file_folder, row_file_name, row_encoding_info = user_data
+
+                if row_file_folder == source_folder and row_file_name == source_file:
+                    file_grid.value_set(
+                        row=row,
+                        col=0,
+                        value=trimmed_file,
+                        user_data=row_file_folder,
+                    )
+
+                    file_grid.value_set(
+                        row=row,
+                        col=6,
+                        value=trimmed_file,
+                        user_data=(
+                            trimmed_path,
+                            trimmed_name,
+                            row_encoding_info,
+                        ),
+                    )
+
+                    break  # Only one trimmed file
+
     def event_handler(self, event: qtg.Action):
         """Handles  application events
 
@@ -762,7 +958,7 @@ class file_control:
         ), f"{event=}. Must be an instance of qtg.Action"
 
         match event.event:
-            case qtg.SYSEVENTS.CLICKED:
+            case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "bulk_select":
                         file_grid: qtg.Grid = event.widget_get(
@@ -815,7 +1011,9 @@ class file_control:
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        selected_files = Video_File_Picker_Popup(title="Choose Video Files").show()
+        selected_files = Video_File_Picker_Popup(
+            title="Choose Video Files", container_tag="video_file_picker"
+        ).show()
 
         if selected_files.strip() != "":
             file_handler = utils.File()
@@ -824,119 +1022,36 @@ class file_control:
                 tag="video_input_files",
             )
 
-            rows_loaded = file_grid.row_count
-            row_index = 0
-            rejected = ""
-
-            with qtg.sys_cursor(qtg.CURSOR.hourglass):
-                # Ugly splits here because video_file_picker can only return a string
-                for file_tuple_str in selected_files.split("|"):
-                    file_tuple = file_tuple_str.split(",")
-
-                    file = file_tuple[2]
-                    file_folder = file_tuple[3]
-
-                    # Check if file already loade in grid
-                    for check_row_index in range(file_grid.row_count):
-                        check_file = file_grid.value_get(row=check_row_index, col=0)
-                        check_folder = file_grid.userdata_get(
-                            row=check_row_index, col=0
-                        )
-
-                        if check_file == file and check_folder == file_folder:
-                            break
-                    else:  # File not in grid already
-                        encoding_info = dvdarch_utils.get_file_encoding_info(
-                            f"{file_folder}{file_handler.ossep}{file}"
-                        )
-
-                        toolbox = qtg.HBoxContainer(height=1, width=3).add_row(
-                            qtg.Button(
-                                tag=f"grid_button|{rows_loaded + row_index}|{6}",
-                                height=1,
-                                width=1,
-                                tune_vsize=-5,
-                                callback=self.grid_events,
-                                user_data=(file_folder, file, encoding_info),
-                                icon="wrench.svg",
-                                tooltip="Cut Video or Change Settings",
-                            )
-                        )
-
-                        if encoding_info["video_tracks"][1] == 0:
-                            rejected += f"{sys_consts.SDELIM}{file} : {sys_consts.SDELIM}No Video Track \n"
-                            continue
-
-                        duration = str(
-                            datetime.timedelta(
-                                seconds=encoding_info["video_duration"][1]
-                            )
-                        ).split(".")[0]
-
-                        file_grid.value_set(
-                            value=file,
-                            row=rows_loaded + row_index,
-                            col=0,
-                            user_data=file_folder,
-                        )
-
-                        file_grid.value_set(
-                            value=str(encoding_info["video_width"][1]),
-                            row=rows_loaded + row_index,
-                            col=1,
-                            user_data=encoding_info,
-                        )
-                        file_grid.value_set(
-                            value=str(encoding_info["video_height"][1]),
-                            row=rows_loaded + row_index,
-                            col=2,
-                            user_data=encoding_info,
-                        )
-
-                        file_grid.value_set(
-                            value=encoding_info["video_format"][1],
-                            row=rows_loaded + row_index,
-                            col=3,
-                            user_data=encoding_info,
-                        )
-
-                        file_grid.value_set(
-                            value=encoding_info["video_standard"][1]
-                            + f" : {encoding_info['video_scan_order'][1]}"
-                            if encoding_info["video_scan_order"] != ""
-                            else "",
-                            row=rows_loaded + row_index,
-                            col=4,
-                            user_data=encoding_info,
-                        ),
-                        file_grid.value_set(
-                            value=duration,
-                            row=rows_loaded + row_index,
-                            col=5,
-                            user_data=encoding_info,
-                        )
-
-                        file_grid.row_widget_set(
-                            row=rows_loaded + row_index, col=6, widget=toolbox
-                        )
-
-                        row_index += 1
+            with qtg.sys_cursor(qtg.Cursor.hourglass):
+                rejected = self._insert_files_into_grid(
+                    file_handler, file_grid, selected_files
+                )
 
             if file_grid.row_count > 0:
-                # First file sets project encoding standard - Files Can be PAL or NTSC not both
+                # First file sets project encoding standard - Project files in toto Can be PAL or NTSC not both
                 encoding_info = file_grid.userdata_get(row=0, col=4)
                 project_video_standard = encoding_info["video_standard"][1]
 
+                loaded_files = []
                 for row_index in reversed(range(file_grid.row_count)):
-                    # encoding_info = file_grid.userdata_get(row=row_index, col=4)
+                    file_name = file_grid.value_get(row_index, 0)
+
+                    encoding_info = file_grid.userdata_get(row=row_index, col=4)
                     video_standard = encoding_info["video_standard"][1]
+
                     if project_video_standard != video_standard:
-                        file = file_grid.value_get(row=row_index, col=4)
                         rejected += (
-                            f"{sys_consts.SDELIM}{file} : {sys_consts.SDELIM} Not Project Video Standard "
+                            f"{sys_consts.SDELIM}{file_name} : {sys_consts.SDELIM} Not Project Video Standard "
                             f"{sys_consts.SDELIM}{project_video_standard}{sys_consts.SDELIM} \n"
                         )
+
                         file_grid.row_delete(row_index)
+                        continue
+
+                    loaded_files.append(file_name)
+
+                # Keep a list of words common to all file names
+                self.common_words = utils.Find_Common_Words(loaded_files)
 
             self._set_project_standard_duration(event)
 
@@ -944,6 +1059,126 @@ class file_control:
                 qtg.PopMessage(
                     title="These Files Are Not Permitted...", message=rejected
                 ).show()
+
+    def _insert_files_into_grid(
+        self, file_handler: utils.File, file_grid: qtg.Grid, selected_files: str
+    ):
+        """
+        Inserts files into a the file gird widget.
+
+        Args:
+            file_handler (utils.File): An instance of a file handler.
+            file_grid (qtg.Grid): The grid widget to insert the files into.
+            selected_files (str): A string containing information about the selected files.
+
+        Returns:
+            str: A string containing information about any rejected files.
+
+        """
+        assert isinstance(
+            file_handler, utils.File
+        ), f"{file_handler=}. Must be an instance of utils.File"
+        assert isinstance(
+            file_grid, qtg.Grid
+        ), f"{file_grid=}. Must be an instance of qtg.Grid"
+        assert isinstance(selected_files, str), f"{selected_files=}/ must be a string."
+
+        rejected = ""
+        rows_loaded = file_grid.row_count
+        row_index = 0
+
+        # Ugly splits here because video_file_picker/cutter can only return a string
+        for file_tuple_str in selected_files.split("|"):
+            _, _, video_file, file_folder = file_tuple_str.split(",")
+            
+            # Check if file already loade in grid
+            for check_row_index in range(file_grid.row_count):
+                check_file = file_grid.value_get(row=check_row_index, col=0)
+                check_folder = file_grid.userdata_get(row=check_row_index, col=0)
+
+                if check_file == video_file and check_folder == file_folder:
+                    break
+            else:  # File not in grid already
+                encoding_info = dvdarch_utils.get_file_encoding_info(
+                    f"{file_folder}{file_handler.ossep}{video_file}"
+                )
+               
+                toolbox = qtg.HBoxContainer(
+                    height=1, width=3, align=qtg.Align.BOTTOMCENTER
+                ).add_row(
+                    qtg.Button(
+                        tag=f"grid_button",
+                        height=1,
+                        width=1,
+                        tune_vsize=-5,
+                        callback=self.grid_events,
+                        user_data=(
+                            file_folder,
+                            video_file,
+                            encoding_info,
+                        ),
+                        icon="wrench.svg",
+                        tooltip="Cut Video or Change Settings",
+                    )
+                )
+
+                if encoding_info["video_tracks"][1] == 0:
+                    rejected += f"{sys_consts.SDELIM}{video_file} : {sys_consts.SDELIM}No Video Track \n"
+                    continue
+
+                duration = str(
+                    datetime.timedelta(seconds=encoding_info["video_duration"][1])
+                ).split(".")[0]
+
+                file_grid.value_set(
+                    value=video_file,
+                    row=rows_loaded + row_index,
+                    col=0,
+                    user_data=file_folder,
+                )
+
+                file_grid.value_set(
+                    value=str(encoding_info["video_width"][1]),
+                    row=rows_loaded + row_index,
+                    col=1,
+                    user_data=encoding_info,
+                )
+                file_grid.value_set(
+                    value=str(encoding_info["video_height"][1]),
+                    row=rows_loaded + row_index,
+                    col=2,
+                    user_data=encoding_info,
+                )
+
+                file_grid.value_set(
+                    value=encoding_info["video_format"][1],
+                    row=rows_loaded + row_index,
+                    col=3,
+                    user_data=encoding_info,
+                )
+
+                file_grid.value_set(
+                    value=encoding_info["video_standard"][1]
+                    + f" : {encoding_info['video_scan_order'][1]}"
+                    if encoding_info["video_scan_order"] != ""
+                    else "",
+                    row=rows_loaded + row_index,
+                    col=4,
+                    user_data=encoding_info,
+                ),
+                file_grid.value_set(
+                    value=duration,
+                    row=rows_loaded + row_index,
+                    col=5,
+                    user_data=encoding_info,
+                )
+
+                file_grid.row_widget_set(
+                    row=rows_loaded + row_index, col=6, widget=toolbox
+                )
+
+                row_index += 1
+        return rejected
 
     def _set_project_standard_duration(self, event: qtg.Action):
         """Sets the  duration and video standard for the current project based on the selected
@@ -1013,11 +1248,9 @@ class file_control:
         Returns:
             qtg.VBoxContainer: THe container that houses the file handler ui layout
         """
-        control_container = qtg.VBoxContainer(
-            tag="control_container", text="Video Input Files", align=qtg.ALIGN.TOPRIGHT
-        )
+
         button_container = qtg.HBoxContainer(
-            tag="control_buttons", align=qtg.ALIGN.RIGHT
+            tag="control_buttons", align=qtg.Align.RIGHT
         ).add_row(
             qtg.Button(
                 tag="remove_files",
@@ -1035,58 +1268,58 @@ class file_control:
         )
 
         file_col_def = (
-            qtg.COL_DEF(
+            qtg.Col_Def(
                 label="Video File",
                 tag="video_file",
-                width=69,
+                width=64,
                 editable=False,
                 checkable=True,
             ),
-            qtg.COL_DEF(
+            qtg.Col_Def(
                 label="Width",
                 tag="width",
                 width=6,
                 editable=False,
                 checkable=False,
             ),
-            qtg.COL_DEF(
+            qtg.Col_Def(
                 label="Height",
                 tag="height",
                 width=6,
                 editable=False,
                 checkable=False,
             ),
-            qtg.COL_DEF(
+            qtg.Col_Def(
                 label="Enc",
                 tag="encoder",
                 width=5,
                 editable=False,
                 checkable=False,
             ),
-            qtg.COL_DEF(
+            qtg.Col_Def(
                 label="Standard",
                 tag="Standard",
                 width=10,
                 editable=False,
                 checkable=False,
             ),
-            qtg.COL_DEF(
+            qtg.Col_Def(
                 label="Duration",
                 tag="Duration",
                 width=7,
                 editable=False,
                 checkable=False,
             ),
-            qtg.COL_DEF(
-                label="Set",
+            qtg.Col_Def(
+                label="",
                 tag="settings",
-                width=4,
+                width=2,
                 editable=False,
                 checkable=False,
             ),
         )
         file_control_container = qtg.VBoxContainer(
-            tag="video_file_controls", align=qtg.ALIGN.TOPLEFT
+            tag="video_file_controls", align=qtg.Align.TOPLEFT
         )
 
         file_control_container.add_row(
@@ -1105,7 +1338,9 @@ class file_control:
             ),
         )
 
-        control_container.add_row(file_control_container, button_container)
+        control_container = qtg.VBoxContainer(
+            tag="control_container", text="Video Input Files", align=qtg.Align.TOPRIGHT
+        ).add_row(file_control_container, button_container)
 
         return control_container
 

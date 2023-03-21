@@ -42,13 +42,13 @@ from collections.abc import MutableMapping
 from enum import Enum, IntEnum
 from typing import (Any, Dict, Generator, Generic, Literal, NamedTuple, Tuple,
                     Type, TypeVar, Union, cast)
-import dateparser
 
+import dateparser
 import dateutil.parser as dateparse
 import netifaces
+import titlecase
 from Crypto.Cipher import AES
 from PySide6 import QtCore, QtWidgets
-import titlecase
 
 # fmt: on
 

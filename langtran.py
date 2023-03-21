@@ -134,7 +134,7 @@ class Lang_Tran(metaclass=Singleton):
         if (
             len(trans_word) > 255
             or trans_word.strip() in ("", "&", ",", ";", "---")
-            or re.search("\x00", trans_word)
+            or re.search("[\x00/\\\\]", trans_word)
             or (
                 delim not in trans_word
                 and re.search("<(\"[^\"]*\"|'[^']*'|[^'\">])*>", trans_word)

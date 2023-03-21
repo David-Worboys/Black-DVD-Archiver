@@ -9808,7 +9808,7 @@ class Grid(_qtpyBase_Control):
 
         if self.pixel_unit:
             height = self.height
-        else:    
+        else:
             height = self.height * self._widget.verticalHeader().defaultSectionSize()
 
         self._widget.verticalHeader().setVisible(False)
@@ -10293,7 +10293,7 @@ class Grid(_qtpyBase_Control):
                 for item in widget.tags_gather():
                     if self.tag != item.tag:
                         self.parent_app.widget_del(
-                            winodw=window_id,
+                            window_id=window_id,
                             container_tag=item.container_tag,
                             tag=item.tag,
                         )

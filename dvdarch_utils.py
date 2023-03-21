@@ -797,6 +797,7 @@ def stream_optimise(output_file: str) -> tuple[int, str]:
 
     return 1, ""
 
+
 def get_nearest_key_frame(
     input_file: str, time: float, direction: str
 ) -> tuple[int, Optional[float]]:
@@ -1188,7 +1189,7 @@ def get_file_encoding_info(video_file: str) -> dict:
         isinstance(video_file, str) and video_file.strip() != ""
     ), f"{video_file=}. Must bbe a non-empy str"
 
-    debug = False
+    debug = True
 
     fmt = "--output=XML"
 
