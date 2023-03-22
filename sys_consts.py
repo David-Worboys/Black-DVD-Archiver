@@ -30,7 +30,7 @@ executable_folder = utils.App_Path()
 file_sep = utils.File().ossep
 
 PROGRAM_NAME = "Black DVD Archiver"
-PROGRAM_VERSION = "0.1"
+PROGRAM_VERSION = "0.2"
 AUTHOR = "David Worboys"
 LICENCE = "GNU V3 GPL"
 
@@ -39,7 +39,7 @@ LICENCE = "GNU V3 GPL"
 COPYRIGHT_YEAR: Callable[
     [], str
 ] = (
-    lambda: f"{'2020' if str(datetime.date.today().year) == '2022' else '2022-'+str(datetime.date.today().year) }"
+    lambda: f"{'2022' if str(datetime.date.today().year) == '2022' else '2022-'+str(datetime.date.today().year) }"
 )
 
 VERSION_TAG = f"{PROGRAM_VERSION} {LICENCE} (c){COPYRIGHT_YEAR()} {AUTHOR} (-:alumnus Moyhu Primary School et al.:-)"
@@ -67,7 +67,6 @@ VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp",
 
 COMPOSITE = f"{executable_folder}{file_sep}tools{file_sep}composite"
 CONVERT = f"{executable_folder}{file_sep}tools{file_sep}magick"
-# DD = f"{executable_folder}{file_sep}tools{file_sep}dd"
 DVDAUTHOR = f"{executable_folder}{file_sep}tools{file_sep}dvdauthor"
 FFMPG = f"{executable_folder}{file_sep}tools{file_sep}ffmpeg"
 FFPROBE = f"{executable_folder}{file_sep}tools{file_sep}ffprobe"
@@ -77,18 +76,17 @@ MPEG2ENC = f"{executable_folder}{file_sep}tools{file_sep}mpeg2enc"
 MPLEX = f"{executable_folder}{file_sep}tools{file_sep}mplex"
 PPMTOY4M = f"{executable_folder}{file_sep}tools{file_sep}ppmtoy4m"
 SPUMUX = f"{executable_folder}{file_sep}tools{file_sep}spumux"
-# TWOLAME = f"{executable_folder}{file_sep}tools{file_sep}twolame"
 
 # Database tables
 PRODUCT_LINE = "product_line"
 
 
 class SPECIAL_PATH(utils.strEnum):
-    """Contains a list of strings that represent special paths on the user's computer"""
+    """Contains a enums for strings that represent special paths on the user's computer"""
 
-    DESKTOP = ("Desktop",)
-    DOCUMENTS = ("Documents",)
-    DOWNLOADS = ("Downloads",)
-    MUSIC = ("Music",)
-    PICTURES = ("Pictures",)
+    DESKTOP = "Desktop"
+    DOCUMENTS = "Documents"
+    DOWNLOADS = "Downloads"
+    MUSIC = "Music"
+    PICTURES = "Pictures"
     VIDEOS = "Videos"
