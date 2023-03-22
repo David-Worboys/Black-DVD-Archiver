@@ -868,11 +868,13 @@ class _qtpyBase:
 
 
 @define(slots=True)
-class Colors(_qtpyBase):
+# class Colors(_qtpyBase): # Removed to get a Nuitka Compile
+class Colors:
     """A class used to handle colors used in the application"""
 
     def __init__(self, parent):
-        super().__init__(parent=parent)
+        pass
+        # super().__init__(parent=parent) # Removed to get a Nitka Compile
 
     def rand_colours(self, num_cols: int):
         """Generates a list of random colour names pulled from TEXT_COLORS. It avoids light coloured colours and

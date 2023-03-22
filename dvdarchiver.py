@@ -1090,7 +1090,7 @@ class file_control:
         # Ugly splits here because video_file_picker/cutter can only return a string
         for file_tuple_str in selected_files.split("|"):
             _, _, video_file, file_folder = file_tuple_str.split(",")
-            
+
             # Check if file already loade in grid
             for check_row_index in range(file_grid.row_count):
                 check_file = file_grid.value_get(row=check_row_index, col=0)
@@ -1102,7 +1102,7 @@ class file_control:
                 encoding_info = dvdarch_utils.get_file_encoding_info(
                     f"{file_folder}{file_handler.ossep}{video_file}"
                 )
-               
+
                 toolbox = qtg.HBoxContainer(
                     height=1, width=3, align=qtg.Align.BOTTOMCENTER
                 ).add_row(
@@ -1117,7 +1117,7 @@ class file_control:
                             video_file,
                             encoding_info,
                         ),
-                        icon="wrench.svg",
+                        icon=utils.App_Path("wrench.svg"),
                         tooltip="Cut Video or Change Settings",
                     )
                 )

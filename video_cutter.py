@@ -1280,7 +1280,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 qtg.HBoxContainer().add_row(
                     qtg.Button(
                         tag="selection_start",
-                        icon="bracket-left.svg",
+                        icon=utils.App_Path("bracket-left.svg"),
                         callback=self.event_handler,
                         tooltip="Mark In Edit Point",
                         width=2,
@@ -1288,7 +1288,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     ),
                     qtg.Button(
                         tag="selection_end",
-                        icon="bracket-right.svg",
+                        icon=utils.App_Path("bracket-right.svg"),
                         callback=self.event_handler,
                         tooltip="Mark Out Edit Point",
                         width=2,
@@ -1390,14 +1390,14 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
             edit_list_buttons = qtg.HBoxContainer(align=qtg.Align.BOTTOMCENTER).add_row(
                 qtg.Button(
-                    icon="film.svg",
+                    icon=utils.App_Path("film.svg"),
                     tag="assemble_segments",
                     callback=self.event_handler,
                     tooltip="Assemble Edit Points Into New Videos",
                     width=3,
                 ),
                 qtg.Button(
-                    icon="scissors.svg",
+                    icon=utils.App_Path("scissors.svg"),
                     tag="delete_segements",
                     callback=self.event_handler,
                     tooltip="Delete Edit Points From Video",
@@ -1405,7 +1405,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 ),
                 qtg.Spacer(width=1),
                 qtg.Button(
-                    icon="x.svg",
+                    icon=utils.App_Path("x.svg"),
                     tag="remove_edit_points",
                     callback=self.event_handler,
                     tooltip="Delete Edit Points From Edit List",

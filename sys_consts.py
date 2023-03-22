@@ -25,6 +25,8 @@ import utils
 
 # fmt: on
 
+executable_folder = utils.App_Path()
+
 file_sep = utils.File().ossep
 
 PROGRAM_NAME = "Black DVD Archiver"
@@ -63,24 +65,19 @@ VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp",
                     "dv")
 # fmt: on
 
-EMPTYPALVIDEO = f".{file_sep}audio{file_sep}empty_pal_ac3.mpg"
-EMPTYNTSCVIDEO = f".{file_sep}audio{file_sep}empty_ntsc_ac3.mpg"
-EMPTYPALAUDIO = f".{file_sep}audio{file_sep}empty_pal_ac3.ac3"
-EMPTYNTSCAUDIO = f".{file_sep}audio{file_sep}empty_ntsc_ac3.ac3"
-
-COMPOSITE = f".{file_sep}tools{file_sep}composite"
-CONVERT = f".{file_sep}tools{file_sep}magick"
-DD = f".{file_sep}tools{file_sep}dd"
-DVDAUTHOR = f".{file_sep}tools{file_sep}dvdauthor"
-FFMPG = f".{file_sep}tools{file_sep}ffmpeg"
-FFPROBE = f".{file_sep}tools{file_sep}ffprobe"
-IDENTIFY = f".{file_sep}tools{file_sep}identify"
-MEDIAINFO = f".{file_sep}tools{file_sep}mediainfo"
-MPEG2ENC = f".{file_sep}tools{file_sep}mpeg2enc"
-MPLEX = f".{file_sep}tools{file_sep}mplex"
-PPMTOY4M = f".{file_sep}tools{file_sep}ppmtoy4m"
-SPUMUX = f".{file_sep}tools{file_sep}spumux"
-TWOLAME = f".{file_sep}tools{file_sep}twolame"
+COMPOSITE = f"{executable_folder}{file_sep}tools{file_sep}composite"
+CONVERT = f"{executable_folder}{file_sep}tools{file_sep}magick"
+# DD = f"{executable_folder}{file_sep}tools{file_sep}dd"
+DVDAUTHOR = f"{executable_folder}{file_sep}tools{file_sep}dvdauthor"
+FFMPG = f"{executable_folder}{file_sep}tools{file_sep}ffmpeg"
+FFPROBE = f"{executable_folder}{file_sep}tools{file_sep}ffprobe"
+IDENTIFY = f"{executable_folder}{file_sep}tools{file_sep}identify"
+MEDIAINFO = f"{executable_folder}{file_sep}tools{file_sep}mediainfo"
+MPEG2ENC = f"{executable_folder}{file_sep}tools{file_sep}mpeg2enc"
+MPLEX = f"{executable_folder}{file_sep}tools{file_sep}mplex"
+PPMTOY4M = f"{executable_folder}{file_sep}tools{file_sep}ppmtoy4m"
+SPUMUX = f"{executable_folder}{file_sep}tools{file_sep}spumux"
+# TWOLAME = f"{executable_folder}{file_sep}tools{file_sep}twolame"
 
 # Database tables
 PRODUCT_LINE = "product_line"

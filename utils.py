@@ -261,11 +261,12 @@ def Find_Common_Words(word_list: list[str]) -> list[str]:
     return common_words
 
 
-def App_Path(file_name: str = "") -> str:
+def App_Path(file_name: str = "", trailing_slash=False) -> str:
     """Returns the full app directory path for the supplied file_name.  Handles pyinstaller.Nuitka runtime directory
 
     Args:
         file_name (str, optional): Defaults to "". file name that needs to be prepended with the app path
+        training_slash(bool): Whether to append a platform appropriate trailing slash to the end of the path.
 
     Returns:
         str: Expanded app directory path if the file name is supplied. The app directory path if the file name is not supplied
@@ -299,9 +300,17 @@ def App_Path(file_name: str = "") -> str:
             # running_mode = 'Interactive'
 
     if file_name.strip() == "":
-        return str(application_path)
+        return (
+            f"{application_path}{os.pathsep}"
+            if trailing_slash
+            else f"{application_path}"
+        )
 
-    return os.path.join(application_path, file_name)
+    return (
+        f"{os.path.join(application_path, file_name)}{os.pathsep}"
+        if trailing_slash
+        else f"{os.path.join(application_path, file_name)}"
+    )
 
 
 def Special_Path(special_path_name: str) -> str:
