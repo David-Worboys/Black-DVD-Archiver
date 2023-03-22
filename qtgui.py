@@ -428,7 +428,7 @@ class Combo_Data:
 
 
 @dataclasses.dataclass(slots=True)
-# `COMBO_ITEM` is a class used by combo boxes that holds a display string, a data value, an icon, and a user data value.
+# `Combo_Item` is a class used by combo boxes that holds a display string, a data value, an icon, and a user data value.
 class Combo_Item:
     display: str
     data: None | str | int | float | bytes | bool

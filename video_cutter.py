@@ -1297,7 +1297,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     qtg.Button(
                         tag="backward",
                         tooltip="Step Back",
-                        icon=qtg.Sys_Icon.mediabackward.get(),
+                        icon=qtg.Sys_Icon.mediaprevious.get(),
                         callback=self.event_handler,
                         width=2,
                         height=1,
@@ -1313,7 +1313,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     qtg.Button(
                         tag="forward",
                         tooltip="Step Forward",
-                        icon=qtg.Sys_Icon.mediaforward.get(),
+                        icon=qtg.Sys_Icon.medianext.get(),
                         callback=self.event_handler,
                         width=2,
                         height=1,
