@@ -1111,22 +1111,20 @@ class File:
         assert isinstance(file_name, str), f"{file_name=} must be a str"
         assert isinstance(file_extension, str), f"{file_extension=} must be a str"
 
-        if file_name == "" or file_extension == "":
-            file_handler = File()
-            directory_path, file_name, file_extension = file_handler.split_file_path(
-                directory_path
-            )
+        if file_name == "":
+            directory_path, file_name = os.path.split(directory_path)
+            file_name, file_extension = os.path.splitext(file_name)
 
         file_suffix = (
             "." + file_extension
-            if not file_extension.startswith(".")
+            if file_extension and not file_extension.startswith(".")
             else file_extension
         )
         file_path = os.path.join(directory_path, file_name + file_suffix)
 
         try:
             return os.path.isfile(file_path)
-        except Exception as e:
+        except FileNotFoundError:
             return False
 
     def filename_validate(self, file_name: str) -> bool:
