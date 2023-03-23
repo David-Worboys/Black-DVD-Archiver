@@ -1402,8 +1402,8 @@ class File:
 
         return ("", "", "")
 
-    def remove_dir_contents(self, file_path_name: str) -> tuple[int, str]:
-        """Removes all contents within a directory specified by file_path_name.
+    def remove_dir_contents(file_path_name: str) -> tuple[int, str]:
+        """Removes a directory and all its contents - specified by file_path_name.
 
         Args:
             file_path_name (str): The file path of the directory to be removed.
@@ -1412,31 +1412,36 @@ class File:
             tuple[int,str]:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
-
         """
 
         assert (
             isinstance(file_path_name, str) and file_path_name.strip() != ""
         ), f"{file_path_name=}. Must be a non-empty str"
+        
+        if not os.path.exists(file_path_name):
+            return -1, f"{file_path_name} Does Not Exist."
+        elif not os.access(file_path_name, os.W_OK):
+            return -1, f"No Write Access To {file_path_name}."
 
-        if self.path_exists(file_path_name) and self.path_writeables(file_path_name):
-            try:
-                with os.scandir(file_path_name) as entries:
-                    for entry in entries:
-                        if entry.is_dir() and not entry.is_symlink():
-                            shutil.rmtree(entry.path)
-                        else:
-                            os.remove(entry.path)
+        try:
+            # Iterate through all the entries within the directory and delete them
+            with os.scandir(file_path_name) as entries:
+                for entry in entries:
+                    if entry.is_dir() and not entry.is_symlink():
+                        # Recursively delete directories using shutil.rmtree()
+                        shutil.rmtree(entry.path)
+                    else:
+                        # Delete files using os.remove()
+                        os.remove(entry.path)
 
-                    shutil.rmtree(self._dvd_working_folder)
+                # Remove the directory itself
+                shutil.rmtree(file_path_name)
 
-            except OSError as error:
-                return -1, f"{error.errno} {error.strerror}"
-        else:
-            return -1, f"{file_path_name} Does Not Exist Or Can Not Be Written To"
+        except (OSError, PermissionError, FileNotFoundError) as error:
+            return -1, f"Failed To Remove Dir/Contents: {str(error)}"
 
         return 1, ""
-
+    
     def remove_file(self, file_path: str) -> int:
         """Removes a file at the specified path.
 
