@@ -1100,6 +1100,66 @@ class File:
 
         return title_text.strip()
 
+    def copy_dir(self, src_folder: str, dst_folder: str) -> Tuple[int, str]:
+        """
+        Copies the folder structure and files from the source folder to the destination folder.
+
+        Args:
+            src_folder (str): The path of the source folder to copy.
+            dst_folder (str): The path of the destination folder to copy to.
+
+        Returns:
+            tuple[int,str]:
+            - arg1 1: ok, -1: fail
+            - arg2: error message or "" if ok
+        """
+        assert (
+            isinstance(src_folder, str) and src_folder.strip() != ""
+        ), f"{src_folder=}. Must be a non-empty str"
+        assert (
+            isinstance(dst_folder, str) and dst_folder.strip() != ""
+        ), f"{dst_folder=}. Must be a non-empty str"
+
+        if not os.path.isdir(src_folder):
+            return -1, f"{src_folder} Is Not A Valid Directory Path."
+
+        if os.path.exists(dst_folder):
+            return -1, f"{dst_folder} Already Exists."
+        
+        if os.path.abspath(src_folder) == os.path.abspath(dst_folder):
+            return -1, "Source And Destination Folder Cannot Be The same."
+        
+        try:
+            os.makedirs(dst_folder)
+        except OSError as e:
+            return -1, f"Error Creating {dst_folder}. {e}"
+        
+        for dirpath, dirnames, filenames in os.walk(src_folder):
+            # create the corresponding subdirectories in the destination folder
+            for dirname in dirnames:
+                src_path = os.path.join(dirpath, dirname)
+                dst_path = os.path.join(
+                    dst_folder, os.path.relpath(src_path, src_folder)
+                )
+
+                try:
+                    os.makedirs(dst_path, exist_ok=True)
+                except OSError as e:
+                    return -1, f"Error Creating Directory {dst_path}. {e}"
+
+            # copy the files to the corresponding subdirectories in the destination folder
+            for filename in filenames:
+                src_path = os.path.join(dirpath, filename)
+                dst_path = os.path.join(
+                    dst_folder, os.path.relpath(src_path, src_folder)
+                )
+                try:
+                    shutil.copy2(src_path, dst_path)
+                except OSError as e:
+                    return -1, f"Error Copying File {src_path} To {dst_path}. {e}"
+
+        return 1, ""
+
     @staticmethod
     def file_exists(
         directory_path: str, file_name: str = "", file_extension: str = ""
@@ -1417,7 +1477,7 @@ class File:
         assert (
             isinstance(file_path_name, str) and file_path_name.strip() != ""
         ), f"{file_path_name=}. Must be a non-empty str"
-        
+
         if not os.path.exists(file_path_name):
             return -1, f"{file_path_name} Does Not Exist."
         elif not os.access(file_path_name, os.W_OK):
@@ -1441,7 +1501,7 @@ class File:
             return -1, f"Failed To Remove Dir/Contents: {str(error)}"
 
         return 1, ""
-    
+
     def remove_file(self, file_path: str) -> int:
         """Removes a file at the specified path.
 
