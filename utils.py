@@ -1100,13 +1100,57 @@ class File:
 
         return title_text.strip()
 
-    def copy_dir(self, src_folder: str, dst_folder: str) -> Tuple[int, str]:
+    def copy_file(self, source: str, destination_path: str) -> tuple[int, str]:
+        """
+        Copy a file from the source path to the destination path.
+
+        Args:
+            src (source): The source path of the file to copy.
+            dst (destination_path): The destination path where the file will be copied.
+
+        Returns:
+            tuple[int, str]:
+                - arg1: 1 for success, -1 for failure.
+                - arg2: An error message, or an empty string if successful.
+        """
+
+        assert (
+            isinstance(source, str) and source.strip()
+        ), f"Invalid source path: {source}"
+        assert (
+            isinstance(destination_path, str) and destination_path.strip()
+        ), f"Invalid destination path: {destination_path}"
+
+        if not os.path.exists(source):
+            return -1, f"File not found: {source}"
+        if os.path.isdir(source):
+            return -1, f"Source path is a directory: {source}"
+
+        if os.path.isfile(destination_path):
+            return -1, f"Destination path is a file: {destination_path}"
+
+        if not os.path.exists(os.path.dirname(destination_path)):
+            return (
+                -1,
+                f"Destination path does not exist: {os.path.dirname(destination_path)}",
+            )
+
+        if os.path.abspath(source) == os.path.abspath(destination_path):
+            return -1, "Source and destination paths cannot be the same."
+
+        try:
+            shutil.copy2(source, destination_path)
+            return 1, ""
+        except Exception as e:
+            return -1, f"Error copying file: {e}"
+
+    def copy_dir(self, src_folder: str, dest_folder: str) -> tuple[int, str]:
         """
         Copies the folder structure and files from the source folder to the destination folder.
 
         Args:
             src_folder (str): The path of the source folder to copy.
-            dst_folder (str): The path of the destination folder to copy to.
+            dest_folder (str): The path of the destination folder to copy to.
 
         Returns:
             tuple[int,str]:
@@ -1117,29 +1161,29 @@ class File:
             isinstance(src_folder, str) and src_folder.strip() != ""
         ), f"{src_folder=}. Must be a non-empty str"
         assert (
-            isinstance(dst_folder, str) and dst_folder.strip() != ""
-        ), f"{dst_folder=}. Must be a non-empty str"
+            isinstance(dest_folder, str) and dest_folder.strip() != ""
+        ), f"{dest_folder=}. Must be a non-empty str"
 
         if not os.path.isdir(src_folder):
             return -1, f"{src_folder} Is Not A Valid Directory Path."
 
-        if os.path.exists(dst_folder):
-            return -1, f"{dst_folder} Already Exists."
-        
-        if os.path.abspath(src_folder) == os.path.abspath(dst_folder):
+        if os.path.exists(dest_folder):
+            return -1, f"{dest_folder} Already Exists."
+
+        if os.path.abspath(src_folder) == os.path.abspath(dest_folder):
             return -1, "Source And Destination Folder Cannot Be The same."
-        
+
         try:
-            os.makedirs(dst_folder)
+            os.makedirs(dest_folder)
         except OSError as e:
-            return -1, f"Error Creating {dst_folder}. {e}"
-        
+            return -1, f"Error Creating {dest_folder}. {e}"
+
         for dirpath, dirnames, filenames in os.walk(src_folder):
             # create the corresponding subdirectories in the destination folder
             for dirname in dirnames:
                 src_path = os.path.join(dirpath, dirname)
                 dst_path = os.path.join(
-                    dst_folder, os.path.relpath(src_path, src_folder)
+                    dest_folder, os.path.relpath(src_path, src_folder)
                 )
 
                 try:
@@ -1151,7 +1195,7 @@ class File:
             for filename in filenames:
                 src_path = os.path.join(dirpath, filename)
                 dst_path = os.path.join(
-                    dst_folder, os.path.relpath(src_path, src_folder)
+                    dest_folder, os.path.relpath(src_path, src_folder)
                 )
                 try:
                     shutil.copy2(src_path, dst_path)
