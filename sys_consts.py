@@ -76,9 +76,14 @@ MPEG2ENC = f"{executable_folder}{file_sep}tools{file_sep}mpeg2enc"
 MPLEX = f"{executable_folder}{file_sep}tools{file_sep}mplex"
 PPMTOY4M = f"{executable_folder}{file_sep}tools{file_sep}ppmtoy4m"
 SPUMUX = f"{executable_folder}{file_sep}tools{file_sep}spumux"
+XORRISO = f"{executable_folder}{file_sep}tools{file_sep}xorriso"
 
 # Database tables
 PRODUCT_LINE = "product_line"
+
+# Database Setting Keys
+ARCHIVE_FOLDER = "archive_folder"
+DVD_BUILD_FOLDER = "dvd_build_folder"
 
 
 class SPECIAL_PATH(utils.strEnum):

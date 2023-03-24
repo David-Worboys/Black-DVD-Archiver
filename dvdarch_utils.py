@@ -227,6 +227,45 @@ def concatenate_videos(
     return 1, ""
 
 
+def create_dvd_iso(input_dir: str, output_file: str) -> tuple[int, str]:
+    """
+    Create a DVD-Video compliant ISO image file from a directory containing VIDEO_TS and AUDIO_TS directories.
+
+    Args:
+        input_dir (str): The path to the input directory containing VIDEO_TS and AUDIO_TS directories.
+        output_file (str): The name of the output ISO file.
+
+    Returns:
+        tuple[int, str]:
+        - arg 1: Status code. Returns 1 if the iso image was created, -1 otherwise.
+        - arg 2: "" if ok, otherwise an error message
+    """
+    assert (
+        isinstance(input_dir, str) and input_dir.strip() != ""
+    ), f"{input_dir}. Must be a non-empty str"
+    assert (
+        isinstance(output_file, str) and output_file.strip() != ""
+    ), f"{output_file}. Must be a non-empty str"
+
+    command = [
+        sys_consts.XORRISO,
+        "-as",
+        "mkisofs",
+        "-o",
+        output_file,
+        "-J",
+        "-r",
+        "-v",
+        "-V",
+        "DVD_VIDEO",
+        "-graft-points",
+        f"AUDIO_TS={input_dir}/AUDIO_TS",
+        "VIDEO_TS=" + input_dir,
+    ]
+
+    return execute_check_output(command)
+
+
 def get_space_available(path: str) -> tuple[int, str]:
     """Returns the amount of available disk space in bytes for the specified file system path.
 

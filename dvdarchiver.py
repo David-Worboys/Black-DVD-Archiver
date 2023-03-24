@@ -32,6 +32,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
+from archive_management import Archive_Manager
 from dvd import DVD, DVD_Config, File_Def
 from video_cutter import Video_Cutter_Popup
 from video_file_picker import Video_File_Picker_Popup
@@ -251,6 +252,8 @@ class DVD_Archiver:
 
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
+                    case "archive_folder_select":
+                        self._archive_folder_select(event)
                     case "dvd_folder_select":
                         self._dvd_folder_select(event)
                     case "exit_app":
@@ -284,24 +287,48 @@ class DVD_Archiver:
                             self._db_settings.setting_set("menu_font", event.value.data)
                             self._title_font_combo_change(event)
 
-    def _dvd_folder_select(self, event):
-        """Select a DVD build folder and update the settings in the database with the selected folder.
+    def _archive_folder_select(self, event):
+        """Select an archive folder and updates the settings in the database with the selected folder.
 
         Args:
             event (Event): The triggering event
-
-        Returns:
-            None.
-
-        Variables:
-            folder (str): The folder path retrieved from the database settings or the default videos folder if it is not set.
-            folder (str): The selected folder path obtained from the PopFolderGet dialog.
 
         Note:
             The selected folder is saved in the database settings for future use.
 
         """
-        folder = self._db_settings.setting_get("dvd_build_folder")
+        folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
+
+        if folder is None or folder.strip() == "":
+            folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+
+        folder = qtg.PopFolderGet(
+            title=f"Select An Archive Folder....",
+            root_dir=folder,
+            create_folder=True,
+            folder_edit=False,
+        ).show()
+
+        if folder.strip() != "":
+            self._db_settings.setting_set(sys_consts.ARCHIVE_FOLDER, folder)
+
+            event.value_set(
+                container_tag="archive_properties",
+                tag="archive_path",
+                value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
+            )
+
+    def _dvd_folder_select(self, event):
+        """Select a DVD build folder and updates the settings in the database with the selected folder.
+
+        Args:
+            event (Event): The triggering event
+
+        Note:
+            The selected folder is saved in the database settings for future use.
+
+        """
+        folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
         if folder is None or folder.strip() == "":
             folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
@@ -314,7 +341,7 @@ class DVD_Archiver:
         ).show()
 
         if folder.strip() != "":
-            self._db_settings.setting_set("dvd_build_folder", folder)
+            self._db_settings.setting_set(sys_consts.DVD_BUILD_FOLDER, folder)
 
             event.value_set(
                 container_tag="dvd_properties",
@@ -362,7 +389,7 @@ class DVD_Archiver:
             container_tag="menu_properties", tag="title_font"
         )
 
-        dvd_folder = self._db_settings.setting_get("dvd_build_folder")
+        dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
         if dvd_folder is None or dvd_folder.strip() == "":
             qtg.PopError(
@@ -396,7 +423,7 @@ class DVD_Archiver:
                 menu_labels.append(".".join(file.split(".")[0:-1]))
 
         result = -1
-        error_message = ""
+        message = ""
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             if video_file_defs:
@@ -440,15 +467,63 @@ class DVD_Archiver:
                 self._dvd.dvd_setup = dvd_config
                 self._dvd.working_folder = dvd_folder
                 self._dvd.application_db = self._app_db
-                self._dvd.dvd_title = dvd_title
+                            
+                result, message = self._dvd.build()
 
-                result, error_message = self._dvd.build()
+                if result == 1:
+                    result, message = self.archive_dvd_files(video_file_defs)
 
         if result == -1:
             qtg.PopError(
                 title="DVD Build Error...",
-                message=f"Failed To Create A DVD!!\n{error_message}",
+                message=f"Failed To Create A DVD!!\n{message}",
             ).show()
+
+    def archive_dvd_files(self, video_file_defs: list[File_Def]) -> tuple[int, str]:
+        """
+        Archives the specified video files into a DVD image and saves the ISO image to the specified folder.
+
+        Args:
+            video_file_defs: A list of `File_Def` objects representing the video files to be archived.
+
+        Returns:
+            tuple[int, str]:
+            - arg 1:1 Ok . -1 otherwise.
+            - arg 2: "" if ok, otherwise an error message
+
+        """
+        assert isinstance(
+            video_file_defs, list
+        ), f"{video_file_defs} must be a list of File_Def instances"
+        assert all(
+            isinstance(fd, File_Def) for fd in video_file_defs
+        ), f"All elements in {video_file_defs} must be instances of File_Def"
+
+        file_handler = utils.File()
+        dvd_image_folder = self._dvd.dvd_image_folder
+        iso_folder = self._dvd.iso_folder
+        archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
+
+        source_files = []
+        for file_def in video_file_defs:
+            file_def: File_Def
+            source_files.append(
+                f"{file_def.path}{file_handler.ossep}{file_def.file_name}"
+            )
+
+        if source_files:
+            archive_manager = Archive_Manager(archive_folder=archive_folder)
+
+            result, message = archive_manager.archive_dvd_build(
+                dvd_name=self._dvd.dvd_setup.serial_number,
+                dvd_folder=dvd_image_folder,
+                iso_folder=iso_folder,
+                source_video_files=source_files,
+            )
+
+            if result == -1:
+                return -11, message
+        return 1, ""
 
     def _menu_color_combo_change(self, event: qtg.Action):
         """Changes the menu colour of the colour patch when the menu colour is changed
@@ -520,11 +595,16 @@ class DVD_Archiver:
         Returns:
             VBoxContainer: The application layout
         """
-        dvd_build_folder = self._db_settings.setting_get("dvd_build_folder")
+        archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
+        dvd_build_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
+
+        if archive_folder is None or archive_folder.strip() == "":
+            archive_folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            self._db_settings.setting_set(sys_consts.ARCHIVE_FOLDER, archive_folder)
 
         if dvd_build_folder is None or dvd_build_folder.strip() == "":
             dvd_build_folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
-            self._db_settings.setting_set("dvd_build_folder", dvd_build_folder)
+            self._db_settings.setting_set(sys_consts.DVD_BUILD_FOLDER, dvd_build_folder)
 
         color_list = [
             qtg.Combo_Item(display=color, data=color, icon=None, user_data=color)
@@ -567,6 +647,28 @@ class DVD_Archiver:
                     line_width=2,
                 ),
                 buddy_control=qtg.Label(text="%", translate=False, width=6),
+            ),
+        )
+
+        archive_properties = qtg.FormContainer(
+            tag="archive_properties", text="Archive Properties"
+        ).add_row(
+            qtg.LineEdit(
+                text=f"{sys_consts.SDELIM}{archive_folder}{sys_consts.SDELIM}",
+                action="edit_action",
+                tag="archive_path",
+                label=f"Archive Folder",
+                width=66,
+                tooltip=f"The Folder Where The DVD Archive Is Stored",
+                editable=False,
+                buddy_control=qtg.Button(
+                    callback=self.event_handler,
+                    tag="archive_folder_select",
+                    height=1,
+                    width=1,
+                    icon=qtg.Sys_Icon.dir.get(),
+                    tooltip=f"Select The  DVD Archive Folder",
+                ),
             ),
         )
 
@@ -657,8 +759,10 @@ class DVD_Archiver:
             align=qtg.Align.TOPLEFT,
             width=60,  # text="DVD Options"
         ).add_row(
+            archive_properties,
+            qtg.Spacer(),
             dvd_properties,
-            # qtg.Spacer(),
+            qtg.Spacer(),
             dvd_menu_properties,
             self._file_control.layout(),
         )
@@ -734,7 +838,7 @@ class file_control:
         ), f"{event=}. Must be an instance of qtg.Action"
 
         file_handler = utils.File()
-        dvd_folder = self._db_settings.setting_get("dvd_build_folder")
+        dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
         if dvd_folder is None or dvd_folder.strip() == "":
             qtg.PopError(
@@ -970,7 +1074,9 @@ class file_control:
                             checked=event.value, col_tag="video_file"
                         )
                     case "select_files":
-                        folder = self._db_settings.setting_get("dvd_build_folder")
+                        folder = self._db_settings.setting_get(
+                            sys_consts.DVD_BUILD_FOLDER
+                        )
 
                         if folder is None or folder.strip() == "":
                             qtg.PopError(

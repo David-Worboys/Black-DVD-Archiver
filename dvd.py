@@ -30,6 +30,7 @@ from random import randint
 from typing import Optional
 
 import psutil
+import pycdlib
 import xmltodict
 
 import dvdarch_utils
@@ -370,6 +371,7 @@ class DVD:
     _working_folder: str = ""
     _dvd_working_folder: str = ""
     _dvd_out_folder: str = ""
+    _iso_out_folder: str = ""
     _menu_image_folder: str = ""
     _tmp_folder: str = ""
     _vob_folder: str = ""
@@ -413,6 +415,14 @@ class DVD:
         ) or value is None, f"{value=}. Must be an instance of sqldb.SQLDB or None"
 
         self._application_db = value
+
+    @property
+    def dvd_image_folder(self) -> str:
+        return self._dvd_out_folder
+
+    @property
+    def iso_folder(self) -> str:
+        return self._iso_out_folder
 
     def build(self) -> tuple[int, str]:
         """Builds the  DVD Folder/File structure
@@ -537,14 +547,21 @@ class DVD:
             self._dvd_out_folder = (
                 f"{self._dvd_working_folder}{file_handler.ossep}dvd_image"
             )
+
+            self._iso_out_folder = (
+                f"{self._dvd_working_folder}{file_handler.ossep}iso_image"
+            )
+
             self._menu_image_folder = (
                 f"{self._dvd_working_folder}{file_handler.ossep}menu_images"
             )
+
             self._tmp_folder = f"{self._dvd_working_folder}{file_handler.ossep}tmp"
             self._vob_folder = f"{self._dvd_working_folder}{file_handler.ossep}vobs"
 
             try:
                 file_handler.make_dir(self._dvd_out_folder)
+                file_handler.make_dir(self._iso_out_folder)
                 file_handler.make_dir(self._menu_image_folder)
                 file_handler.make_dir(self._tmp_folder)
                 file_handler.make_dir(self._vob_folder)
@@ -1775,6 +1792,7 @@ class DVD:
         Returns:
             tuple[int, str]: _description_
         """
+
         path_name = os.path.dirname(self._background_canvas_file)
         file_name = os.path.splitext(os.path.basename(self._background_canvas_file))[0]
         # file_extn = os.path.splitext(os.path.basename(self._background_canvas_file))[1]
@@ -1855,6 +1873,9 @@ class DVD:
         )
 
         if result.returncode == 0:
-            return 1, ""
+            return dvdarch_utils.create_dvd_iso(
+                self._dvd_out_folder, f"{self._iso_out_folder}{os.sep}dvd_iso"
+            )
+
         else:
             return -1, result.stderr.strip()

@@ -463,10 +463,12 @@ class Video_Cutter_Popup(qtg.PopContainer):
             event (qtg.Action): The triggering event
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
-        # print(
-        #   f"DBG EH {event.container_tag=} {event.tag=} {event.action=} {event.event=} {event.value=}"
-        # )
-        # print(f"DBG VC {event.event=} {event.action=} {event.container_tag=} {event.tag=} {self.container_tag=} {self.tag=}")
+        print(
+            f"DBG EH {event.container_tag=} {event.tag=} {event.action=} {event.event=} {event.value=}"
+        )
+        print(
+            f"DBG VC {event.event=} {event.action=} {event.container_tag=} {event.tag=} {self.container_tag=} {self.tag=}"
+        )
         match event.event:
             case qtg.Sys_Events.WINDOWOPEN:
                 self.window_open_handler(event)
@@ -537,7 +539,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._sliding = False
 
     def window_open_handler(self, event):
-        self._video_file_system_maker()  # Might close winw if file system issues
+        self._video_file_system_maker()  # Might close window if file system issues
 
         self._media_source = Video_Handler(
             aspect_ratio=self.aspect_ratio,
