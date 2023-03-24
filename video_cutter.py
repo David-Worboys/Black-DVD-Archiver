@@ -253,8 +253,6 @@ class Video_Handler:
         """
         playback_state = self._media_player.playbackState()
 
-        print(f"DBG {playback_state=}")
-
         if playback_state == qtM.QMediaPlayer.PlaybackState.PlayingState:
             return "playing"
         elif playback_state == qtM.QMediaPlayer.PlaybackState.PausedState:
@@ -463,12 +461,12 @@ class Video_Cutter_Popup(qtg.PopContainer):
             event (qtg.Action): The triggering event
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
-        print(
-            f"DBG EH {event.container_tag=} {event.tag=} {event.action=} {event.event=} {event.value=}"
-        )
-        print(
-            f"DBG VC {event.event=} {event.action=} {event.container_tag=} {event.tag=} {self.container_tag=} {self.tag=}"
-        )
+        # print(
+        #     f"DBG EH {event.container_tag=} {event.tag=} {event.action=} {event.event=} {event.value=}"
+        # )
+        # print(
+        #     f"DBG VC {event.event=} {event.action=} {event.container_tag=} {event.tag=} {self.container_tag=} {self.tag=}"
+        # )
         match event.event:
             case qtg.Sys_Events.WINDOWOPEN:
                 self.window_open_handler(event)
