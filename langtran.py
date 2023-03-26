@@ -21,7 +21,7 @@
 import re
 from typing import Optional
 
-import appdirs
+import platformdirs
 
 import sqldb
 from sys_consts import PROGRAM_NAME, SDELIM
@@ -40,7 +40,7 @@ class Lang_Tran(metaclass=Singleton):
         self._error_code: int = 0
         self._error_msg: str = ""
         self._db_file: str = "lang_tran"
-        self._path = appdirs.user_data_dir(appname=PROGRAM_NAME)
+        self._path = platformdirs.user_data_dir(appname=PROGRAM_NAME)
         self._language_code: str = ""
         self._DB: Optional[sqldb.SQLDB] = None
 

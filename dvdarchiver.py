@@ -25,7 +25,7 @@
 import datetime
 import os
 
-import appdirs
+import platformdirs
 
 import dvdarch_utils
 import qtgui as qtg
@@ -58,7 +58,7 @@ class DVD_Archiver:
 
         self._startup = True
 
-        self._data_path: str = appdirs.user_data_dir(sys_consts.PROGRAM_NAME)
+        self._data_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
         self._file_control = file_control()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)

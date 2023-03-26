@@ -29,7 +29,7 @@ from enum import unique
 from pathlib import Path
 from typing import Callable
 
-import appdirs
+import platformdirs
 
 from sys_consts import SDELIM
 from utils import File, Get_Unique_Sysid, Is_Complied, strEnum
@@ -602,7 +602,7 @@ class App_Settings:
         self._new_cfg = True
         suffix = "cfg"
 
-        self._app_data_dir = appdirs.user_config_dir(self._app_name)
+        self._app_data_dir = platformdirs.user_config_dir(self._app_name)
         file_handler = File()
 
         if file_handler.file_exists(self._app_data_dir, self._app_name, suffix):
