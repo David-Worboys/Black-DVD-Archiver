@@ -22,6 +22,8 @@
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+from dataclasses import dataclass
+import dataclasses
 import datetime
 import os
 
@@ -60,7 +62,7 @@ class DVD_Archiver:
 
         self._data_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
-        self._file_control = file_control()
+        self._file_control = File_Control()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
 
         # A problem in the next 3 lines can shutdown startup as daabase initialization failed
@@ -467,7 +469,7 @@ class DVD_Archiver:
                 self._dvd.dvd_setup = dvd_config
                 self._dvd.working_folder = dvd_folder
                 self._dvd.application_db = self._app_db
-                            
+
                 result, message = self._dvd.build()
 
                 if result == 1:
@@ -789,15 +791,33 @@ class DVD_Archiver:
         self._DVD_Arch_App.run(layout=self.layout(), windows_ui=False)
 
 
-class file_control:
+class File_Control:
     """This class implements the file handling of the Black DVD Archiver ui"""
 
+    @dataclasses.dataclass(slots=True)
+    class Video_Data:
+        video_folder: str
+        video_file: str
+        video_extension: str
+        encoding_info: str
+
+        @property
+        def video_path(self) -> str:
+            video_path = (
+                f"{self.video_folder}{os.sep}{self.video_file}{self.video_extension}"
+            )
+            print(f"DBG {video_path}")
+
+            return video_path
+
     def __init__(self):
+        self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
+        self.common_words = []
         self.project_video_standard = ""  # PAL or NTSC
         self.project_duration = ""
-        self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
+
+        # Private instance variables
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
-        self.common_words = []
 
     def grid_events(self, event: qtg.Action):
         """Process Grid Events
@@ -853,21 +873,19 @@ class file_control:
 
         tool_button: qtg.Button = event.widget_get(
             container_tag=event.container_tag, tag=event.tag
-        )
-        user_data = tool_button.userdata_get()
+        )  # Data we want is on the button
 
-        source_folder = user_data[0]
-        source_file = user_data[1]
-        encoding_info = user_data[2]
+        user_data: self.Video_Data = tool_button.userdata_get()
 
-        file = f"{source_folder}{os.path.sep}{source_file}"
+        file = f"{user_data.video_folder}{os.path.sep}{user_data.video_file}{user_data.video_extension}"
 
         result = Video_Cutter_Popup(
-            title="Video File Cutter/Setings",
-            aspect_ratio=encoding_info["video_dar"][1],
+            title="Video File Cutter/Settings",
+            aspect_ratio=user_data.encoding_info["video_dar"][1],
             input_file=file,
             output_folder=dvd_folder,
-            encoding_info=encoding_info,
+            encoding_info=user_data.encoding_info,
+            excluded_word_list=self.common_words,
         ).show()
 
         # All this hairy string stuff to get the file properties is becaue I can only return a str from the
@@ -885,7 +903,7 @@ class file_control:
                 # Splits out the str rows of of the file propertiees; delim '|'
                 edit_file_list = result.split("|")
                 file_str = ""
-
+                
                 # Have to build up a new string containig the file info required to load the file list display
                 for row, edit_file in enumerate(edit_file_list):
                     # Split the file property str into the appropriate vars; delim ','
@@ -897,19 +915,9 @@ class file_control:
                         operation,
                     ) = edit_file.split(",")
 
-                    # Split the file paths into the components needed
-                    (
-                        source_folder,
-                        source_file,
-                        source_extension,
-                    ) = file_handler.split_file_path(input_file)
-
                     rename_path, _, rename_extension = file_handler.split_file_path(
                         user_rename_file_path
                     )
-
-                    # Assemble the source file name
-                    source_file = f"{source_file}{source_extension}"
 
                     # This is the target str format for loading the file list display
                     file_str += f"{row},-,{user_entered_file_name}{rename_extension},{rename_path}|"
@@ -918,44 +926,35 @@ class file_control:
                     # Strip the trailing "|" delimiter from the file_str
                     file_str = file_str[:-1]
 
-                    self._processed_assembled(
-                        file_handler, file_grid, source_folder, source_file, file_str
-                    )
+                    self._delete_file_from_grid(file_grid, input_file)
 
-    def _processed_assembled(
+                    # Insert Assembled Children  Files
+                    self._insert_files_into_grid(file_handler, file_grid, file_str)
+
+    def _delete_file_from_grid(
         self,
-        file_handler: utils.File,
         file_grid: qtg.Grid,
-        source_folder: str,
-        source_file: str,
-        file_str: str,
+        source_file_path: str,
     ):
-        """Delete the source file from the file grid and insert its children assembled files.
+        """Delete the source file from the file grid.
 
         Args:
-            file_handler (utils.File): An instance of the `File` class.
             file_grid (qtg.Grid): An instance of the `Grid` class.
-            source_folder (str): A string representing the source folder of the file to be deleted.
-            source_file (str): A string representing the name of the file to be deleted.
-            file_str (str): A string representing the contents of the files to be processed.
-                File Delim '|', Prop delim ','
-
+            source_file_path (str): A string representing the source folder path of the file to be deleted.
         """
-        assert isinstance(
-            file_handler, qtg.File
-        ), f"{file_handler=}/ Must be a File instance "
         assert isinstance(file_grid, qtg.Grid), f"{file_grid}. Must be a Grid instance"
         assert (
-            isinstance(source_folder, str) and source_folder.strip() != ""
-        ), f"{source_folder=}. Must be a non-empty str"
-        assert (
-            isinstance(source_file, str) and source_file.strip() != ""
-        ), f"{source_file=}. Must be a non-empty str"
-        assert (
-            isinstance(file_str, str) and file_str.strip() != ""
-        ), f"{file_str=}. Must be a non-empty str"
+            isinstance(source_file_path, str) and source_file_path.strip() != ""
+        ), f"{source_file_path=}. Must be a non-empty str"
 
-        # Delete Source File as I will be replacing with the aseembled file list
+        file_handler = utils.File()
+
+        (
+            source_folder,
+            source_file,
+            source_extension,
+        ) = file_handler.split_file_path(source_file_path)
+
         for row in range(0, file_grid.row_count):
             # File data we want is on the button object
             row_tool_button: qtg.Button = file_grid.row_widget_get(
@@ -964,20 +963,13 @@ class file_control:
 
             user_data = row_tool_button.userdata_get()
 
-            if (
-                user_data is not None
-                and isinstance(user_data, tuple)
-                and len(user_data) == 3
-            ):
-                row_file_folder = user_data[0]
-                row_file_name = user_data[1]
-                row_encoding_info = user_data[2]
-
-                if source_folder == row_file_folder and source_file == row_file_name:
+            if user_data is not None:
+                if (
+                    source_folder == user_data.video_folder
+                    and source_file == user_data.video_file
+                    and source_extension == user_data.video_extension
+                ):
                     file_grid.row_delete(row)
-
-        # Insert Children Assembled Files
-        self._insert_files_into_grid(file_handler, file_grid, file_str)
 
     def _processed_trimmed(
         self,
@@ -1012,7 +1004,11 @@ class file_control:
             isinstance(trimmed_file, str) and trimmed_file.strip() != ""
         ), f"{trimmed_file=}. Must be a non-empty str."
 
-        trimmed_path, trimmed_name, _ = file_handler.split_file_path(trimmed_file)
+        (
+            trimmed_folder,
+            trimmed_file_name,
+            trimmed_extension,
+        ) = file_handler.split_file_path(trimmed_file)
 
         # Scan looking for source of trimmed file
         for row in range(file_grid.row_count):
@@ -1021,32 +1017,34 @@ class file_control:
                 row=row, col=6, tag="grid_button"
             )
 
-            user_data = row_tool_button.userdata_get()
+            user_data: self.Video_Data = row_tool_button.userdata_get()
 
-            if (
-                user_data is not None
-                and isinstance(user_data, tuple)
-                and len(user_data) == 3
-            ):
-                row_file_folder, row_file_name, row_encoding_info = user_data
+            print(f"DBG {user_data=}")
 
-                if row_file_folder == source_folder and row_file_name == source_file:
+            if user_data is not None:  # Should never happen
+                if (
+                    user_data.video_folder == source_folder
+                    and user_data.video_file == source_file
+                ):
+                    updated_user_data = self.Video_Data(
+                        video_folder=trimmed_folder,
+                        video_file=trimmed_file_name,
+                        video_extension=trimmed_extension,
+                        encoding_info=user_data.encoding_info,
+                    )
+
                     file_grid.value_set(
                         row=row,
                         col=0,
-                        value=trimmed_file,
-                        user_data=row_file_folder,
+                        value=trimmed_file_name,
+                        user_data=updated_user_data,
                     )
 
                     file_grid.value_set(
                         row=row,
                         col=6,
                         value=trimmed_file,
-                        user_data=(
-                            trimmed_path,
-                            trimmed_name,
-                            row_encoding_info,
-                        ),
+                        user_data=updated_user_data,
                     )
 
                     break  # Only one trimmed file
@@ -1135,14 +1133,17 @@ class file_control:
 
             if file_grid.row_count > 0:
                 # First file sets project encoding standard - Project files in toto Can be PAL or NTSC not both
-                encoding_info = file_grid.userdata_get(row=0, col=4)
+                print(f"DBG {file_grid.userdata_get(row=0, col=4)=}")
+                encoding_info = file_grid.userdata_get(row=0, col=4).encoding_info
                 project_video_standard = encoding_info["video_standard"][1]
 
                 loaded_files = []
                 for row_index in reversed(range(file_grid.row_count)):
                     file_name = file_grid.value_get(row_index, 0)
 
-                    encoding_info = file_grid.userdata_get(row=row_index, col=4)
+                    encoding_info = file_grid.userdata_get(
+                        row=row_index, col=4
+                    ).encoding_info
                     video_standard = encoding_info["video_standard"][1]
 
                     if project_video_standard != video_standard:
@@ -1195,18 +1196,38 @@ class file_control:
 
         # Ugly splits here because video_file_picker/cutter can only return a string
         for file_tuple_str in selected_files.split("|"):
-            _, _, video_file, file_folder = file_tuple_str.split(",")
+            _, _, video_file_name, video_file_folder = file_tuple_str.split(",")
 
-            # Check if file already loade in grid
+            video_file_path = os.path.join(video_file_folder, video_file_name)
+
+            (
+                video_file_path,
+                video_file_name,
+                video_extension,
+            ) = file_handler.split_file_path(video_file_path)
+
+            # Check if file already loaded in grid
             for check_row_index in range(file_grid.row_count):
-                check_file = file_grid.value_get(row=check_row_index, col=0)
-                check_folder = file_grid.userdata_get(row=check_row_index, col=0)
+                video_user_data: self.Video_Data = file_grid.userdata_get(
+                    row=check_row_index, col=0
+                )
 
-                if check_file == video_file and check_folder == file_folder:
+                if (
+                    video_user_data.video_file == video_file_name
+                    and video_user_data.video_folder == video_file_path
+                    and video_user_data.video_extension == video_extension
+                ):
                     break
             else:  # File not in grid already
-                encoding_info = dvdarch_utils.get_file_encoding_info(
-                    f"{file_folder}{file_handler.ossep}{video_file}"
+                video_user_data = self.Video_Data(
+                    video_file_path,
+                    video_file_name,
+                    video_extension,
+                    {},
+                )
+
+                video_user_data.encoding_info = dvdarch_utils.get_file_encoding_info(
+                    video_user_data.video_path
                 )
 
                 toolbox = qtg.HBoxContainer(
@@ -1218,65 +1239,63 @@ class file_control:
                         width=1,
                         tune_vsize=-5,
                         callback=self.grid_events,
-                        user_data=(
-                            file_folder,
-                            video_file,
-                            encoding_info,
-                        ),
+                        user_data=video_user_data,
                         icon=utils.App_Path("wrench.svg"),
                         tooltip="Cut Video or Change Settings",
                     )
                 )
 
-                if encoding_info["video_tracks"][1] == 0:
-                    rejected += f"{sys_consts.SDELIM}{video_file} : {sys_consts.SDELIM}No Video Track \n"
+                if video_user_data.encoding_info["video_tracks"][1] == 0:
+                    rejected += f"{sys_consts.SDELIM}{video_file_name} : {sys_consts.SDELIM}No Video Track \n"
                     continue
 
                 duration = str(
-                    datetime.timedelta(seconds=encoding_info["video_duration"][1])
+                    datetime.timedelta(
+                        seconds=video_user_data.encoding_info["video_duration"][1]
+                    )
                 ).split(".")[0]
 
                 file_grid.value_set(
-                    value=video_file,
+                    value=video_file_name,
                     row=rows_loaded + row_index,
                     col=0,
-                    user_data=file_folder,
+                    user_data=video_user_data,
                 )
 
                 file_grid.value_set(
-                    value=str(encoding_info["video_width"][1]),
+                    value=str(video_user_data.encoding_info["video_width"][1]),
                     row=rows_loaded + row_index,
                     col=1,
-                    user_data=encoding_info,
+                    user_data=video_user_data,
                 )
                 file_grid.value_set(
-                    value=str(encoding_info["video_height"][1]),
+                    value=str(video_user_data.encoding_info["video_height"][1]),
                     row=rows_loaded + row_index,
                     col=2,
-                    user_data=encoding_info,
+                    user_data=video_user_data,
                 )
 
                 file_grid.value_set(
-                    value=encoding_info["video_format"][1],
+                    value=video_user_data.encoding_info["video_format"][1],
                     row=rows_loaded + row_index,
                     col=3,
-                    user_data=encoding_info,
+                    user_data=video_user_data,
                 )
 
                 file_grid.value_set(
-                    value=encoding_info["video_standard"][1]
-                    + f" : {encoding_info['video_scan_order'][1]}"
-                    if encoding_info["video_scan_order"] != ""
+                    value=video_user_data.encoding_info["video_standard"][1]
+                    + f" : { video_user_data.encoding_info['video_scan_order'][1]}"
+                    if video_user_data.encoding_info["video_scan_order"] != ""
                     else "",
                     row=rows_loaded + row_index,
                     col=4,
-                    user_data=encoding_info,
+                    user_data=video_user_data,
                 ),
                 file_grid.value_set(
                     value=duration,
                     row=rows_loaded + row_index,
                     col=5,
-                    user_data=encoding_info,
+                    user_data=video_user_data,
                 )
 
                 file_grid.row_widget_set(
@@ -1309,11 +1328,13 @@ class file_control:
         self.dvd_percent_used = 0
 
         if file_grid.row_count > 0:
-            encoding_info = file_grid.userdata_get(row=0, col=4)
+            encoding_info = file_grid.userdata_get(row=0, col=4).encoding_info
             self.project_video_standard = encoding_info["video_standard"][1]
 
             for check_row_index in range(file_grid.row_count):
-                encoding_info = file_grid.userdata_get(row=check_row_index, col=4)
+                encoding_info = file_grid.userdata_get(
+                    row=check_row_index, col=4
+                ).encoding_info
 
                 total_duration += encoding_info["video_duration"][1]
 
