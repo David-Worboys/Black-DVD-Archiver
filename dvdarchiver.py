@@ -22,7 +22,6 @@
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
-from dataclasses import dataclass
 import dataclasses
 import datetime
 import os
@@ -796,17 +795,48 @@ class File_Control:
 
     @dataclasses.dataclass(slots=True)
     class Video_Data:
+        """
+        video data container class.
+
+        Attributes:
+            video_folder (str): The path to the folder containing the video.
+            video_file (str): The name of the video file.
+            video_extension (str): The file extension of the video file.
+            encoding_info (dict): Information about the encoding of the video.
+
+        """
+
         video_folder: str
         video_file: str
         video_extension: str
-        encoding_info: str
+        encoding_info: dict
+
+        def __post_init__(self):
+            assert (
+                isinstance(self.video_folder, str) and self.video_folder.strip() != ""
+            ), f"{self.video_folder=} must be str"
+            assert (
+                isinstance(self.video_file, str) and self.video_file.strip() != ""
+            ), f"{self.video_file=} must be str"
+            assert (
+                isinstance(self.video_extension, str)
+                and self.video_extension.strip() != ""
+            ), f"{self.video_extension=} must be str"
+            assert isinstance(
+                self.encoding_info, dict
+            ), f"{self.encoding_info=}. Must be dict"
 
         @property
         def video_path(self) -> str:
+            """
+            Gets the full path to the video file.
+
+            Returns:
+                str: The full path to the video file
+            """
             video_path = (
                 f"{self.video_folder}{os.sep}{self.video_file}{self.video_extension}"
             )
-            print(f"DBG {video_path}")
 
             return video_path
 
@@ -903,7 +933,7 @@ class File_Control:
                 # Splits out the str rows of of the file propertiees; delim '|'
                 edit_file_list = result.split("|")
                 file_str = ""
-                
+
                 # Have to build up a new string containig the file info required to load the file list display
                 for row, edit_file in enumerate(edit_file_list):
                     # Split the file property str into the appropriate vars; delim ','
@@ -1019,8 +1049,6 @@ class File_Control:
 
             user_data: self.Video_Data = row_tool_button.userdata_get()
 
-            print(f"DBG {user_data=}")
-
             if user_data is not None:  # Should never happen
                 if (
                     user_data.video_folder == source_folder
@@ -1133,7 +1161,6 @@ class File_Control:
 
             if file_grid.row_count > 0:
                 # First file sets project encoding standard - Project files in toto Can be PAL or NTSC not both
-                print(f"DBG {file_grid.userdata_get(row=0, col=4)=}")
                 encoding_info = file_grid.userdata_get(row=0, col=4).encoding_info
                 project_video_standard = encoding_info["video_standard"][1]
 
