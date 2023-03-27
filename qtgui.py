@@ -10042,6 +10042,22 @@ class Grid(_qtpyBase_Control):
 
         self._widget.setRowCount(0)
 
+    @property
+    def col_count(self) -> int:
+        """Gets number of colunns in the grid
+
+        Returns:
+            int: The number of colunns in the grid
+
+        """
+
+        self._widget: qtW.QTableWidget
+
+        if self._widget is None:
+            raise RuntimeError(f"{self._widget=}. Not set")
+
+        return self._widget.columnCount()
+
     def colindex_get(self, column_tag: str) -> int:
         """Returns the column index for a given column tag name.
 
