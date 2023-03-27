@@ -1240,6 +1240,37 @@ class File:
         except FileNotFoundError:
             return False
 
+    def file_join(self, dir_path: str, file_name: str, ext: str = "") -> str:
+        """Join a directory, filename, and extension string to construct a file path.
+
+        Args:
+            dir_path (str): A string representing the directory path where the file will be saved.
+            file_name (str): A string representing the name of the file.
+            ext (str): An optional string representing the extension of the file, including the leading dot.
+                If not provided, the resulting file path will not have a proper file extension.
+
+        Returns:
+            A string representing the full file path constructed from the directory, filename, and extension.
+
+        """
+        assert (
+            isinstance(dir_path, str) and dir_path.strip() != ""
+        ), f"{dir_path=}. Must be a non-empty str"
+        assert (
+            isinstance(file_name, str) and dir_path.strip() != ""
+        ), f"{file_name=}. Must be a non-empty str"
+        assert isinstance(ext, str), f"{ext=}. Must be a str"
+
+        if ext and not ext.startswith("."):
+            ext = "." + ext
+
+        file_path = os.path.join(dir_path, file_name + ext)
+
+        if not self.filename_validate(file_name):
+            raise RuntimeError(f"{file_name=}. Is Invalid")
+
+        return file_path
+
     def filename_validate(self, file_name: str) -> bool:
         """
         Basic check to see if file name is valid. Might need beefing up later
@@ -1506,7 +1537,7 @@ class File:
 
         return ("", "", "")
 
-    def remove_dir_contents(file_path_name: str) -> tuple[int, str]:
+    def remove_dir_contents(self, file_path_name: str) -> tuple[int, str]:
         """Removes a directory and all its contents - specified by file_path_name.
 
         Args:
