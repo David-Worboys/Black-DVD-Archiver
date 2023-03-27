@@ -19,9 +19,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
-import os
 import subprocess
-from tempfile import NamedTemporaryFile
 
 import PySide6.QtCore as qtC
 import PySide6.QtGui as qtG
@@ -279,16 +277,15 @@ class Video_Handler:
         if not file_handler.file_exists(self.input_file):
             return -1, f"File Does Not Exist {self.input_file}"
 
-        input_file_name = os.path.splitext(os.path.basename(self.input_file))[0]
-        input_file_extn = os.path.splitext(os.path.basename(self.input_file))[1]
+        _, input_file_name, input_file_extn = file_handler.split_file_path()
 
-        output_file = (
-            f"{self.output_edit_folder}{os.sep}{input_file_name}_edit{input_file_extn}"
+        output_file = file_handler.file_join(
+            self.output_edit_folder, f"{input_file_name}_edit{input_file_extn}"
         )
 
         # Construct the FFmpeg command
         command = [
-            "ffmpeg",
+            sys_consts.FFMPG,
             "-i",
             self.input_file,
             "-vf",
@@ -320,7 +317,7 @@ class Video_Handler:
 
 @dataclasses.dataclass
 class Video_Cutter_Popup(qtg.PopContainer):
-    """This class is a popup that allows the user cut a video"""
+    """This class is a popup that allows the user to cut a video"""
 
     tag = "Video_Cutter_Popup"
 
@@ -330,6 +327,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
     input_file: str = ""
     output_folder: str = ""
     encoding_info: dict = dataclasses.field(default_factory=dict)
+    excluded_word_list: list[str] = dataclasses.field(default_factory=list)
 
     # Private instance variables
     _frame_rate: int = 25  # Default to 25 frames per second
@@ -374,6 +372,13 @@ class Video_Cutter_Popup(qtg.PopContainer):
         assert isinstance(
             self.encoding_info, dict
         ), f"{self.encoding_info=}. Must be a dict"
+
+        assert isinstance(
+            self.excluded_word_list, list
+        ), f"{self.excluded_word_list=}. Must be a list of str"
+        assert all(
+            isinstance(excluded_word, str) for excluded_word in self.excluded_word_list
+        ), f"Excluded words must be str"
 
         if "video_width" in self.encoding_info:
             self._frame_width = self.encoding_info["video_width"][1]
@@ -537,21 +542,29 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._sliding = False
 
     def window_open_handler(self, event):
+        """
+        Handles the the video_cutters open event processing
+
+        Args:
+            event (qtg.Action): The event that triggered this method.
+
+        """
+
         self._video_file_system_maker()  # Might close window if file system issues
 
-        self._media_source = Video_Handler(
-            aspect_ratio=self.aspect_ratio,
-            input_file=self.input_file,
-            output_edit_folder=self.output_folder,
-            encoding_info=self.encoding_info,
-            video_display=self._video_display,
-            video_slider=self._video_slider,
-            frame_display=self._frame_display,
-            display_width=self._display_width,
-            display_height=self._display_height,
-        )
-
         with qtg.sys_cursor(qtg.Cursor.hourglass):
+            self._media_source = Video_Handler(
+                aspect_ratio=self.aspect_ratio,
+                input_file=self.input_file,
+                output_edit_folder=self.output_folder,
+                encoding_info=self.encoding_info,
+                video_display=self._video_display,
+                video_slider=self._video_slider,
+                frame_display=self._frame_display,
+                display_width=self._display_width,
+                display_height=self._display_height,
+            )
+
             self._media_source.play()
             self._media_source.pause()
             self._selection_button_toggle(event=event, init=True)
@@ -585,8 +598,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
         if edit_list:
             _, filename, extension = file_handler.split_file_path(self.input_file)
 
-            output_file = (
-                f"{self._edit_folder}{file_handler.ossep}{filename}_{extension}"
+            output_file = file_handler.file_join(
+                self._edit_folder, f"{filename}_", extension
             )
 
             video_files = []
@@ -1471,6 +1484,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 @dataclasses.dataclass
 class File_Renamer_Popup(qtg.PopContainer):
     "Renames video files sourced from the video cutter"
+
     file_list: list[str] | tuple[str] = dataclasses.field(default_factory=list)
     tag = "File_Renamer_Popup"
     file_validated: bool = True
@@ -1671,8 +1685,7 @@ class File_Renamer_Popup(qtg.PopContainer):
                     self._package_files(event)
 
                 return result
-        else:
-            return 1
+        return 1
 
     def _process_ok(self, event: qtg.Action) -> int:
         """
@@ -1702,6 +1715,8 @@ class File_Renamer_Popup(qtg.PopContainer):
                     self._package_files(event)
 
                 return result
+        else:
+            self._package_files(event)
 
         return 1
 

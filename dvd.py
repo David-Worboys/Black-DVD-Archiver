@@ -23,14 +23,11 @@ import dataclasses
 import datetime
 import hashlib
 import math
-import os
-import shutil
 import subprocess
 from random import randint
 from typing import Optional
 
 import psutil
-import pycdlib
 import xmltodict
 
 import dvdarch_utils
@@ -60,7 +57,8 @@ class File_Def:
         assert (
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a file path"
-        assert os.path.exists(value), f"{value=}. Path does not exist"
+
+        assert utils.File().path_exists(value), f"{value=}. Path does not exist"
 
         self._path = value
 
@@ -96,7 +94,7 @@ class File_Def:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a file path"
 
-        assert os.path.exists(value), f"{value=}. Path does not exist"
+        assert utils.File().file_exists(value), f"{value=}. Path does not exist"
 
         self._mneu_image_file_path = value
 
@@ -118,7 +116,7 @@ class File_Def:
             self.path != "" and self.file_name != ""
         ), f"{self.path=}, {self.file_name=}. Must be set"
 
-        return os.path.join(self.path, self.file_name)
+        return utils.File().file_join(self.path, self.file_name)
 
 
 @dataclasses.dataclass
@@ -154,7 +152,8 @@ class DVD_Config:
             assert isinstance(
                 video_file, File_Def
             ), f"{video_file=}. Must be a File_Def"
-            assert os.path.exists(
+
+            assert utils.File().path_exists(
                 video_file.path
             ), f"{video_file.path=}. Must be a valid file path"
 
@@ -221,7 +220,7 @@ class DVD_Config:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a non-empty string"
 
-        if os.path.exists(value):
+        if utils.File().file_exists(value):
             self._menu_font = value
             return
         else:
@@ -276,7 +275,7 @@ class DVD_Config:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a non-empty string"
 
-        if os.path.exists(value):
+        if utils.File().path_exists(value):
             self._timestamp_font = value
             return
         else:
@@ -523,18 +522,10 @@ class DVD:
         ) and file_handler.path_writeable(
             self._dvd_working_folder
         ):  # Blow it away
-            try:
-                with os.scandir(self._dvd_working_folder) as entries:
-                    for entry in entries:
-                        if entry.is_dir() and not entry.is_symlink():
-                            shutil.rmtree(entry.path)
-                        else:
-                            os.remove(entry.path)
+            result, message = file_handler.remove_dir_contents(self._dvd_working_folder)
 
-                    shutil.rmtree(self._dvd_working_folder)
-
-            except OSError as error:
-                return -1, f"{error.errno} {error.strerror}"
+            if result == -1:
+                return -1, message
 
         if file_handler.path_exists(
             self.working_folder
@@ -591,6 +582,8 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
+        file_handler = utils.File()
+
         # Black Video Choices
         average_bit_rate = sys_consts.AVERAGE_BITRATE
         apply_video_filters = True
@@ -622,11 +615,8 @@ class DVD:
             video_filters = []
 
         for video_file in self.dvd_setup.input_videos:
-            # path_name = os.path.dirname(video_file.file_path)
-            file_name = os.path.splitext(os.path.basename(video_file.file_path))[0]
-            # file_extn = os.path.splitext(os.path.basename(video_file.file_path))[1]
-
-            vob_file = f"{self._vob_folder}{os.sep}{file_name}.vob"
+            _, file_name, _ = file_handler.split_file_path(video_file.file_path)
+            vob_file = file_handler.file_join(self._vob_folder, file_name, "vob")
 
             if (
                 "video_height" not in video_file.file_info
@@ -911,22 +901,20 @@ class DVD:
         # background: str = "none"
         # gravity: str = "center"
 
-        for input_video in self.dvd_setup.input_videos:
-            # Setup required files
-            path_name = os.path.dirname(input_video.menu_image_file_path)
-            file_name = os.path.splitext(
-                os.path.basename(input_video.menu_image_file_path)
-            )[0]
-            file_extn = os.path.splitext(
-                os.path.basename(input_video.menu_image_file_path)
-            )[1]
-            menu_button_file = f"{path_name}{os.sep}{file_name}{file_extn}"
+        file_handler = utils.File()
 
-            menu_button_text_file = (
-                f"{path_name}{os.sep}{file_name}_text{file_extn}"  # {file_extn}"
+        for input_video in self.dvd_setup.input_videos:
+            path_name, file_name, file_extn = file_handler.split_file_path(
+                input_video.menu_image_file_path
             )
 
-            if not os.path.exists(menu_button_file):
+            # Setup required files
+            menu_button_file = file_handler.file_join(path_name, file_name, file_extn)
+            menu_button_text_file = file_handler.file_join(
+                path_name, f"{file_name}_text", file_extn
+            )
+
+            if not file_handler.file_exists(menu_button_file):
                 return -1, f"Video File Does Not Exist : {menu_button_file}"
 
             menu_text = utils.File().extract_title(file_name)
@@ -1124,6 +1112,9 @@ class DVD:
 
         pointsize = self.dvd_setup.menu_font_point_size
         font = self.dvd_setup.menu_font
+
+        pointsize = self.dvd_setup.menu_font_point_size
+        font = self.dvd_setup.menu_font
         menu_title = self.dvd_setup.menu_title
 
         commands = [
@@ -1310,16 +1301,25 @@ class DVD:
             return dvdarch_utils.execute_check_output(commands=command)
 
         # ===== Main
-        path_name = os.path.dirname(self._background_canvas_file)
-        file_name = os.path.splitext(os.path.basename(self._background_canvas_file))[0]
-        file_extn = os.path.splitext(os.path.basename(self._background_canvas_file))[1]
+        file_handler = utils.File()
+        path_name, file_name, file_extn = file_handler.split_file_path(
+            self._background_canvas_file
+        )
 
-        canvas_overlay_file = f"{path_name}{os.sep}{file_name}_overlay.png"
-        canvas_highlight_file = f"{path_name}{os.sep}{file_name}_highlight.png"
-        canvas_select_file = f"{path_name}{os.sep}{file_name}_select.png"
-        canvas_images_file = f"{path_name}{os.sep}{file_name}_images.png"
+        canvas_overlay_file = file_handler.file_join(
+            path_name, f"{file_name}_overlay", "png"
+        )
+        canvas_highlight_file = file_handler.file_join(
+            path_name, f"{file_name}_highlight", "png"
+        )
+        canvas_select_file = file_handler.file_join(
+            path_name, f"{file_name}_select", "png"
+        )
+        canvas_images_file = file_handler.file_join(
+            path_name, f"{file_name}_images", "png"
+        )
 
-        spumux_xml = f"{path_name}{os.path.sep}spumux.xml"
+        spumux_xml = file_handler.file_join(path_name, "spumux", "xml")
 
         command = [
             sys_consts.CONVERT,
@@ -1374,18 +1374,28 @@ class DVD:
         for video_index, input_video in enumerate(self.dvd_setup.input_videos):
             button_coords = cell_coords[video_index]
 
-            path_name = os.path.dirname(input_video.menu_image_file_path)
-            file_name = os.path.splitext(
-                os.path.basename(input_video.menu_image_file_path)
-            )[0]
-            file_extn = os.path.splitext(
-                os.path.basename(input_video.menu_image_file_path)
-            )[1]
+            path_name, file_name, file_extn = file_handler.split_file_path(
+                input_video.menu_image_file_path
+            )
 
-            button_overlay_file = f"{path_name}{os.sep}{file_name}_overlay.png"
-            button_highlight_file = f"{path_name}{os.sep}{file_name}_highlight.png"
-            button_select_file = f"{path_name}{os.sep}{file_name}_select.png"
-            button_text_file = f"{path_name}{os.sep}{file_name}_text{file_extn}"
+            print(f"DBG {path_name=} {file_name=} {file_extn=}")
+
+            button_overlay_file = file_handler.file_join(
+                path_name, f"{file_name}_overlay", "png"
+            )
+            button_highlight_file = file_handler.file_join(
+                path_name, f"{file_name}_highlight", "png"
+            )
+            button_select_file = file_handler.file_join(
+                path_name, f"{file_name}_select", "png"
+            )
+            button_text_file = file_handler.file_join(
+                path_name, f"{file_name}_text", file_extn
+            )
+
+            print(
+                f"DBG {button_overlay_file=} {button_highlight_file=} {button_select_file=} {button_text_file=}"
+            )
 
             width, message = dvdarch_utils.get_image_width(button_text_file)
 
@@ -1583,16 +1593,18 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        path_name = os.path.dirname(self._background_canvas_file)
-        file_name = os.path.splitext(os.path.basename(self._background_canvas_file))[0]
-        file_extn = os.path.splitext(os.path.basename(self._background_canvas_file))[1]
+        file_handler = utils.File()
 
-        background_canvas_images_file = (
-            f"{path_name}{os.sep}{file_name}_images{file_extn}"
+        path_name, file_name, file_extn = file_handler.split_file_path(
+            self._background_canvas_file
         )
-        m2v_file = f"{path_name}{os.sep}{file_name}_menu_video.m2v"
 
-        if not os.path.exists(background_canvas_images_file):
+        background_canvas_images_file = file_handler.file_join(
+            path_name, f"{file_name}_images", file_extn
+        )
+        m2v_file = file_handler.file_join(path_name, f"{file_name}_menu_video", "m2v")
+
+        if not file_handler.file_exists(background_canvas_images_file):
             return -1, f"Sys Error : {background_canvas_images_file} does not exist!"
 
         if self._dvd_setup.video_standard == sys_consts.PAL:
@@ -1608,58 +1620,58 @@ class DVD:
         else:
             aspect = "2"
 
-        with open(f"{path_name}{os.path.sep}_m2v.log", "a") as log:
+        result = subprocess.run(
+            [sys_consts.CONVERT, background_canvas_images_file, "ppm:-"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        # Chained pipes here so be cognisant of that when modifying
+        if result.returncode == 0:
             result = subprocess.run(
-                [sys_consts.CONVERT, background_canvas_images_file, "ppm:-"],
+                [
+                    sys_consts.PPMTOY4M,
+                    "-n",
+                    f"{frames}",
+                    "-F",
+                    f"{framerate}",
+                    "-A",
+                    f"{pixel_aspect}",
+                    "-I",
+                    "p",
+                    "-r",
+                    "-S",
+                    "420mpeg2",
+                ],
+                input=result.stdout,
                 stdout=subprocess.PIPE,
-                stderr=log,
+                stderr=subprocess.PIPE,
             )
 
             if result.returncode == 0:
                 result = subprocess.run(
                     [
-                        sys_consts.PPMTOY4M,
+                        sys_consts.MPEG2ENC,
                         "-n",
-                        str(frames),
-                        "-F",
-                        framerate,
-                        "-A",
-                        pixel_aspect,
-                        "-I",
-                        "p",
-                        "-r",
-                        "-S",
-                        "420mpeg2",
+                        fmt,
+                        "-f",
+                        "8",
+                        "-b",
+                        "5000",
+                        "-a",
+                        aspect,
+                        "-o",
+                        m2v_file,
                     ],
                     input=result.stdout,
                     stdout=subprocess.PIPE,
-                    stderr=log,
+                    stderr=subprocess.PIPE,
                 )
-
-                if result.returncode == 0:
-                    result = subprocess.run(
-                        [
-                            sys_consts.MPEG2ENC,
-                            "-n",
-                            fmt,
-                            "-f",
-                            "8",
-                            "-b",
-                            "5000",
-                            "-a",
-                            aspect,
-                            "-o",
-                            m2v_file,
-                        ],
-                        input=result.stdout,
-                        stdout=subprocess.PIPE,
-                        stderr=log,
-                    )
 
             if result.returncode == 0:
                 return 1, ""
-            else:
-                return -1, f"Sys Error: Failed To Produce Menu Video {m2v_file}"
+
+        return -1, f"Sys Error: Failed To Produce Menu Video {m2v_file}"
 
     def _convert_audio(self, frames: int = 300):
         """Generates the audio for the menu. By default it is a empty soundtrack
@@ -1674,11 +1686,14 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        path_name = os.path.dirname(self._background_canvas_file)
-        file_name = os.path.splitext(os.path.basename(self._background_canvas_file))[0]
-        # file_extn = os.path.splitext(os.path.basename(self._background_canvas_file))[1]
 
-        ac3_file = f"{path_name}{os.sep}{file_name}_menu_video.ac3"
+        file_handler = utils.File()
+
+        path_name, file_name, _ = file_handler.split_file_path(
+            self._background_canvas_file
+        )
+
+        ac3_file = file_handler.file_join(path_name, f"{file_name}_menu_video", "ac3")
 
         if self._dvd_setup.video_standard == sys_consts.PAL:
             framerate = 25
@@ -1725,13 +1740,17 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        path_name = os.path.dirname(self._background_canvas_file)
-        file_name = os.path.splitext(os.path.basename(self._background_canvas_file))[0]
-        # file_extn = os.path.splitext(os.path.basename(self._background_canvas_file))[1]
+        file_handler = utils.File()
 
-        ac3_file = f"{path_name}{os.sep}{file_name}_menu_video.ac3"
-        m2v_file = f"{path_name}{os.sep}{file_name}_menu_video.m2v"
-        menu_video_file = f"{path_name}{os.sep}{file_name}_menu_video.mpg"
+        path_name, file_name, _ = file_handler.split_file_path(
+            self._background_canvas_file
+        )
+
+        ac3_file = file_handler.file_join(path_name, f"{file_name}_menu_video", "ac3")
+        m2v_file = file_handler.file_join(path_name, f"{file_name}_menu_video", "m2v")
+        menu_video_file = file_handler.file_join(
+            path_name, f"{file_name}_menu_video", "mpg"
+        )
 
         commands = [
             sys_consts.MPLEX,
@@ -1753,15 +1772,19 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        path_name = os.path.dirname(self._background_canvas_file)
-        file_name = os.path.splitext(os.path.basename(self._background_canvas_file))[0]
-        # file_extn = os.path.splitext(os.path.basename(self._background_canvas_file))[1]
+        file_handler = utils.File()
 
-        menu_video_file = f"{path_name}{os.sep}{file_name}_menu_video.mpg"
-        menu_video_buttons_file = (
-            f"{path_name}{os.sep}{file_name}_menu_video_buttons.mpg"
+        path_name, file_name, _ = file_handler.split_file_path(
+            self._background_canvas_file
         )
-        spumux_xml = f"{path_name}{os.path.sep}spumux.xml"
+
+        menu_video_file = file_handler.file_join(
+            path_name, f"{file_name}_menu_video", "mpg"
+        )
+        menu_video_buttons_file = file_handler.file_join(
+            path_name, f"{file_name}_menu_video_buttons", "mpg"
+        )
+        spumux_xml = file_handler.file_join(path_name, "spumux", "xml")
 
         env = {"VIDEO_FORMAT": self.dvd_setup.video_standard}
 
@@ -1793,12 +1816,16 @@ class DVD:
             tuple[int, str]: _description_
         """
 
-        path_name = os.path.dirname(self._background_canvas_file)
-        file_name = os.path.splitext(os.path.basename(self._background_canvas_file))[0]
-        # file_extn = os.path.splitext(os.path.basename(self._background_canvas_file))[1]
+        file_handler = utils.File()
 
-        menu_video_file = f"{path_name}{os.sep}{file_name}_menu_video_buttons.mpg"
-        dvd_author_file = f"{path_name}{os.sep}dvd_author.xml"
+        path_name, file_name, _ = file_handler.split_file_path(
+            self._background_canvas_file
+        )
+
+        menu_video_file = file_handler.file_join(
+            path_name, f"{file_name}_menu_video_buttons", "mpg"
+        )
+        dvd_author_file = file_handler.file_join(path_name, "dvd_author", "xml")
 
         # Create the DVDauthor XML control file
         video_dict = {
@@ -1811,7 +1838,8 @@ class DVD:
         title_list = []
 
         for menu_index, input_video in enumerate(self.dvd_setup.input_videos):
-            video_name = os.path.splitext(os.path.basename(input_video.file_path))[0]
+            _, video_name, _ = file_handler.split_file_path(input_video.file_path)
+            vob_file = file_handler.file_join(self._vob_folder, video_name, "vob")
 
             button_list.append(f"jump title {menu_index + 1};")
             title_list.append(
@@ -1820,9 +1848,7 @@ class DVD:
                         "video": video_dict,
                         "pgc": {
                             "post": "call vmgm menu 1;",
-                            "vob": {
-                                "@file": f"{self._vob_folder}{os.sep}{video_name}.vob"
-                            },
+                            "vob": {"@file": f"{vob_file}"},
                         },
                     }
                 }
@@ -1873,9 +1899,9 @@ class DVD:
         )
 
         if result.returncode == 0:
-            return dvdarch_utils.create_dvd_iso(
-                self._dvd_out_folder, f"{self._iso_out_folder}{os.sep}dvd_iso"
-            )
+            iso_folder = file_handler.file_join(self._iso_out_folder, "dvd_iso")
+
+            return dvdarch_utils.create_dvd_iso(self._dvd_out_folder, iso_folder)
 
         else:
             return -1, result.stderr.strip()

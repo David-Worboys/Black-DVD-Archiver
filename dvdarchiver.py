@@ -24,7 +24,6 @@
 # fmt: off
 import dataclasses
 import datetime
-import os
 
 import platformdirs
 
@@ -404,24 +403,37 @@ class DVD_Archiver:
             tag="video_input_files",
         )
 
+        dvd_title: str = event.value_get(
+            container_tag="menu_properties", tag="menu_title"
+        )
+
+        if dvd_title.strip() == "":
+            qtg.PopMessage(
+                title="DVD Menu Title Not Entered...",
+                message="A Menu Title Must Be Entered!",
+            ).show()
+            return None
+
         video_file_defs = []
         menu_labels = []
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             for row_index in range(file_grid.row_count):
-                file = file_grid.value_get(row_index, col=0)
-                folder = file_grid.userdata_get(row_index, col=0)
-                video_properties = file_grid.userdata_get(row_index, col=1)
+                user_data: File_Control.Video_Data = file_grid.userdata_get(
+                    row_index, col=0
+                )
 
                 file_def = File_Def()
-                file_def.path = folder
-                file_def.file_name = file
-                file_def._file_info = video_properties
+                file_def.path = user_data.video_folder
+                file_def.file_name = (
+                    f"{user_data.video_file}{user_data.video_extension}"
+                )
+                file_def._file_info = user_data.encoding_info
 
                 video_file_defs.append(file_def)
 
                 # menu_image_files.append(image_file)
-                menu_labels.append(".".join(file.split(".")[0:-1]))
+                menu_labels.append(".".join(user_data.video_file.split(".")[0:-1]))
 
         result = -1
         message = ""
@@ -429,10 +441,6 @@ class DVD_Archiver:
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             if video_file_defs:
                 dvd_config = DVD_Config()
-
-                dvd_title: str = event.value_get(
-                    container_tag="menu_properties", tag="menu_title"
-                )
 
                 # TODO: Move this to the GUI, currently the following is guaranteed as set in DB when created
                 sql_result = self._app_db.sql_select(
@@ -834,8 +842,8 @@ class File_Control:
             Returns:
                 str: The full path to the video file
             """
-            video_path = (
-                f"{self.video_folder}{os.sep}{self.video_file}{self.video_extension}"
+            video_path = utils.File().file_join(
+                self.video_folder, self.video_file, self.video_extension
             )
 
             return video_path
@@ -905,9 +913,11 @@ class File_Control:
             container_tag=event.container_tag, tag=event.tag
         )  # Data we want is on the button
 
-        user_data: self.Video_Data = tool_button.userdata_get()
+        user_data: File_Control.Video_Data = tool_button.userdata_get()
 
-        file = f"{user_data.video_folder}{os.path.sep}{user_data.video_file}{user_data.video_extension}"
+        file = file_handler.file_join(
+            user_data.video_folder, user_data.video_file, user_data.video_extension
+        )
 
         result = Video_Cutter_Popup(
             title="Video File Cutter/Settings",
@@ -1047,7 +1057,7 @@ class File_Control:
                 row=row, col=6, tag="grid_button"
             )
 
-            user_data: self.Video_Data = row_tool_button.userdata_get()
+            user_data: File_Control.Video_Data = row_tool_button.userdata_get()
 
             if user_data is not None:  # Should never happen
                 if (
@@ -1225,7 +1235,7 @@ class File_Control:
         for file_tuple_str in selected_files.split("|"):
             _, _, video_file_name, video_file_folder = file_tuple_str.split(",")
 
-            video_file_path = os.path.join(video_file_folder, video_file_name)
+            video_file_path = file_handler.file_join(video_file_folder, video_file_name)
 
             (
                 video_file_path,
@@ -1235,7 +1245,7 @@ class File_Control:
 
             # Check if file already loaded in grid
             for check_row_index in range(file_grid.row_count):
-                video_user_data: self.Video_Data = file_grid.userdata_get(
+                video_user_data: File_Control.Video_Data = file_grid.userdata_get(
                     row=check_row_index, col=0
                 )
 
@@ -1246,7 +1256,7 @@ class File_Control:
                 ):
                     break
             else:  # File not in grid already
-                video_user_data = self.Video_Data(
+                video_user_data = File_Control.Video_Data(
                     video_file_path,
                     video_file_name,
                     video_extension,
