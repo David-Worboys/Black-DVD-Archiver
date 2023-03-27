@@ -933,12 +933,9 @@ class File_Control:
         if result:
             if result.endswith("T"):  # Trimmed File
                 # Pretty basic, just a source and a trimmed file
-                input_file, trimmed_file, _ = result.split(",")
-                source_folder, source_file, _ = file_handler.split_file_path(input_file)
+                source_file, trimmed_file, _ = result.split(",")
 
-                self._processed_trimmed(
-                    file_handler, file_grid, source_folder, source_file, trimmed_file
-                )
+                self._processed_trimmed(file_grid, source_file, trimmed_file)
             else:  # Assemble Multiple Files
                 # Splits out the str rows of of the file propertiees; delim '|'
                 edit_file_list = result.split("|")
@@ -1013,36 +1010,34 @@ class File_Control:
 
     def _processed_trimmed(
         self,
-        file_handler: utils.File,
         file_grid: qtg.Grid,
-        source_folder: str,
         source_file: str,
         trimmed_file: str,
     ):
         """
-        Updates the given file_grid with the trimmed_file, if the source_file matches the specified source_folder.
+        Updates the file_grid with the trimmed_file detail, after finding the corresponding grid entry.
 
         Args:
-            file_handler (utils.File): The file handler to use.
             file_grid (qtg.Grid): The grid to update.
-            source_folder (str): The folder to search for the source_file.
             source_file (str): The name of the source file to match.
             trimmed_file (str): The trimmed file to update the grid with.
 
         """
-        assert isinstance(
-            file_handler, utils.File
-        ), f"{file_handler=}. Must be utils.File"
         assert isinstance(file_grid, qtg.Grid), f"{file_grid=}. Must br qtg.Grid,"
-        assert (
-            isinstance(source_folder, str) and source_folder.strip() != ""
-        ), f"{source_folder=}. Must be a non-empty str"
         assert (
             isinstance(source_file, str) and source_file.strip() != ""
         ), f"{source_file=}. Must be a non-empty str"
         assert (
             isinstance(trimmed_file, str) and trimmed_file.strip() != ""
         ), f"{trimmed_file=}. Must be a non-empty str."
+
+        file_handler = utils.File()
+
+        (
+            source_folder,
+            source_file_name,
+            source_extension,
+        ) = file_handler.split_file_path(source_file)
 
         (
             trimmed_folder,
@@ -1062,28 +1057,25 @@ class File_Control:
             if user_data is not None:  # Should never happen
                 if (
                     user_data.video_folder == source_folder
-                    and user_data.video_file == source_file
+                    and user_data.video_file == source_file_name
+                    and user_data.video_extension == source_extension
                 ):
                     updated_user_data = self.Video_Data(
                         video_folder=trimmed_folder,
                         video_file=trimmed_file_name,
                         video_extension=trimmed_extension,
-                        encoding_info=user_data.encoding_info,
+                        encoding_info=user_data.encoding_info,  # Stays the same
                     )
 
-                    file_grid.value_set(
-                        row=row,
-                        col=0,
-                        value=trimmed_file_name,
-                        user_data=updated_user_data,
-                    )
+                    for col in range(file_grid.col_count):
+                        file_grid.value_set(
+                            row=row,
+                            col=col,
+                            value=trimmed_file_name,
+                            user_data=updated_user_data,
+                        )
 
-                    file_grid.value_set(
-                        row=row,
-                        col=6,
-                        value=trimmed_file,
-                        user_data=updated_user_data,
-                    )
+                    row_tool_button.userdata_set(updated_user_data)
 
                     break  # Only one trimmed file
 
