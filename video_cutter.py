@@ -479,6 +479,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
             case qtg.Sys_Events.WINDOWOPEN:
                 self.window_open_handler(event)
                 self.set_result("")
+            case qtg.Sys_Events.WINDOWPOSTOPEN:    
+                self._archive_edit_list_read()
             case qtg.Sys_Events.WINDOWCLOSED:
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
                     if self._media_source:
@@ -581,9 +583,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self._media_source.pause()
             self._selection_button_toggle(event=event, init=True)
             self._media_source.update_slider = True
-
-        qtC.QTimer.singleShot(200, self._archive_edit_list_read)
-
+        
     def archive_edit_list_write(self):
         """Writes the edit list from the GUI grid to the archive manager for the current video file.
 
@@ -631,7 +631,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             mark_out = self._edit_list_grid.colindex_get("mark_out")
 
             for row, cut_tuple in enumerate(edit_cuts):
-                print(f"DBG {cut_tuple=} {row=} {mark_in=} {mark_out=}")
+                
                 self._edit_list_grid.value_set(
                     row=row, col=mark_in, value=cut_tuple[0], user_data=cut_tuple
                 )
