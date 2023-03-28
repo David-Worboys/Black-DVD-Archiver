@@ -165,7 +165,7 @@ def concatenate_videos(
 
     file_handler = utils.File()
     out_path, _, _ = file_handler.split_file_path(output_file)
-    file_list_txt = f"{out_path}{file_handler.ossep}file_list.txt"
+    file_list_txt = file_handler.file_join(out_path, "file_list", "txt")
 
     if not file_handler.path_writeable(out_path):
         return -1, f"Can Not Be Write To {out_path}!"
@@ -177,6 +177,12 @@ def concatenate_videos(
 
     if result == -1:
         return -1, message
+
+    if file_handler.file_exists(output_file):
+        result = file_handler.remove_file(output_file)
+
+        if result == -1:
+            return -1, f"Failed To Remove File {output_file}"
 
     aac_audio = []
     if audio_codec == "aac":

@@ -933,7 +933,15 @@ class File_Control:
         if result:
             if result.endswith("T"):  # Trimmed File
                 # Pretty basic, just a source and a trimmed file
-                source_file, trimmed_file, _ = result.split(",")
+
+                items = result.split(",")
+
+                if len(items) > 3:
+                    source_file = items[0]
+                    trimmed_file = items[1]
+                    print(f"DBG {items=}")
+                else:
+                    source_file, trimmed_file, _ = result.split(",")
 
                 self._processed_trimmed(file_grid, source_file, trimmed_file)
             else:  # Assemble Multiple Files

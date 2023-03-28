@@ -479,7 +479,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             case qtg.Sys_Events.WINDOWOPEN:
                 self.window_open_handler(event)
                 self.set_result("")
-            case qtg.Sys_Events.WINDOWPOSTOPEN:    
+            case qtg.Sys_Events.WINDOWPOSTOPEN:
                 self._archive_edit_list_read()
             case qtg.Sys_Events.WINDOWCLOSED:
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
@@ -583,7 +583,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self._media_source.pause()
             self._selection_button_toggle(event=event, init=True)
             self._media_source.update_slider = True
-        
+
     def archive_edit_list_write(self):
         """Writes the edit list from the GUI grid to the archive manager for the current video file.
 
@@ -631,7 +631,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
             mark_out = self._edit_list_grid.colindex_get("mark_out")
 
             for row, cut_tuple in enumerate(edit_cuts):
-                
                 self._edit_list_grid.value_set(
                     row=row, col=mark_in, value=cut_tuple[0], user_data=cut_tuple
                 )
@@ -1180,11 +1179,25 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 continue
 
             if cut_out:
-                temp_file = f"{out_path}{file_handler.ossep}{file_handler.extract_title(out_file)}({cut_index}){out_extn}"
+                temp_file = file_handler.file_join(
+                    out_path,
+                    f"{file_handler.extract_title(out_file)}({cut_index})",
+                    out_extn,
+                )
             else:
-                temp_file = f"{out_path}{file_handler.ossep}{file_handler.extract_title(out_file)}_{cut_index:03d}{out_extn}"
+                temp_file = file_handler.file_join(
+                    out_path,
+                    f"{file_handler.extract_title(out_file)}_{cut_index:03d}",
+                    out_extn,
+                )
 
             temp_files.append(temp_file)
+
+            if file_handler.file_exists(temp_file):
+                result = file_handler.remove_file(temp_file)
+
+                if result == -1:
+                    return -1, f"Failed To Remove {temp_file}"
 
             # Calculate the start and end times of the segment based on the frame numbers
             start_time = start_frame / self._frame_rate
@@ -1216,6 +1229,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 else end_time - segment_start
             )
 
+            # command = [sys_consts.FFMPG,"-v","debug", "-i", input_file] #DBG
             command = [sys_consts.FFMPG, "-i", input_file]
 
             # Check if re-encoding is necessary
@@ -1232,6 +1246,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 if after_key_frame is not None:
                     command += ["-tune", "fastdecode"]
                 command += [temp_file, "-y"]
+
             else:
                 # Copy the segment
                 if before_key_frame is not None:
@@ -1265,6 +1280,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             for temp_file in temp_files:
                 if file_handler.remove_file(temp_file) == -1:
                     return -1, f"Faied To Remove File <{temp_file}>"
+
         else:
             # We keep the temp files, as they are the new videos, and build an output file str where each video is
             # delimitered by a ','

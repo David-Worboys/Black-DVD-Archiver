@@ -6675,8 +6675,7 @@ class PopContainer(_qtpyBase_Control):
                     ),
                     control_name=self.__class__.__name__,
                     parent=self,
-                )    
-
+                )
 
         return result
 
