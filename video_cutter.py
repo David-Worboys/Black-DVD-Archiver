@@ -30,6 +30,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
+from archive_management import Archive_Manager
 
 # fmt: on
 
@@ -330,6 +331,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
     excluded_word_list: list[str] = dataclasses.field(default_factory=list)
 
     # Private instance variables
+    _archive_manager: Archive_Manager | None = None
+    _edit_list_grid: qtg.Grid | None = None
     _frame_rate: int = 25  # Default to 25 frames per second
     _frame_width: int = 720
     _frame_height: int = 576
@@ -477,12 +480,15 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 self.window_open_handler(event)
                 self.set_result("")
             case qtg.Sys_Events.WINDOWCLOSED:
-                if self._media_source is not None:
-                    self._media_source.stop()
+                with qtg.sys_cursor(qtg.Cursor.hourglass):
+                    if self._media_source:
+                        self._media_source.stop()
+
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "ok":
                         if self._process_ok(event=event) == 1:
+                            self.archive_edit_list_write()
                             super().close()
                     case "backward":
                         self._step_backward()
@@ -496,6 +502,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         )
                     case "cancel":
                         if self._process_cancel(event=event) == 1:
+                            self.archive_edit_list_write()
                             super().close()
                     case "assemble_segments":
                         self._assemble_segments(event)
@@ -552,6 +559,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         self._video_file_system_maker()  # Might close window if file system issues
 
+        archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
+
+        if archive_folder:
+            self._archive_manager = Archive_Manager(archive_folder=archive_folder)
+
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             self._media_source = Video_Handler(
                 aspect_ratio=self.aspect_ratio,
@@ -570,6 +582,65 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self._selection_button_toggle(event=event, init=True)
             self._media_source.update_slider = True
 
+        qtC.QTimer.singleShot(200, self._archive_edit_list_read)
+
+    def archive_edit_list_write(self):
+        """Writes the edit list from the GUI grid to the archive manager for the current video file.
+
+        The edit list is read from the GUI grid, which has columns for the mark in, mark out,
+        and cut name for each cut in the edit list. These values are extracted from the grid and
+        stored in a list of tuples. The list is then written to the archive manager for the current
+        video file.
+
+        If the archive manager has not been set up, this method does nothing.
+
+        """
+        if self._archive_manager:
+            mark_in = self._edit_list_grid.colindex_get("mark_in")
+            mark_out = self._edit_list_grid.colindex_get("mark_out")
+
+            # TODO Add cut_name
+            edit_list = [
+                (
+                    int(self._edit_list_grid.value_get(row=row_index, col=mark_in)),
+                    int(
+                        self._edit_list_grid.value_get(row=row_index, col=mark_out)
+                        or self._frame_count
+                    ),
+                    "",
+                )
+                for row_index in range(self._edit_list_grid.row_count)
+            ]
+
+            if edit_list:
+                self._archive_manager.write_edit_cuts(self.input_file, edit_list)
+
+    def _archive_edit_list_read(self):
+        """Reads edit cuts from the archive manager and populates the edit list grid with the data.
+
+        If both the archive manager and the edit list grid exist, reads edit cuts for the input file from the archive
+        manager using the `read_edit_cuts` method. Then, for each cut tuple in the edit cuts list, sets the `mark_in` and
+        `mark_out` values of the corresponding row in the edit list grid using the `value_set` method.
+
+
+        """
+        if self._archive_manager and self._edit_list_grid:
+            edit_cuts = self._archive_manager.read_edit_cuts(self.input_file)
+
+            mark_in = self._edit_list_grid.colindex_get("mark_in")
+            mark_out = self._edit_list_grid.colindex_get("mark_out")
+
+            for row, cut_tuple in enumerate(edit_cuts):
+                print(f"DBG {cut_tuple=} {row=} {mark_in=} {mark_out=}")
+                self._edit_list_grid.value_set(
+                    row=row, col=mark_in, value=cut_tuple[0], user_data=cut_tuple
+                )
+
+                self._edit_list_grid.value_set(
+                    row=row, col=mark_out, value=cut_tuple[1], user_data=cut_tuple
+                )
+                # TODO Add cut_name
+
     def _assemble_segments(self, event: qtg.Action):
         """
         Takes the specified segments from the input file and makes new video files from them.
@@ -583,16 +654,17 @@ class Video_Cutter_Popup(qtg.PopContainer):
         assert isinstance(event, qtg.Action), f"{event=}. Must be type qtg.Action"
 
         file_handler = utils.File()
-        edit_list_grid: qtg.Grid = event.widget_get(
-            container_tag="edit_list", tag="edit_list_grid"
-        )
+
+        mark_in = self._edit_list_grid.colindex_get("mark_in")
+        mark_out = self._edit_list_grid.colindex_get("mark_out")
 
         edit_list = [
             (
-                edit_list_grid.value_get(row=row_index, col=0),
-                edit_list_grid.value_get(row=row_index, col=1) or self._frame_count,
+                self._edit_list_grid.value_get(row=row_index, col=mark_in),
+                self._edit_list_grid.value_get(row=row_index, col=mark_out)
+                or self._frame_count,
             )
-            for row_index in range(edit_list_grid.row_count)
+            for row_index in range(self._edit_list_grid.row_count)
         ]
 
         if edit_list:
@@ -665,16 +737,17 @@ class Video_Cutter_Popup(qtg.PopContainer):
         assert isinstance(event, qtg.Action), f"{event=}. Must be type qtg.Action"
 
         file_handler = utils.File()
-        edit_list_grid: qtg.Grid = event.widget_get(
-            container_tag="edit_list", tag="edit_list_grid"
-        )
+
+        mark_in = self._edit_list_grid.colindex_get("mark_in")
+        mark_out = self._edit_list_grid.colindex_get("mark_out")
 
         edit_list = [
             (
-                edit_list_grid.value_get(row=row_index, col=0),
-                edit_list_grid.value_get(row=row_index, col=1) or self._frame_count,
+                self._edit_list_grid.value_get(row=row_index, col=mark_in),
+                self._edit_list_grid.value_get(row=row_index, col=mark_out)
+                or self._frame_count,
             )
-            for row_index in range(edit_list_grid.row_count)
+            for row_index in range(self._edit_list_grid.row_count)
         ]
 
         if edit_list:
@@ -1401,6 +1474,13 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 # ),
             ]
 
+            self._edit_list_grid = qtg.Grid(
+                tag="edit_list_grid",
+                height=self._display_height,
+                col_def=edit_list_cols,
+                pixel_unit=True,
+            )
+
             edit_list_buttons = qtg.HBoxContainer(align=qtg.Align.BOTTOMCENTER).add_row(
                 qtg.Button(
                     icon=utils.App_Path("film.svg"),
@@ -1434,12 +1514,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     tooltip="Select All Edit Points",
                     width=11,
                 ),
-                qtg.Grid(
-                    tag="edit_list_grid",
-                    height=self._display_height,
-                    col_def=edit_list_cols,
-                    pixel_unit=True,
-                ),
+                self._edit_list_grid,
                 edit_list_buttons,
             )
 
