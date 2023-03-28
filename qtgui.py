@@ -318,6 +318,7 @@ class Sys_Events(IntEnum):
     TRIGGERED = 37  #: The widged has triggered
     WINDOWCLOSED = 38  #: The window has been closed
     WINDOWOPEN = 39  #: The window has been opened
+    WINDOWPOSTOPEN = 40  #: Triggered after the window has been opened
 
 
 # Tell Black to leave this block alone
@@ -6657,6 +6658,25 @@ class PopContainer(_qtpyBase_Control):
 
             if result == -1:
                 self.dialog.close()
+
+                return result
+
+            if callable(self.callback):
+                result = handler.event(
+                    window_id=window_id,
+                    callback=self.callback,
+                    action=Sys_Events.WINDOWPOSTOPEN.name,
+                    container_tag=self.container_tag,
+                    tag=self.tag,
+                    event=Sys_Events.WINDOWPOSTOPEN,
+                    value=None,
+                    widget_dict=self.parent_app.widget_dict_get(
+                        window_id=window_id, container_tag=self.container_tag
+                    ),
+                    control_name=self.__class__.__name__,
+                    parent=self,
+                )    
+
 
         return result
 
