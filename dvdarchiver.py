@@ -531,7 +531,7 @@ class DVD_Archiver:
             )
 
             if result == -1:
-                return -11, message
+                return -1, message
         return 1, ""
 
     def _menu_color_combo_change(self, event: qtg.Action):
