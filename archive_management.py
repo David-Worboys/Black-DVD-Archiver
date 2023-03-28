@@ -20,6 +20,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
+import json
 from datetime import datetime
 
 import sys_consts
@@ -42,7 +43,9 @@ class Archive_Manager:
 
     # Private instance variables
     _error_message: str = ""
+    _error_code: int = -1
     _backup_folders: tuple[str] = dataclasses.field(default_factory=list)
+    _json_edit_cuts_file: str = "edit_cuts"
 
     def __post_init__(self):
         assert (
@@ -56,6 +59,10 @@ class Archive_Manager:
     def get_error(self) -> str:
         return self._error_message
 
+    @property
+    def get_error_code(self) -> int:
+        return self._error_code
+
     def _make_folder_structure(self) -> str:
         """Makes the archive folder structure
 
@@ -63,10 +70,12 @@ class Archive_Manager:
             str : An error message if the folder structure caould not be created
         """
         file_handler = utils.File()
+        self._error_code = 1
 
         if not file_handler.path_exists(self.archive_folder):
             if file_handler.make_dir(self.archive_folder) == -1:
                 self._error_message = f"Failed To Create Archive Folder {sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM}"
+                self._error_code = -1
                 return self._error_message
 
             now = datetime.now()
@@ -79,6 +88,7 @@ class Archive_Manager:
                     )
             except:
                 self._error_message = f"Failed To Write {readme_file} "
+                self._error_code = 1
 
     def archive_dvd_build(
         self,
@@ -116,28 +126,35 @@ class Archive_Manager:
             isinstance(file_path, str) for file_path in source_video_files
         ), "source_video_files list must only contain strings"
 
+        self._error_code = 1
+
         file_handler = utils.File()
 
         backup_path = f"{self.archive_folder}{file_handler.ossep}{dvd_name}"
 
         if not file_handler.path_exists(dvd_folder):
             self._error_message = f"Can Not Access DVD Folder : {sys_consts.SDELIM}{dvd_folder}{sys_consts.SDELIM}"
+            self._error_code = -1
             return -1, self._error_message
 
         if not file_handler.path_exists(iso_folder):
             self._error_message = f"Can Not Access ISO Folder : {sys_consts.SDELIM}{iso_folder}{sys_consts.SDELIM}"
+            self._error_code = -1
             return -1, self._error_message
 
         if not file_handler.path_exists(self.archive_folder):
             self._error_message = f"Can Not Access Archive Folder : {sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM}"
+            self._error_code = -1
             return -1, self._error_message
 
         if not file_handler.path_writeable(self.archive_folder):
             self._error_message = f"Can Not Write To Archive Folder : {sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM}"
+            self._error_code = -1
             return -1, self._error_message
 
         if file_handler.path_exists(backup_path) and not overwrite_existing:
             self._error_message = f"Backup Folder Already Exists : {sys_consts.SDELIM}{sys_consts.SDELIM}{sys_consts.SDELIM}"
+            self._error_code = -1
 
             return -1, self._error_message
 
@@ -149,9 +166,11 @@ class Archive_Manager:
                     backup_path,
                     f"{sys_consts.SDELIM}{sys_consts.SDELIM}{sys_consts.SDELIM}",
                 )
+                self._error_code = -1
                 return -1, self._error_message
 
         if file_handler.make_dir(dvd_name) == -1:
+            self._error_code = -1
             return (
                 -1,
                 f"Failed To Create Backup Folder : {sys_consts.SDELIM}{dvd_name}{sys_consts.SDELIM}",
@@ -166,6 +185,7 @@ class Archive_Manager:
                 )
 
                 if result == -1:
+                    self._error_code = -1
                     return -1, message
             elif folder == ISO_IMAGE:
                 result, message = file_handler.copy_dir(
@@ -175,6 +195,7 @@ class Archive_Manager:
                 pass
             elif folder == VIDEO_SOURCE:
                 if file_handler.make_dir(backup_item_folder) == -1:
+                    self._error_code = -1
                     return -1, f"Failed To Create Backup Folder : {backup_item_folder}"
 
                 for source_file in source_video_files:
@@ -183,3 +204,160 @@ class Archive_Manager:
                     )
 
         return 1, ""
+
+    def read_edit_cuts(self, file_path: str) -> tuple[(int, int, str)] | tuple:
+        """
+        Read edit cuts for a video file from a JSON file.
+
+        Args:
+            file_path (str): The path of the video file.
+
+        Returns:
+            tuple[(int,int,str)]: A tuple containing the edit cuts for the file_path,
+            or an empty tuple if the file_path is not stored or an error occurs.
+            Each cut is represented by a tuple with the cut_in value, cut_out value,
+            and cut_name string.
+        """
+        assert (
+            isinstance(file_path, str) and file_path.strip() != ""
+        ), f"{file_path=}. Must be a str"
+
+        self._error_message = ""
+        self._error_code = 1
+
+        file_handler = utils.File()
+        json_cuts_file = file_handler.file_join(
+            self.archive_folder, self._json_edit_cuts_file, "json"
+        )
+
+        if not file_handler.path_exists(self.archive_folder):
+            self._error_message = f"{self.archive_folder} does not exist"
+            self._error_code = -1
+            return ()
+
+        if not file_handler.path_writeable(self.archive_folder):
+            self._error_message = f"{self.archive_folder} is not writable"
+            self._error_code = -1
+            return ()
+
+        if not file_handler.file_exists(json_cuts_file):
+            self._error_message = f"{json_cuts_file} does not exist"
+            self._error_code = 1  # May not be an actual error
+            return ()
+
+        # Read JSON data from file
+        try:
+            with open(json_cuts_file, "r") as json_file:
+                json_data_dict = json.load(json_file)
+        except (
+            FileNotFoundError,
+            PermissionError,
+            IOError,
+            json.decoder.JSONDecodeError,
+        ) as e:
+            self._error_message = f"Can not read {json_cuts_file}. {e}"
+            self._error_code = -1
+            return ()
+
+        if not isinstance(json_data_dict, dict):
+            self._error_message = "Invalid JSON file format"
+            self._error_code = -1
+            return ()
+
+        edit_cuts = []
+        if file_path in json_data_dict:
+            for edit_point in json_data_dict[file_path]:
+                if (
+                    len(edit_point) != 3
+                    or not isinstance(edit_point[0], int)
+                    or not isinstance(edit_point[1], int)
+                    or not isinstance(edit_point[2], str)
+                ):
+                    self._error_message = f"Invalid JSON format for {file_path}"
+                    edit_cuts = ()
+                    break
+                edit_cuts.append(tuple(edit_point))
+
+        return tuple(edit_cuts)
+
+    def write_edit_cuts(
+        self,
+        file_path: str,
+        file_cuts: list[(int, int, str)],
+    ):
+        """Store files and cuts in the archive json_file.
+
+        Args:
+            file_path (str): The path of the video file that owns the cuts.
+            files_cuts (list[(int,int,str)]): A  list of cuts for the file_path.
+                Each cut is represented by a tuple with the cut_in value, cut_out value, and cut_name string.
+
+        Returns:
+            int, str: Error code (1 Ok, -1 Fail) and Error Message ("" if all good otherwise and error message)
+        """
+        assert (
+            isinstance(file_path, str) and file_path.strip() != ""
+        ), f"{file_path=}. Must be a str"
+        assert isinstance(file_cuts, list), f"{file_cuts=}. Must be a list"
+
+        for cut in file_cuts:
+            assert isinstance(cut, tuple), f"{cut=}. Must be a tuple"
+            assert len(cut) == 3, f"{cut=}. Must have Mark_In, Mark_Out, Cut Name"
+            assert isinstance(cut[0], int), f"{cut[0]=}. Must be int"
+            assert isinstance(cut[1], int), f"{cut[1]=}. Must be int"
+            assert isinstance(cut[2], str), f"{cut[2]=}. Must be str"
+
+        self._error_message = ""
+        self._error_code = 1
+
+        file_handler = utils.File()
+
+        json_cuts_file = file_handler.file_join(
+            self.archive_folder, self._json_edit_cuts_file, "json"
+        )
+
+        if not file_handler.path_exists(self.archive_folder):
+            self._error_message = f"{self.archive_folder} Does Not Exist"
+            self._error_code = -1
+            return self._error_code, self._error_message
+
+        if not file_handler.path_writeable(self.archive_folder):
+            self._error_message = f"{self.archive_folder} Is Not Writable"
+            self._error_code = -1
+            return self._error_code, self._error_message
+
+        json_data_dict = {}
+
+        if file_handler.file_exists(json_cuts_file):
+            # Read the JSON file. if it exists, so we update the file_path entry
+            try:
+                with open(json_cuts_file, "r") as json_file:
+                    json_data_dict = json.load(json_file)
+            except (
+                FileNotFoundError,
+                PermissionError,
+                IOError,
+                json.decoder.JSONDecodeError,
+            ) as e:
+                # Ignore errors as the file might be empty or corrup. The write statement below will catch
+                # real file OS errors.
+                pass
+
+        json_data_dict[
+            file_path
+        ] = file_cuts  # Update or make new entry in the json_data_dict.
+
+        # Write the JSON file
+        try:
+            with open(json_cuts_file, "w") as json_file:
+                json.dump(json_data_dict, json_file)
+        except (
+            FileNotFoundError,
+            PermissionError,
+            IOError,
+            json.decoder.JSONDecodeError,
+        ) as e:
+            self._error_message = f"Unable to write to JSON file: {e}"
+            self._error_code = -1
+
+        return self._error_code, self._error_message
