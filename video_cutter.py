@@ -470,10 +470,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
         # print(
-        #     f"DBG EH {event.container_tag=} {event.tag=} {event.action=} {event.event=} {event.value=}"
+        #    f"DBG EH {event.container_tag=} {event.tag=} {event.action=} {event.event=} {event.value=}"
         # )
         # print(
-        #     f"DBG VC {event.event=} {event.action=} {event.container_tag=} {event.tag=} {self.container_tag=} {self.tag=}"
+        #    f"DBG VC {event.event=} {event.action=} {event.container_tag=} {event.tag=} {self.container_tag=} {self.tag=}"
         # )
         match event.event:
             case qtg.Sys_Events.WINDOWOPEN:
@@ -510,6 +510,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._assemble_segments(event)
                     case "delete_segements":
                         self._delete_segments(event)
+                    case "mark_in" | "mark_out":  # Edit List Seek
+                        self._edit_list_seek(event)
                     case "forward":
                         self._step_forward()
                     case "play":
@@ -550,7 +552,28 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._media_source.update_slider = True
                         self._sliding = False
 
-    def window_open_handler(self, event):
+    def _edit_list_seek(self, event: qtg.Action):
+        """
+        Seeks on a frame number from the edit list when mark_in or mark_out is clicked
+
+        Args:
+            event (qtg.Action): The event that triggered this method.
+
+        """
+        value: qtg.Grid_Col_Value = event.value
+
+        assert isinstance(
+            value, qtg.Grid_Col_Value
+        ), f"{value=} must be a qtg.Grid_Col_Value"
+
+        if value.value < 0:
+            self._media_source.seek(0)
+        elif value.value >= self._frame_count:
+            self._media_source.seek(self._frame_count - 1)  # frame count is zero based
+        else:
+            self._media_source.seek(value.value)
+
+    def window_open_handler(self, event: qtg.Action):
         """
         Handles the the video_cutters open event processing
 
@@ -1495,6 +1518,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 height=self._display_height,
                 col_def=edit_list_cols,
                 pixel_unit=True,
+                callback=self.event_handler,
+                header_sort=False,
             )
 
             edit_list_buttons = qtg.HBoxContainer(align=qtg.Align.BOTTOMCENTER).add_row(

@@ -278,6 +278,8 @@ class Archive_Manager:
                     break
                 edit_cuts.append(tuple(edit_point))
 
+        edit_cuts = sorted(edit_cuts, key=lambda x: x[0], reverse=False)
+
         return tuple(edit_cuts)
 
     def write_edit_cuts(
