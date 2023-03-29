@@ -1534,7 +1534,7 @@ class _Event_Filter(qtC.QObject):
                     self.popupSignal.emit(event)  # type: ignore
                     return True
                 case qtC.QEvent.Type.KeyPress:
-                    if not isinstance(obj, Grid_TableWidget):
+                    if not isinstance(obj, _Grid_TableWidget):
                         # print(f"{obj=} {event.key()= } {type(obj)=} {isinstance(obj,LineEdit)=} ")
                         # TODO - Matbe tab should be processed separately?
                         if (
@@ -2577,7 +2577,7 @@ class _qtpyBase_Control(_qtpyBase):
                 # self._widget = qtW.QDateEdit(parent)
                 self._widget = _Custom_Dateedit(parent)
             case Grid():
-                self._widget = Grid_TableWidget(parent)  # qtW.QTableWidget(parent)
+                self._widget = _Grid_TableWidget(parent)  # qtW.QTableWidget(parent)
             case FolderView():
                 self._widget = qtW.QTreeView(parent)
             case Image():
@@ -9511,7 +9511,7 @@ class Grid_Col_Value:
     existing_value: any
 
 
-class Grid_TableWidget(qtW.QTableWidget):
+class _Grid_TableWidget(qtW.QTableWidget):
     typeBufferCleared = qtC.Signal(Grid_Col_Value)
 
     def __init__(self, *args, **kwargs) -> None:
@@ -9630,6 +9630,29 @@ class Grid_TableWidget(qtW.QTableWidget):
             self.typeBufferCleared.emit(grid_col_value)
 
 
+class _Grid_TableWidget_Item(qtW.QTableWidgetItem):
+    def __lt__(self, other):
+        self_text = self.text()
+        other_text = other.text()
+
+        try:
+            # if both items are numeric, compare as floats
+            return float(self_text) < float(other_text)
+        except ValueError:
+            try:
+                # if both items are date/time strings, compare as datetime objects
+                self_datetime = datetime.strptime(self_text, "%Y-%m-%d %H:%M:%S")
+                other_datetime = datetime.strptime(other_text, "%Y-%m-%d %H:%M:%S")
+                return self_datetime < other_datetime
+            except ValueError:
+                try:
+                    # if both items are strings, compare as strings
+                    return self_text < other_text
+                except ValueError:
+                    # if either item is not valid, treat it as larger than the other
+                    return False
+
+
 @dataclasses.dataclass
 class Grid(_qtpyBase_Control):
     """Grid widget definition and creation"""
@@ -9640,6 +9663,7 @@ class Grid(_qtpyBase_Control):
     col_def: list[Col_Def] | tuple[Col_Def, ...] = ()
     multiselect: bool = False
     noselection: bool = False
+    header_sort: bool = True
 
     @dataclasses.dataclass(slots=True)
     class _Item_Data:
@@ -9721,28 +9745,19 @@ class Grid(_qtpyBase_Control):
 
         assert isinstance(self.multiselect, bool), f"{self.multiselect=}. Must be bool"
         assert isinstance(self.noselection, bool), f"{self.noselection=}. Must be bool"
+        assert isinstance(self.header_sort, bool), f"{self.header_sort=}. Must be bool"
+
         assert isinstance(
             self.col_def, (list, tuple)
-        ), f"{self.col_def=}. Must be List[COL_DEF] | Tuple[COL_DEF]"
+        ), f"{self.col_def=}. Must be list[Col_Def] | tuplle[Col_Def]"
+
         assert (
             len(self.col_def) > 0
         ), f"{self.col_def=}. Must be at least one column definition!"
 
-        for definition in self.col_def:
-            assert isinstance(definition, Col_Def), f"{definition=}. Must be COL_DEF"
-            assert isinstance(
-                definition.label, str
-            ), f"{definition.label=}. Must be str."
-            assert isinstance(definition.tag, str), f"{definition.tag=}. Must be str."
-            assert isinstance(
-                definition.width, int
-            ), f"{definition.width=}. Must be int"
-            assert isinstance(
-                definition.editable, bool
-            ), f"{definition.editable=}. Must be bool"
-            assert isinstance(
-                definition.checkable, bool
-            ), f"{definition.checkable=}. Must be bool"
+        assert all(
+            isinstance(definition, Col_Def) for definition in self.col_def
+        ), f"{self.col_def=}. All items must be instances of Col_Def"
 
     def _create_widget(
         self, parent_app: QtPyApp, parent: qtW.QWidget, container_tag: str = ""
@@ -9815,7 +9830,7 @@ class Grid(_qtpyBase_Control):
 
             grid_width += self._col_widths[col_index]
 
-            item = qtW.QTableWidgetItem(
+            item = _Grid_TableWidget_Item(
                 definition.label, qtW.QListWidgetItem.ItemType.Type
             )
             item.setData(qtC.Qt.UserRole, item_data)
@@ -9847,7 +9862,12 @@ class Grid(_qtpyBase_Control):
         if self.noselection:
             self._widget.setSelectionMode(qtW.QTableView.NoSelection)
 
-        self._widget.setSortingEnabled(True)
+        if self.header_sort:
+            self._widget.setSortingEnabled(True)
+            self._widget.horizontalHeader().setSectionsClickable(True)
+        else:
+            self._widget.setSortingEnabled(False)
+            self._widget.horizontalHeader().setSectionsClickable(False)
 
         if self.width <= 1:  # Override auto-calculated grid width
             self.width = grid_width + 3  # Scroll bar space
@@ -9900,7 +9920,12 @@ class Grid(_qtpyBase_Control):
             event
             and self.callback
             and (
-                (widget_item and isinstance(widget_item, qtW.QTableWidgetItem))
+                (
+                    widget_item
+                    and isinstance(
+                        widget_item, (qtW.QTableWidgetItem, _Grid_TableWidget_Item)
+                    )
+                )
                 or event in (Sys_Events.FOCUSIN, Sys_Events.FOCUSOUT)
             )
             and self.parent_app.widget_exist(
@@ -10276,7 +10301,7 @@ class Grid(_qtpyBase_Control):
                 orig_row=row,
             )
 
-            item = qtW.QTableWidgetItem("")
+            item = _Grid_TableWidget_Item("")
 
             if self.col_def[col_index].editable:
                 flags = (
