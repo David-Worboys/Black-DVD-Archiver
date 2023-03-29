@@ -9888,6 +9888,7 @@ class Grid(_qtpyBase_Control):
                         row_prev, col_prev, row, col = arg
 
         # print(f"DBG YXXXXY {event=} {args=} {widget_item=}")
+
         value = None
         user_data = None
         self._widget: qtW.QTableWidget  # Type hinting
@@ -9896,24 +9897,28 @@ class Grid(_qtpyBase_Control):
 
         # Handle event
         if (
-            event is not None
-            and self.callback is not None
+            event
+            and self.callback
+            and (
+                (widget_item and isinstance(widget_item, qtW.QTableWidgetItem))
+                or event in (Sys_Events.FOCUSIN, Sys_Events.FOCUSOUT)
+            )
             and self.parent_app.widget_exist(
                 window_id=window_id, container_tag=self.container_tag, tag=self.tag
             )
         ):
+            if row == -1:
+                row = self._widget.currentRow()
+
+            if col == -1:
+                col = self._widget.currentColumn()
+
             event: Sys_Events
             if event == Sys_Events.CLEAR_TYPING_BUFFER:
                 grid_col_value = widget_item  # Grid_Col_Value
             elif event == Sys_Events.TEXTCHANGED:
                 pass
             else:
-                if row == -1:
-                    row = self._widget.currentRow()
-
-                if col == -1:
-                    col = self._widget.currentColumn()
-
                 if row >= 0 and col >= 0:
                     value = self.value_get(row, col)
                     user_data = self.userdata_get(row, col)
@@ -9924,12 +9929,17 @@ class Grid(_qtpyBase_Control):
 
                 grid_col_value = Grid_Col_Value(value, user_data, row, col, value)
 
+            if col >= 0:
+                col_tag = self.coltag_get(col)
+            else:
+                col_tag = self.tag
+
             return _Event_Handler(parent_app=self.parent_app, parent=self).event(
                 window_id=window_id,
                 callback=self.callback,
                 action=event.name,
                 container_tag=self.container_tag,
-                tag=self.tag,
+                tag=col_tag,
                 event=event,
                 value=grid_col_value,
                 widget_dict=self.parent_app.widget_dict_get(
@@ -10115,7 +10125,7 @@ class Grid(_qtpyBase_Control):
         assert isinstance(column_index, int), "column_index must be an integer."
         assert (
             0 <= column_index < self._widget.columnCount()
-        ), "column_index is out of range."
+        ), f"{column_index=} is out of range. {self._widget.columnCount()=}"
 
         item = self._widget.horizontalHeaderItem(column_index)
         item_data = item.data(qtC.Qt.UserRole)
