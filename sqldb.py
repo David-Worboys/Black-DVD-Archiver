@@ -31,8 +31,9 @@ from typing import Callable
 
 import platformdirs
 
+from file_utils import File
 from sys_consts import SDELIM
-from utils import File, Get_Unique_Sysid, Is_Complied, strEnum
+from utils import Get_Unique_Sysid, Is_Complied, strEnum
 
 # fmt: on
 

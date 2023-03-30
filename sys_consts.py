@@ -21,13 +21,14 @@
 import datetime
 from typing import Callable
 
+import file_utils
 import utils
 
 # fmt: on
 
 executable_folder = utils.App_Path()
 
-file_sep = utils.File().ossep
+file_sep = file_utils.File().ossep
 
 PROGRAM_NAME = "Black DVD Archiver"
 PROGRAM_VERSION = "0.2"

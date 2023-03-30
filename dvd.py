@@ -31,9 +31,9 @@ import psutil
 import xmltodict
 
 import dvdarch_utils
+import file_utils
 import sqldb
 import sys_consts
-import utils
 
 # fmt: on
 
@@ -58,7 +58,7 @@ class File_Def:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a file path"
 
-        assert utils.File().path_exists(value), f"{value=}. Path does not exist"
+        assert file_utils.File().path_exists(value), f"{value=}. Path does not exist"
 
         self._path = value
 
@@ -94,7 +94,7 @@ class File_Def:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a file path"
 
-        assert utils.File().file_exists(value), f"{value=}. Path does not exist"
+        assert file_utils.File().file_exists(value), f"{value=}. Path does not exist"
 
         self._mneu_image_file_path = value
 
@@ -116,7 +116,7 @@ class File_Def:
             self.path != "" and self.file_name != ""
         ), f"{self.path=}, {self.file_name=}. Must be set"
 
-        return utils.File().file_join(self.path, self.file_name)
+        return file_utils.File().file_join(self.path, self.file_name)
 
 
 @dataclasses.dataclass
@@ -153,7 +153,7 @@ class DVD_Config:
                 video_file, File_Def
             ), f"{video_file=}. Must be a File_Def"
 
-            assert utils.File().path_exists(
+            assert file_utils.File().path_exists(
                 video_file.path
             ), f"{video_file.path=}. Must be a valid file path"
 
@@ -220,7 +220,7 @@ class DVD_Config:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a non-empty string"
 
-        if utils.File().file_exists(value):
+        if file_utils.File().file_exists(value):
             self._menu_font = value
             return
         else:
@@ -275,7 +275,7 @@ class DVD_Config:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a non-empty string"
 
-        if utils.File().path_exists(value):
+        if file_utils.File().path_exists(value):
             self._timestamp_font = value
             return
         else:
@@ -513,7 +513,7 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         self._dvd_working_folder = (
             f"{self.working_folder}{file_handler.ossep}{sys_consts.PROGRAM_NAME} DVD"
@@ -588,7 +588,7 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         # Black Video Choices
         average_bit_rate = sys_consts.AVERAGE_BITRATE
@@ -918,7 +918,7 @@ class DVD:
         # background: str = "none"
         # gravity: str = "center"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         for input_video in self.dvd_setup.input_videos:
             path_name, file_name, file_extn = file_handler.split_file_path(
@@ -934,7 +934,7 @@ class DVD:
             if not file_handler.file_exists(menu_button_file):
                 return -1, f"Video File Does Not Exist : {menu_button_file}"
 
-            menu_text = utils.File().extract_title(file_name)
+            menu_text = file_utils.File().extract_title(file_name)
 
             result, message = dvdarch_utils.overlay_text(
                 in_file=menu_button_file,
@@ -1318,7 +1318,7 @@ class DVD:
             return dvdarch_utils.execute_check_output(commands=command)
 
         # ===== Main
-        file_handler = utils.File()
+        file_handler = file_utils.File()
         path_name, file_name, file_extn = file_handler.split_file_path(
             self._background_canvas_file
         )
@@ -1613,7 +1613,7 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         path_name, file_name, file_extn = file_handler.split_file_path(
             self._background_canvas_file
@@ -1707,7 +1707,7 @@ class DVD:
             - arg2: error message or "" if ok
         """
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         path_name, file_name, _ = file_handler.split_file_path(
             self._background_canvas_file
@@ -1760,7 +1760,7 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         path_name, file_name, _ = file_handler.split_file_path(
             self._background_canvas_file
@@ -1792,7 +1792,7 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         path_name, file_name, _ = file_handler.split_file_path(
             self._background_canvas_file
@@ -1836,7 +1836,7 @@ class DVD:
             tuple[int, str]: _description_
         """
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         path_name, file_name, _ = file_handler.split_file_path(
             self._background_canvas_file

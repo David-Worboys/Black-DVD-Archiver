@@ -32,8 +32,8 @@ from typing import Generator, Optional
 import psutil
 import xmltodict
 
+import file_utils
 import sys_consts
-import utils
 
 # fmt: on
 
@@ -163,7 +163,7 @@ def concatenate_videos(
     assert isinstance(audio_codec, str), f"{audio_codec=}. Must be a str"
     assert isinstance(delete_temp_files, bool), f"{delete_temp_files=}. Must be a bool"
 
-    file_handler = utils.File()
+    file_handler = file_utils.File()
     out_path, _, _ = file_handler.split_file_path(output_file)
     file_list_txt = file_handler.file_join(out_path, "file_list", "txt")
 
@@ -1153,7 +1153,7 @@ def generate_menu_image_from_file(
     ), f"{out_folder=}. Must be non-empty str"
     assert isinstance(button_height, int), f"{button_height=}. Must be int > 0"
 
-    file_handler = utils.File()
+    file_handler = file_utils.File()
 
     video_file_path, video_file_name = file_handler.split_head_tail(video_file)
 

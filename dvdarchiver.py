@@ -28,6 +28,7 @@ import datetime
 import platformdirs
 
 import dvdarch_utils
+import file_utils
 import qtgui as qtg
 import sqldb
 import sys_consts
@@ -105,7 +106,7 @@ class DVD_Archiver:
         Raises:
             RuntimeError: If the application data folder cannot be created or the database cannot be initialized.
         """
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         if not file_handler.path_exists(self._data_path):
             print(f"*** Need To Create {self._data_path}")
@@ -216,7 +217,7 @@ class DVD_Archiver:
                 else:
                     return -1
             case qtg.Sys_Events.APPPOSTINIT:
-                file_handler = utils.File()
+                file_handler = file_utils.File()
 
                 menu_background_color: str = self._db_settings.setting_get(
                     "menu_background_color"
@@ -514,7 +515,7 @@ class DVD_Archiver:
             isinstance(fd, File_Def) for fd in video_file_defs
         ), f"All elements in {video_file_defs} must be instances of File_Def"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
         dvd_image_folder = self._dvd.dvd_image_folder
         iso_folder = self._dvd.iso_folder
         archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
@@ -852,7 +853,7 @@ class File_Control:
             Returns:
                 str: The full path to the video file
             """
-            video_path = utils.File().file_join(
+            video_path = file_utils.File().file_join(
                 self.video_folder, self.video_file, self.video_extension
             )
 
@@ -905,7 +906,7 @@ class File_Control:
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
         dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
         if dvd_folder is None or dvd_folder.strip() == "":
@@ -1004,7 +1005,7 @@ class File_Control:
             isinstance(source_file_path, str) and source_file_path.strip() != ""
         ), f"{source_file_path=}. Must be a non-empty str"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         (
             source_folder,
@@ -1051,7 +1052,7 @@ class File_Control:
             isinstance(trimmed_file, str) and trimmed_file.strip() != ""
         ), f"{trimmed_file=}. Must be a non-empty str."
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         (
             source_folder,
@@ -1173,7 +1174,7 @@ class File_Control:
         ).show()
 
         if selected_files.strip() != "":
-            file_handler = utils.File()
+            file_handler = file_utils.File()
             file_grid: qtg.Grid = event.widget_get(
                 container_tag="video_file_controls",
                 tag="video_input_files",
@@ -1221,7 +1222,7 @@ class File_Control:
                 ).show()
 
     def _insert_files_into_grid(
-        self, file_handler: utils.File, file_grid: qtg.Grid, selected_files: str
+        self, file_handler: file_utils.File, file_grid: qtg.Grid, selected_files: str
     ):
         """
         Inserts files into a the file gird widget.
@@ -1236,7 +1237,7 @@ class File_Control:
 
         """
         assert isinstance(
-            file_handler, utils.File
+            file_handler, file_utils.File
         ), f"{file_handler=}. Must be an instance of utils.File"
         assert isinstance(
             file_grid, qtg.Grid

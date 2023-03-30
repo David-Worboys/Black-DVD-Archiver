@@ -23,8 +23,8 @@ import dataclasses
 import json
 from datetime import datetime
 
+import file_utils
 import sys_consts
-import utils
 
 # fmt: on
 
@@ -69,7 +69,7 @@ class Archive_Manager:
         Returns:
             str : An error message if the folder structure caould not be created
         """
-        file_handler = utils.File()
+        file_handler = file_utils.File()
         self._error_code = 1
 
         if not file_handler.path_exists(self.archive_folder):
@@ -133,7 +133,7 @@ class Archive_Manager:
 
         self._error_code = 1
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         backup_path = file_handler.file_join(self.archive_folder, dvd_name)
 
@@ -248,7 +248,7 @@ class Archive_Manager:
         self._error_message = ""
         self._error_code = 1
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
         json_cuts_file = file_handler.file_join(
             self.archive_folder, self._json_edit_cuts_file, "json"
         )
@@ -301,7 +301,7 @@ class Archive_Manager:
                     break
                 edit_cuts.append(tuple(edit_point))
 
-        edit_cuts = sorted(edit_cuts, key=lambda x: x[0], reverse=False)
+        # edit_cuts = sorted(edit_cuts, key=lambda x: x[0], reverse=False)
 
         return tuple(edit_cuts)
 
@@ -335,7 +335,7 @@ class Archive_Manager:
         self._error_message = ""
         self._error_code = 1
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         json_cuts_file = file_handler.file_join(
             self.archive_folder, self._json_edit_cuts_file, "json"

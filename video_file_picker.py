@@ -19,6 +19,7 @@
 # fmt: off
 import dataclasses
 
+import file_utils
 import qtgui as qtg
 import sqldb
 import sys_consts
@@ -119,7 +120,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         ), f"{video_folder=}. Must be a non-empty str"
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         if file_handler.path_exists(
             video_folder

@@ -24,8 +24,9 @@ from typing import Optional
 import platformdirs
 
 import sqldb
+from file_utils import File
 from sys_consts import PROGRAM_NAME, SDELIM
-from utils import File, Singleton
+from utils import Singleton
 
 # fmt: on
 
