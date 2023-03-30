@@ -87,7 +87,9 @@ class Video_File_Picker_Popup(qtg.PopContainer):
 
                         video_folder = qtg.PopFolderGet(
                             title="Select A Video Folder....",
-                            root_dir=f"{sys_consts.SDELIM}{video_folder}{sys_consts.SDELIM}",
+                            root_dir=(
+                                f"{sys_consts.SDELIM}{video_folder}{sys_consts.SDELIM}"
+                            ),
                             create_folder=False,
                             folder_edit=False,
                         ).show()

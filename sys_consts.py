@@ -36,17 +36,20 @@ LICENCE = "GNU V3 GPL"
 
 
 # Needs Callable to keep MyPy happy. Returns a string that is either 2020 or 2020-<current year>
-COPYRIGHT_YEAR: Callable[
-    [], str
-] = (
-    lambda: f"{'2022' if str(datetime.date.today().year) == '2022' else '2022-'+str(datetime.date.today().year) }"
+COPYRIGHT_YEAR: Callable[[], str] = (
+    lambda: (
+        f"{'2022' if str(datetime.date.today().year) == '2022' else '2022-'+str(datetime.date.today().year) }"
+    )
 )
 
-VERSION_TAG = f"{PROGRAM_VERSION} {LICENCE} (c){COPYRIGHT_YEAR()} {AUTHOR} (-:alumnus Moyhu Primary School et al.:-)"
+VERSION_TAG = (
+    f"{PROGRAM_VERSION} {LICENCE} (c){COPYRIGHT_YEAR()} {AUTHOR} (-:alumnus Moyhu"
+    " Primary School et al.:-)"
+)
 
 SEED = "9d392b49808544f7bc5b93b935b76ced"
-SDELIM = (
-    "||"  # Used to delimit strings - particularly non-translatable sections of strings
+SDELIM = (  # Used to delimit strings - particularly non-translatable sections of strings
+    "||"
 )
 PAL = "PAL"
 NTSC = "NTSC"

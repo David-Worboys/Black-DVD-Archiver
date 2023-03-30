@@ -104,7 +104,8 @@ class Lang_Tran(metaclass=Singleton):
 
             if self.DB.table_create("lang_tran", lang_tran_def, drop_table=True) == -1:
                 raise RuntimeError(
-                    f"Failed To Configure {PROGRAM_NAME} - Could Not Create Table <{self._db_file}>"
+                    f"Failed To Configure {PROGRAM_NAME} - Could Not Create Table"
+                    f" <{self._db_file}>"
                 )
 
     def translate(self, trans_word: str, delim: str = SDELIM) -> str:
@@ -166,12 +167,15 @@ class Lang_Tran(metaclass=Singleton):
                 notrans_word = deleted_wordlist.pop()
 
                 if notrans_word != "":
-                    trans_string = f"{'' if trans_string == '' else trans_string + ' '}{notrans_word}"
+                    trans_string = (
+                        f"{'' if trans_string == '' else trans_string + ' '}{notrans_word}"
+                    )
             else:
                 if word_token != "":
                     trans_sql = (
-                        f"{sqldb.SQL.SELECT} id, word {sqldb.SQL.FROM} lang_tran {sqldb.SQL.WHERE} word = '{word_token}' "
-                        f"{sqldb.SQL.AND} language_code {sqldb.SQL.IS_NULL}"
+                        f"{sqldb.SQL.SELECT} id, word {sqldb.SQL.FROM} lang_tran"
+                        f" {sqldb.SQL.WHERE} word = '{word_token}'"
+                        f" {sqldb.SQL.AND} language_code {sqldb.SQL.IS_NULL}"
                     )
 
                     result = self.DB.sql_execute(trans_sql, debug=False)
@@ -194,8 +198,9 @@ class Lang_Tran(metaclass=Singleton):
                             )
                         ):
                             sql = (
-                                f"{sqldb.SQL.INSERTINTO} lang_tran (language_code, word) {sqldb.SQL.VALUES} "
-                                f"(NULL,'{word_token.strip()}')"
+                                f"{sqldb.SQL.INSERTINTO} lang_tran (language_code,"
+                                " word)"
+                                f" {sqldb.SQL.VALUES} (NULL,'{word_token.strip()}')"
                             )
                             result = self.DB.sql_execute(sql, debug=True)
                             error = self.DB.get_error_status()
@@ -203,14 +208,18 @@ class Lang_Tran(metaclass=Singleton):
                             if error.code == 1:
                                 if self.DB.sql_commit == -1:
                                     print(f"SQL Error {error.code=} {error.message=}")
-                            trans_string = f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
+                            trans_string = (
+                                f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
+                            )
                         else:
-                            trans_string = f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
+                            trans_string = (
+                                f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
+                            )
                     else:
                         trans_sql = (
-                            f"{sqldb.SQL.SELECT} id, word {sqldb.SQL.FROM} lang_tran {sqldb.SQL.WHERE} "
-                            f"base_lang_id = '{base_lang_id}' "
-                            f"{sqldb.SQL.AND} language_code = '{self._language_code}'"
+                            f"{sqldb.SQL.SELECT} id, word {sqldb.SQL.FROM} lang_tran"
+                            f" {sqldb.SQL.WHERE} base_lang_id = '{base_lang_id}'"
+                            f" {sqldb.SQL.AND} language_code = '{self._language_code}'"
                         )
 
                         result = self.DB.sql_execute(trans_sql, debug=False)
@@ -219,9 +228,13 @@ class Lang_Tran(metaclass=Singleton):
                         if error.code == 1 and result:  # Have a foreign word
                             foreign_word = result[0][1]
 
-                            trans_string = f"{'' if trans_string == '' else trans_string + ' '}{foreign_word}"
+                            trans_string = (
+                                f"{'' if trans_string == '' else trans_string + ' '}{foreign_word}"
+                            )
                         else:
-                            trans_string = f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
+                            trans_string = (
+                                f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
+                            )
         if debug:
             print(f"DBG Trans {trans_word=} {trans_string=}")
 

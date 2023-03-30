@@ -66,7 +66,8 @@ class DVD_Archiver:
         # A problem in the next 3 lines can shutdown startup as daabase initialization failed
         if self._db_settings.error_code == -1:
             raise RuntimeError(
-                f"Failed To Start {sys_consts.PROGRAM_NAME} - {self._db_settings.error_message}"
+                f"Failed To Start {sys_consts.PROGRAM_NAME} -"
+                f" {self._db_settings.error_message}"
             )
         self._app_db = self.db_init()
         self._db_tables_create()
@@ -174,7 +175,8 @@ class DVD_Archiver:
                 error_status = self._app_db.get_error_status()
 
                 raise RuntimeError(
-                    f"Failed To Create {sys_consts.PROGRAM_NAME} Database - {error_status.message}"
+                    f"Failed To Create {sys_consts.PROGRAM_NAME} Database -"
+                    f" {error_status.message}"
                 )
             # Load a default product line
             self._app_db.sql_update(
@@ -185,7 +187,8 @@ class DVD_Archiver:
             error_status = self._app_db.get_error_status()
             if error_status.code == -1:
                 raise RuntimeError(
-                    f"Failed To Initialise {sys_consts.PROGRAM_NAME} Database - {error_status.message}"
+                    f"Failed To Initialise {sys_consts.PROGRAM_NAME} Database -"
+                    f" {error_status.message}"
                 )
 
     def event_handler(self, event: qtg.Action):
@@ -201,7 +204,10 @@ class DVD_Archiver:
                 if (
                     qtg.PopYesNo(
                         title="Exit Application...",
-                        message=f"Exit The {sys_consts.SDELIM}{sys_consts.PROGRAM_NAME}?{sys_consts.SDELIM}",
+                        message=(
+                            "Exit The"
+                            f" {sys_consts.SDELIM}{sys_consts.PROGRAM_NAME}?{sys_consts.SDELIM}"
+                        ),
                     ).show()
                     == "yes"
                 ):
@@ -595,7 +601,11 @@ class DVD_Archiver:
             else:
                 qtg.PopError(
                     title="Font Can Not Be Rendered...",
-                    message=f"THe font {sys_consts.SDELIM} {combo_data.display} {sys_consts.SDELIM} Can Not Be Rendered!",
+                    message=(
+                        "The font"
+                        f" {sys_consts.SDELIM} {combo_data.display} {sys_consts.SDELIM} Can"
+                        " Not Be Rendered!"
+                    ),
                 ).show()
 
     def layout(self) -> qtg.VBoxContainer:
@@ -901,7 +911,9 @@ class File_Control:
         if dvd_folder is None or dvd_folder.strip() == "":
             qtg.PopError(
                 title="DVD Build Folder Error...",
-                message="A DVD Build Folder Must Be Entered Before Making A Video Edit!",
+                message=(
+                    "A DVD Build Folder Must Be Entered Before Making A Video Edit!"
+                ),
             ).show()
             return None
 
@@ -1117,7 +1129,10 @@ class File_Control:
                         if folder is None or folder.strip() == "":
                             qtg.PopError(
                                 title="DVD Build Folder Error...",
-                                message="A DVD Build Folder Must Be Entered Before Video Folders Are Selected!",
+                                message=(
+                                    "A DVD Build Folder Must Be Entered Before Video"
+                                    " Folders Are Selected!"
+                                ),
                             ).show()
                             return None
 
@@ -1185,7 +1200,8 @@ class File_Control:
 
                     if project_video_standard != video_standard:
                         rejected += (
-                            f"{sys_consts.SDELIM}{file_name} : {sys_consts.SDELIM} Not Project Video Standard "
+                            f"{sys_consts.SDELIM}{file_name} : {sys_consts.SDELIM} Not"
+                            " Project Video Standard "
                             f"{sys_consts.SDELIM}{project_video_standard}{sys_consts.SDELIM} \n"
                         )
 
@@ -1283,7 +1299,10 @@ class File_Control:
                 )
 
                 if video_user_data.encoding_info["video_tracks"][1] == 0:
-                    rejected += f"{sys_consts.SDELIM}{video_file_name} : {sys_consts.SDELIM}No Video Track \n"
+                    rejected += (
+                        f"{sys_consts.SDELIM}{video_file_name} : {sys_consts.SDELIM}No"
+                        " Video Track \n"
+                    )
                     continue
 
                 duration = str(
@@ -1320,10 +1339,12 @@ class File_Control:
                 )
 
                 file_grid.value_set(
-                    value=video_user_data.encoding_info["video_standard"][1]
-                    + f" : { video_user_data.encoding_info['video_scan_order'][1]}"
-                    if video_user_data.encoding_info["video_scan_order"] != ""
-                    else "",
+                    value=(
+                        video_user_data.encoding_info["video_standard"][1]
+                        + f" : { video_user_data.encoding_info['video_scan_order'][1]}"
+                        if video_user_data.encoding_info["video_scan_order"] != ""
+                        else ""
+                    ),
                     row=rows_loaded + row_index,
                     col=4,
                     user_data=video_user_data,
@@ -1392,7 +1413,9 @@ class File_Control:
         event.value_set(
             container_tag="dvd_properties",
             tag="project_video_standard",
-            value=f"{sys_consts.SDELIM}{self.project_video_standard}{sys_consts.SDELIM}",
+            value=(
+                f"{sys_consts.SDELIM}{self.project_video_standard}{sys_consts.SDELIM}"
+            ),
         )
 
         event.value_set(

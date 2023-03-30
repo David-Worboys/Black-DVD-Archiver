@@ -74,17 +74,22 @@ class Archive_Manager:
 
         if not file_handler.path_exists(self.archive_folder):
             if file_handler.make_dir(self.archive_folder) == -1:
-                self._error_message = f"Failed To Create Archive Folder {sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM}"
+                self._error_message = (
+                    "Failed To Create Archive Folder"
+                    f" {sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM}"
+                )
                 self._error_code = -1
                 return self._error_message
 
             now = datetime.now()
-            readme_file = f"{self.archive_folder}{file_handler.ossep}README.txt"
+            readme_file = file_handler.file_join(self.archive_folder, "README", "txt")
 
             try:
                 with open(readme_file, "w") as file:
                     file.write(
-                        f"{now} \n Video Archive Folder Created By {sys_consts.PROGRAM_NAME} - {sys_consts.VERSION_TAG} \n Do Not Delete!"
+                        f"{now} \n Video Archive Folder Created By"
+                        f"{sys_consts.PROGRAM_NAME} - {sys_consts.VERSION_TAG} \n Do"
+                        " Not Delete Folder!"
                     )
             except:
                 self._error_message = f"Failed To Write {readme_file} "
@@ -130,30 +135,45 @@ class Archive_Manager:
 
         file_handler = utils.File()
 
-        backup_path = f"{self.archive_folder}{file_handler.ossep}{dvd_name}"
+        backup_path = file_handler.file_join(self.archive_folder, dvd_name)
 
         if not file_handler.path_exists(dvd_folder):
-            self._error_message = f"Can Not Access DVD Folder : {sys_consts.SDELIM}{dvd_folder}{sys_consts.SDELIM}"
+            self._error_message = (
+                "Can Not Access DVD Folder :"
+                f" {sys_consts.SDELIM}{dvd_folder}{sys_consts.SDELIM}"
+            )
             self._error_code = -1
             return -1, self._error_message
 
         if not file_handler.path_exists(iso_folder):
-            self._error_message = f"Can Not Access ISO Folder : {sys_consts.SDELIM}{iso_folder}{sys_consts.SDELIM}"
+            self._error_message = (
+                "Can Not Access ISO Folder :"
+                f" {sys_consts.SDELIM}{iso_folder}{sys_consts.SDELIM}"
+            )
             self._error_code = -1
             return -1, self._error_message
 
         if not file_handler.path_exists(self.archive_folder):
-            self._error_message = f"Can Not Access Archive Folder : {sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM}"
+            self._error_message = (
+                "Can Not Access Archive Folder :"
+                f" {sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM}"
+            )
             self._error_code = -1
             return -1, self._error_message
 
         if not file_handler.path_writeable(self.archive_folder):
-            self._error_message = f"Can Not Write To Archive Folder : {sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM}"
+            self._error_message = (
+                "Can Not Write To Archive Folder :"
+                f" {sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM}"
+            )
             self._error_code = -1
             return -1, self._error_message
 
         if file_handler.path_exists(backup_path) and not overwrite_existing:
-            self._error_message = f"Backup Folder Already Exists : {sys_consts.SDELIM}{sys_consts.SDELIM}{sys_consts.SDELIM}"
+            self._error_message = (
+                "Backup Folder Already Exists :"
+                f" {sys_consts.SDELIM}{sys_consts.SDELIM}{sys_consts.SDELIM}"
+            )
             self._error_code = -1
 
             return -1, self._error_message
@@ -173,11 +193,14 @@ class Archive_Manager:
             self._error_code = -1
             return (
                 -1,
-                f"Failed To Create Backup Folder : {sys_consts.SDELIM}{dvd_name}{sys_consts.SDELIM}",
+                (
+                    "Failed To Create Backup Folder :"
+                    f" {sys_consts.SDELIM}{dvd_name}{sys_consts.SDELIM}"
+                ),
             )
 
         for folder in self._backup_folders:
-            backup_item_folder = f"{backup_path}{file_handler.ossep}{folder}"
+            backup_item_folder = file_handler.file_join(backup_path, folder)
 
             if folder == DVD_IMAGE:
                 result, message = file_handler.copy_dir(
@@ -345,9 +368,9 @@ class Archive_Manager:
                 # real file OS errors.
                 pass
 
-        json_data_dict[
-            file_path
-        ] = file_cuts  # Update or make new entry in the json_data_dict.
+        json_data_dict[file_path] = (
+            file_cuts  # Update or make new entry in the json_data_dict.
+        )
 
         # Write the JSON file
         try:

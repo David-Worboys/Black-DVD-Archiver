@@ -396,7 +396,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self._frame_count = self.encoding_info["video_frame_count"][1]
 
         # Group the video cutter working folders togethr and seperate from the DVD Build
-        self.output_folder = f"{self.output_folder}{utils.File().ossep}{sys_consts.PROGRAM_NAME} Video Editor"
+        self.output_folder = (
+            f"{self.output_folder}{utils.File().ossep}{sys_consts.PROGRAM_NAME} Video"
+            " Editor"
+        )
 
         self.container = self.layout()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
@@ -422,7 +425,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
         if not file_handler.path_exists(self.output_folder):
             qtg.PopError(
                 title="Video Output Folder Does Not Exist",
-                message=f"The output folder {sys_consts.SDELIM}'{self.output_folder}'{sys_consts.SDELIM} does not exist. Please create the folder and try again.",
+                message=(
+                    "The output folder"
+                    f" {sys_consts.SDELIM}'{self.output_folder}'{sys_consts.SDELIM} does"
+                    " not exist. Please create the folder and try again."
+                ),
             ).show()
             self.close()
 
@@ -437,14 +444,23 @@ class Video_Cutter_Popup(qtg.PopContainer):
             # This should never happen, unless dev error or mount/drive problems
             qtg.PopError(
                 title="Video File Does Not Exist",
-                message=f"The input video file {sys_consts.SDELIM}'{self.input_file}'{sys_consts.SDELIM} does not exist. Please ensure the file exists and try again.",
+                message=(
+                    "The input video file"
+                    f" {sys_consts.SDELIM}'{self.input_file}'{sys_consts.SDELIM} does"
+                    " not exist. Please ensure the file exists and try again."
+                ),
             ).show()
             self.close()
 
         if not file_handler.path_writeable(self.output_folder):
             qtg.PopError(
                 title="Video Output Folder Write Error",
-                message=f"The output folder {sys_consts.SDELIM}'{self.output_folder}'{sys_consts.SDELIM} is not writeable. Please ensure you have write permissions for the folder and try again.",
+                message=(
+                    "The output folder"
+                    f" {sys_consts.SDELIM}'{self.output_folder}'{sys_consts.SDELIM} is"
+                    " not writeable. Please ensure you have write permissions for the"
+                    " folder and try again."
+                ),
             ).show()
             self.close()
 
@@ -452,14 +468,24 @@ class Video_Cutter_Popup(qtg.PopContainer):
             if file_handler.make_dir(self._edit_folder) == -1:
                 qtg.PopError(
                     title="Video Edit Folder Creation Error",
-                    message=f"Failed to create the video edit folder {sys_consts.SDELIM}'{self._edit_folder}'.{sys_consts.SDELIM} Please ensure you have write permissions for the folder and try again.",
+                    message=(
+                        "Failed to create the video edit folder"
+                        f" {sys_consts.SDELIM}'{self._edit_folder}'.{sys_consts.SDELIM} Please"
+                        " ensure you have write permissions for the folder and try"
+                        " again."
+                    ),
                 ).show()
 
         if not file_handler.path_exists(self._transcode_folder):
             if file_handler.make_dir(self._transcode_folder) == -1:
                 qtg.PopError(
                     title="Video Transcode Folder Creation Error",
-                    message=f"Failed to create the video transcode folder {sys_consts.SDELIM}'{self._transcode_folder}'.{sys_consts.SDELIM} Please ensure you have write permissions for the folder and try again.",
+                    message=(
+                        "Failed to create the video transcode folder"
+                        f" {sys_consts.SDELIM}'{self._transcode_folder}'.{sys_consts.SDELIM} Please"
+                        " ensure you have write permissions for the folder and try"
+                        " again."
+                    ),
                 ).show()
 
     def event_handler(self, event: qtg.Action):
@@ -1133,7 +1159,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 raise ValueError("edit_list should not be empty")
             if any(start_frame >= end_frame for start_frame, end_frame in edit_list):
                 raise ValueError(
-                    "start_frame should be less than end_frame in every tuple of edit_list"
+                    "start_frame should be less than end_frame in every tuple of"
+                    " edit_list"
                 )
 
             prev_start = 0
@@ -1324,7 +1351,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
             if (
                 qtg.PopYesNo(
                     title="Files Edited...",
-                    message="Video Edits Have Been Made, Discard Changes and Delete The Edited Files?",
+                    message=(
+                        "Video Edits Have Been Made, Discard Changes and Delete The"
+                        " Edited Files?"
+                    ),
                 ).show()
                 == "yes"
             ):
@@ -1868,7 +1898,10 @@ class File_Renamer_Popup(qtg.PopContainer):
             if file_name.strip() != "" and not file_handler.filename_validate(
                 file_name
             ):
-                error_msg = f"{sys_consts.SDELIM}{file_name!r}{sys_consts.SDELIM} is not a valid file name! Please reenter."
+                error_msg = (
+                    f"{sys_consts.SDELIM}{file_name!r}{sys_consts.SDELIM} is not a"
+                    " valid file name! Please reenter."
+                )
                 qtg.PopError(title="Invalid File Name...", message=error_msg).show()
                 file_grid.row_scroll_to(row_index, col_index)
                 return -1
@@ -1880,7 +1913,11 @@ class File_Renamer_Popup(qtg.PopContainer):
 
             if file_name.strip() != old_file_name.strip():
                 if file_handler.rename_file(old_file, new_file_path) == -1:
-                    error_msg = f"Failed to rename file {sys_consts.SDELIM}{old_file_path!r}{sys_consts.SDELIM} to {sys_consts.SDELIM}{new_file_path!r}{sys_consts.SDELIM}"
+                    error_msg = (
+                        "Failed to rename file"
+                        f" {sys_consts.SDELIM}{old_file_path!r}{sys_consts.SDELIM} to"
+                        f" {sys_consts.SDELIM}{new_file_path!r}{sys_consts.SDELIM}"
+                    )
 
                     qtg.PopError(
                         title="Failed To Rename File...", message=error_msg

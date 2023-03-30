@@ -953,7 +953,8 @@ def execute_check_output(
             print(f'DBG Call command ***   {" ".join(commands)}')
             print(f"DBG Call commands command lisr ***   {commands}")
             print(
-                f'DBG Call commands shlex split  ***   {shlex.split(" ".join(commands))}'
+                "DBG Call commands shlex split  ***  "
+                f" {shlex.split(' '.join(commands))}"
             )
             output = subprocess.check_output(
                 commands if not execute_as_string else " ".join(commands),

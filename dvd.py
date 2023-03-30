@@ -515,7 +515,10 @@ class DVD:
         """
         file_handler = utils.File()
 
-        self._dvd_working_folder = f"{self.working_folder}{file_handler.ossep}{sys_consts.PROGRAM_NAME} DVD Builder"
+        self._dvd_working_folder = (
+            f"{self.working_folder}{file_handler.ossep}{sys_consts.PROGRAM_NAME} DVD"
+            " Builder"
+        )
 
         if file_handler.path_exists(
             self._dvd_working_folder
@@ -564,7 +567,10 @@ class DVD:
         ) and not file_handler.path_writeable(self._dvd_working_folder):
             return (
                 -1,
-                f"{self._dvd_working_folder=}. Could Not Be Created Or Is Not Writeable",
+                (
+                    f"{self._dvd_working_folder=}. Could Not Be Created Or Is Not"
+                    " Writeable"
+                ),
             )
 
         # Build mandatory file paths
@@ -590,7 +596,9 @@ class DVD:
 
         # Black filter Choices for now TODO Allow some user configuration
         debug = False
-        normalise_video_filter = "normalize=blackpt=black:whitept=white:smoothing=12:independence=1"  # Try to improve exposure of video
+        normalise_video_filter = (  # Try to improve exposure of video
+            "normalize=blackpt=black:whitept=white:smoothing=12:independence=1"
+        )
 
         video_denoise_filter = "nlmeans=1.0:7:5:3:3"  # Light but fairly fast denoise
         color_correct_filter = "colorcorrect=analyze='average'"  # Fixes white balance
@@ -605,11 +613,11 @@ class DVD:
         if apply_video_filters:
             video_filters = [
                 "-vf",  # set video filters,
-                (
+                (  # video filters applied
                     f"{normalise_video_filter},{auto_bright},{video_denoise_filter},"
                     f" {color_correct_filter}, {usharp_filter},"
                     f" {black_box_filter}"
-                ),  # video filters applied
+                ),
             ]
         else:
             video_filters = []
@@ -637,7 +645,10 @@ class DVD:
             else:
                 return (
                     -1,
-                    f'Unrecognised Aspect Ratio : {video_file.file_info["video_ar"][1]}',
+                    (
+                        "Unrecognised Aspect Ratio :"
+                        f" {video_file.file_info['video_ar'][1]}"
+                    ),
                 )
 
             video_width = video_file.file_info["video_width"][1]
@@ -651,7 +662,10 @@ class DVD:
                     # TODO Add Resize Filter
                     return (
                         -1,
-                        f"Video {video_width=}x{video_height} does not conform to PAL standard size 720x576",
+                        (
+                            f"Video {video_width=}x{video_height} does not conform to"
+                            " PAL standard size 720x576"
+                        ),
                     )
             else:  # NTSC
                 frame_rate = f"{sys_consts.NTSC_FRAMERATE}"
@@ -661,7 +675,10 @@ class DVD:
                 else:
                     return (
                         -1,
-                        f"Video {video_width=}x{video_height} does not conform to NTSC standard size 720x480",
+                        (
+                            f"Video {video_width=}x{video_height} does not conform to"
+                            " NTSC standard size 720x480"
+                        ),
                     )
 
             if debug:
@@ -1563,7 +1580,10 @@ class DVD:
             if menu_image_frame > video_file.file_info["video_frame_count"][1]:
                 return (
                     -1,
-                    f"{menu_image_frame=} is greater than video frame count {video_file.file_info['video_frame_count'][1]}",
+                    (
+                        f"{menu_image_frame=} is greater than video frame count"
+                        f" {video_file.file_info['video_frame_count'][1]}"
+                    ),
                 )
 
             (

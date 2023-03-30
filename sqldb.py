@@ -410,7 +410,8 @@ class App_Settings:
             if app_id > 0:
                 sql_statement = (
                     f"{SQL.SELECT} {SQL.COUNT}('*') {SQL.FROM} {SYSDEF.SYSSETTINGS} "
-                    + f" {SQL.WHERE} app_id = {app_id} {SQL.AND} setting_name = '{setting_name}' "
+                    + f" {SQL.WHERE} app_id = {app_id} {SQL.AND} setting_name ="
+                    f" '{setting_name}' "
                 )
 
                 setting_result = self._appcfg_db.sql_execute(sql_statement)
@@ -455,7 +456,8 @@ class App_Settings:
             sql_statement = (
                 f"{SQL.SELECT} setting_value, datatype"
                 + f" {SQL.FROM} {SYSDEF.SYSSETTINGS} "
-                + f"{SQL.WHERE} app_id = {app_id} {SQL.AND} setting_name='{setting_name}'"
+                + f"{SQL.WHERE} app_id ="
+                f" {app_id} {SQL.AND} setting_name='{setting_name}'"
             )
 
             sql_result = self._appcfg_db.sql_execute(sql_statement)
@@ -520,7 +522,8 @@ class App_Settings:
             if app_id > 0:
                 sql_statement = (
                     f"{SQL.SELECT} {SQL.COUNT}('*') {SQL.FROM} {SYSDEF.SYSSETTINGS} "
-                    + f" {SQL.WHERE} app_id = {app_id} {SQL.AND} setting_name = '{setting_name}' "
+                    + f" {SQL.WHERE} app_id = {app_id} {SQL.AND} setting_name ="
+                    f" '{setting_name}' "
                 )
 
                 setting_result = self._appcfg_db.sql_execute(sql_statement)
@@ -541,8 +544,10 @@ class App_Settings:
                                 datatype = SQL.TEXT
                             case _:
                                 raise ValueError(
-                                    f"setting_name <{setting_name}>, setting_value <{setting_value}> "
-                                    + f"has an unsupported_type <{type(setting_value)}> "
+                                    f"setting_name <{setting_name}>, setting_value"
+                                    f" <{setting_value}> "
+                                    + "has an unsupported_type"
+                                    f" <{type(setting_value)}> "
                                 )
 
                         sql_statement = (
@@ -614,7 +619,8 @@ class App_Settings:
         if file_handler.path_exists(self._app_data_dir):
             if not file_handler.path_writeable(self._app_data_dir):
                 raise ValueError(
-                    f"Folder <{self._app_data_dir}> Cannot Be Written To! - Check Permissions"
+                    f"Folder <{self._app_data_dir}> Cannot Be Written To! - Check"
+                    " Permissions"
                 )
         else:
             raise ValueError(f"Folder <{self._app_data_dir}> Cannot Be Created!")
@@ -884,7 +890,10 @@ class SQLDB:
                 except:
                     self._error_message(
                         "DB_Error",
-                        f"Database File <{str(dbfile_instance.resolve())}> Not Found or Could Not Be created ",
+                        (
+                            f"Database File <{str(dbfile_instance.resolve())}> Not"
+                            " Found or Could Not Be created "
+                        ),
                     )
 
                 try:
@@ -1425,9 +1434,14 @@ class SQLDB:
         value_clause = value_clause[:-1]
 
         if where_str.strip() == "":  # Insert statement
-            sql_statement = f"{SQL.INSERTINTO} {table_str} ({column_clause}) {SQL.VALUES} ({value_clause})"
+            sql_statement = (
+                f"{SQL.INSERTINTO} {table_str} ({column_clause})"
+                f" {SQL.VALUES} ({value_clause})"
+            )
         else:  # Update statement
-            sql_statement = f"{SQL.UPDATE} {table_str} {SQL.SET} {value_clause} {SQL.WHERE} {where_str}"
+            sql_statement = (
+                f"{SQL.UPDATE} {table_str} {SQL.SET} {value_clause} {SQL.WHERE} {where_str}"
+            )
 
         if debug and not Is_Complied():
             print(f">>>>>>>>>>>>>>>>>>>>>>>>> {sql_statement} <<<<<<<<<<<<<<<<")
@@ -1544,9 +1558,10 @@ class SQLDB:
                     + "must be created before being used in a foreign key relationship!"
                 )
 
-                assert self.col_exists(
-                    col_def.parent_table, col_def.parent_col
-                ), f"parent_col <{col_def.parent_col}> does not exist in parent_table<{col_def.parent_table}>"
+                assert self.col_exists(col_def.parent_table, col_def.parent_col), (
+                    f"parent_col <{col_def.parent_col}> does not exist in"
+                    f" parent_table<{col_def.parent_table}>"
+                )
 
                 col_list += (
                     f", {SQL.FOREIGN_KEY}({col_def.name}) {SQL.REFERENCES} "
@@ -1652,7 +1667,8 @@ class SQLDB:
         if self.table_exists(table_name):
             sql_statement = (
                 f"{SQL.SELECT} {SQL.COUNT}(*) AS CNTCOL {SQL.FROM} "
-                + f"{PRAGMA.TABLE_INFO}('{table_name.strip()}') {SQL.WHERE} name='{column_name.strip()}'"
+                + f"{PRAGMA.TABLE_INFO}('{table_name.strip()}')"
+                f" {SQL.WHERE} name='{column_name.strip()}'"
             )
 
             column_result = self.sql_execute(sql_statement)

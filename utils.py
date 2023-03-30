@@ -878,7 +878,10 @@ class Crypt:
 
         assert isinstance(str_key, str) and (
             len(str_key) % 16 == 0 or len(str_key) % 24 == 0 or len(str_key) % 32 == 0
-        ), f"str_key <{str_key}> must be a num-empty string with only  16,24 or 32 characters"
+        ), (
+            f"str_key <{str_key}> must be a num-empty string with only  16,24 or 32"
+            " characters"
+        )
 
         random.seed(str_key)
         str_key_len = len(str_key)
@@ -916,7 +919,8 @@ class Crypt:
                 value_error.args[0] == "AES key must be either 16, 24, or 32 bytes long"
             ):
                 raise ValueError(
-                    f"Encryption Error: Encryption key <{str_key}> must be either 16, 24, or 32 characters long"
+                    f"Encryption Error: Encryption key <{str_key}> must be either 16,"
+                    " 24, or 32 characters long"
                 )
             else:
                 raise ValueError(value_error)
@@ -935,7 +939,10 @@ class Crypt:
 
         assert isinstance(str_key, str) and (
             len(str_key) % 16 == 0 or len(str_key) % 24 == 0 or len(str_key) % 32 == 0
-        ), f"str_key <{str_key}> must be a num-empty string with only  16,24 or 32 characters"
+        ), (
+            f"str_key <{str_key}> must be a num-empty string with only  16,24 or 32"
+            " characters"
+        )
 
         random.seed(str_key)
         str_key_len = len(str_key)
@@ -974,7 +981,8 @@ class Crypt:
                 value_error.args[0] == "AES key must be either 16, 24, or 32 bytes long"
             ):
                 raise ValueError(
-                    "Decryption Error: Encryption key must be either 16, 24, or 32 characters long"
+                    "Decryption Error: Encryption key must be either 16, 24, or 32"
+                    " characters long"
                 )
             else:
                 raise ValueError(value_error)
