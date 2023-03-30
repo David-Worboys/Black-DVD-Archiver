@@ -23,7 +23,6 @@ import file_utils
 import qtgui as qtg
 import sqldb
 import sys_consts
-import utils
 
 # fmt: on
 
@@ -59,7 +58,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                 video_folder = self._db_settings.setting_get("video_import_folder")
 
                 if video_folder is None or video_folder.strip() == "":
-                    video_folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+                    video_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
                     self._db_settings.setting_set("video_import_folder", video_folder)
 
                 self.load_files(video_folder=video_folder, event=event)
@@ -125,7 +124,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         if file_handler.path_exists(
             video_folder
         ):  # Catch case where folder is not accessible
-            video_folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            video_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
 
         if video_folder.strip() != "":
             with qtg.sys_cursor(qtg.Cursor.hourglass):

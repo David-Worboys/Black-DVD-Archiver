@@ -26,7 +26,7 @@ import utils
 
 # fmt: on
 
-executable_folder = utils.App_Path()
+executable_folder = file_utils.App_Path()
 
 file_sep = file_utils.File().ossep
 

@@ -51,10 +51,11 @@ import shiboken6  # type: ignore
 from attrs import define
 from pathvalidate import ValidationError, validate_filepath
 from PySide6.QtGui import QCloseEvent
+from file_utils import App_Path
 
 from langtran import Lang_Tran
 from sys_consts import SDELIM
-from utils import (App_Path, Coords, Is_Complied, amper_length,
+from utils import (Coords, Is_Complied, amper_length,
                    country_date_formatmask)
 
 # fmt: on

@@ -307,7 +307,7 @@ class DVD_Archiver:
         folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
 
         if folder is None or folder.strip() == "":
-            folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
 
         folder = qtg.PopFolderGet(
             title=f"Select An Archive Folder....",
@@ -338,7 +338,7 @@ class DVD_Archiver:
         folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
         if folder is None or folder.strip() == "":
-            folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
 
         folder = qtg.PopFolderGet(
             title=f"Select A DVD Buld Folder....",
@@ -619,11 +619,11 @@ class DVD_Archiver:
         dvd_build_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
         if archive_folder is None or archive_folder.strip() == "":
-            archive_folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            archive_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
             self._db_settings.setting_set(sys_consts.ARCHIVE_FOLDER, archive_folder)
 
         if dvd_build_folder is None or dvd_build_folder.strip() == "":
-            dvd_build_folder = utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            dvd_build_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
             self._db_settings.setting_set(sys_consts.DVD_BUILD_FOLDER, dvd_build_folder)
 
         color_list = [
@@ -1294,7 +1294,7 @@ class File_Control:
                         tune_vsize=-5,
                         callback=self.grid_events,
                         user_data=video_user_data,
-                        icon=utils.App_Path("wrench.svg"),
+                        icon=file_utils.App_Path("wrench.svg"),
                         tooltip="Cut Video or Change Settings",
                     )
                 )

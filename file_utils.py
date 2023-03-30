@@ -19,31 +19,126 @@
 """
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+import dataclasses
 import enum
 import locale
 import os
 import pathlib
 import re
 import shutil
-from typing import NamedTuple
+import sys
+from typing import Dict, NamedTuple, Tuple
 
 import dateparser
 import titlecase
 
 # fmt: on
+@dataclasses.dataclass(slots=True)
+class File_Result():
+    files: list[str]
+    path:str
+    error_code: str
+    error_message: str
+
+def App_Path(file_name: str = "", trailing_slash=False) -> str:
+    """Returns the full app directory path for the supplied file_name.  Handles pyinstaller.Nuitka runtime directory
+    Args:
+        file_name (str, optional): Defaults to "". file name that needs to be prepended with the app path
+        training_slash(bool): Whether to append a platform appropriate trailing slash to the end of the path.
+    Returns:
+        str: Expanded app directory path if the file name is supplied. The app directory path if the file name is not supplied
+    """
+
+    assert isinstance(file_name, str), f"file_name <{file_name}> must be str"
+
+    if (
+        getattr(sys, "frozen", False)
+        and hasattr(sys, "_MEIPASS")
+        or globals().get("__compiled__", False)
+    ):  # Pyinstaller handling
+        if globals().get("__compiled__", False) and globals().get("__spec__", False):
+            application_path = globals()["__spec__"].origin
+            application_path = os.path.dirname(application_path)
+        elif globals().get("__compiled__", False):
+            application_path = os.getcwd()
+        else:
+            application_path: str = sys._MEIPASS  # type: ignore
+        # running_mode = 'Frozen/executable'
+        # print("Running Frozen")
+    else:
+        try:
+            app_full_path = os.path.abspath(
+                __file__
+            )  # realpath does not work with symbolic links
+            application_path = os.path.dirname(app_full_path)
+            # running_mode = "Non-interactive
+        except NameError:
+            application_path = os.getcwd()
+            # running_mode = 'Interactive'
+
+    if file_name.strip() == "":
+        return (
+            f"{application_path}{os.pathsep}"
+            if trailing_slash
+            else f"{application_path}"
+        )
+
+    return (
+        f"{os.path.join(application_path, file_name)}{os.pathsep}"
+        if trailing_slash
+        else f"{os.path.join(application_path, file_name)}"
+    )
+
+
+def Special_Path(special_path_name: str) -> str:
+    """Translates a special path name to a path (Desktop, Documents, Pictures etc.)
+    Args:
+        special_path_name (str): The special path name
+    Returns:
+        str : Either a full path in linux or a location sourced from the registery in windows
+    """
+    special_paths: Dict[str, Tuple[str, str]] = {
+        "Desktop": (
+            "Desktop",
+            "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}",
+        ),
+        "Documents": (
+            "Documents",
+            "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}",
+        ),
+        "Downloads": (
+            "Downloads",
+            "{374DE290-123F-4565-9164-39C4925E467B}",
+        ),
+        "Music": ("Music", "{4BD8D571-6D19-48D3-BE97-422220080E43}"),
+        "Pictures": (
+            "Pictures",
+            "{A990AE9F-A03B-4E80-94BC-9912D7504104}",
+        ),
+        "Videos": ("Videos", "{file_handler}"),
+    }
+
+    special_names = ""
+
+    for path_name in special_paths:
+        special_names += f"{path_name},"
+
+    if special_path_name not in special_paths:
+        return ""
+
+    if os.name == "nt":  # windows
+        import winreg
+
+        sub_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_key) as key:
+            location = winreg.QueryValueEx(key, special_paths[special_path_name][1])[0]
+        return location
+
+    # Linux or Mac
+    return os.path.join(os.path.expanduser("~"), special_paths[special_path_name][0])
 
 
 class File:
-    File_Result = NamedTuple(
-        "File_Result",
-        [
-            ("files", list[str]),
-            ("path", str),
-            ("error_code", int),
-            ("error_message", str),
-        ],
-    )
-
     class Path_Error(enum.IntEnum):
         """File class methods provide an easy-to-use wrapper around file info/manipulation calls"""
 
@@ -355,7 +450,7 @@ class File:
             path (str): File system path.
             extensions (list[str] | tuple[str, ...]): A list or tuple of file extensions.
         Returns:
-            File_Result: A named tuple containing a list of files, the path, and any errors encountered.
+            File_Result: A dataclass containing a list of files, the path, and any errors encountered.
         """
         assert (
             isinstance(path, str) and path.strip() != ""
@@ -386,21 +481,21 @@ class File:
                     )
                 ]
 
-                return self.File_Result(
+                return File_Result(
                     files=file_list,
                     path=path_ptr,
                     error_code=self.Path_Error.OK,
                     error_message="",
                 )
 
-            return self.File_Result(
+            return File_Result(
                 files=[],
                 path=path,
                 error_code=self.Path_Error.NOTEXIST,
                 error_message=self.Error_Dict[self.Path_Error.NOTEXIST],
             )
         except OSError as error:
-            return self.File_Result(
+            return File_Result(
                 files=[],
                 path=path,
                 error_code=self.Path_Error.EXCEPTION,
