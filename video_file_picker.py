@@ -58,7 +58,9 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                 video_folder = self._db_settings.setting_get("video_import_folder")
 
                 if video_folder is None or video_folder.strip() == "":
-                    video_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+                    video_folder = file_utils.Special_Path(
+                        sys_consts.SPECIAL_PATH.VIDEOS
+                    )
                     self._db_settings.setting_set("video_import_folder", video_folder)
 
                 self.load_files(video_folder=video_folder, event=event)

@@ -36,7 +36,8 @@ import uuid
 from base64 import b64decode, b64encode
 from collections.abc import MutableMapping
 from enum import Enum, IntEnum
-from typing import (Any, Generator, Generic, Literal, NamedTuple, Type, TypeVar, Union, cast)
+from typing import (Any, Generator, Generic, Literal, NamedTuple, Type,
+                    TypeVar, Union, cast)
 
 import dateutil.parser as dateparse
 import netifaces

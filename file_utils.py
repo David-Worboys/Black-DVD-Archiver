@@ -27,18 +27,19 @@ import pathlib
 import re
 import shutil
 import sys
-from typing import Dict, NamedTuple, Tuple
 
 import dateparser
 import titlecase
 
+
 # fmt: on
 @dataclasses.dataclass(slots=True)
-class File_Result():
+class File_Result:
     files: list[str]
-    path:str
+    path: str
     error_code: str
     error_message: str
+
 
 def App_Path(file_name: str = "", trailing_slash=False) -> str:
     """Returns the full app directory path for the supplied file_name.  Handles pyinstaller.Nuitka runtime directory
@@ -97,7 +98,7 @@ def Special_Path(special_path_name: str) -> str:
     Returns:
         str : Either a full path in linux or a location sourced from the registery in windows
     """
-    special_paths: Dict[str, Tuple[str, str]] = {
+    special_paths: dict[str, tuple[str, str]] = {
         "Desktop": (
             "Desktop",
             "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}",
