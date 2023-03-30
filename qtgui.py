@@ -10260,6 +10260,21 @@ class Grid(_qtpyBase_Control):
 
         return self._widget.currentRow()
 
+    @property
+    def selected_col(self) -> int:
+        """Gets the currently selected col
+
+        Returns:
+            int: The currently selected col
+
+        """
+        self._widget: qtW.QTableWidget
+
+        if self._widget is None:
+            raise RuntimeError(f"{self._widget=}. Not set")
+
+        return self._widget.currentColumn()
+
     def load_csv_file(
         self,
         file_name: str,
@@ -10345,6 +10360,79 @@ class Grid(_qtpyBase_Control):
         return max_len
 
     @property
+    def move_row_up(self) -> int:
+        """Move the currently selected row up one position in the table.
+
+        If the currently selected row is already at the top of the table, nothing happens.
+
+        Returns:
+            int: The new row or -1 if the row is at the top of the table
+        """
+        current_row = self.selected_row
+
+        if current_row > 0:
+            new_row = current_row - 1
+
+            for column in range(self._widget.columnCount()):
+                current_value = self.value_get(current_row, column)
+                current_user_data = self.userdata_get(current_row, column)
+
+                new_value = self.value_get(new_row, column)
+                new_user_data = self.userdata_get(new_row, column)
+
+                self.value_set(
+                    row=new_row,
+                    col=column,
+                    value=current_value,
+                    user_data=current_user_data,
+                )
+                self.value_set(
+                    row=current_row,
+                    col=column,
+                    value=new_value,
+                    user_data=new_user_data,
+                )
+
+            return new_row
+        return -1
+
+    @property
+    def move_row_down(self) -> int:
+        """Move the currently selected row down one position in the table.
+
+        If the currently selected row is already at the bottom of the table, nothing happens.
+
+        Returns:
+            int: The new row or -1 if the row is not at the bottom of the table
+        """
+        current_row = self.selected_row
+
+        if current_row < self._widget.rowCount() - 1:
+            new_row = current_row + 1
+
+            for column in range(self._widget.columnCount()):
+                current_value = self.value_get(current_row, column)
+                current_user_data = self.userdata_get(current_row, column)
+
+                new_value = self.value_get(new_row, column)
+                new_user_data = self.userdata_get(new_row, column)
+
+                self.value_set(
+                    row=new_row,
+                    col=column,
+                    value=current_value,
+                    user_data=current_user_data,
+                )
+                self.value_set(
+                    row=current_row,
+                    col=column,
+                    value=new_value,
+                    user_data=new_user_data,
+                )
+            return new_row
+        return -1
+
+    @property
     def row_count(self) -> int:
         """Returns the grid row count
 
@@ -10415,7 +10503,7 @@ class Grid(_qtpyBase_Control):
                 self._widget.takeItem(row, col_index)
                 self._widget.setItem(row, col_index, item)
 
-        self.row_scroll_to(row)
+        self.select_row(row)
 
         return row
 
@@ -10514,9 +10602,35 @@ class Grid(_qtpyBase_Control):
             self._widget.insertRow(row)
 
         if scroll_to:
-            self.row_scroll_to(row=row)
+            self.select_row(row=row)
 
-    def row_scroll_to(self, row: int, col=-1):
+    def select_col(self, row: int, col: int):
+        self._widget: qtW.QTableWidget
+
+        if self._widget is None:
+            raise RuntimeError(f"{self._widget=}. Not set")
+
+        assert isinstance(row, int), f"{row=}. Must be int"
+        assert isinstance(col, int), f"{col=}. Must be int"
+
+        assert (
+            0 <= row < self._widget.rowCount()
+        ), f"{row=}. Must be >= 0 and < {self._widget.rowCount()}"
+        assert (
+            col == -1 or 0 <= col < self._widget.columnCount()
+        ), f"{col=}. Must be >= 0 and < {self._widget.columnCount()}"
+
+        self._widget.setCurrentCell(row, col)
+
+    def row_scroll_to(self, row: int, col: int = -1):
+        """
+        Scrolls to the row.
+
+        Note: Deprected will be removed in a later realse. Use select_row
+        """
+        self.select_row(row, col)
+
+    def select_row(self, row: int, col: int = -1):
         """Scrolls to the row.
 
         Args:
@@ -10525,7 +10639,6 @@ class Grid(_qtpyBase_Control):
 
         Raises:
             RuntimeError: If the widget is not set.
-            ValueError: If row or is not an integer or is outside the valid range of row/col indices.
         """
         self._widget: qtW.QTableWidget
 
@@ -10545,8 +10658,7 @@ class Grid(_qtpyBase_Control):
         index = self._widget.model().index(row, 0)
         self._widget.scrollTo(index)
 
-        if not self.noselection:
-            self._widget.selectRow(row)
+        self._widget.selectRow(row)
 
         if col >= 0:
             self._widget.setCurrentCell(row, col)
