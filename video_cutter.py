@@ -26,6 +26,7 @@ import PySide6.QtGui as qtG
 import PySide6.QtMultimedia as qtM
 
 import dvdarch_utils
+import file_utils
 import qtgui as qtg
 import sqldb
 import sys_consts
@@ -267,7 +268,7 @@ class Video_Handler:
                 arg 1: 1 if ok, -1 if error
                 arg 2: error message if error else ""
         """
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         if not file_handler.path_exists(self.output_edit_folder):
             return -1, f"{self.output_edit_folder} Does not exist"
@@ -397,7 +398,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         # Group the video cutter working folders togethr and seperate from the DVD Build
         self.output_folder = (
-            f"{self.output_folder}{utils.File().ossep}{sys_consts.PROGRAM_NAME} Video"
+            f"{self.output_folder}{file_utils.File().ossep}{sys_consts.PROGRAM_NAME} Video"
             " Editor"
         )
 
@@ -417,7 +418,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             Creates folders as necessary for the video processing task.
 
         """
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         if not file_handler.path_exists(self.output_folder):
             file_handler.make_dir(self.output_folder)
@@ -499,7 +500,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         #    f"DBG EH {event.container_tag=} {event.tag=} {event.action=} {event.event=} {event.value=}"
         # )
         # print(
-        #    f"DBG VC {event.event=} {event.action=} {event.container_tag=} {event.tag=} {self.container_tag=} {self.tag=}"
+        #   f"DBG VC {event.event=} {event.action=} {event.container_tag=} {event.tag=} {self.container_tag=} {self.tag=}"
         # )
         match event.event:
             case qtg.Sys_Events.WINDOWOPEN:
@@ -538,6 +539,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._delete_segments(event)
                     case "mark_in" | "mark_out":  # Edit List Seek
                         self._edit_list_seek(event)
+                    case "move_edit_point_down":
+                        self._move_edit_point(up=False)
+                    case "move_edit_point_up":
+                        self._move_edit_point(up=True)
                     case "forward":
                         self._step_forward()
                     case "play":
@@ -577,6 +582,38 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     case "video_slider":
                         self._media_source.update_slider = True
                         self._sliding = False
+
+    def _move_edit_point(self, up: bool):
+        checked_items: qtg.Grid_Item_Tuple = self._edit_list_grid.checkitems_get
+
+        if len(checked_items) == 0:
+            qtg.PopMessage(
+                title="Select An Edit Point...",
+                message="Please Check An Edit Point To Move!",
+            ).show()
+        elif len(checked_items) > 1:
+            qtg.PopMessage(
+                title="Too Many Checked Edit Points...",
+                message="Check Only One Edit Point For A Move ",
+            ).show()
+        else:
+            self._edit_list_grid.checkitemrow_set(False, checked_items[0].row_index, 0)
+
+            self._edit_list_grid.select_row(checked_items[0].row_index)
+
+            if up:
+                new_row = self._edit_list_grid.move_row_up
+            else:
+                new_row = self._edit_list_grid.move_row_down
+
+            if new_row >= 0:
+                self._edit_list_grid.checkitemrow_set(True, new_row, 0)
+                self._edit_list_grid.select_col(new_row, 0)
+            else:
+                self._edit_list_grid.checkitemrow_set(
+                    True, checked_items[0].row_index, 0
+                )
+                self._edit_list_grid.select_col(checked_items[0].row_index, 0)
 
     def _edit_list_seek(self, event: qtg.Action):
         """
@@ -701,7 +738,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be type qtg.Action"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         mark_in = self._edit_list_grid.colindex_get("mark_in")
         mark_out = self._edit_list_grid.colindex_get("mark_out")
@@ -716,56 +753,111 @@ class Video_Cutter_Popup(qtg.PopContainer):
         ]
 
         if edit_list:
-            _, filename, extension = file_handler.split_file_path(self.input_file)
+            result = qtg.PopOptions(
+                title="Choose Clip Assembly Method...",
+                message="Please Choose How To Assemble Clips",
+                options=("As A Single File", "As Individual Files"),
+            ).show()
 
-            output_file = file_handler.file_join(
-                self._edit_folder, f"{filename}_", extension
-            )
+            if result == "As Individual Files":
+                _, filename, extension = file_handler.split_file_path(self.input_file)
 
-            video_files = []
-
-            with qtg.sys_cursor(qtg.Cursor.hourglass):
-                result, video_files_string = self.cut_video_with_editlist(
-                    input_file=self.input_file,
-                    output_file=output_file,
-                    edit_list=edit_list,
-                    cut_out=False,
+                assembled_file = file_handler.file_join(
+                    self._edit_folder, f"{filename}_", extension
                 )
 
-                if (
-                    result == -1
-                ):  # video_files_string is the error meesage and not the ',' delimtered file list
-                    qtg.PopError(
-                        title="Error Cutting File...",
-                        message=f"<{video_files_string}>",
+                video_files = []
+
+                with qtg.sys_cursor(qtg.Cursor.hourglass):
+                    result, video_files_string = self.cut_video_with_editlist(
+                        input_file=self.input_file,
+                        output_file=assembled_file,
+                        edit_list=edit_list,
+                        cut_out=False,
+                    )
+
+                    if (
+                        result == -1
+                    ):  # video_files_string is the error meesage and not the ',' delimtered file list
+                        qtg.PopError(
+                            title="Error Cutting File...",
+                            message=f"<{video_files_string}>",
+                        ).show()
+                    else:
+                        video_files = video_files_string.split(",")
+
+                if video_files:
+                    result = File_Renamer_Popup(
+                        file_list=video_files, container_tag="file_renamer"
                     ).show()
-                else:
-                    video_files = video_files_string.split(",")
 
-            if video_files:
-                result = File_Renamer_Popup(
-                    file_list=video_files, container_tag="file_renamer"
+                    file_str = ""
+
+                    if result:
+                        for file_detail in result.split("|"):
+                            (
+                                user_entered_file_name,
+                                orig_rename_file_path,
+                                user_rename_file_path,
+                            ) = file_detail.split(",")
+
+                            if not user_entered_file_name.strip():
+                                continue  # Probably an error
+
+                            file_str += f"{self.input_file},{user_entered_file_name},{orig_rename_file_path},{user_rename_file_path},A|"
+
+                        # Strip the trailing "|" delimiter from the file_str
+                        file_str = file_str[:-1]
+
+                        self.set_result(file_str)
+            elif result == "As A Single File":
+                _, filename, extension = file_handler.split_file_path(self.input_file)
+
+                assembled_file = file_handler.file_join(
+                    self._edit_folder, f"{filename}_assembled", extension
+                )
+
+                with qtg.sys_cursor(qtg.Cursor.hourglass):
+                    result, video_files_string = self.cut_video_with_editlist(
+                        input_file=self.input_file,
+                        output_file=assembled_file,
+                        edit_list=edit_list,
+                        cut_out=False,
+                    )
+
+                    if (
+                        result == -1
+                    ):  # video_files_string is the error meesage and not the ',' delimtered file list
+                        qtg.PopError(
+                            title="Error Cutting File...",
+                            message=f"<{video_files_string}>",
+                        ).show()
+                    else:
+                        video_files = video_files_string.split(",")
+
+                    if video_files:
+                        result, message = dvdarch_utils.concatenate_videos(
+                            temp_files=video_files,
+                            output_file=assembled_file,
+                            delete_temp_files=True,
+                        )
+
+                        if result == -1:
+                            qtg.PopError(
+                                title="Error Assembling Files...",
+                                message=f"<{video_files_string}> {message}",
+                            ).show()
+                        else:
+                            self._edit_files.append(
+                                f"{self.input_file},{assembled_file},T"
+                            )
+
+                            self.set_result("|".join(self._edit_files))
+            else:
+                qtg.PopMessage(
+                    title="No Assembly Method Selected...",
+                    message="No Output As No Assembly Method Selected!",
                 ).show()
-
-                file_str = ""
-
-                if result:
-                    for file_detail in result.split("|"):
-                        (
-                            user_entered_file_name,
-                            orig_rename_file_path,
-                            user_rename_file_path,
-                        ) = file_detail.split(",")
-
-                        if not user_entered_file_name.strip():
-                            continue  # Probably an error
-
-                        file_str += f"{self.input_file},{user_entered_file_name},{orig_rename_file_path},{user_rename_file_path},A|"
-
-                    # Strip the trailing "|" delimiter from the file_str
-                    file_str = file_str[:-1]
-
-                    self.set_result(file_str)
         else:
             qtg.PopMessage(
                 title="No Entries In The Edit List...",
@@ -784,7 +876,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be type qtg.Action"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         mark_in = self._edit_list_grid.colindex_get("mark_in")
         mark_out = self._edit_list_grid.colindex_get("mark_out")
@@ -803,6 +895,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
             output_file = (
                 f"{self._edit_folder}{file_handler.ossep}{filename}_trimmed{extension}"
+            )
+
+            output_file = file_handler.file_join(
+                self._edit_folder, f"{filename}_trimmed", extension
             )
 
             with qtg.sys_cursor(qtg.Cursor.hourglass):
@@ -1207,7 +1303,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         ), "The end frame in each edit tuple must be an integer"
         assert isinstance(cut_out, bool), f"{cut_out=}. Must be a bool"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         out_path, out_file, out_extn = file_handler.split_file_path(output_file)
 
@@ -1382,6 +1478,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
             """
             Creates a  horizontal box container housing the video cutter.
 
+            TODO : Pull into its own class
+
             Returns:
                 qtg.HBoxContainer: A horizontal box container for the video cutter.
             """
@@ -1516,6 +1614,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
             """
             Create a FormContainer containg the editing list.
 
+            TODO : Pull into its own class
+
             Returns:
                 qtg.FormContainer: A form container that houses the edit list.
             """
@@ -1550,6 +1650,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 pixel_unit=True,
                 callback=self.event_handler,
                 header_sort=False,
+                noselection=True,
             )
 
             edit_list_buttons = qtg.HBoxContainer(align=qtg.Align.BOTTOMCENTER).add_row(
@@ -1573,6 +1674,20 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     tag="remove_edit_points",
                     callback=self.event_handler,
                     tooltip="Delete Edit Points From Edit List",
+                    width=3,
+                ),
+                qtg.Button(
+                    icon=utils.App_Path("arrow-up.svg"),
+                    tag="move_edit_point_up",
+                    callback=self.event_handler,
+                    tooltip="Move This Edit Point Up!",
+                    width=3,
+                ),
+                qtg.Button(
+                    icon=utils.App_Path("arrow-down.svg"),
+                    tag="move_edit_point_down",
+                    callback=self.event_handler,
+                    tooltip="Move This Edit Point Down!",
                     width=3,
                 ),
             )
@@ -1703,7 +1818,7 @@ class File_Renamer_Popup(qtg.PopContainer):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         file_grid: qtg.Grid = event.widget_get(
             container_tag="file_controls", tag="video_input_files"
@@ -1734,7 +1849,7 @@ class File_Renamer_Popup(qtg.PopContainer):
         """
         assert isinstance(event, qtg.Action), "event must be an instance qtg.Action"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         file_grid: qtg.Grid = event.widget_get(
             container_tag="file_controls",
@@ -1770,7 +1885,7 @@ class File_Renamer_Popup(qtg.PopContainer):
             event, qtg.Action
         ), f"{event=} must be an instance of qtg.Action"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         file_grid: qtg.Grid = event.widget_get(
             container_tag="file_controls", tag="video_input_files"
@@ -1879,7 +1994,7 @@ class File_Renamer_Popup(qtg.PopContainer):
         """
         assert isinstance(event, qtg.Action), "event must be an instance qtg.Action"
 
-        file_handler = utils.File()
+        file_handler = file_utils.File()
 
         file_grid: qtg.Grid = event.widget_get(
             container_tag="file_controls",
@@ -1903,7 +2018,7 @@ class File_Renamer_Popup(qtg.PopContainer):
                     " valid file name! Please reenter."
                 )
                 qtg.PopError(title="Invalid File Name...", message=error_msg).show()
-                file_grid.row_scroll_to(row_index, col_index)
+                file_grid.select_row(row_index, col_index)
                 return -1
 
             old_file_path, old_file_name, extension = file_handler.split_file_path(
@@ -1923,7 +2038,7 @@ class File_Renamer_Popup(qtg.PopContainer):
                         title="Failed To Rename File...", message=error_msg
                     ).show()
 
-                    file_grid.row_scroll_to(row_index, col_index)
+                    file_grid.select_row(row_index, col_index)
                     return -1
         return 1
 
