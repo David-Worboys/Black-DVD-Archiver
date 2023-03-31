@@ -20,10 +20,12 @@
 # fmt: off
 import dataclasses
 import subprocess
+from typing import Callable, Literal
 
 import PySide6.QtCore as qtC
 import PySide6.QtGui as qtG
 import PySide6.QtMultimedia as qtM
+import shiboken6
 
 import dvdarch_utils
 import file_utils
@@ -48,6 +50,17 @@ class Video_Handler:
     display_width: int
     display_height: int
     update_slider: bool = True
+    source_state: Literal[
+        "NoMedia",
+        "Loading",
+        "Loaded",
+        "Stalled",
+        "Buffering",
+        "Buffered",
+        "EndOfMedia",
+        "InvalidMedia",
+    ] = "NoMedia"
+    state_handler: Callable = None
 
     # Private instance variables
     _frame_count: int = 0
@@ -114,7 +127,7 @@ class Video_Handler:
         if "video_frame_count" in self.encoding_info:
             self._frame_count = self.encoding_info["video_frame_count"][1]
 
-        media_format = qtM.QMediaFormat()
+        # media_format = qtM.QMediaFormat()
 
         self._media_player = qtM.QMediaPlayer()
         self._video_sink = qtM.QVideoSink()
@@ -131,51 +144,59 @@ class Video_Handler:
         self._media_player.seekableChanged.connect(self._seekable_changed)
         self._media_player.positionChanged.connect(self._position_changed)
 
-        # Check if the player can read the media content
-        if self._media_player.isAvailable():
-            print("The file is supported.")
-            print(self._media_player.mediaStatus())
-            print(self._media_player.hasAudio())
-            print(self._media_player.hasAudio())
-            print(self._media_player.isSeekable())
-        else:
-            print("The file is not supported.")
-
-    def test(self, *args):
-        print(f"DBG {args=}")
-        print(self._media_player.mediaStatus())
-        print(self._media_player.hasAudio())
-        print(self._media_player.hasAudio())
-        print(self._media_player.isSeekable())
-
     def _duration_changed(self, duration: int):
+        """ Handles a video duration change
+
+        Args:
+            duration (int): The length of the video
+        """        
         pass
 
     def _frame_handler(self, frame: qtM.QVideoFrame):
+        """ Handles displaying the video frame
+
+        Args:
+            frame (qtM.QVideoFrame): THe video frame to be displayed
+        """        
         if frame.isValid():
             image = frame.toImage().scaled(self.display_width, self.display_height)
             pixmap = qtG.QPixmap.fromImage(image)
 
-            self.video_display.guiwidget_get.setPixmap(pixmap)
+            if shiboken6.isValid(
+                self.video_display.guiwidget_get
+            ):  # Should not need this check but on shutdown I sometimes got the  dreaded C++ object deleted error
+                self.video_display.guiwidget_get.setPixmap(pixmap)
 
-    def _media_status_change(media_status: qtM.QMediaPlayer.mediaStatus):
+    def _media_status_change(self, media_status: qtM.QMediaPlayer.mediaStatus):
+        """ When the status of the media player changes this method sets the source_state var and calls the 
+        state_hanlder if provided.
+
+        Args:
+            media_status (qtM.QMediaPlayer.mediaStatus): The status of the media player
+        """        
         match media_status:
             case qtM.QMediaPlayer.MediaStatus.NoMedia:
-                pass
+                self.source_state = "NoMedia"
             case qtM.QMediaPlayer.MediaStatus.LoadingMedia:
-                pass
+                self.source_state = "Loading"
             case qtM.QMediaPlayer.MediaStatus.LoadedMedia:
-                pass
+                self.source_state = "Loaded"
+                print(f"{self._media_player.hasAudio()=}")
+                print(f"{self._media_player.hasVideo()=}")
+                print(f"{self._media_player.isSeekable()=}")
             case qtM.QMediaPlayer.MediaStatus.StalledMedia:
-                pass
+                self.source_state = "Stalled"
             case qtM.QMediaPlayer.MediaStatus.BufferingMedia:
-                pass
+                self.source_state = "Buffering"
             case qtM.QMediaPlayer.MediaStatus.BufferedMedia:
-                pass
+                self.source_state = "Buffered"
             case qtM.QMediaPlayer.MediaStatus.EndOfMedia:
-                pass
+                self.source_state = "EndOfMedia"
             case qtM.QMediaPlayer.MediaStatus.InvalidMedia:
-                pass
+                self.source_state = "InvalidMedia"
+
+        if self.state_handler and isinstance(self.state_handler, Callable):
+            self.state_handler()
 
     def _position_changed(self, position_milliseconds: int) -> None:
         """
@@ -211,6 +232,14 @@ class Video_Handler:
             int: The current frame number.
         """
         return int(self._media_player.position() / (1000 / self._frame_rate))
+
+    def Available(self) -> bool:
+        """Checks if the media player is supported on the platform
+
+        Returns:
+            bool: True if the media player is supported, False otherwise.
+        """
+        return self._media_player.isAvailable()
 
     def play(self) -> None:
         """
@@ -508,7 +537,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 self.window_open_handler(event)
                 self.set_result("")
             case qtg.Sys_Events.WINDOWPOSTOPEN:
-                self._archive_edit_list_read()
+                return self.window_post_open_handler(event)
             case qtg.Sys_Events.WINDOWCLOSED:
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
                     if self._media_source:
@@ -519,6 +548,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     case "ok":
                         if self._process_ok(event=event) == 1:
                             self.archive_edit_list_write()
+
+                            if self._media_source:
+                                self._media_source.stop()
+
                             super().close()
                     case "backward":
                         self._step_backward()
@@ -529,6 +562,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     case "cancel":
                         if self._process_cancel(event=event) == 1:
                             self.archive_edit_list_write()
+
+                            if self._media_source:
+                                self._media_source.stop()
+
                             super().close()
                     case "assemble_segments":
                         self._assemble_segments(event)
@@ -580,6 +617,49 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._media_source.update_slider = True
                         self._sliding = False
 
+    def media_state_handler(self):
+        """Allows processing the chage of Media State"""
+
+        if self._media_source.source_state in ("NoMedia", "InvalidMedia"):
+            print("No Media Loaded")
+        elif self._media_source.source_state == "Loaded":
+            self._media_source.play()
+            self._media_source.pause()
+            self._media_source.update_slider = True
+            self._archive_edit_list_read()
+        elif self._media_source.source_state == "InvalidMedia":
+            popups.PopMessage(
+                title="Media Playback Error...",
+                message="Can Not Play/Edit Files Of This Type!",
+            ).show()
+            # TODO Offer to transcode
+        else:
+            print(self._media_source.source_state)
+
+    def window_post_open_handler(self, event: qtg.Action):
+        """Handles post window opening processing.
+
+        Note: If media play is not available on platform or mulimedia codecs not installed the window will close
+
+        Args:
+            event (qtg.Action): _description_
+        """
+
+        if not self._media_source.Available():
+            popups.PopMessage(
+                title="Media Playback Error...",
+                message=(
+                    "Media Playback Error! Multimedia Codecs Not Installed or"
+                    " Media Playback Not Supported On Platform! "
+                ),
+            ).show()
+
+            return -1
+
+        self._selection_button_toggle(event=event, init=True)
+
+        return 1
+
     def _move_edit_point(self, up: bool):
         """
         Move the selected edit point up or down in the edit list grid.
@@ -610,9 +690,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self._edit_list_grid.select_row(checked_items[0].row_index)
 
             if up:
-                new_row = self._edit_list_grid.move_row_up()
+                new_row = self._edit_list_grid.move_row_up
             else:
-                new_row = self._edit_list_grid.move_row_down()
+                new_row = self._edit_list_grid.move_row_down
 
             if new_row >= 0:
                 self._edit_list_grid.checkitemrow_set(True, new_row, 0)
@@ -671,12 +751,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 frame_display=self._frame_display,
                 display_width=self._display_width,
                 display_height=self._display_height,
+                state_handler=self.media_state_handler,
             )
 
-            self._media_source.play()
-            self._media_source.pause()
-            self._selection_button_toggle(event=event, init=True)
-            self._media_source.update_slider = True
+        self._selection_button_toggle(event=event, init=True)
 
     def archive_edit_list_write(self):
         """Writes the edit list from the GUI grid to the archive manager for the current video file.
@@ -1500,7 +1578,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 ),
             ]
 
-            # self._video_display = qtg.Label(width=edit_width -6, height=edit_height)
+            # self._video_display = qtg.Label(width=edit_width -6, height=edit_height)        
             self._video_display = qtg.Label(
                 width=self._display_width, height=self._display_height, pixel_unit=True
             )
@@ -1709,9 +1787,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
         # ===== Main
         """Generate the form UI layout"""
         self._display_height = (
-            self._frame_height
+            self._frame_height if self._frame_height <= 576 else self._frame_height // 2
         )  # // 2 # Black Choice, TODO Make settable
-        self._display_width = self._frame_width  # // 2
+        self._display_width = self._frame_width if self._frame_width <= 720 else  self._frame_width // 2
 
         video__cutter_container = assemble_video_cutter_container()
         edit_list_continer = assemble_edit_list_container()
