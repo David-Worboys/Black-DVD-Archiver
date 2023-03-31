@@ -515,9 +515,8 @@ class DVD:
         """
         file_handler = file_utils.File()
 
-        self._dvd_working_folder = (
-            f"{self.working_folder}{file_handler.ossep}{sys_consts.PROGRAM_NAME} DVD"
-            " Builder"
+        self._dvd_working_folder = file_handler.file_join(
+            self.working_folder, f"{sys_consts.PROGRAM_NAME} DVD Builder"
         )
 
         if file_handler.path_exists(
@@ -538,20 +537,17 @@ class DVD:
         if file_handler.path_exists(
             self._dvd_working_folder
         ) and file_handler.path_writeable(self._dvd_working_folder):
-            self._dvd_out_folder = (
-                f"{self._dvd_working_folder}{file_handler.ossep}dvd_image"
+            self._dvd_out_folder = file_handler.file_join(
+                self._dvd_working_folder, "dvd_image"
             )
-
-            self._iso_out_folder = (
-                f"{self._dvd_working_folder}{file_handler.ossep}iso_image"
+            self._iso_out_folder = file_handler.file_join(
+                self._dvd_working_folder, "iso_image"
             )
-
-            self._menu_image_folder = (
-                f"{self._dvd_working_folder}{file_handler.ossep}menu_images"
+            self._menu_image_folder = file_handler.file_join(
+                self._dvd_working_folder, "menu_images"
             )
-
-            self._tmp_folder = f"{self._dvd_working_folder}{file_handler.ossep}tmp"
-            self._vob_folder = f"{self._dvd_working_folder}{file_handler.ossep}vobs"
+            self._tmp_folder = file_handler.file_join(self._dvd_working_folder, "tmp")
+            self._vob_folder = file_handler.file_join(self._dvd_working_folder, "vobs")
 
             try:
                 file_handler.make_dir(self._dvd_out_folder)
@@ -574,8 +570,8 @@ class DVD:
             )
 
         # Build mandatory file paths
-        self._background_canvas_file = (
-            f"{self._tmp_folder}{file_handler.ossep}{self._BACKGROUND_CANVAS_FILE}"
+        self._background_canvas_file = file_handler.file_join(
+            self._tmp_folder, self._BACKGROUND_CANVAS_FILE
         )
 
         return 1, ""

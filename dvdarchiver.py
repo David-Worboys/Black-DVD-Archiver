@@ -524,8 +524,9 @@ class DVD_Archiver:
         source_files = []
         for file_def in video_file_defs:
             file_def: File_Def
+
             source_files.append(
-                f"{file_def.path}{file_handler.ossep}{file_def.file_name}"
+                file_handler.file_join(file_def.path, file_def.file_name)
             )
 
         if source_files:

@@ -1170,7 +1170,7 @@ def generate_menu_image_from_file(
     ):
         return -1, ""
 
-    image_file = f"{out_folder}{file_handler.ossep}{video_file_name}.jpg"
+    image_file = file_handler.file_join(out_folder, video_file_name, "jpg")
 
     if file_handler.file_exists(out_folder, video_file_name, "jpg"):
         os.remove(image_file)

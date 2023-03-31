@@ -396,10 +396,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
         if "video_frame_count" in self.encoding_info:
             self._frame_count = self.encoding_info["video_frame_count"][1]
 
+        file_handler = file_utils.File()
+
         # Group the video cutter working folders togethr and seperate from the DVD Build
-        self.output_folder = (
-            f"{self.output_folder}{file_utils.File().ossep}{sys_consts.PROGRAM_NAME} Video"
-            " Editor"
+        self.output_folder = file_handler.file_join(
+            self.output_folder, f"{sys_consts.PROGRAM_NAME} Video Editor"
         )
 
         self.container = self.layout()
@@ -434,11 +435,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
             ).show()
             self.close()
 
-        self._edit_folder = (
-            f"{self.output_folder}{file_handler.ossep}{self._edit_folder}"
+        self._edit_folder = file_handler.file_join(
+            self.output_folder, self._edit_folder
         )
-        self._transcode_folder = (
-            f"{self.output_folder}{file_handler.ossep}{self._transcode_folder}"
+        self._edit_folder = file_handler.file_join(
+            self.output_folder, self._transcode_folder
         )
 
         if not file_handler.file_exists(self.input_file):
@@ -522,11 +523,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     case "backward":
                         self._step_backward()
                     case "bulk_select":
-                        edit_list_grid: qtg.Grid = event.widget_get(
-                            container_tag="edit_list", tag="edit_list_grid"
-                        )
-
-                        edit_list_grid.checkitems_all(
+                        self._edit_list_grid.checkitems_all(
                             checked=event.value, col_tag="mark_in"
                         )
                     case "cancel":
@@ -584,7 +581,19 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._sliding = False
 
     def _move_edit_point(self, up: bool):
-        checked_items: qtg.Grid_Item_Tuple = self._edit_list_grid.checkitems_get
+        """
+        Move the selected edit point up or down in the edit list grid.
+
+        Args:
+            up (bool): True to move the edit point up, False to move it down.
+
+        """
+        assert isinstance(up, bool), f"{up=}. Must be bool"
+
+        checked_items: list[qtg.Grid_Item_Tuple] = self._edit_list_grid.checkitems_get()
+        assert all(
+            isinstance(item, qtg.Grid_Item_Tuple) for item in checked_items
+        ), f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
 
         if len(checked_items) == 0:
             popups.PopMessage(
@@ -598,13 +607,12 @@ class Video_Cutter_Popup(qtg.PopContainer):
             ).show()
         else:
             self._edit_list_grid.checkitemrow_set(False, checked_items[0].row_index, 0)
-
             self._edit_list_grid.select_row(checked_items[0].row_index)
 
             if up:
-                new_row = self._edit_list_grid.move_row_up
+                new_row = self._edit_list_grid.move_row_up()
             else:
-                new_row = self._edit_list_grid.move_row_down
+                new_row = self._edit_list_grid.move_row_down()
 
             if new_row >= 0:
                 self._edit_list_grid.checkitemrow_set(True, new_row, 0)
@@ -893,10 +901,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
         if edit_list:
             _, filename, extension = file_handler.split_file_path(self.input_file)
 
-            output_file = (
-                f"{self._edit_folder}{file_handler.ossep}{filename}_trimmed{extension}"
-            )
-
             output_file = file_handler.file_join(
                 self._edit_folder, f"{filename}_trimmed", extension
             )
@@ -942,20 +946,16 @@ class Video_Cutter_Popup(qtg.PopContainer):
             event, qtg.Action
         ), f"{event=}. Must be of type qtg.Action but got {type(event)}"
 
-        edit_list_grid: qtg.Grid = event.widget_get(
-            container_tag="edit_list", tag="edit_list_grid"
-        )
-
         if (
-            edit_list_grid.row_count > 0
-            and edit_list_grid.checkitems_get
+            self._edit_list_grid.row_count > 0
+            and self._edit_list_grid.checkitems_get
             and popups.PopYesNo(
                 title="Remove Checked...", message="Remove the Checked Edit Points?"
             ).show()
             == "yes"
         ):
-            for item in reversed(edit_list_grid.checkitems_get):
-                edit_list_grid.row_delete(item.row_index)
+            for item in reversed(self._edit_list_grid.checkitems_get):
+                self._edit_list_grid.row_delete(item.row_index)
 
     def _step_unit(self, event: qtg.Action):
         """
@@ -1049,16 +1049,12 @@ class Video_Cutter_Popup(qtg.PopContainer):
         frame = self._media_source.get_current_frame()
         end_time = self.frame_num_to_ffmpeg_time(frame)
 
-        edit_list_grid: qtg.Grid = event.widget_get(
-            container_tag="edit_list", tag="edit_list_grid"
-        )
-
-        if edit_list_grid.row_count <= 0:
+        if self._edit_list_grid.row_count <= 0:
             return None
 
-        current_row = edit_list_grid.row_count - 1
+        current_row = self._edit_list_grid.row_count - 1
 
-        start_frame = edit_list_grid.value_get(row=current_row, col=0)
+        start_frame = self._edit_list_grid.value_get(row=current_row, col=0)
 
         if start_frame >= frame:
             popups.PopMessage(
@@ -1066,7 +1062,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 message="End Frame Must Be Greater Than The Start Frame!",
             ).show()
         else:
-            edit_list_grid.value_set(
+            self._edit_list_grid.value_set(
                 row=current_row, col=1, value=frame, user_data=end_time
             )
             self._selection_button_toggle(event=event)
@@ -1087,13 +1083,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         start_time = self.frame_num_to_ffmpeg_time(frame)
 
-        edit_list_grid: qtg.Grid = event.widget_get(
-            container_tag="edit_list", tag="edit_list_grid"
+        new_row = self._edit_list_grid.row_count + 1
+
+        self._edit_list_grid.value_set(
+            row=new_row, col=0, value=frame, user_data=start_time
         )
-
-        new_row = edit_list_grid.row_count + 1
-
-        edit_list_grid.value_set(row=new_row, col=0, value=frame, user_data=start_time)
         self._selection_button_toggle(event=event)
 
     def _selection_button_toggle(self, event: qtg.Action, init=False) -> None:
@@ -1659,36 +1653,36 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     tag="assemble_segments",
                     callback=self.event_handler,
                     tooltip="Assemble Edit Points Into New Videos",
-                    width=3,
+                    width=2,
                 ),
                 qtg.Button(
                     icon=file_utils.App_Path("scissors.svg"),
                     tag="delete_segements",
                     callback=self.event_handler,
                     tooltip="Delete Edit Points From Video",
-                    width=3,
+                    width=2,
                 ),
-                qtg.Spacer(width=1),
+                qtg.Spacer(width=3),
                 qtg.Button(
                     icon=file_utils.App_Path("x.svg"),
                     tag="remove_edit_points",
                     callback=self.event_handler,
                     tooltip="Delete Edit Points From Edit List",
-                    width=3,
+                    width=2,
                 ),
                 qtg.Button(
                     icon=file_utils.App_Path("arrow-up.svg"),
                     tag="move_edit_point_up",
                     callback=self.event_handler,
                     tooltip="Move This Edit Point Up!",
-                    width=3,
+                    width=2,
                 ),
                 qtg.Button(
                     icon=file_utils.App_Path("arrow-down.svg"),
                     tag="move_edit_point_down",
                     callback=self.event_handler,
                     tooltip="Move This Edit Point Down!",
-                    width=3,
+                    width=2,
                 ),
             )
 
@@ -1902,8 +1896,8 @@ class File_Renamer_Popup(qtg.PopContainer):
                 orig_rename_file_path
             )
 
-            user_rename_file_path = (
-                f"{renamed_path}{file_handler.ossep}{user_entered_file_name}{extension}"
+            user_rename_file_path = file_handler.file_join(
+                renamed_path, user_entered_file_name, extension
             )
 
             file_str += f"{user_entered_file_name},{orig_rename_file_path},{user_rename_file_path}|"
@@ -2024,7 +2018,7 @@ class File_Renamer_Popup(qtg.PopContainer):
             old_file_path, old_file_name, extension = file_handler.split_file_path(
                 old_file
             )
-            new_file_path = f"{old_file_path}{file_handler.ossep}{file_name}{extension}"
+            new_file_path = file_handler.file_join(old_file_path, file_name, extension)
 
             if file_name.strip() != old_file_name.strip():
                 if file_handler.rename_file(old_file, new_file_path) == -1:

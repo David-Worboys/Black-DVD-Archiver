@@ -531,7 +531,7 @@ class PopMessage(PopContainer):
                     frame=Widget_Frame(
                         frame=Frame.SUNKEN, frame_style=Frame_Style.STYLED
                     ),
-                    # txt_align=ALIGN.CENTER,
+                    txt_align=Align.CENTER,
                 ),
             )
         else:
@@ -546,7 +546,7 @@ class PopMessage(PopContainer):
                     frame=Widget_Frame(
                         frame=Frame.SUNKEN, frame_style=Frame_Style.STYLED
                     ),
-                    # txt_align=ALIGN.CENTER,
+                    txt_align=Align.CENTER,
                 )
             )
 
