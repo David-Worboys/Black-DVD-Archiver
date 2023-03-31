@@ -212,8 +212,7 @@ class DVD_Archiver:
                         ),
                     ).show()
                     == "yes"
-                ):
-                    print(f"{sys_consts.PROGRAM_NAME} App Closed")
+                ):                    
                     return 1
                 else:
                     return -1
@@ -953,8 +952,7 @@ class File_Control:
 
                 if len(items) > 3:
                     source_file = items[0]
-                    trimmed_file = items[1]
-                    print(f"DBG {items=}")
+                    trimmed_file = items[1]                    
                 else:
                     source_file, trimmed_file, _ = result.split(",")
 

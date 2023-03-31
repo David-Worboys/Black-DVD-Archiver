@@ -124,7 +124,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
 
         file_handler = file_utils.File()
 
-        if file_handler.path_exists(
+        if not file_handler.path_exists(
             video_folder
         ):  # Catch case where folder is not accessible
             video_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
@@ -141,6 +141,8 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                         container_tag="file_controls",
                         tag="video_input_files",
                     )
+
+                    file_grid.clear()
 
                     for row_index, file in enumerate(result.files):
                         file_grid.value_set(

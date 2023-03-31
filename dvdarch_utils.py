@@ -34,6 +34,7 @@ import xmltodict
 
 import file_utils
 import sys_consts
+import utils
 
 # fmt: on
 
@@ -1268,7 +1269,7 @@ def get_file_encoding_info(video_file: str) -> dict:
 
         video_info = xmltodict.parse(mi)
 
-        if debug:
+        if debug and not utils.Is_Complied():
             print(f"=========== Video Info Debug {video_file} ===========")
             pprint.pprint(video_info)
             print("=========== Video Info Debug ===========")
@@ -1325,7 +1326,7 @@ def get_file_encoding_info(video_file: str) -> dict:
     except OSError as call_error:
         video_details["error"][1] = f"{sys_consts.MEDIAINFO} Failed! To Run\n {fmt}"
 
-    if debug:
+    if debug and not utils.Is_Complied():
         print(f"=========== video_details Debug {video_file} ===========")
         pprint.pprint(video_details)
         print("=========== video_details Debug ===========")
