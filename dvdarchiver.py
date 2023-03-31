@@ -29,6 +29,7 @@ import platformdirs
 
 import dvdarch_utils
 import file_utils
+import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
@@ -203,7 +204,7 @@ class DVD_Archiver:
                 pass
             case qtg.Sys_Events.APPCLOSED:
                 if (
-                    qtg.PopYesNo(
+                    popups.PopYesNo(
                         title="Exit Application...",
                         message=(
                             "Exit The"
@@ -309,7 +310,7 @@ class DVD_Archiver:
         if folder is None or folder.strip() == "":
             folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
 
-        folder = qtg.PopFolderGet(
+        folder = popups.PopFolderGet(
             title=f"Select An Archive Folder....",
             root_dir=folder,
             create_folder=True,
@@ -340,7 +341,7 @@ class DVD_Archiver:
         if folder is None or folder.strip() == "":
             folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
 
-        folder = qtg.PopFolderGet(
+        folder = popups.PopFolderGet(
             title=f"Select A DVD Buld Folder....",
             root_dir=folder,
             create_folder=True,
@@ -378,7 +379,7 @@ class DVD_Archiver:
         ), f"{event} is not an instance of qtg.Action"
 
         if self._file_control.dvd_percent_used + PERCENT_SAFTEY_BUFFER >= 100:
-            qtg.PopError(
+            popups.PopError(
                 title="DVD Build Error...",
                 message="Selected Files Will Not Fit On A DVD!",
             ).show()
@@ -399,7 +400,7 @@ class DVD_Archiver:
         dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
         if dvd_folder is None or dvd_folder.strip() == "":
-            qtg.PopError(
+            popups.PopError(
                 title="DVD Build Folder Error...",
                 message="A DVD Build Folder Must Be Entered Before Making A DVD!",
             ).show()
@@ -415,7 +416,7 @@ class DVD_Archiver:
         )
 
         if dvd_title.strip() == "":
-            qtg.PopMessage(
+            popups.PopMessage(
                 title="DVD Menu Title Not Entered...",
                 message="A Menu Title Must Be Entered!",
             ).show()
@@ -490,7 +491,7 @@ class DVD_Archiver:
                     result, message = self.archive_dvd_files(video_file_defs)
 
         if result == -1:
-            qtg.PopError(
+            popups.PopError(
                 title="DVD Build Error...",
                 message=f"Failed To Create A DVD!!\n{message}",
             ).show()
@@ -600,7 +601,7 @@ class DVD_Archiver:
                 self._menu_title_font_size = pointsize
                 image.image_set(png_bytes)
             else:
-                qtg.PopError(
+                popups.PopError(
                     title="Font Can Not Be Rendered...",
                     message=(
                         "The font"
@@ -910,7 +911,7 @@ class File_Control:
         dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
         if dvd_folder is None or dvd_folder.strip() == "":
-            qtg.PopError(
+            popups.PopError(
                 title="DVD Build Folder Error...",
                 message=(
                     "A DVD Build Folder Must Be Entered Before Making A Video Edit!"
@@ -1128,7 +1129,7 @@ class File_Control:
                         )
 
                         if folder is None or folder.strip() == "":
-                            qtg.PopError(
+                            popups.PopError(
                                 title="DVD Build Folder Error...",
                                 message=(
                                     "A DVD Build Folder Must Be Entered Before Video"
@@ -1147,7 +1148,7 @@ class File_Control:
                         if (
                             file_grid.row_count > 0
                             and file_grid.checkitems_get
-                            and qtg.PopYesNo(
+                            and popups.PopYesNo(
                                 title="Remove Checied...",
                                 message="Remove The Checked Files?",
                             ).show()
@@ -1217,7 +1218,7 @@ class File_Control:
             self._set_project_standard_duration(event)
 
             if rejected != "":
-                qtg.PopMessage(
+                popups.PopMessage(
                     title="These Files Are Not Permitted...", message=rejected
                 ).show()
 

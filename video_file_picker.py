@@ -20,6 +20,7 @@
 import dataclasses
 
 import file_utils
+import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
@@ -87,7 +88,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                             "video_import_folder"
                         )
 
-                        video_folder = qtg.PopFolderGet(
+                        video_folder = popups.PopFolderGet(
                             title="Select A Video Folder....",
                             root_dir=(
                                 f"{sys_consts.SDELIM}{video_folder}{sys_consts.SDELIM}"

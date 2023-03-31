@@ -380,6 +380,7 @@ class File:
 
     def file_join(self, dir_path: str, file_name: str, ext: str = "") -> str:
         """Join a directory, filename, and extension string to construct a file path.
+
         Args:
             dir_path (str): A string representing the directory path where the file will be saved.
             file_name (str): A string representing the name of the file.

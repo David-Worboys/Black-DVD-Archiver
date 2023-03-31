@@ -27,6 +27,7 @@ import PySide6.QtMultimedia as qtM
 
 import dvdarch_utils
 import file_utils
+import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
@@ -423,7 +424,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             file_handler.make_dir(self.output_folder)
 
         if not file_handler.path_exists(self.output_folder):
-            qtg.PopError(
+            popups.PopError(
                 title="Video Output Folder Does Not Exist",
                 message=(
                     "The output folder"
@@ -442,7 +443,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         if not file_handler.file_exists(self.input_file):
             # This should never happen, unless dev error or mount/drive problems
-            qtg.PopError(
+            popups.PopError(
                 title="Video File Does Not Exist",
                 message=(
                     "The input video file"
@@ -453,7 +454,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self.close()
 
         if not file_handler.path_writeable(self.output_folder):
-            qtg.PopError(
+            popups.PopError(
                 title="Video Output Folder Write Error",
                 message=(
                     "The output folder"
@@ -466,7 +467,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         if not file_handler.path_exists(self._edit_folder):
             if file_handler.make_dir(self._edit_folder) == -1:
-                qtg.PopError(
+                popups.PopError(
                     title="Video Edit Folder Creation Error",
                     message=(
                         "Failed to create the video edit folder"
@@ -478,7 +479,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         if not file_handler.path_exists(self._transcode_folder):
             if file_handler.make_dir(self._transcode_folder) == -1:
-                qtg.PopError(
+                popups.PopError(
                     title="Video Transcode Folder Creation Error",
                     message=(
                         "Failed to create the video transcode folder"
@@ -586,12 +587,12 @@ class Video_Cutter_Popup(qtg.PopContainer):
         checked_items: qtg.Grid_Item_Tuple = self._edit_list_grid.checkitems_get
 
         if len(checked_items) == 0:
-            qtg.PopMessage(
+            popups.PopMessage(
                 title="Select An Edit Point...",
                 message="Please Check An Edit Point To Move!",
             ).show()
         elif len(checked_items) > 1:
-            qtg.PopMessage(
+            popups.PopMessage(
                 title="Too Many Checked Edit Points...",
                 message="Check Only One Edit Point For A Move ",
             ).show()
@@ -752,7 +753,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         ]
 
         if edit_list:
-            result = qtg.PopOptions(
+            result = popups.PopOptions(
                 title="Choose Clip Assembly Method...",
                 message="Please Choose How To Assemble Clips",
                 options=("As A Single File", "As Individual Files"),
@@ -778,7 +779,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     if (
                         result == -1
                     ):  # video_files_string is the error meesage and not the ',' delimtered file list
-                        qtg.PopError(
+                        popups.PopError(
                             title="Error Cutting File...",
                             message=f"<{video_files_string}>",
                         ).show()
@@ -827,7 +828,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     if (
                         result == -1
                     ):  # video_files_string is the error meesage and not the ',' delimtered file list
-                        qtg.PopError(
+                        popups.PopError(
                             title="Error Cutting File...",
                             message=f"<{video_files_string}>",
                         ).show()
@@ -842,7 +843,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         )
 
                         if result == -1:
-                            qtg.PopError(
+                            popups.PopError(
                                 title="Error Assembling Files...",
                                 message=f"<{video_files_string}> {message}",
                             ).show()
@@ -853,12 +854,12 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
                             self.set_result("|".join(self._edit_files))
             else:
-                qtg.PopMessage(
+                popups.PopMessage(
                     title="No Assembly Method Selected...",
                     message="No Output As No Assembly Method Selected!",
                 ).show()
         else:
-            qtg.PopMessage(
+            popups.PopMessage(
                 title="No Entries In The Edit List...",
                 message="Please Mark Some Edit List Entries With The [ and ] Buttone!",
             ).show()
@@ -910,7 +911,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 if (
                     result == -1
                 ):  # trimmed file is the error meesage and not the file name
-                    qtg.PopError(
+                    popups.PopError(
                         title="Error Cutting File...",
                         message=f"<{trimmed_file}>",
                     ).show()
@@ -919,7 +920,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
                     self.set_result("|".join(self._edit_files))
         else:
-            qtg.PopMessage(
+            popups.PopMessage(
                 title="No Entries In The Edit List...",
                 message="Please Mark Some Edit List Entries With The [ and ] Buttone!",
             ).show()
@@ -948,7 +949,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         if (
             edit_list_grid.row_count > 0
             and edit_list_grid.checkitems_get
-            and qtg.PopYesNo(
+            and popups.PopYesNo(
                 title="Remove Checked...", message="Remove the Checked Edit Points?"
             ).show()
             == "yes"
@@ -1060,7 +1061,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         start_frame = edit_list_grid.value_get(row=current_row, col=0)
 
         if start_frame >= frame:
-            qtg.PopMessage(
+            popups.PopMessage(
                 title="Invalid End Select...",
                 message="End Frame Must Be Greater Than The Start Frame!",
             ).show()
@@ -1444,7 +1445,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         """
         if self.get_result:
             if (
-                qtg.PopYesNo(
+                popups.PopYesNo(
                     title="Files Edited...",
                     message=(
                         "Video Edits Have Been Made, Discard Changes and Delete The"
@@ -1928,7 +1929,7 @@ class File_Renamer_Popup(qtg.PopContainer):
 
         if self._is_changed(event):
             if (
-                qtg.PopYesNo(
+                popups.PopYesNo(
                     title="Files Renamed...",
                     message="Discard Renamed Files And Close Window?",
                 ).show()
@@ -1939,7 +1940,7 @@ class File_Renamer_Popup(qtg.PopContainer):
                 result = self._rename_files(event)
 
                 if result == 1:
-                    qtg.PopMessage(
+                    popups.PopMessage(
                         title="Rename Files...", message="Files Renamed Successfully"
                     ).show()
                     self._package_files(event)
@@ -1963,13 +1964,13 @@ class File_Renamer_Popup(qtg.PopContainer):
 
         if self._is_changed(event):
             if (
-                qtg.PopYesNo(title="Rename Files...", message="Rename Files?").show()
+                popups.PopYesNo(title="Rename Files...", message="Rename Files?").show()
                 == "yes"
             ):
                 result = self._rename_files(event)
 
                 if result == 1:
-                    qtg.PopMessage(
+                    popups.PopMessage(
                         title="Rename Files...", message="Files Renamed Successfully"
                     ).show()
                     self._package_files(event)
@@ -2016,7 +2017,7 @@ class File_Renamer_Popup(qtg.PopContainer):
                     f"{sys_consts.SDELIM}{file_name!r}{sys_consts.SDELIM} is not a"
                     " valid file name! Please reenter."
                 )
-                qtg.PopError(title="Invalid File Name...", message=error_msg).show()
+                popups.PopError(title="Invalid File Name...", message=error_msg).show()
                 file_grid.select_row(row_index, col_index)
                 return -1
 
@@ -2033,7 +2034,7 @@ class File_Renamer_Popup(qtg.PopContainer):
                         f" {sys_consts.SDELIM}{new_file_path!r}{sys_consts.SDELIM}"
                     )
 
-                    qtg.PopError(
+                    popups.PopError(
                         title="Failed To Rename File...", message=error_msg
                     ).show()
 
