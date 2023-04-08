@@ -212,7 +212,7 @@ class DVD_Archiver:
                         ),
                     ).show()
                     == "yes"
-                ):                    
+                ):
                     return 1
                 else:
                     return -1
@@ -440,7 +440,8 @@ class DVD_Archiver:
                 video_file_defs.append(file_def)
 
                 # menu_image_files.append(image_file)
-                menu_labels.append(".".join(user_data.video_file.split(".")[0:-1]))
+                # menu_labels.append(".".join(user_data.video_file.split(".")[0:-1]))
+                menu_labels.append(user_data.video_file)
 
         result = -1
         message = ""
@@ -467,6 +468,7 @@ class DVD_Archiver:
                     dvd_config.serial_number = dvd_serial_number
 
                 dvd_config.input_videos = video_file_defs
+               
                 dvd_config.menu_labels = menu_labels
 
                 dvd_config.menu_title = dvd_title
@@ -952,7 +954,7 @@ class File_Control:
 
                 if len(items) > 3:
                     source_file = items[0]
-                    trimmed_file = items[1]                    
+                    trimmed_file = items[1]
                 else:
                     source_file, trimmed_file, _ = result.split(",")
 
@@ -1527,7 +1529,7 @@ class File_Control:
         )
 
         control_container = qtg.VBoxContainer(
-            tag="control_container", text="Video Input Files", align=qtg.Align.TOPRIGHT
+            tag="control_container", text="DVD Input Files", align=qtg.Align.TOPRIGHT
         ).add_row(file_control_container, button_container)
 
         return control_container

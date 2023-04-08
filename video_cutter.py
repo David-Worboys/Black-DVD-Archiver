@@ -145,19 +145,19 @@ class Video_Handler:
         self._media_player.positionChanged.connect(self._position_changed)
 
     def _duration_changed(self, duration: int):
-        """ Handles a video duration change
+        """Handles a video duration change
 
         Args:
             duration (int): The length of the video
-        """        
+        """
         pass
 
     def _frame_handler(self, frame: qtM.QVideoFrame):
-        """ Handles displaying the video frame
+        """Handles displaying the video frame
 
         Args:
             frame (qtM.QVideoFrame): THe video frame to be displayed
-        """        
+        """
         if frame.isValid():
             image = frame.toImage().scaled(self.display_width, self.display_height)
             pixmap = qtG.QPixmap.fromImage(image)
@@ -168,12 +168,12 @@ class Video_Handler:
                 self.video_display.guiwidget_get.setPixmap(pixmap)
 
     def _media_status_change(self, media_status: qtM.QMediaPlayer.mediaStatus):
-        """ When the status of the media player changes this method sets the source_state var and calls the 
+        """When the status of the media player changes this method sets the source_state var and calls the
         state_hanlder if provided.
 
         Args:
             media_status (qtM.QMediaPlayer.mediaStatus): The status of the media player
-        """        
+        """
         match media_status:
             case qtM.QMediaPlayer.MediaStatus.NoMedia:
                 self.source_state = "NoMedia"
@@ -1459,6 +1459,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 command += ["-map", "0:v", "-map", "0:a"]
                 command += ["-c:v", codec]
                 command += ["-c:a", "copy"]
+
                 if before_key_frame is not None:
                     command += ["-force_key_frames", f"{before_key_frame}+1"]
                 if after_key_frame is not None:
@@ -1475,11 +1476,14 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     "-avoid_negative_ts",
                     "make_zero",
                 ]
+
                 command += ["-map", "0:v", "-map", "0:a", "-c", "copy"]
+
                 if before_key_frame is not None:
                     command += ["-force_key_frames", f"{before_key_frame}+1"]
                 if after_key_frame is not None:
                     command += ["-force_key_frames", f"{after_key_frame}"]
+
                 command += [temp_file, "-y"]
 
             result, message = dvdarch_utils.execute_check_output(command, debug=False)
@@ -1578,7 +1582,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 ),
             ]
 
-            # self._video_display = qtg.Label(width=edit_width -6, height=edit_height)        
+            # self._video_display = qtg.Label(width=edit_width -6, height=edit_height)
             self._video_display = qtg.Label(
                 width=self._display_width, height=self._display_height, pixel_unit=True
             )
@@ -1789,7 +1793,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
         self._display_height = (
             self._frame_height if self._frame_height <= 576 else self._frame_height // 2
         )  # // 2 # Black Choice, TODO Make settable
-        self._display_width = self._frame_width if self._frame_width <= 720 else  self._frame_width // 2
+        self._display_width = (
+            self._frame_width if self._frame_width <= 720 else self._frame_width // 2
+        )
 
         video__cutter_container = assemble_video_cutter_container()
         edit_list_continer = assemble_edit_list_container()
