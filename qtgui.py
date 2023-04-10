@@ -40,7 +40,8 @@ from collections import deque, namedtuple
 from contextlib import contextmanager
 from dataclasses import field
 from enum import Enum, IntEnum
-from typing import Callable, ClassVar, Optional, Union, cast, overload
+from typing import (Callable, ClassVar, NoReturn, Optional, Union, cast,
+                    overload)
 
 import numpy as np
 import PySide6.QtCore as qtC
@@ -3466,17 +3467,16 @@ class _qtpyBase_Control(_qtpyBase):
     def value_set(self, value: Combo_Data):
         ...
 
-    # @overload
-    # def value_set(self, date: str, format: str = ""):
-    #    pass
-
     @overload
     def value_set(self, value: str):
         ...
 
-    # @overload
-    # def value_set(self, value: any, row: int, col: int, user_data: any):
-    #     ...
+    def value_set(self, value: datetime.date) -> NoReturn:
+        ...
+
+    @overload
+    def value_set(self, value: datetime.datetime) -> NoReturn:
+        ...
 
     @overload
     def value_set(self, value: Union[str, int, float]):
@@ -8710,8 +8710,9 @@ class _Grid_TableWidget(qtW.QTableWidget):
 
         # This is here to select the text when focus is setinto the cell by row_scroll_to
         item = self.currentItem()
-        if item is not None:  # and item.isSelected():
-            editor = self.editItem(item)
+
+        if item and item.flags() & qtC.Qt.ItemIsEditable:
+            editor = self.item.editItem(item)
             if editor is not None:
                 editor.setSelected(True)
 
@@ -9924,15 +9925,45 @@ class Grid(_qtpyBase_Control):
 
         return item_data.previous_value if item_data is not None else None
 
+    @overload
+    def value_set(self, value: bool, row: int, col: int, user_data: any) -> NoReturn:
+        ...
+
+    @overload
+    def value_set(
+        self, value: datetime.date, row: int, col: int, user_data: any
+    ) -> NoReturn:
+        ...
+
+    @overload
+    def value_set(
+        self, value: datetime.datetime, row: int, col: int, user_data: any
+    ) -> NoReturn:
+        ...
+
+    @overload
+    def value_set(
+        self, value: datetime.time, row: int, col: int, user_data: any
+    ) -> NoReturn:
+        ...
+
+    @overload
+    def value_set(self, value: float, row: int, col: int, user_data: any) -> NoReturn:
+        ...
+
+    @overload
+    def value_set(self, value: int, row: int, col: int, user_data: any) -> NoReturn:
+        ...
+
+    @overload
+    def value_set(self, value: str, row: int, col: int, user_data: any) -> NoReturn:
+        ...
+
     def value_set(
         self,
-        value: bool
-        | datetime.date
-        | datetime.datetime
-        | datetime.time
-        | float
-        | int
-        | str,
+        value: Union[
+            bool, datetime.date, datetime.datetime, datetime.time, float, int, str
+        ],
         row: int,
         col: int,
         user_data: any,
