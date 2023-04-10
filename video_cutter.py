@@ -20,6 +20,7 @@
 # fmt: off
 import dataclasses
 import subprocess
+from time import sleep
 from typing import Callable, Literal
 
 import PySide6.QtCore as qtC
@@ -169,7 +170,7 @@ class Video_Handler:
 
     def _media_status_change(self, media_status: qtM.QMediaPlayer.mediaStatus):
         """When the status of the media player changes this method sets the source_state var and calls the
-        state_hanlder if provided.
+        state_handler if provided.
 
         Args:
             media_status (qtM.QMediaPlayer.mediaStatus): The status of the media player
@@ -181,9 +182,9 @@ class Video_Handler:
                 self.source_state = "Loading"
             case qtM.QMediaPlayer.MediaStatus.LoadedMedia:
                 self.source_state = "Loaded"
-                print(f"{self._media_player.hasAudio()=}")
-                print(f"{self._media_player.hasVideo()=}")
-                print(f"{self._media_player.isSeekable()=}")
+                # print(f"{self._media_player.hasAudio()=}")
+                # print(f"{self._media_player.hasVideo()=}")
+                # print(f"{self._media_player.isSeekable()=}")
             case qtM.QMediaPlayer.MediaStatus.StalledMedia:
                 self.source_state = "Stalled"
             case qtM.QMediaPlayer.MediaStatus.BufferingMedia:
@@ -216,7 +217,7 @@ class Video_Handler:
     def _seekable_changed(self, seekable: bool) -> None:
         """
         A callback function that is called when the seekable status of the media player changes.
-        Currently does nothing, but can be used to enable or disable seek controls based on this status.
+        Currently, does nothing, but can be used to enable or disable seek controls based on this status.
 
         Args:
             seekable (bool): True if the media player is seekable, False otherwise.
@@ -233,7 +234,7 @@ class Video_Handler:
         """
         return int(self._media_player.position() / (1000 / self._frame_rate))
 
-    def Available(self) -> bool:
+    def available(self) -> bool:
         """Checks if the media player is supported on the platform
 
         Returns:
@@ -308,7 +309,9 @@ class Video_Handler:
         if not file_handler.file_exists(self.input_file):
             return -1, f"File Does Not Exist {self.input_file}"
 
-        _, input_file_name, input_file_extn = file_handler.split_file_path()
+        _, input_file_name, input_file_extn = file_handler.split_file_path(
+            self.input_file
+        )
 
         output_file = file_handler.file_join(
             self.output_edit_folder, f"{input_file_name}_edit{input_file_extn}"
@@ -618,15 +621,19 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._sliding = False
 
     def media_state_handler(self):
-        """Allows processing the chage of Media State"""
+        """Allows processing the change of Media State"""
 
         if self._media_source.source_state in ("NoMedia", "InvalidMedia"):
             print("No Media Loaded")
         elif self._media_source.source_state == "Loaded":
             self._media_source.play()
+            sleep(
+                0.6
+            )  # QT 6.5.0 requires this delay before the  first video frame is displayed. TODO Findout why!
             self._media_source.pause()
             self._media_source.update_slider = True
             self._archive_edit_list_read()
+
         elif self._media_source.source_state == "InvalidMedia":
             popups.PopMessage(
                 title="Media Playback Error...",
@@ -634,18 +641,19 @@ class Video_Cutter_Popup(qtg.PopContainer):
             ).show()
             # TODO Offer to transcode
         else:
-            print(self._media_source.source_state)
+            pass
+            # print(self._media_source.source_state)
 
     def window_post_open_handler(self, event: qtg.Action):
         """Handles post window opening processing.
 
-        Note: If media play is not available on platform or mulimedia codecs not installed the window will close
+        Note: If media play is not available on platform or multimedia codecs not installed the window will close
 
         Args:
             event (qtg.Action): _description_
         """
 
-        if not self._media_source.Available():
+        if not self._media_source.available():
             popups.PopMessage(
                 title="Media Playback Error...",
                 message=(
@@ -670,7 +678,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         """
         assert isinstance(up, bool), f"{up=}. Must be bool"
 
-        checked_items: list[qtg.Grid_Item_Tuple] = self._edit_list_grid.checkitems_get()
+        checked_items: tuple[qtg.Grid_Item_Tuple] = self._edit_list_grid.checkitems_get
         assert all(
             isinstance(item, qtg.Grid_Item_Tuple) for item in checked_items
         ), f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
@@ -726,7 +734,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
     def window_open_handler(self, event: qtg.Action):
         """
-        Handles the the video_cutters open event processing
+        Handles the video_cutters open event processing
 
         Args:
             event (qtg.Action): The event that triggered this method.
@@ -864,7 +872,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
                     if (
                         result == -1
-                    ):  # video_files_string is the error meesage and not the ',' delimtered file list
+                    ):  # video_files_string is the error message and not the ',' delimitered file list
                         popups.PopError(
                             title="Error Cutting File...",
                             message=f"<{video_files_string}>",
@@ -913,7 +921,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
                     if (
                         result == -1
-                    ):  # video_files_string is the error meesage and not the ',' delimtered file list
+                    ):  # video_files_string is the error message and not the ',' delimitered file list
                         popups.PopError(
                             title="Error Cutting File...",
                             message=f"<{video_files_string}>",
@@ -954,7 +962,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         """
         Deletes the specified segments from the input file.
 
-        Note: Pop_Container set_result is called here and not in the _process_ok meothd
+        Note: Pop_Container set_result is called here and not in the _process_ok method
 
         Args:
             event (qtg.Action): The event that triggered this method.
@@ -992,7 +1000,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
                 if (
                     result == -1
-                ):  # trimmed file is the error meesage and not the file name
+                ):  # trimmed file is the error message and not the file name
                     popups.PopError(
                         title="Error Cutting File...",
                         message=f"<{trimmed_file}>",
@@ -1179,7 +1187,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
         assert isinstance(
             event, qtg.Action
         ), f"{event=}. Must be of type qtg.Action but got {type(event)} instead"
-
         select_start: qtg.Button = event.widget_get(
             container_tag="video_buttons", tag="selection_start"
         )
@@ -1310,7 +1317,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 frame_count (int): The total number of frames in the video.
 
             Returns:
-            - edit_list_2 (List[Tuple[int, int]]): A new list of tuples representing the cut out points of the video.
+            - edit_list_2 (List[Tuple[int, int]]): A new list of tuples representing the cut-out points of the video.
 
             Raises:
             - TypeError: If edit_list is not a list or frame_count is not an integer.
@@ -1345,8 +1352,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 if cut_index < len(edit_list) - 1:
                     _, next_start_frame = edit_list[cut_index + 1]
                     if (
-                        end_frame >= next_start_frame
-                        and end_frame <= next_start_frame + (self._frame_rate // 2)
+                        next_start_frame
+                        <= end_frame
+                        <= next_start_frame + (self._frame_rate // 2)
                     ):
                         # merge the two tuples into a single tuple
                         cut_out_list[-1] = (cut_out_list[-1][0], next_start_frame)
@@ -1686,9 +1694,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
             return video_cutter_container
 
-        def assemble_edit_list_container() -> qtg.FormContainer:
+        def assemble_edit_list_container() -> qtg.VBoxContainer:
             """
-            Create a FormContainer containg the editing list.
+            Create a VBoxContainer containing the editing list.
 
             TODO : Pull into its own class
 
@@ -1822,7 +1830,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
 @dataclasses.dataclass
 class File_Renamer_Popup(qtg.PopContainer):
-    "Renames video files sourced from the video cutter"
+    """Renames video files sourced from the video cutter"""
 
     file_list: list[str] | tuple[str] = dataclasses.field(default_factory=list)
     tag = "File_Renamer_Popup"
@@ -1935,6 +1943,7 @@ class File_Renamer_Popup(qtg.PopContainer):
         )
 
         col_index = file_grid.colindex_get("new_file_name")
+        row_index = 0
 
         for row_index, file_path in enumerate(self.file_list):
             _, file_name, _ = file_handler.split_file_path(file_path)
@@ -1943,7 +1952,7 @@ class File_Renamer_Popup(qtg.PopContainer):
                 value=file_name,
                 row=row_index,
                 col=col_index,
-                user_data=(file_path),
+                user_data=file_path,
             )
 
         return row_index
@@ -2061,7 +2070,7 @@ class File_Renamer_Popup(qtg.PopContainer):
 
     def _rename_files(self, event: qtg.Action) -> int:
         """
-        Handles renaing of video file if needed.
+        Handles renaming of video file if needed.
 
         Args:
             event (qtg.Action): The triggering event.
