@@ -65,7 +65,7 @@ class DVD_Archiver:
         self._file_control = File_Control()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
 
-        # A problem in the next 3 lines can shutdown startup as daabase initialization failed
+        # A problem in the next 3 lines can shut down startup as database initialization failed
         if self._db_settings.error_code == -1:
             raise RuntimeError(
                 f"Failed To Start {sys_consts.PROGRAM_NAME} -"
@@ -202,7 +202,7 @@ class DVD_Archiver:
         match event.event:
             case qtg.Sys_Events.APPINIT:
                 pass
-            case qtg.Sys_Events.APPCLOSED:
+            case qtg.Sys_Events.APPEXIT:
                 if (
                     popups.PopYesNo(
                         title="Exit Application...",
@@ -468,7 +468,7 @@ class DVD_Archiver:
                     dvd_config.serial_number = dvd_serial_number
 
                 dvd_config.input_videos = video_file_defs
-               
+
                 dvd_config.menu_labels = menu_labels
 
                 dvd_config.menu_title = dvd_title
