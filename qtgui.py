@@ -1260,11 +1260,15 @@ class Font(_qtpyBase):
 
 
 # Private Classes
-class _qtpyBaseFrame(qtW.QMainWindow, _qtpyBase):
+class _qtpyBaseFrame(qtW.QMainWindow):  # , _qtpyBase): # QT 6.5.0 change
     """The _qtyBaseFrame class is a base class for SDI aND MDI frames # TODO: Add MDI support"""
 
     def __init__(self):
         super().__init__()
+
+    @property
+    def parent_get(self):  # QT 6.5.0 change
+        return g_application
 
 
 # TODO MDI frame
@@ -1355,14 +1359,12 @@ class _qtpyFrame(_qtpyBaseFrame):
     def closeEvent(self, event: QCloseEvent):
         """
         The function is called when the sheet is closed. Overrides the closeEvent method of QWidget.
-
         - If the window has a callback method, then the callback function is called.
         - If the callback method returns 1, then the window is closed.
         - If the callback method returns 0, then the window is not closed.
         - If the window does not have a callback method, then the window is closed.
-
         Args:
-          event (QCloseEvent): The event that was trigger of the closeEvent.
+            event (QCloseEvent): The event that was trigger of the closeEvent.
         """
         if self.callback is not None:
             qtpyevent: Sys_Events = Sys_Events.APPCLOSED
@@ -1443,7 +1445,6 @@ class _qtpySDI_Frame(_qtpyFrame):
     ):
         """Constructor for the class. It performs a correctness checks on the input parameters and sets innstance
         variables as needed.
-
         Args:
             parent_app (QtPyApp): The parent application.
             title (str): The title of the window.
@@ -1564,7 +1565,7 @@ class _Widget_Registry:
         # `_widget_entry` is a class that stores the widget details.
         container_tag: str
         tag: str
-        widget: _qtpyBase
+        widget: _qtpyBase | _qtpySDI_Frame  # QT 6.5.0
 
     # ===== Main
     _widget_dict: dict = field(default_factory=dict)
@@ -1592,9 +1593,9 @@ class _Widget_Registry:
         assert (
             isinstance(tag, str) and tag.strip() != ""
         ), f"{tag=}. Must be a non-empty str"
-        assert issubclass(
-            type(widget), (_qtpyBase)
-        ), f"widget <{widget}> <{type(widget)}> must be a sub_class of _qtpyBase"
+        assert isinstance(
+            widget, (_qtpyBase, _qtpySDI_Frame)  # QT 6.5.0
+        ), f"{widget=}. Must be an instance of _qtpyBase"
 
         container_tag = f"{window_id}_{container_tag}"
 
@@ -3811,6 +3812,7 @@ class QtPyApp(_qtpyBase):
         if result == 1:  # Allow application to close
             if self._main_frame is not None:
                 self._main_frame.close()
+
             self.app_get.quit()
 
     def app_title(self) -> str:
@@ -3989,8 +3991,10 @@ class QtPyApp(_qtpyBase):
         ), f"{container_tag=}. Must be str"
         assert isinstance(tag, str) and tag.strip() != "", f"{tag=}. Must be str"
         assert isinstance(
-            widget, _qtpyBase
+            widget, (_qtpyBase, _qtpySDI_Frame)  # QT 6.5.0
         ), f"{widget=}. Must be an instance of _qtpyBase"
+        # if not isinstance(widget, _qtpyBase): #QT 6.5.0
+        #    print(f"DBG {widget=} {type(widget)=}")
 
         self._widget_registry.widget_add(
             window_id=window_id, container_tag=container_tag, tag=tag, widget=widget
@@ -4159,8 +4163,12 @@ class Action(_qtpyBase):
             " types.LambdaType, types.MethodType]]"
         )
         assert (
-            isinstance(self.parent_widget, _qtpyBase) or self.parent_widget is None
-        ), f"{self.parent_widget=}. Must be an instance _qtpyBase or None"
+            isinstance(self.parent_widget, (_qtpyBase, _qtpySDI_Frame))
+            or self.parent_widget is None
+        ), (  # QT 6.5.0
+            f"{self.parent_widget=}. Must be an instance _qtpyBase, _qtpySDI_Frame or"
+            " None"
+        )
         assert isinstance(self.control_name, str), f"{self.control_name=}. Must be str"
 
         self._tag_dict = self.widget_dict
