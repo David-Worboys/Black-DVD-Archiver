@@ -16,17 +16,16 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
 import datetime
 import hashlib
+import locale
 import math
-import pprint
 import subprocess
 from random import randint
-from typing import Optional
+from typing import Final, Optional
 
 import psutil
 import xmltodict
@@ -37,6 +36,8 @@ import sqldb
 import sys_consts
 
 # fmt: on
+
+SPUMUX_BUFFER: Final[int] = 43
 
 # ===== Public API class for class DVD use
 
@@ -130,14 +131,32 @@ class DVD_Config:
     _menu_font_point_size: int = 24
     _menu_font: str = ""
     _menu_aspect_ratio: str = sys_consts.AR43
+    _menu_buttons_across: int = 2
+    _menu_buttons_per_page: int = 4
     _serial_number: str = ""
     _timestamp_font: str = ""
     _timestamp_font_point_size: int = 11
     _timestamp_prefix: str = "DVD Build Date:"
-    _timestamp: str = (
-        f"{_timestamp_prefix} : {datetime.datetime.now().strftime('%x %Y %H:%M')}"
-    )
+    _timestamp: str = ""
     _video_standard: str = sys_consts.PAL
+
+    def __post_init__(self):
+        if self.menu_background_color.strip() == "":
+            self.menu_background_color = "wheat"
+
+        # Get the current locale settings and store them
+        current_locale = locale.getlocale(locale.LC_TIME)
+
+        # Set the locale to the user's default locale
+        locale.setlocale(locale.LC_TIME, "")
+
+        # Format the timestamp using the user's default locale
+        self.timestamp = (
+            f"{self.timestamp_prefix} {datetime.datetime.now().strftime('%x %H:%M')}"
+        )
+
+        # Restore the previous locale settings
+        locale.setlocale(locale.LC_TIME, current_locale)
 
     @property
     def input_videos(self):
@@ -255,6 +274,26 @@ class DVD_Config:
         self._menu_font_point_size = value
 
     @property
+    def menu_buttons_across(self) -> int:
+        return self._menu_buttons_across
+
+    @menu_buttons_across.setter
+    def menu_buttons_across(self, value: int):
+        assert isinstance(value, int) and value > 0, f"{value=}. Must be an int > 0"
+
+        self._menu_buttons_across = value
+
+    @property
+    def menu_buttons_per_page(self) -> int:
+        return self._menu_buttons_per_page
+
+    @menu_buttons_per_page.setter
+    def menu_buttons_per_page(self, value: int):
+        assert isinstance(value, int) and value > 0, f"{value=}. Must be an int > 0"
+
+        self._menu_buttons_per_page = value
+
+    @property
     def serial_number(self) -> str:
         return self._serial_number
 
@@ -335,10 +374,6 @@ class DVD_Config:
             sys_consts.PAL,
             sys_consts.NTSC,
         ), f"{value=}. Must be NTSC or PAL"
-
-    def __post_init__(self):
-        if self.menu_background_color.strip() == "":
-            self.menu_background_color = "wheat"
 
 
 @dataclasses.dataclass(slots=True)
@@ -636,7 +671,8 @@ class DVD:
 
         # Black Video Choices
         average_bit_rate = sys_consts.AVERAGE_BITRATE
-        apply_video_filters = True
+        apply_video_filters = False
+        black_border_size = 12  # TODO Black choice for now
 
         # Black filter Choices for now TODO Allow some user configuration
         debug = False
@@ -649,7 +685,13 @@ class DVD:
         usharp_filter = "unsharp=luma_amount=0.2"  # Gentle sharpening of luma channel
 
         # Black frame around the video to hide things like head switching noise
-        black_box_filter = "drawbox=y=ih-h:w=0:h=10:t=fill"
+        filter_commands = [
+            f"drawbox=x=0:y=0:w=iw:h={black_border_size}:color=black:t=fill",
+            f"drawbox=x=0:y=ih-{black_border_size}:w=iw:h={black_border_size}:color=black:t=fill",
+            f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size*2}:color=black:t=fill",
+            f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size*2}:color=black:t=fill",
+        ]
+        black_box_filter = ",".join(filter_commands)
 
         # Tries to lighten dark videos somewhat
         auto_bright = "pp=dr/al"
@@ -664,7 +706,10 @@ class DVD:
                 ),
             ]
         else:
-            video_filters = []
+            video_filters = [
+                "-vf",  # set video filters,
+                f" {black_box_filter}",  # video filters applied
+            ]
 
         for video_file in self.dvd_setup.input_videos:
             _, file_name, _ = file_handler.split_file_path(video_file.file_path)
@@ -827,8 +872,8 @@ class DVD:
 
         menu_title_height = 0
         timestamp_height = 0
-        buttons_per_page = 2
-        buttons_across = 2
+        buttons_per_page = self.dvd_setup.menu_buttons_per_page
+        buttons_across = self.dvd_setup.menu_buttons_across
 
         dvd_dims = dvdarch_utils.get_dvd_dims(
             self.dvd_setup.menu_aspect_ratio, self.dvd_setup.video_standard
@@ -860,16 +905,6 @@ class DVD:
 
             if menu_title_height == -1:
                 return -1, "Failed To Get Menu Title Dimensions"
-
-        if self.dvd_setup.timestamp:
-            _, timestamp_height = dvdarch_utils.get_text_dims(
-                text=self.dvd_setup.timestamp,
-                font=self.dvd_setup.timestamp_font,
-                pointsize=self.dvd_setup.timestamp_font_point_size,
-            )
-
-            if timestamp_height == -1:
-                return -1, "Failed To Get TimEstamp Dimensions"
 
         result, message = self._create_canvas_image(
             width=dvd_dims.display_width, height=dvd_dims.display_height
@@ -957,7 +992,7 @@ class DVD:
         # label_line_height = 0
         # label_lines = 2
         font: str = "DejaVu-Sans-Bold"
-        pointsize: int = 20
+        pointsize: int = 15
         # fill: str = "white"
         # fill: str = "gold"
         # stroke: str = "black"
@@ -1000,7 +1035,7 @@ class DVD:
                 text_color="white",
                 position="bottom",
                 background_color="black",
-                opacity=0.8,
+                opacity=0.5,
                 y_offset=10,
             )
 
@@ -1063,23 +1098,83 @@ class DVD:
             isinstance(border_right, int) and border_right >= 0
         ), f"{border_right=}. Must be int >= than zero"
 
+        # ===== Helper
+        def _build_page_grid(
+            num_buttons: int,
+            buttons_per_page: int,
+            buttons_across: int,
+        ) -> tuple[list[list], int, int]:
+            """Builds a page grid.  Empty cells are represented by -1, Non-empty cells are represented by 1.
+
+            Args:
+                num_buttons (int): Total number of buttons in the dvd menu.
+                buttons_per_page (int): Number of buttons on a single page.
+                buttons_across (int): Number of buttons across a single page.
+
+            Returns:
+                tuple[list[list], int, int]:
+                - arg 1: A list of page grids.
+                - arg 2: Number of rows in the page grid.
+                - arg 3: Number of columns in the page grid.
+            """
+            assert (
+                isinstance(num_buttons, int) and num_buttons > 0
+            ), f"{num_buttons=}. Must be int > 0"
+            assert (
+                isinstance(buttons_per_page, int) and buttons_per_page > 0
+            ), f"{buttons_per_page=}. Must be int > 0"
+            assert (
+                isinstance(buttons_across, int) and buttons_across > 0
+            ), f"{buttons_across=}. Must be int > 0"
+
+            pages = []
+            button_count = 0
+            num_rows = 0
+            num_cols = 0
+
+            if buttons_per_page == 1:
+                buttons_down = 1
+            else:
+                buttons_down = math.ceil(buttons_per_page / buttons_across)
+
+            for _ in range(num_pages):
+                page_grid = [
+                    [-1 for _ in range(buttons_across)] for _ in range(buttons_down)
+                ]
+
+                button_num = 0
+                for row_index in range(buttons_down):
+                    for col_index in range(buttons_across):
+                        if button_num > buttons_per_page - 1:
+                            break
+                        elif button_count < num_buttons:
+                            page_grid[row_index][col_index] = 1
+                            button_count += 1
+                        else:
+                            break
+
+                        button_num += 1
+
+                    if button_num > buttons_per_page - 1 or button_count == num_buttons:
+                        break
+
+                pages.append(page_grid)
+                num_rows = max(num_rows, len(page_grid))
+                num_cols = max(num_cols, len(page_grid[0]))
+            return pages, num_rows, num_cols
+
+        # ===== Main
+
         # TODO Make these values configurable
         header_pad = 10
         button_padding = 10
 
-        # if buttons_per_page == 1:
-        #     buttons_down = 1
-        # else:
-        #     buttons_down = math.floor(buttons_per_page / buttons_across)
-
         # This keeps spumux happy
-        if border_right < 43:
-            border_right = 43
+        if border_right < SPUMUX_BUFFER:
+            border_right = SPUMUX_BUFFER
 
-        if border_left < 43:
-            border_left = 43
-
-        # num_pages = math.ceil(num_buttons / buttons_per_page)
+        if border_left < SPUMUX_BUFFER:
+            border_left = SPUMUX_BUFFER
 
         if self.dvd_setup.menu_title == "":  # Header pad is only for titles
             header_pad = 0
@@ -1089,89 +1184,16 @@ class DVD:
         canvas_height = dvd_dims.display_height - (
             border_top + border_bottom + header_pad
         )
-        max_button_height = canvas_height // 2
-
-        # Create a list to store the button cells
-        pages = []
-        page_grid = []
-        num_rows = 0
-        num_cols = 0
-
-        """ if buttons_per_page == 1:
-            page_grid = [[1]]
-            for _ in range(num_buttons):
-                pages.append(page_grid)
-            num_rows = 1
-            num_cols = 1
-        else:
-            for _ in range(num_pages):
-                # Create a grid for the current page with rows and columns filled with -1
-                page_row = []
-                page_grid = []
-                for _ in range(buttons_across):
-                    page_row.append(-1)
-
-                for _ in range(buttons_down):
-                    page_grid.append(page_row)
-
-                # Fill out 1 for each button starting from the top-left corner
-                button_index = 0
-                for row in range(buttons_down):
-                    for col in range(buttons_across):
-                        if button_index < buttons_per_page :
-                            page_grid[row][col] = 1
-                            button_index += 1
-                        #else:
-                        #    break
-
-                # Add the grid to the list of pages and update the maximum number of rows and columns
-                pages.append(page_grid)
-                num_rows = max(num_rows, len(page_grid))
-                num_cols = max(num_cols, len(page_grid[0])) """
-
-        if buttons_per_page == 1:
-            buttons_down = 1
-        else:
-            buttons_down = math.ceil(buttons_per_page / buttons_across)
 
         num_pages = math.ceil(num_buttons / buttons_per_page)
 
-        pages = []
-        button_count = 0
+        pages, num_rows, num_cols = _build_page_grid(
+            num_buttons=num_buttons,
+            buttons_per_page=buttons_per_page,
+            buttons_across=buttons_across,
+        )
 
-        for _ in range(num_pages):
-            page_grid = [
-                [-1 for _ in range(buttons_across)] for _ in range(buttons_down)
-            ]
-
-            button_num = 0
-            for row_index in range(buttons_down):
-                for col_index in range(buttons_across):
-                    print(
-                        f"FBG {row_index=} {col_index=} {page_grid[row_index][col_index]=} {button_count=} {num_buttons=} {button_num=} {buttons_per_page=}"
-                    )
-                    if button_num > buttons_per_page - 1:
-                        print("FBG 2")
-                        break
-                    elif button_count < num_buttons:
-                        print("FBG 1")
-                        page_grid[row_index][col_index] = 1
-                    else:
-                        print("FBG 3")
-                        break
-
-                    button_num += 1
-                    button_count += 1
-
-                if button_num > buttons_per_page - 1:
-                    print("FBG 2")
-                    break
-
-            pages.append(page_grid)
-            num_rows = max(num_rows, len(page_grid))
-            num_cols = max(num_cols, len(page_grid[0]))
-
-        print(pages)
+        max_button_height = canvas_height // max(num_rows,4)
 
         ## Compute the maximum width of each rectangle based on the number of columns across all pages
         rect_width_max = (
@@ -1201,17 +1223,21 @@ class DVD:
         if rect_padding < button_padding or rect_padding > 2 * button_padding:
             rect_padding = 2 * button_padding
 
-        # Count the number of rows with at least one non-empty cell
-        num_non_empty_rows = sum(
-            1 for row in page_grid if any(col != -1 for col in row)
-        )
+        # Want buttons in same pos on all pages, so we calc based on first page
+        num_non_empty_rows = sum(1 for row in pages[0] if any(col != -1 for col in row))
 
         # Calculate the total height of the grid
         total_height = (
             num_non_empty_rows * rect_height + (num_non_empty_rows - 1) * rect_padding
         )
 
-        # Calculate the y offset
+        if total_height > canvas_height:
+            return (
+                [],
+                f"Too Many Buttons Down: {total_height=}  >  {canvas_height=}",
+            )
+
+            # Calculate the y offset
         y_offset = ((canvas_height - total_height) // 2) + border_top + header_pad
 
         cell_cords = []
@@ -1223,6 +1249,12 @@ class DVD:
                 total_width = (row_col_count * rect_width) + (
                     button_padding * (row_col_count - 1)
                 )
+
+                if total_width > canvas_width:
+                    return (
+                        [],
+                        f"Too Many Buttons Across: {total_width=}  >  {canvas_width=}",
+                    )
 
                 x_offset = (canvas_width - total_width) // 2 + border_right
 
@@ -1341,14 +1373,41 @@ class DVD:
                 pointsize=self.dvd_setup.timestamp_font_point_size,
             )
 
-            if timestamp_height == -1:
-                return -1, "Failed to get timestamp height"
+            if serial_num_height == -1:
+                return -1, "Failed to get serial number height"
 
             result, message = dvdarch_utils.write_text_on_file(
                 input_file=self._background_canvas_file,
                 text=self.dvd_setup.serial_number,
                 x=width - serial_num_width - self._dvd_timestamp_x_offset,
                 y=height - serial_num_height,
+                pointsize=self.dvd_setup.timestamp_font_point_size,
+                color=self.dvd_setup.menu_font_color,
+                font=self.dvd_setup.timestamp_font,
+            )
+
+            if result == -1:
+                return -1, message
+
+            calling_card = (
+                f"{sys_consts.PROGRAM_NAME} (c)"
+                f" {sys_consts.AUTHOR} {sys_consts.COPYRIGHT_YEAR()}"
+            )
+
+            progname_width, progname_height = dvdarch_utils.get_text_dims(
+                text=calling_card,
+                font=self.dvd_setup.timestamp_font,
+                pointsize=self.dvd_setup.timestamp_font_point_size,
+            )
+
+            if progname_height == -1:
+                return -1, "Failed to get calling card height"
+
+            result, message = dvdarch_utils.write_text_on_file(
+                input_file=self._background_canvas_file,
+                text=calling_card,
+                x=width // 2 - progname_width // 2,
+                y=height - progname_height,
                 pointsize=self.dvd_setup.timestamp_font_point_size,
                 color=self.dvd_setup.menu_font_color,
                 font=self.dvd_setup.timestamp_font,
@@ -1710,10 +1769,10 @@ class DVD:
         max_page_no = 0
         prev_page = -1
 
-        left_x = 43
-        left_y = canvas_height - (pointer_height + 43)
-        right_x = canvas_width - (pointer_width + 43)
-        right_y = canvas_height - (pointer_height + 43)
+        left_x = SPUMUX_BUFFER
+        left_y = canvas_height - (pointer_height + SPUMUX_BUFFER)
+        right_x = canvas_width - (pointer_width + SPUMUX_BUFFER)
+        right_y = canvas_height - (pointer_height + SPUMUX_BUFFER)
 
         for coords in cell_coords:
             if coords.page != prev_page:

@@ -19,7 +19,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import datetime
-from typing import Callable, Final, Literal
+from typing import Callable, Final
 
 import file_utils
 import utils
@@ -30,10 +30,10 @@ executable_folder = file_utils.App_Path()
 
 file_sep = file_utils.File().ossep
 
-PROGRAM_NAME = "Black DVD Archiver"
-PROGRAM_VERSION = "0.2"
-AUTHOR = "David Worboys"
-LICENCE = "GNU V3 GPL"
+PROGRAM_NAME: Final[str] = "Black DVD Archiver"
+PROGRAM_VERSION: Final[str] = "0.3"
+AUTHOR: Final[str] = "David Worboys"
+LICENCE: Final[str] = "GNU V3 GPL"
 
 
 # Needs Callable to keep MyPy happy. Returns a string that is either 2020 or 2020-<current year>
@@ -52,15 +52,15 @@ SEED = "9d392b49808544f7bc5b93b935b76ced"
 SDELIM = (  # Used to delimit strings - particularly non-translatable sections of strings
     "||"
 )
-PAL = "PAL"
-NTSC = "NTSC"
-AR169 = "16:9"
-AR43 = "4:3"
-PAL_FRAMERATE = 25
-NTSC_FRAMERATE = 29.97
-AVERAGE_BITRATE = 5500  # kilobits/sec
-SINGLE_SIDED_DVD_SIZE = 40258730  # kb ~ 4.7GB DVD5
-DOUBLE_SIDED_DVD_SIZE = 72453177  # kb ~ 8.5GB DVD9
+PAL: Final[str] = "PAL"
+NTSC: Final[str] = "NTSC"
+AR169: Final[str] = "16:9"
+AR43: Final[str] = "4:3"
+PAL_FRAMERATE: Final[int] = 25
+NTSC_FRAMERATE: Final[float] = 29.97
+AVERAGE_BITRATE: Final[int] = 5500  # kilobits/sec
+SINGLE_SIDED_DVD_SIZE: Final[int] = 40258730  # kb ~ 4.7GB DVD5
+DOUBLE_SIDED_DVD_SIZE: Final[int] = 72453177  # kb ~ 8.5GB DVD9
 
 # fmt: off
 VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp", 
@@ -85,19 +85,19 @@ XORRISO: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}xorriso"
 ICON_PATH: Final[str] = f"{executable_folder}{file_sep}icons"
 
 # Database tables
-PRODUCT_LINE = "product_line"
+PRODUCT_LINE: Final[str] = "product_line"
 
 # Database Setting Keys
-ARCHIVE_FOLDER = "archive_folder"
-DVD_BUILD_FOLDER = "dvd_build_folder"
+ARCHIVE_FOLDER: Final[str] = "archive_folder"
+DVD_BUILD_FOLDER: Final[str] = "dvd_build_folder"
 
 
 class SPECIAL_PATH(utils.strEnum):
     """Contains a enums for strings that represent special paths on the user's computer"""
 
-    DESKTOP = "Desktop"
-    DOCUMENTS = "Documents"
-    DOWNLOADS = "Downloads"
-    MUSIC = "Music"
-    PICTURES = "Pictures"
-    VIDEOS = "Videos"
+    DESKTOP: Final[str] = "Desktop"
+    DOCUMENTS: Final[str] = "Documents"
+    DOWNLOADS: Final[str] = "Downloads"
+    MUSIC: Final[str] = "Music"
+    PICTURES: Final[str] = "Pictures"
+    VIDEOS: Final[str] = "Videos"
