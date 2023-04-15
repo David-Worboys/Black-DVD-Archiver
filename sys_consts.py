@@ -19,7 +19,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import datetime
-from typing import Callable
+from typing import Callable, Final, Literal
 
 import file_utils
 import utils
@@ -69,18 +69,20 @@ VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp",
                     "dv")
 # fmt: on
 
-COMPOSITE = f"{executable_folder}{file_sep}tools{file_sep}composite"
-CONVERT = f"{executable_folder}{file_sep}tools{file_sep}magick"
-DVDAUTHOR = f"{executable_folder}{file_sep}tools{file_sep}dvdauthor"
-FFMPG = f"{executable_folder}{file_sep}tools{file_sep}ffmpeg"
-FFPROBE = f"{executable_folder}{file_sep}tools{file_sep}ffprobe"
-IDENTIFY = f"{executable_folder}{file_sep}tools{file_sep}identify"
-MEDIAINFO = f"{executable_folder}{file_sep}tools{file_sep}mediainfo"
-MPEG2ENC = f"{executable_folder}{file_sep}tools{file_sep}mpeg2enc"
-MPLEX = f"{executable_folder}{file_sep}tools{file_sep}mplex"
-PPMTOY4M = f"{executable_folder}{file_sep}tools{file_sep}ppmtoy4m"
-SPUMUX = f"{executable_folder}{file_sep}tools{file_sep}spumux"
-XORRISO = f"{executable_folder}{file_sep}tools{file_sep}xorriso"
+COMPOSITE: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}composite"
+CONVERT: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}magick"
+DVDAUTHOR: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}dvdauthor"
+FFMPG: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}ffmpeg"
+FFPROBE: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}ffprobe"
+IDENTIFY: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}identify"
+MEDIAINFO: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}mediainfo"
+MPEG2ENC: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}mpeg2enc"
+MPLEX: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}mplex"
+PPMTOY4M: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}ppmtoy4m"
+SPUMUX: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}spumux"
+XORRISO: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}xorriso"
+
+ICON_PATH: Final[str] = f"{executable_folder}{file_sep}icons"
 
 # Database tables
 PRODUCT_LINE = "product_line"

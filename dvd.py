@@ -23,6 +23,7 @@ import dataclasses
 import datetime
 import hashlib
 import math
+import pprint
 import subprocess
 from random import randint
 from typing import Optional
@@ -169,10 +170,10 @@ class DVD_Config:
             value, (list, tuple)
         ), f"{value=}. Must be a list | tuple of str"
 
-        for menu_label in value:
-            assert (
-                isinstance(menu_label, str) and menu_label.strip() != ""
-            ), f"{menu_label=}. Must be a non-empty string"
+        assert all(
+            isinstance(menu_label, str) and menu_label.strip() != ""
+            for menu_label in value
+        ), f"{value=} must be list | tuple of non-empty strings."
 
         self._menu_labels = value
 
@@ -348,6 +349,58 @@ class _Cell_Coords:
     y1: int = 0
     width: int = 0
     height: int = 0
+    page: int = 0
+    video_file: File_Def | None = None
+
+    def get_mask_filenames(
+        self, alternate_file_path: str = ""
+    ) -> tuple[str, str, str, str]:
+        """Generate the file names for overlay, highlight, select, and text masks.
+
+        Args:
+            path_name (str): The path to the directory containing the files.
+            file_name (str): The name of the file (without extension).
+            file_extn (str): The extension of the file (most likely jpg).
+            page_number (int): The page number of the file (must be >= 0).
+
+        Returns:
+            A tuple of four strings representing the file names of the following:
+            - overlay_file: A PNG file containing the overlay mask.
+            - highlight_file: A PNG file containing the highlight mask.
+            - select_file: A PNG file containing the select mask.
+            - text_file: A file containing the text (with extension specified by file_extn).
+        """
+
+        file_handler = file_utils.File()
+
+        if alternate_file_path:
+            path_name, file_name, file_extn = file_handler.split_file_path(
+                alternate_file_path
+            )
+        else:
+            path_name, file_name, file_extn = file_handler.split_file_path(
+                self.video_file.menu_image_file_path
+            )
+
+        suffixes = ["_overlay", "_highlight", "_select", "_text"]
+        filenames = []
+
+        for suffix in suffixes:
+            if suffix == "_text":
+                filename = (
+                    file_handler.file_join(
+                        path_name, f"{file_name}{suffix}_{self.page}", file_extn
+                    )
+                    if file_extn
+                    else ""
+                )
+            else:
+                filename = file_handler.file_join(
+                    path_name, f"{file_name}{suffix}_{self.page}", "png"
+                )
+            filenames.append(filename)
+
+        return tuple(filenames)
 
 
 # ===== Public Class
@@ -455,11 +508,6 @@ class DVD:
             return error_no, error_message
 
         error_no, error_message = self._create_dvd_menu()
-
-        if error_no == -1:
-            return error_no, error_message
-
-        error_no, error_message = self._create_dvd_image()
 
         if error_no == -1:
             return error_no, error_message
@@ -779,12 +827,29 @@ class DVD:
 
         menu_title_height = 0
         timestamp_height = 0
+        buttons_per_page = 2
+        buttons_across = 2
 
         dvd_dims = dvdarch_utils.get_dvd_dims(
             self.dvd_setup.menu_aspect_ratio, self.dvd_setup.video_standard
         )
         if dvd_dims.display_height == -1:
             return -1, "Failed To Get DVD Dimensions"
+
+        cell_coords, message = self._calc_layout(
+            num_buttons=len(self.dvd_setup.input_videos),
+            buttons_per_page=buttons_per_page,
+            buttons_across=buttons_across,
+            button_aspect_ratio=4 / 3,
+            dvd_dims=dvd_dims,
+            border_top=10 + menu_title_height,
+            border_bottom=10 + timestamp_height,
+            border_left=10,  # + timestamp_height,
+            border_right=10,  # + timestamp_height,
+        )
+
+        if not cell_coords:
+            return -1, message
 
         if self.dvd_setup.menu_title:
             _, menu_title_height = dvdarch_utils.get_text_dims(
@@ -794,7 +859,6 @@ class DVD:
             )
 
             if menu_title_height == -1:
-                print(f"DBG {self.dvd_setup.menu_title=}")
                 return -1, "Failed To Get Menu Title Dimensions"
 
         if self.dvd_setup.timestamp:
@@ -806,19 +870,6 @@ class DVD:
 
             if timestamp_height == -1:
                 return -1, "Failed To Get TimEstamp Dimensions"
-
-        cell_coords, message = self._calc_layout(
-            num_buttons=len(self.dvd_setup.input_videos),
-            button_aspect_ratio=4 / 3,
-            dvd_dims=dvd_dims,
-            border_top=10 + menu_title_height,
-            border_bottom=10 + timestamp_height,
-            border_left=10,  # + timestamp_height,
-            border_right=10,  # + timestamp_height,
-        )
-
-        if not cell_coords:
-            return -1, message
 
         result, message = self._create_canvas_image(
             width=dvd_dims.display_width, height=dvd_dims.display_height
@@ -843,7 +894,7 @@ class DVD:
         if result == -1:
             return -1, message
 
-        result, message = self._create_labels()
+        result, message = self._create_labels(buttons_per_page=buttons_per_page)
 
         if result == -1:
             return -1, message
@@ -864,31 +915,38 @@ class DVD:
         if result == -1:
             return -1, message
 
-        result, message = self._convert_to_m2v()
+        result, message = self._convert_to_m2v(cell_coords=cell_coords)
 
         if result == -1:
             return -1, message
 
-        result, message = self._convert_audio()
+        result, message = self._convert_audio(cell_coords=cell_coords)
 
         if result == -1:
             return -1, message
 
-        result, message = self._multiplex_audio_video()
+        result, message = self._multiplex_audio_video(cell_coords=cell_coords)
 
         if result == -1:
             return -1, message
 
-        result, message = self._create_menu_mpg()
+        result, message = self._create_menu_mpg(cell_coords=cell_coords)
+
+        if result == -1:
+            return -1, message
+
+        result, message = self._create_dvd_image(buttons_per_page=buttons_per_page)
 
         if result == -1:
             return -1, message
 
         return 1, ""
 
-    def _create_labels(self) -> tuple[int, str]:
+    def _create_labels(self, buttons_per_page: int) -> tuple[int, str]:
         """
         Create images for each label to be placed on the button images.
+        Args:
+            buttons_per_page (int): The number of buttons on the DVD menu page
 
         Returns:
             tuple[int,str]:
@@ -916,7 +974,8 @@ class DVD:
 
         file_handler = file_utils.File()
 
-        for input_video in self.dvd_setup.input_videos:
+        for video_index, input_video in enumerate(self.dvd_setup.input_videos):
+            page = math.floor(video_index / buttons_per_page)
             path_name, file_name, file_extn = file_handler.split_file_path(
                 input_video.menu_image_file_path
             )
@@ -924,7 +983,7 @@ class DVD:
             # Setup required files
             menu_button_file = file_handler.file_join(path_name, file_name, file_extn)
             menu_button_text_file = file_handler.file_join(
-                path_name, f"{file_name}_text", file_extn
+                path_name, f"{file_name}_text_{page}", file_extn
             )
 
             if not file_handler.file_exists(menu_button_file):
@@ -953,6 +1012,8 @@ class DVD:
     def _calc_layout(
         self,
         num_buttons: int,
+        buttons_per_page: int,
+        buttons_across,
         button_aspect_ratio: float,
         dvd_dims: dvdarch_utils.dvd_dims,
         border_top: int = 0,
@@ -966,6 +1027,8 @@ class DVD:
 
         Args:
             num_buttons (int): The number of num_buttons to be arranged.
+            buttons_per_page (int): The number of buttons on the DVD menu page
+            buttons_across (int): The number of buttons across the DVD menu (buttons down is calculated).
             button_aspect_ratio (float): The aspect ratio of the button rectangles (height/width).
             dvd_dims (dvdarch_utils.dvd_dims): The DVD dimenstions
             border_top (int): The width of the border at the top edge of the canvas.
@@ -1001,9 +1064,22 @@ class DVD:
         ), f"{border_right=}. Must be int >= than zero"
 
         # TODO Make these values configurable
-        buttons_across = 1
         header_pad = 10
         button_padding = 10
+
+        # if buttons_per_page == 1:
+        #     buttons_down = 1
+        # else:
+        #     buttons_down = math.floor(buttons_per_page / buttons_across)
+
+        # This keeps spumux happy
+        if border_right < 43:
+            border_right = 43
+
+        if border_left < 43:
+            border_left = 43
+
+        # num_pages = math.ceil(num_buttons / buttons_per_page)
 
         if self.dvd_setup.menu_title == "":  # Header pad is only for titles
             header_pad = 0
@@ -1016,37 +1092,95 @@ class DVD:
         max_button_height = canvas_height // 2
 
         # Create a list to store the button cells
-        rows = []
-        col_index = -1
-        cols = []
-        col_count = 0
+        pages = []
+        page_grid = []
+        num_rows = 0
+        num_cols = 0
 
-        for row in range(num_buttons):
-            col_index += 1
-            cols.append(col_index)
+        """ if buttons_per_page == 1:
+            page_grid = [[1]]
+            for _ in range(num_buttons):
+                pages.append(page_grid)
+            num_rows = 1
+            num_cols = 1
+        else:
+            for _ in range(num_pages):
+                # Create a grid for the current page with rows and columns filled with -1
+                page_row = []
+                page_grid = []
+                for _ in range(buttons_across):
+                    page_row.append(-1)
 
-            if col_index == buttons_across - 1 or row == num_buttons - 1:
-                rows.append(cols)
-                col_count = max(col_count, len(cols))
-                cols = [] if row < num_buttons - 1 else cols
+                for _ in range(buttons_down):
+                    page_grid.append(page_row)
 
-        num_rows = len(rows)
-        num_cols = len(max(rows, key=len))
+                # Fill out 1 for each button starting from the top-left corner
+                button_index = 0
+                for row in range(buttons_down):
+                    for col in range(buttons_across):
+                        if button_index < buttons_per_page :
+                            page_grid[row][col] = 1
+                            button_index += 1
+                        #else:
+                        #    break
 
-        for col in rows:
-            diff = num_cols - len(col)
-            left_zeros = diff // 2
-            right_zeros = diff - left_zeros
-            col[:0] = [-1] * left_zeros
-            col.extend([-1] * right_zeros)
+                # Add the grid to the list of pages and update the maximum number of rows and columns
+                pages.append(page_grid)
+                num_rows = max(num_rows, len(page_grid))
+                num_cols = max(num_cols, len(page_grid[0])) """
 
+        if buttons_per_page == 1:
+            buttons_down = 1
+        else:
+            buttons_down = math.ceil(buttons_per_page / buttons_across)
+
+        num_pages = math.ceil(num_buttons / buttons_per_page)
+
+        pages = []
+        button_count = 0
+
+        for _ in range(num_pages):
+            page_grid = [
+                [-1 for _ in range(buttons_across)] for _ in range(buttons_down)
+            ]
+
+            button_num = 0
+            for row_index in range(buttons_down):
+                for col_index in range(buttons_across):
+                    print(
+                        f"FBG {row_index=} {col_index=} {page_grid[row_index][col_index]=} {button_count=} {num_buttons=} {button_num=} {buttons_per_page=}"
+                    )
+                    if button_num > buttons_per_page - 1:
+                        print("FBG 2")
+                        break
+                    elif button_count < num_buttons:
+                        print("FBG 1")
+                        page_grid[row_index][col_index] = 1
+                    else:
+                        print("FBG 3")
+                        break
+
+                    button_num += 1
+                    button_count += 1
+
+                if button_num > buttons_per_page - 1:
+                    print("FBG 2")
+                    break
+
+            pages.append(page_grid)
+            num_rows = max(num_rows, len(page_grid))
+            num_cols = max(num_cols, len(page_grid[0]))
+
+        print(pages)
+
+        ## Compute the maximum width of each rectangle based on the number of columns across all pages
         rect_width_max = (
             (canvas_width // num_cols)
             - (num_cols * button_padding)
             - (border_left + border_right)
         )
 
-        ## Compute the dimensions of each rectangle and the padding between them
+        # Compute the dimensions of each rectangle and the padding between them
         rect_width = rect_width_max
         rect_height = int(min(canvas_height / num_rows, max_button_height))
         rect_aspect_ratio = rect_width / rect_height
@@ -1067,45 +1201,64 @@ class DVD:
         if rect_padding < button_padding or rect_padding > 2 * button_padding:
             rect_padding = 2 * button_padding
 
-        # Center the rows in the y direction
-        total_height = num_rows * rect_height + (num_rows - 1) * rect_padding
+        # Count the number of rows with at least one non-empty cell
+        num_non_empty_rows = sum(
+            1 for row in page_grid if any(col != -1 for col in row)
+        )
+
+        # Calculate the total height of the grid
+        total_height = (
+            num_non_empty_rows * rect_height + (num_non_empty_rows - 1) * rect_padding
+        )
+
+        # Calculate the y offset
         y_offset = ((canvas_height - total_height) // 2) + border_top + header_pad
 
         cell_cords = []
-        for row_index, row_list in enumerate(rows):
-            row_col_count = len([col for col in row_list if col != -1])
-            col_index = 0
+        file_index = 0
+        for page_index, page in enumerate(pages):
+            for row_index, row in enumerate(page):
+                row_col_count = len([col for col in row if col != -1])
 
-            for _, col_value in enumerate(row_list):
-                if col_value == -1:  # Ignore not on grid
-                    continue
-
-                total_width = (
-                    row_col_count * rect_width
-                    + (row_col_count - 1) * button_padding
-                    + border_left
-                    + border_right
+                total_width = (row_col_count * rect_width) + (
+                    button_padding * (row_col_count - 1)
                 )
 
-                x_offset = (canvas_width - total_width) // 2
+                x_offset = (canvas_width - total_width) // 2 + border_right
 
-                x = int(x_offset + col_index * (rect_width + button_padding))
-                y = int(y_offset + row_index * (rect_height + rect_padding))
+                col_index = 0
+                for col_value in row:
+                    if col_value == -1:  # Ignore not on grid
+                        continue
 
-                cell_cords.append(
-                    _Cell_Coords(
-                        x0=x,
-                        y0=y,
-                        x1=x + rect_width,
-                        y1=y + rect_height,
-                        width=rect_width
-                        - button_padding,  # Provide space between buttons
-                        height=rect_height
-                        - button_padding,  # Provide space between buttons
+                    x = int(x_offset + col_index * (rect_width + button_padding))
+                    y = int(y_offset + row_index * (rect_height + rect_padding))
+
+                    if file_index > len(self.dvd_setup.input_videos) - 1:
+                        return (
+                            [],
+                            (
+                                "File index out of range 0 -"
+                                f" {len(self.dvd_setup.input_videos) - 1}"
+                            ),
+                        )
+
+                    cell_cords.append(
+                        _Cell_Coords(
+                            x0=x,
+                            y0=y,
+                            x1=x + rect_width,
+                            y1=y + rect_height,
+                            width=rect_width
+                            - button_padding,  # Provide space between buttons
+                            height=rect_height
+                            - button_padding,  # Provide space between buttons
+                            page=page_index,
+                            video_file=self.dvd_setup.input_videos[file_index],
+                        )
                     )
-                )
-                col_index += 1
-
+                    file_index += 1
+                    col_index += 1
         return cell_cords, ""
 
     def _create_canvas_image(self, width: int, height: int) -> tuple[int, str]:
@@ -1209,320 +1362,626 @@ class DVD:
     def _prepare_buttons(
         self, cell_coords: list[_Cell_Coords], max_cell_width: int, max_cell_height: int
     ) -> tuple[int, str]:
-        """Prepares the menu buttons by creating background files with the image
-        outlines placed on them for the overlay, highlight and the select state that
-        are used when the DVD menu is navigated
-
-        Creates the spumux xml file used to create the menu video file
-
-        Args:
-            cell_coords (list[_Cell_Coords]): Precalculated co-ordinates for each button
-            max_cell_width (int): Maximum cell (button) width
-            max_cell_height (int): Maximum cell (button) height
-
-        Returns:
-            tuple[int,str]:
-            - arg1 1: ok, -1: fail
-            - arg2: error message or "" if ok
-        """
-        # Black choices, could be user configured if needed and stored in database
-        color: str = "none"
-        button_border_color = "white"
-        button_border_thickness = 5
-        button_highlight_color = "gold"
-        button_highlight_thickness = 10
-        button_select_color = "white"
-
-        # ===== Helper functions
-        def _create_transparent_file(
-            width: int, height: int, out_file: str, border_color=""
-        ):
-            """Creates a transparent file of a given width and height.
-            If a border color is provided a rectangle of that color is drawn
-            around the edge of the file
+        # ===== Helper
+        def _get_canvas_overlay_files(
+            background_path_name: str, background_file_name: str, page_no: int
+        ) -> tuple[int, str, str, str, str]:
+            """Returns a tuple containing the paths of canvas overlay, highlight, select, and images files.
 
             Args:
-                width (int): Width of the new file
-                height (int): Height of the new file
-                out_file (str): The path for the new transparent file
-                border_color (str, optional): The corder color of the transparent
-                file. Defaults to "".
+                background_path_name (str): The path of the background file.
+                background_file_name (str): The name of the background file.
+                page_no (int): The page number for which the canvas files are required.
 
             Returns:
-                tuple[int,str]:
-                - arg1 1: ok, -1: fail,
-                - arg2: error message or "" if ok
+                tuple[int, str, str, str, str]: A tuple containing the following values:
+                    - 1 if ok, otherwise -1.
+                    - The path of the canvas overlay file or error_message of not ok .
+                    - The path of the canvas highlight file.
+                    - The path of the canvas select file.
+                    - The path of the canvas images file.
             """
-            border_width = 10
+            assert (
+                isinstance(background_path_name, str)
+                and background_path_name.strip() != ""
+            ), f"{background_path_name=}. Must be non-empty str"
+            assert (
+                isinstance(background_file_name, str)
+                and background_file_name.strip() != ""
+            ), f"{background_file_name=}. Must be non-empty str"
+            assert (
+                isinstance(page_no, int) and page_no >= 0
+            ), f"{page_no=}. Must be int >= 0"
 
-            if border_color == "":
-                command = [
-                    sys_consts.CONVERT,
-                    "-size",
-                    f"{width}x{height}",
-                    "xc:none",
-                    out_file,
-                ]
-            else:
-                command = [
-                    sys_consts.CONVERT,
-                    "-size",
-                    f"{width}x{height}",
-                    "xc:transparent",
-                    "-fill",
-                    "none",
-                    "-stroke",
-                    border_color,
-                    "-strokewidth",
-                    f"{border_width}",
-                    "-draw",
-                    f"rectangle 0,0,{width},{height}",
-                    out_file,
-                ]
+            canvas_overlay_file = file_handler.file_join(
+                background_path_name,
+                f"{background_file_name}_overlay_{page_no}",
+                "png",
+            )
+            canvas_highlight_file = file_handler.file_join(
+                background_path_name,
+                f"{background_file_name}_highlight_{page_no}",
+                "png",
+            )
+            canvas_select_file = file_handler.file_join(
+                background_path_name,
+                f"{background_file_name}_select_{page_no}",
+                "png",
+            )
+            canvas_images_file = file_handler.file_join(
+                background_path_name,
+                f"{background_file_name}_images_{page_no}",
+                "png",
+            )
 
-            return dvdarch_utils.execute_check_output(commands=command)
-
-        def _overlay_file(
-            in_file: str, overlay_file: str, out_file: str, x: int, y: int
-        ) -> tuple[int, str]:
-            """Places the overlay_file on the input file at a given x,y co-ord
-            saves the combined file to the output file
-
-            Args:
-                in_file (str): File which will have the overlay_file placed on it
-                overlay_file (str): File which will be overlaid on the in_file
-                out_file (str): File which will be saved as the combined file in_file and overlay_file
-                x (int): x co-ord of overlay_file
-                y (int): y co-ord of overlay_file
-
-            Returns:
-                tuple[int,str]:
-                - arg1 1: ok, -1: fail
-                - arg2: error message or "" if ok
-            """
-            # Image magick V6 Composite works magick V7 magick composite does not
             command = [
-                # "composite",
-                sys_consts.COMPOSITE,
-                "-geometry",
-                f"+{x}+{y}",
-                overlay_file,
-                in_file,
-                out_file,
+                sys_consts.CONVERT,
+                self._background_canvas_file,
+                canvas_images_file,
             ]
 
-            return dvdarch_utils.execute_check_output(commands=command)
+            result, message = dvdarch_utils.execute_check_output(commands=command)
 
-        # ===== Main
-        file_handler = file_utils.File()
-        path_name, file_name, file_extn = file_handler.split_file_path(
-            self._background_canvas_file
-        )
+            if result == -1:
+                return -1, message, "", "", ""
 
-        canvas_overlay_file = file_handler.file_join(
-            path_name, f"{file_name}_overlay", "png"
-        )
-        canvas_highlight_file = file_handler.file_join(
-            path_name, f"{file_name}_highlight", "png"
-        )
-        canvas_select_file = file_handler.file_join(
-            path_name, f"{file_name}_select", "png"
-        )
-        canvas_images_file = file_handler.file_join(
-            path_name, f"{file_name}_images", "png"
-        )
-
-        spumux_xml = file_handler.file_join(path_name, "spumux", "xml")
-
-        command = [
-            sys_consts.CONVERT,
-            self._background_canvas_file,
-            canvas_images_file,
-        ]
-
-        result, message = dvdarch_utils.execute_check_output(commands=command)
-
-        if result == -1:
-            return -1, message
-
-        canvas_width, message = dvdarch_utils.get_image_width(
-            self._background_canvas_file
-        )
-
-        if canvas_width == -1:
-            return -1, message
-
-        canvas_height, message = dvdarch_utils.get_image_height(
-            self._background_canvas_file
-        )
-
-        if canvas_height == -1:
-            return -1, message
-
-        result, message = _create_transparent_file(
-            width=canvas_width,
-            height=canvas_height,
-            out_file=canvas_overlay_file,
-        )
-        if result == -1:
-            return -1, message
-
-        result, message = _create_transparent_file(
-            width=canvas_width,
-            height=canvas_height,
-            out_file=canvas_highlight_file,
-        )
-        if result == -1:
-            return -1, message
-
-        result, message = _create_transparent_file(
-            width=canvas_width,
-            height=canvas_height,
-            out_file=canvas_select_file,
-        )
-
-        if result == -1:
-            return -1, message
-
-        for video_index, input_video in enumerate(self.dvd_setup.input_videos):
-            button_coords = cell_coords[video_index]
-
-            path_name, file_name, file_extn = file_handler.split_file_path(
-                input_video.menu_image_file_path
+            return (
+                1,
+                canvas_overlay_file,
+                canvas_highlight_file,
+                canvas_select_file,
+                canvas_images_file,
             )
 
-            print(f"DBG {path_name=} {file_name=} {file_extn=}")
+        def _create_canvas_files(
+            width: int,
+            height: int,
+            canvas_overlay_file: str,
+            canvas_highlight_file: str,
+            canvas_select_file: str,
+        ) -> tuple[int, str]:
+            """Create canvas image files with specified width and height.
 
-            button_overlay_file = file_handler.file_join(
-                path_name, f"{file_name}_overlay", "png"
-            )
-            button_highlight_file = file_handler.file_join(
-                path_name, f"{file_name}_highlight", "png"
-            )
-            button_select_file = file_handler.file_join(
-                path_name, f"{file_name}_select", "png"
-            )
-            button_text_file = file_handler.file_join(
-                path_name, f"{file_name}_text", file_extn
-            )
+            Args:
+                width (int): Width of the canvas image files to create.
+                height (int): Height of the canvas image files to create.
+                canvas_overlay_file (str): Filename for the canvas overlay file.
+                canvas_highlight_file (str): Filename for the canvas highlight file.
+                canvas_select_file (str): Filename for the canvas select file.
 
-            print(
-                f"DBG {button_overlay_file=} {button_highlight_file=} {button_select_file=} {button_text_file=}"
-            )
+            Returns:
+                tuple[int, str]: A tuple containing the following values:
+                    - 1 if successful, otherwise -1.
+                    - "" if successful, otherwise the error message.
+            """
+            # Check that the width and height are positive integers
+            assert isinstance(width, int) and width > 0, f"{width=}. Must be int >= 0 "
+            assert (
+                isinstance(height, int) and height > 0
+            ), f"{height=}. Must be int >= 0 "
+            assert (
+                isinstance(canvas_overlay_file, str)
+                and canvas_overlay_file.strip() != ""
+            ), f"{canvas_overlay_file=}. Cannot be empty."
+            assert (
+                isinstance(canvas_highlight_file, str)
+                and canvas_highlight_file.strip() != ""
+            ), f"{canvas_highlight_file=}. Cannot be empty."
+            assert (
+                isinstance(canvas_select_file, str) and canvas_select_file.strip() != ""
+            ), f"{canvas_select_file=}. Cannot be empty."
 
-            width, message = dvdarch_utils.get_image_width(button_text_file)
+            for file in (
+                canvas_overlay_file,
+                canvas_highlight_file,
+                canvas_select_file,
+            ):
+                result, message = dvdarch_utils.create_transparent_file(
+                    width=width,
+                    height=height,
+                    out_file=file,
+                )
 
-            if width == -1:
-                return -1, message
+                if result == -1:
+                    return -1, message
+            return 1, ""
 
-            height, message = dvdarch_utils.get_image_height(button_text_file)
+        def _create_outline_files(
+            width: int,
+            height: int,
+            overlay_file: str,
+            highlight_file: str,
+            selected_file: str,
+            highlight_border_colour: str = "gold",
+            select_border_colour: str = "white",
+        ) -> tuple[int, str]:
+            """Creates three outline files (highlight, select, and overlay) with transparent backgrounds and colored borders.
 
-            if height == -1:
-                return -1, message
+            Args:
+                width (int): The width of the outline files in pixels.
+                height (int): The height of the outline files in pixels.
+                overlay_file (str): The name of the overlay file.
+                highlight_file (str): The name of the highlight file.
+                selected_file (str): The name of the selected file.
+                highlight_border_colour (str, optional): The color of the highlight border. Defaults to "gold".
+                select_border_colour (str, optional): The color of the select border. Defaults to "white".
 
-            x_padding = math.floor((button_coords.width - width) / 2)
-            y_padding = math.floor((button_coords.height - height) / 2)
-
-            button_x = button_coords.x0 + x_padding
-            button_y = button_coords.y0 + y_padding
+            Returns:
+                tuple[int, str]: A tuple containing the following values:
+                    - 1 if ok, otherwise -1.
+                    - "" if ok otherwise the error message
+            """
+            assert isinstance(width, int), f"{width=}. Must be int >= 0"
+            assert isinstance(height, int), f"{height=} . Must be int >= 0"
+            assert (
+                isinstance(overlay_file, str) and overlay_file.strip() != ""
+            ), f"{overlay_file=}. Must be non-empty str"
+            assert (
+                isinstance(highlight_file, str) and highlight_file.strip() != ""
+            ), f"{highlight_file} . Must be non-empty str"
+            assert (
+                isinstance(selected_file, str) and selected_file.strip() != ""
+            ), f"{selected_file} . Must be non-empty str"
+            assert (
+                isinstance(highlight_border_colour, str)
+                and highlight_border_colour.strip() != ""
+            ), f"{highlight_border_colour=} . Must be non-empty str"
+            assert (
+                isinstance(select_border_colour, str)
+                and select_border_colour.strip() != ""
+            ), f"{select_border_colour=} . Must be non-empty str"
 
             # Create the 3 outline files we will need - highlight, select, overlay
-            result, message = _create_transparent_file(
-                width=width, height=height, out_file=button_overlay_file
-            )
-            if result == -1:
-                return -1, message
+            for file in (
+                (overlay_file, ""),
+                (highlight_file, highlight_border_colour),
+                (selected_file, select_border_colour),
+            ):
+                out_file = file[0]
+                border_color = file[1]
 
-            result, message = _create_transparent_file(
-                width=width,
-                height=height,
-                out_file=button_highlight_file,
-                border_color="gold",
-            )
-            if result == -1:
-                return -1, message
+                result, message = dvdarch_utils.create_transparent_file(
+                    width=width,
+                    height=height,
+                    out_file=out_file,
+                    border_color=border_color,
+                )
 
-            result, message = _create_transparent_file(
-                width=width,
-                height=height,
-                out_file=button_select_file,
-                border_color="white",
-            )
+                if result == -1:
+                    return -1, message
 
-            if result == -1:
-                return -1, message
+            return 1, ""
 
-            # Overlay the outline files on the approiiate canvas file
-            result, message = _overlay_file(
-                in_file=canvas_overlay_file,
-                overlay_file=button_overlay_file,
-                out_file=canvas_overlay_file,
-                x=button_x,
-                y=button_y,
-            )
+        def _overlay_files(
+            x: int, y: int, files: tuple[(str, str), ...]
+        ) -> tuple[int, str]:
+            """Places a file on another file at a given x, y coord
 
-            if result == -1:
-                return -1, message
+            Args:
+                x (int): x co-ordinate of image
+                y (int): y co-ordinate of image
+                files (tuple[(str, str), ...]): A tuple of tuples defining the files to be overlaid.
+                tuple[0] is the file to be overlaid, tuple[1] is the file to overlay it on.
 
-            result, message = _overlay_file(
-                in_file=canvas_select_file,
-                overlay_file=button_select_file,
-                out_file=canvas_select_file,
-                x=button_x,
-                y=button_y,
-            )
-            if result == -1:
-                return -1, message
 
-            result, message = _overlay_file(
-                in_file=canvas_highlight_file,
-                overlay_file=button_highlight_file,
-                out_file=canvas_highlight_file,
-                x=button_x,
-                y=button_y,
-            )
-            if result == -1:
-                return -1, message
+            Returns:
+                tuple[int, str]: A tuple containing the following values:
+                    - 1 if ok, otherwise -1.
+                    - "" if ok otherwise the error message
+            """
+            assert isinstance(x, int), f"{x=}. Must be int >= 0"
+            assert isinstance(y, int), f"{y=}. Must be int >= 0"
+            assert isinstance(files, tuple), f"{files=}. Must be tuple"
+            assert all(
+                isinstance(file_tuple, tuple) and len(file_tuple) == 2
+                for file_tuple in files
+            ), f"{files=}. Must be tuple of tuples"
 
-            # Place text file on canvas image
-            result, message = _overlay_file(
-                in_file=canvas_images_file,
-                overlay_file=button_text_file,
-                out_file=canvas_images_file,
-                x=button_x,
-                y=button_y,
-            )
-            if result == -1:
-                return -1, message
+            for file_tuple in files:
+                overlaid_file = file_tuple[0]
+                overlay_file = file_tuple[1]
 
-        # Create the spumux xml control file
-        spumux_dict = {
-            "subpictures": {
-                "@format": self.dvd_setup.video_standard,
-                "stream": {
-                    "spu": {
-                        "@force": "yes",
-                        "@start": "00:00:00.00",
-                        "@image": canvas_highlight_file,  # canvas_overlay_file,
-                        "@highlight": canvas_highlight_file,
-                        "@select": canvas_select_file,
-                        "@autooutline": "infer",
-                        "@outlinewidth": "6",
-                        "@autoorder": "rows",
-                    }
-                },
+                result, message = dvdarch_utils.overlay_file(
+                    in_file=overlaid_file,
+                    overlay_file=overlay_file,
+                    out_file=overlaid_file,
+                    x=x,
+                    y=y,
+                )
+
+                if result == -1:
+                    return 1, message
+            return 1, ""
+
+        def _write_spumux_xml(
+            page: int,
+            prev_page: int,
+            canvas_highlight_file: str,
+            canvas_select_file: str,
+            background_path_name: str,
+        ) -> tuple[int, str]:
+            """
+            Write spumux xml file for a new page.
+
+            Args:
+                page (int): The current page number.
+                prev_page (int): The previous page number.
+                canvas_highlight_file (str): The filename of the highlight overlay file.
+                canvas_select_file (str): The filename of the select overlay file.
+                background_path_name (str): The path name for the background file.
+
+            Returns:
+                tuple[int, str]: A tuple of an integer (1 on success, -1 on failure) and a string message.
+
+            """
+            assert isinstance(page, int), f"{page=}. Must be int"
+            assert isinstance(prev_page, int), f"{prev_page}. Must be int"
+            assert (
+                isinstance(canvas_highlight_file, str)
+                and canvas_highlight_file.strip() != ""
+            ), f"{canvas_highlight_file=}. Must be str"
+            assert (
+                isinstance(canvas_select_file, str) and canvas_select_file.strip() != ""
+            ), f"{canvas_select_file}. Must be str"
+            assert (
+                isinstance(background_path_name, str)
+                and background_path_name.strip() != ""
+            ), f"{background_path_name}. Must be str"
+
+            spumux_dict = {
+                "subpictures": {
+                    "@format": self.dvd_setup.video_standard,
+                    "stream": {
+                        "spu": {
+                            "@force": "yes" if prev_page == 0 else "no",
+                            "@start": "00:00:00.00",
+                            "@image": canvas_highlight_file,  # canvas_overlay_file,
+                            "@highlight": canvas_highlight_file,
+                            "@select": canvas_select_file,
+                            "@autooutline": "infer",
+                            "@outlinewidth": "6",
+                            "@autoorder": "rows",
+                            # "button": spu_buttons #TODO For Later
+                        }
+                    },
+                }
             }
-        }
 
-        try:
-            with open(spumux_xml, "w") as result_file:
-                (
+            spumux_xml = file_handler.file_join(
+                background_path_name, f"spumux_{page}", "xml"
+            )
+
+            try:
+                with open(spumux_xml, "w") as result_file:
                     xmltodict.unparse(
                         input_dict=spumux_dict, output=result_file, pretty=True
                     )
+            except IOError:
+                return -1, f"Sys Error: Cound Not Write {spumux_xml}"
+
+            return 1, ""
+
+        # ===== Main
+        file_handler = file_utils.File()
+
+        # TODO Black Choices - make user configurable
+        pointer_left = "pointer_left"
+        pointer_right = "pointer_right"
+
+        right_pointer_file = "pointer.black.right"
+        left_pointer_file = "pointer.black.left"
+        pointer_file_extn = "png"
+
+        left_pointer_icon_path = file_handler.file_join(
+            sys_consts.ICON_PATH,
+            left_pointer_file,
+            pointer_file_extn,
+        )
+
+        right_pointer_icon_path = file_handler.file_join(
+            sys_consts.ICON_PATH,
+            right_pointer_file,
+            pointer_file_extn,
+        )
+
+        pointer_width, pointer_height, message = dvdarch_utils.get_image_size(
+            left_pointer_icon_path
+        )  # Assume left and right are the same size
+
+        if pointer_width == -1 and pointer_height == -1:
+            return -1, message
+
+        background_path_name, background_file_name, back_ground_file_extn = (
+            file_handler.split_file_path(self._background_canvas_file)
+        )
+
+        canvas_width, canvas_height, message = dvdarch_utils.get_image_size(
+            self._background_canvas_file
+        )
+
+        if canvas_width == -1 and canvas_height == -1:
+            return -1, message
+
+        canvas_overlay_file = ""
+        canvas_select_file = ""
+        canvas_highlight_file = ""
+        canvas_images_file = ""
+
+        max_page_no = 0
+        prev_page = -1
+
+        left_x = 43
+        left_y = canvas_height - (pointer_height + 43)
+        right_x = canvas_width - (pointer_width + 43)
+        right_y = canvas_height - (pointer_height + 43)
+
+        for coords in cell_coords:
+            if coords.page != prev_page:
+                prev_page = coords.page
+                max_page_no += 1
+
+        # ----- Write out spumux files # TODO Enhance with button name/pos/action, split out to another method then
+        prev_page = cell_coords[0].page
+        (
+            result,
+            canvas_overlay_file,
+            canvas_highlight_file,
+            canvas_select_file,
+            canvas_images_file,
+        ) = _get_canvas_overlay_files(
+            background_path_name=background_path_name,
+            background_file_name=background_file_name,
+            page_no=0,
+        )
+
+        if result == -1:
+            return (
+                -1,
+                canvas_overlay_file,
+            )  # Holds error message if result is -1
+
+        result, message = _write_spumux_xml(
+            page=0,
+            prev_page=-1,
+            canvas_highlight_file=canvas_highlight_file,
+            canvas_select_file=canvas_select_file,
+            background_path_name=background_path_name,
+        )
+
+        if result == -1:
+            return -1, message
+
+        for cell_index, cell_coord in enumerate(cell_coords):
+            if (
+                prev_page != cell_coord.page or cell_index == len(cell_coords) - 1
+            ):  # Page break
+                prev_page = cell_coord.page
+
+                result, message = _write_spumux_xml(
+                    page=cell_coord.page,
+                    prev_page=-prev_page,
+                    canvas_highlight_file=canvas_highlight_file,
+                    canvas_select_file=canvas_select_file,
+                    background_path_name=background_path_name,
                 )
-        except IOError:
-            return -1, f"Sys Error: Cound Not Write {spumux_xml}"
+
+                if result == -1:
+                    return -1, message
+
+                (
+                    result,
+                    canvas_overlay_file,
+                    canvas_highlight_file,
+                    canvas_select_file,
+                    canvas_images_file,
+                ) = _get_canvas_overlay_files(
+                    background_path_name=background_path_name,
+                    background_file_name=background_file_name,
+                    page_no=cell_coord.page,
+                )
+
+                if result == -1:
+                    return (
+                        -1,
+                        canvas_overlay_file,
+                    )  # Holds error message if result is -1
+
+        else:
+            result, message = _write_spumux_xml(
+                page=cell_coord.page,
+                prev_page=-prev_page,
+                canvas_highlight_file=canvas_highlight_file,
+                canvas_select_file=canvas_select_file,
+                background_path_name=background_path_name,
+            )
+
+            if result == -1:
+                return -1, message
+
+        # ---------- Write Out Required graphics Files
+        prev_page = -1
+
+        for cell_index, cell_coord in enumerate(cell_coords):
+            (
+                button_overlay_file,
+                button_highlight_file,
+                button_select_file,
+                button_text_file,
+            ) = cell_coord.get_mask_filenames()
+
+            width, height, message = dvdarch_utils.get_image_size(button_text_file)
+
+            if width == -1 and height == -1:
+                return -1, message
+
+            x_padding = math.floor((cell_coord.width - width) / 2)
+            y_padding = math.floor((cell_coord.height - height) / 2)
+
+            button_x = cell_coord.x0 + x_padding
+            button_y = (
+                cell_coord.y0
+                + y_padding  # - (pointer_height) if max_page_no > 1 else 0
+            )
+
+            if (
+                prev_page != cell_coord.page or cell_index > len(cell_coords) - 1
+            ):  # Page break
+                prev_page = cell_coord.page
+
+                (
+                    result,
+                    canvas_overlay_file,
+                    canvas_highlight_file,
+                    canvas_select_file,
+                    canvas_images_file,
+                ) = _get_canvas_overlay_files(
+                    background_path_name=background_path_name,
+                    background_file_name=background_file_name,
+                    page_no=cell_coord.page,
+                )
+
+                if result == -1:
+                    return (
+                        -1,
+                        canvas_overlay_file,
+                    )  # Holds error message if result is -1
+
+                command = [
+                    sys_consts.CONVERT,
+                    self._background_canvas_file,
+                    canvas_images_file,
+                ]
+
+                result, message = dvdarch_utils.execute_check_output(commands=command)
+
+                if result == -1:
+                    return -1, message
+
+                result, message = _create_canvas_files(
+                    width=canvas_width,
+                    height=canvas_height,
+                    canvas_overlay_file=canvas_overlay_file,
+                    canvas_highlight_file=canvas_highlight_file,
+                    canvas_select_file=canvas_select_file,
+                )
+
+                if result == -1:
+                    return -1, message
+
+            # Create button outline files
+            result, message = _create_outline_files(
+                width=width,
+                height=height,
+                overlay_file=button_overlay_file,
+                highlight_file=button_highlight_file,
+                selected_file=button_select_file,
+                highlight_border_colour="gold",
+                select_border_colour="white",
+            )
+
+            if result == -1:
+                return -1, message
+
+            # Overlay the button outline files on the canvas
+            overlay_files = (
+                (canvas_overlay_file, button_overlay_file),
+                (canvas_select_file, button_select_file),
+                (canvas_highlight_file, button_highlight_file),
+                (canvas_images_file, button_text_file),
+            )
+
+            result, message = _overlay_files(
+                x=button_x, y=button_y, files=overlay_files
+            )
+
+            if result == -1:
+                return -1, message
+
+            if max_page_no > 1:  # Need pointers to access pages
+                path_name, _, _ = file_handler.split_file_path(
+                    cell_coord.video_file.menu_image_file_path
+                )
+                left_pointer_path = file_handler.file_join(
+                    path_name,
+                    f"{pointer_left}_{cell_coord.page}",
+                    pointer_file_extn,
+                )
+
+                right_pointer_path = file_handler.file_join(
+                    path_name,
+                    f"{pointer_right}_{cell_coord.page}",
+                    pointer_file_extn,
+                )
+
+                (
+                    left_pointer_overlay_file,
+                    left_pointer_highlight_file,
+                    left_pointer_select_file,
+                    _,
+                ) = cell_coord.get_mask_filenames(left_pointer_path)
+
+                (
+                    right_pointer_overlay_file,
+                    right_pointer_highlight_file,
+                    right_pointer_select_file,
+                    _,
+                ) = cell_coord.get_mask_filenames(right_pointer_path)
+
+                # Create pointer outline files
+                result, message = _create_outline_files(
+                    width=pointer_width,
+                    height=pointer_height,
+                    overlay_file=left_pointer_overlay_file,
+                    highlight_file=left_pointer_highlight_file,
+                    selected_file=left_pointer_select_file,
+                    highlight_border_colour="gold",
+                    select_border_colour="white",
+                )
+
+                if result == -1:
+                    return -1, message
+
+                result, message = _create_outline_files(
+                    width=pointer_width,
+                    height=pointer_height,
+                    overlay_file=right_pointer_overlay_file,
+                    highlight_file=right_pointer_highlight_file,
+                    selected_file=right_pointer_select_file,
+                    highlight_border_colour="gold",
+                    select_border_colour="white",
+                )
+
+                if result == -1:
+                    return -1, message
+
+                # Overlay the pointer outline files on the canvas
+                left_overlay_files = (
+                    (canvas_overlay_file, left_pointer_overlay_file),
+                    (canvas_select_file, left_pointer_select_file),
+                    (canvas_highlight_file, left_pointer_highlight_file),
+                    (canvas_images_file, left_pointer_icon_path),
+                )
+
+                right_overlay_files = (
+                    (canvas_overlay_file, right_pointer_overlay_file),
+                    (canvas_select_file, right_pointer_select_file),
+                    (canvas_highlight_file, right_pointer_highlight_file),
+                    (canvas_images_file, right_pointer_icon_path),
+                )
+
+                result, message = _overlay_files(
+                    x=left_x, y=left_y, files=left_overlay_files
+                )
+
+                if result == -1:
+                    return -1, message
+
+                result, message = _overlay_files(
+                    x=right_x, y=right_y, files=right_overlay_files
+                )
+
+                if result == -1:
+                    return -1, message
 
         return 1, ""
 
@@ -1598,10 +2057,13 @@ class DVD:
 
         return 1, ""
 
-    def _convert_to_m2v(self, frames: int = 360) -> tuple[int, str]:
+    def _convert_to_m2v(
+        self, cell_coords: list[_Cell_Coords], frames: int = 360
+    ) -> tuple[int, str]:
         """Converts the background_canvas_images_file into a short video stream
 
         Args:
+            cell_coords (list[_Cell_Coords]): The calculated grid layout
             frames (int, optional): Number of video frames in stream. Defaults to 360.
 
         Returns:
@@ -1615,85 +2077,97 @@ class DVD:
             self._background_canvas_file
         )
 
-        background_canvas_images_file = file_handler.file_join(
-            path_name, f"{file_name}_images", file_extn
-        )
-        m2v_file = file_handler.file_join(path_name, f"{file_name}_menu_video", "m2v")
+        prev_page = -1
 
-        if not file_handler.file_exists(background_canvas_images_file):
-            return -1, f"Sys Error : {background_canvas_images_file} does not exist!"
+        for coord in cell_coords:
+            if prev_page != coord.page:
+                prev_page = coord.page
 
-        if self._dvd_setup.video_standard == sys_consts.PAL:
-            framerate = "25:1"
-            pixel_aspect = "59:54"
-            fmt = "p"
-        else:  # NTSC
-            framerate = "30000:1001"
-            pixel_aspect = "10:11"
-            fmt = "n"
-        if self._dvd_setup.menu_aspect_ratio == sys_consts.AR169:
-            aspect = "3"
-        else:
-            aspect = "2"
+                background_canvas_images_file = file_handler.file_join(
+                    path_name, f"{file_name}_images_{coord.page}", file_extn
+                )
+                m2v_file = file_handler.file_join(
+                    path_name, f"{file_name}_menu_video_{coord.page}", "m2v"
+                )
 
-        result = subprocess.run(
-            [sys_consts.CONVERT, background_canvas_images_file, "ppm:-"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+                if not file_handler.file_exists(background_canvas_images_file):
+                    return (
+                        -1,
+                        f"Sys Error : {background_canvas_images_file} does not exist!",
+                    )
 
-        # Chained pipes here so be cognisant of that when modifying
-        if result.returncode == 0:
-            result = subprocess.run(
-                [
-                    sys_consts.PPMTOY4M,
-                    "-n",
-                    f"{frames}",
-                    "-F",
-                    f"{framerate}",
-                    "-A",
-                    f"{pixel_aspect}",
-                    "-I",
-                    "p",
-                    "-r",
-                    "-S",
-                    "420mpeg2",
-                ],
-                input=result.stdout,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
+                if self._dvd_setup.video_standard == sys_consts.PAL:
+                    framerate = "25:1"
+                    pixel_aspect = "59:54"
+                    fmt = "p"
+                else:  # NTSC
+                    framerate = "30000:1001"
+                    pixel_aspect = "10:11"
+                    fmt = "n"
+                if self._dvd_setup.menu_aspect_ratio == sys_consts.AR169:
+                    aspect = "3"
+                else:
+                    aspect = "2"
 
-            if result.returncode == 0:
                 result = subprocess.run(
-                    [
-                        sys_consts.MPEG2ENC,
-                        "-n",
-                        fmt,
-                        "-f",
-                        "8",
-                        "-b",
-                        "5000",
-                        "-a",
-                        aspect,
-                        "-o",
-                        m2v_file,
-                    ],
-                    input=result.stdout,
+                    [sys_consts.CONVERT, background_canvas_images_file, "ppm:-"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
 
-            if result.returncode == 0:
-                return 1, ""
+                # Chained pipes here so be cognisant of that when modifying
+                if result.returncode == 0:
+                    result = subprocess.run(
+                        [
+                            sys_consts.PPMTOY4M,
+                            "-n",
+                            f"{frames}",
+                            "-F",
+                            f"{framerate}",
+                            "-A",
+                            f"{pixel_aspect}",
+                            "-I",
+                            "p",
+                            "-r",
+                            "-S",
+                            "420mpeg2",
+                        ],
+                        input=result.stdout,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                    )
 
-        return -1, f"Sys Error: Failed To Produce Menu Video {m2v_file}"
+                    if result.returncode == 0:
+                        result = subprocess.run(
+                            [
+                                sys_consts.MPEG2ENC,
+                                "-n",
+                                fmt,
+                                "-f",
+                                "8",
+                                "-b",
+                                "5000",
+                                "-a",
+                                aspect,
+                                "-o",
+                                m2v_file,
+                            ],
+                            input=result.stdout,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                        )
 
-    def _convert_audio(self, frames: int = 300):
+                    if result.returncode != 0:
+                        return -1, f"Sys Error: Failed To Produce Menu Video {m2v_file}"
+
+        return 1, ""
+
+    def _convert_audio(self, cell_coords: list[_Cell_Coords], frames: int = 300):
         """Generates the audio for the menu. By default it is a empty soundtrack
         TODO Allow user selection of an audio file
 
         Args:
+            cell_coords (list[_Cell_Coords]): The calculated grid layout
             frames (int, optional): Number of video frames - determines length of
             audio. Defaults to 300.
 
@@ -1709,48 +2183,64 @@ class DVD:
             self._background_canvas_file
         )
 
-        ac3_file = file_handler.file_join(path_name, f"{file_name}_menu_video", "ac3")
+        prev_page = -1
 
-        if self._dvd_setup.video_standard == sys_consts.PAL:
-            framerate = 25
-        else:
-            framerate = 30000 / 1001
+        for coord in cell_coords:
+            if prev_page != coord.page:
+                prev_page = coord.page
 
-        duration = math.floor(frames / framerate)
+                ac3_file = file_handler.file_join(
+                    path_name, f"{file_name}_menu_video_{coord.page}", "ac3"
+                )
 
-        # TODO Allow an audio file of the users choice
-        # Generate an empty audio file
-        commands = [
-            sys_consts.FFMPG,
-            "-t",
-            f"{duration}",
-            "-f lavfi",
-            "-i anullsrc=channel_layout=5.1:sample_rate=48000",
-            "-c:a ac3",
-            "-b:a 224000",
-            ac3_file,
-        ]
+                if self._dvd_setup.video_standard == sys_consts.PAL:
+                    framerate = 25
+                else:
+                    framerate = 30000 / 1001
 
-        commands = [
-            sys_consts.FFMPG,
-            "-f",
-            "lavfi",
-            "-i",
-            "anullsrc=channel_layout=5.1:sample_rate=48000",
-            "-t",
-            f"{duration}",
-            "-b:a",
-            "224000",
-            "-c:a",
-            "ac3",
-            ac3_file,
-        ]
+                duration = math.floor(frames / framerate)
 
-        return dvdarch_utils.execute_check_output(commands=commands)
+                # TODO Allow an audio file of the users choice
+                # Generate an empty audio file
+                commands = [
+                    sys_consts.FFMPG,
+                    "-t",
+                    f"{duration}",
+                    "-f lavfi",
+                    "-i anullsrc=channel_layout=5.1:sample_rate=48000",
+                    "-c:a ac3",
+                    "-b:a 224000",
+                    ac3_file,
+                ]
 
-    def _multiplex_audio_video(self):
+                commands = [
+                    sys_consts.FFMPG,
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "anullsrc=channel_layout=5.1:sample_rate=48000",
+                    "-t",
+                    f"{duration}",
+                    "-b:a",
+                    "224000",
+                    "-c:a",
+                    "ac3",
+                    ac3_file,
+                ]
+
+                result, message = dvdarch_utils.execute_check_output(commands=commands)
+
+                if result == -1:
+                    return -1, message
+
+        return 1, ""
+
+    def _multiplex_audio_video(self, cell_coords: list[_Cell_Coords]):
         """Multiplexes the menu m2v file and the menu ac3 file to peoduce the menu mgp file
 
+        Args:
+            cell_coords (list[_Cell_Coords]): The calculated grid layout
+
         Returns:
             tuple[int,str]:
             - arg1 1: ok, -1: fail
@@ -1762,27 +2252,44 @@ class DVD:
             self._background_canvas_file
         )
 
-        ac3_file = file_handler.file_join(path_name, f"{file_name}_menu_video", "ac3")
-        m2v_file = file_handler.file_join(path_name, f"{file_name}_menu_video", "m2v")
-        menu_video_file = file_handler.file_join(
-            path_name, f"{file_name}_menu_video", "mpg"
-        )
+        prev_page = -1
 
-        commands = [
-            sys_consts.MPLEX,
-            "-f",
-            "8",
-            "-o",
-            menu_video_file,
-            m2v_file,
-            ac3_file,
-        ]
+        for coord in cell_coords:
+            if prev_page != coord.page:
+                prev_page = coord.page
 
-        return dvdarch_utils.execute_check_output(commands=commands)
+                ac3_file = file_handler.file_join(
+                    path_name, f"{file_name}_menu_video_{coord.page}", "ac3"
+                )
+                m2v_file = file_handler.file_join(
+                    path_name, f"{file_name}_menu_video_{coord.page}", "m2v"
+                )
+                menu_video_file = file_handler.file_join(
+                    path_name, f"{file_name}_menu_video_{coord.page}", "mpg"
+                )
 
-    def _create_menu_mpg(self) -> tuple[int, str]:
+                commands = [
+                    sys_consts.MPLEX,
+                    "-f",
+                    "8",
+                    "-o",
+                    menu_video_file,
+                    m2v_file,
+                    ac3_file,
+                ]
+
+                result, message = dvdarch_utils.execute_check_output(commands=commands)
+
+                if result == -1:
+                    return -1, message
+        return 1, ""
+
+    def _create_menu_mpg(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
         """Creates the DVD menu mpg file via the dvdauthor application spumux
 
+        Args:
+            cell_coords (list[_Cell_Coords]): The calculated grid layout
+
         Returns:
             tuple[int,str]:
             - arg1 1: ok, -1: fail
@@ -1794,109 +2301,155 @@ class DVD:
             self._background_canvas_file
         )
 
-        menu_video_file = file_handler.file_join(
-            path_name, f"{file_name}_menu_video", "mpg"
-        )
-        menu_video_buttons_file = file_handler.file_join(
-            path_name, f"{file_name}_menu_video_buttons", "mpg"
-        )
-        spumux_xml = file_handler.file_join(path_name, "spumux", "xml")
+        prev_page = -1
 
-        env = {"VIDEO_FORMAT": self.dvd_setup.video_standard}
+        for coord in cell_coords:
+            if prev_page != coord.page:
+                prev_page = coord.page
 
-        commands = [
-            sys_consts.SPUMUX,
-            "-s",
-            str(0),
-            spumux_xml,
-        ]
+                menu_video_file = file_handler.file_join(
+                    path_name, f"{file_name}_menu_video_{coord.page}", "mpg"
+                )
+                menu_video_buttons_file = file_handler.file_join(
+                    path_name, f"{file_name}_menu_video_buttons_{coord.page}", "mpg"
+                )
 
-        result = subprocess.run(
-            commands,
-            env=env,
-            stdin=open(menu_video_file, "rb"),
-            stdout=open(menu_video_buttons_file, "wb"),
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+                spumux_xml = file_handler.file_join(
+                    path_name, f"spumux_{coord.page}", "xml"
+                )
 
-        if result.returncode == 0:
-            return 1, ""
-        else:
-            return -1, result.stderr.strip()
+                env = {"VIDEO_FORMAT": self.dvd_setup.video_standard}
 
-    def _create_dvd_image(self) -> tuple[int, str]:
+                commands = [
+                    sys_consts.SPUMUX,
+                    "-m",
+                    "dvd",
+                    "-s",
+                    str(0),
+                    spumux_xml,
+                ]
+
+                result = subprocess.run(
+                    commands,
+                    env=env,
+                    stdin=open(menu_video_file, "rb"),
+                    stdout=open(menu_video_buttons_file, "wb"),
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+
+                if result.returncode != 0:
+                    return -1, result.stderr.strip()
+        return 1, ""
+
+    def _create_dvd_image(self, buttons_per_page: int) -> tuple[int, str]:
         """Creates the DVD Folder/File structure via the dvdauthor application
 
+        Args:
+                buttons_per_page (int): The maximum number of buttons to display per page.
+
         Returns:
-            tuple[int, str]: _description_
+            tuple[int, str]: arg 1 : 1 Ok, -1 Fail, arg 2 : "" if Ok otherwise Error Message
         """
+        assert (
+            isinstance(buttons_per_page, int) and buttons_per_page > 0
+        ), f"{buttons_per_page=}. Must be int > 0"
 
         file_handler = file_utils.File()
-
         path_name, file_name, _ = file_handler.split_file_path(
             self._background_canvas_file
         )
 
-        menu_video_file = file_handler.file_join(
-            path_name, f"{file_name}_menu_video_buttons", "mpg"
-        )
-        dvd_author_file = file_handler.file_join(path_name, "dvd_author", "xml")
-
-        # Create the DVDauthor XML control file
         video_dict = {
             "@format": self.dvd_setup.video_standard,
             "@aspect": self.dvd_setup.menu_aspect_ratio,
         }
 
-        pgc_dict = {}
-        button_list = []
-        title_list = []
+        # Create the main DVD author structure
+        dvd_author_dict = {
+            "dvdauthor": {
+                "@dest": "DVD",
+                "@jumppad": "1",
+                "vmgm": {"menus": {}},
+                "titleset": [],
+            }
+        }
 
+        page_max = math.ceil(len(self.dvd_setup.input_videos) / buttons_per_page)
+        page_count = 0
+        button_count = 1
+        buttons_per_page = min(len(self.dvd_setup.input_videos), buttons_per_page)
+        pgc = {"button": [], "vob": {"@pause": "inf"}}
+        pgcs = []
+        button_index = 0
+        arrow_index = 0
+
+        # Build menu pass
         for menu_index, input_video in enumerate(self.dvd_setup.input_videos):
+            button_index += 1
+            # pgc["button"].append({"@name":f"btn-{button_index}","#text":f"jump title {menu_index + 1};"})
+            pgc["button"].append(f"jump title {menu_index + 1};")
+
+            if (
+                button_count == buttons_per_page
+                or menu_index == len(self.dvd_setup.input_videos) - 1
+            ):
+                page_count += 1
+
+                if page_max > 1:
+                    prev_index = page_count - 1 if page_count > 1 else page_max
+                    next_index = page_count + 1 if page_count < page_max else 1
+
+                    arrow_index += 1
+                    # pgc["button"].append({"@name":f"ar-{arrow_index}","#text":f"jump vmgm menu {prev_index};"})
+                    pgc["button"].append(f"jump vmgm menu {prev_index};")
+
+                    arrow_index += 1
+                    # pgc["button"].append({"@name":f"ar-{arrow_index}","#text":f"jump vmgm menu {next_index};"})
+                    pgc["button"].append(f"jump vmgm menu {next_index};")
+
+                menu_video_file = file_handler.file_join(
+                    path_name, f"{file_name}_menu_video_buttons_{page_count - 1}.mpg"
+                )
+
+                pgc["vob"]["@file"] = menu_video_file
+
+                pgcs.append(pgc)
+
+                pgc = {"button": [], "vob": {"@pause": "inf"}}
+                button_count = 0
+
+            button_count += 1
+
+        dvd_author_dict["dvdauthor"]["vmgm"]["menus"] = {
+            "video": video_dict,
+            "pgc": pgcs,
+        }
+
+        # Build titleset pass
+        for input_video in self.dvd_setup.input_videos:
             _, video_name, _ = file_handler.split_file_path(input_video.file_path)
             vob_file = file_handler.file_join(self._vob_folder, video_name, "vob")
 
-            button_list.append(f"jump title {menu_index + 1};")
-            title_list.append(
-                {
-                    "titles": {
-                        "video": video_dict,
-                        "pgc": {
-                            "post": "call vmgm menu 1;",
-                            "vob": {"@file": f"{vob_file}"},
-                        },
-                    }
-                }
+            pgc = {"vob": {"@file": vob_file}}
+
+            pgc["vob"]["@pause"] = "inf"
+
+            dvd_author_dict["dvdauthor"]["titleset"].append(
+                {"titles": {"video": video_dict, "pgc": pgc}}
             )
 
-        pgc_dict = {
-            "button": button_list,
-            "vob": {"@file": menu_video_file, "@pause": "inf"},
-        }
-
-        dvd_dict = {
-            "dvdauthor": {
-                "@dest": "DVD",
-                "vmgm": {
-                    "menus": {
-                        "video": video_dict,
-                        "pgc": pgc_dict,
-                    }
-                },
-                "titleset": title_list,
-            },
-        }
+        dvd_author_file = file_handler.file_join(path_name, "dvd_author", "xml")
 
         try:
             with open(dvd_author_file, "w") as result_file:
                 (
                     xmltodict.unparse(
-                        input_dict=dvd_dict, output=result_file, pretty=True
+                        input_dict=dvd_author_dict, output=result_file, pretty=True
                     )
                 )
         except IOError:
-            return -1, f"Sys Error: Cound Not Write {dvd_author_file}"
+            return -1, f"Sys Error: Could Not Write {dvd_author_file}"
 
         # Run the DVDauthor XML control file
         env = {"VIDEO_FORMAT": self.dvd_setup.video_standard}

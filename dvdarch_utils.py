@@ -531,6 +531,85 @@ def make_opaque(color: str, opacity: float) -> tuple[int, str]:
     return 1, hex_color + opacity_hex
 
 
+def create_transparent_file(width: int, height: int, out_file: str, border_color=""):
+    """Creates a transparent file of a given width and height.
+    If a border color is provided a rectangle of that color is drawn
+    around the edge of the file
+
+    Args:
+        width (int): Width of the new file
+        height (int): Height of the new file
+        out_file (str): The path for the new transparent file
+        border_color (str, optional): The border color of the transparent
+        file. Defaults to "".
+
+    Returns:
+        tuple[int,str]:
+        - arg1 1: ok, -1: fail,
+        - arg2: error message or "" if ok
+    """
+    border_width = 10
+
+    if border_color == "":
+        command = [
+            sys_consts.CONVERT,
+            "-size",
+            f"{width}x{height}",
+            "xc:none",
+            out_file,
+        ]
+    else:
+        command = [
+            sys_consts.CONVERT,
+            "-size",
+            f"{width}x{height}",
+            "xc:transparent",
+            "-fill",
+            "none",
+            "-stroke",
+            border_color,
+            "-strokewidth",
+            f"{border_width}",
+            "-draw",
+            f"rectangle 0,0,{width},{height}",
+            out_file,
+        ]
+
+    return execute_check_output(commands=command)
+
+
+def overlay_file(
+    in_file: str, overlay_file: str, out_file: str, x: int, y: int
+) -> tuple[int, str]:
+    """Places the overlay_file on the input file at a given x,y co-ord
+    saves the combined file to the output file
+
+    Args:
+        in_file (str): File which will have the overlay_file placed on it
+        overlay_file (str): File which will be overlaid on the in_file
+        out_file (str): File which will be saved as the combined file in_file and overlay_file
+        x (int): x co-ord of overlay_file
+        y (int): y co-ord of overlay_file
+
+    Returns:
+        tuple[int,str]:
+        - arg1 1: ok, -1: fail
+        - arg2: error message or "" if ok
+    """
+    # Image magick V6 Composite works magick V7 magick composite does not
+    command = [
+        # "composite",
+        sys_consts.COMPOSITE,
+        "-geometry",
+        f"+{x}+{y}",
+        overlay_file,
+        in_file,
+        out_file,
+    ]
+
+    return execute_check_output(commands=command)
+
+
 def overlay_text(
     in_file: str,
     text: str,
@@ -1106,12 +1185,11 @@ def get_image_size(image_file: str) -> tuple[int, int, str]:
 
     Returns:
         tuple[int,int,str]:
-        - arg1: > 0 OK, -1 Error,
-        - arg2: > 0 OK, -1 Error,
+        - arg1: > 0 OK, -1 Error, width
+        - arg2: > 0 OK, -1 Error, height
         - arg3: Error message ot "" if ok
 
     """
-    # TODO: Test this, do not think I have used it yet
     assert (
         isinstance(image_file, str) and image_file.strip() != ""
     ), f"{image_file=}. Must be a path to a file"
@@ -1124,7 +1202,9 @@ def get_image_size(image_file: str) -> tuple[int, int, str]:
     if result == -1:
         return -1, -1, message
 
-    return int(message.strip()), ""
+    width, height = message.strip().split()
+
+    return int(width), int(height), ""
 
 
 def generate_menu_image_from_file(
