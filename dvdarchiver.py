@@ -1090,13 +1090,18 @@ class File_Control:
                         encoding_info=user_data.encoding_info,  # Stays the same
                     )
 
-                    for col in range(file_grid.col_count):
-                        file_grid.value_set(
-                            row=row,
-                            col=col,
-                            value=trimmed_file_name,
-                            user_data=updated_user_data,
+                    duration = str(
+                        datetime.timedelta(
+                            seconds=updated_user_data.encoding_info["video_duration"][1]
                         )
+                    ).split(".")[0]
+
+                    self._populate_grid_row(
+                        file_grid=file_grid,
+                        row_index=row,
+                        video_user_data=updated_user_data,
+                        duration=duration,
+                    )
 
                     row_tool_button.userdata_set(updated_user_data)
 
@@ -1255,6 +1260,7 @@ class File_Control:
             _, _, video_file_name, video_file_folder = file_tuple_str.split(",")
 
             video_file_path = file_handler.file_join(video_file_folder, video_file_name)
+            print(f"DBG {video_file_path=} {file_tuple_str=}")
 
             (
                 video_file_path,
@@ -1286,6 +1292,15 @@ class File_Control:
                     video_user_data.video_path
                 )
 
+                if video_user_data.encoding_info["error"][
+                    1
+                ]:  # Error Occured, should not happen
+                    rejected += (
+                        f"File Error {sys_consts.SDELIM}{video_file_name} :"
+                        f" {sys_consts.SDELIM} {video_user_data.encoding_info['error'][1]} \n"
+                    )
+                    continue
+
                 toolbox = qtg.HBoxContainer(
                     height=1, width=3, align=qtg.Align.BOTTOMCENTER
                 ).add_row(
@@ -1314,49 +1329,11 @@ class File_Control:
                     )
                 ).split(".")[0]
 
-                file_grid.value_set(
-                    value=video_file_name,
-                    row=rows_loaded + row_index,
-                    col=0,
-                    user_data=video_user_data,
-                )
-
-                file_grid.value_set(
-                    value=str(video_user_data.encoding_info["video_width"][1]),
-                    row=rows_loaded + row_index,
-                    col=1,
-                    user_data=video_user_data,
-                )
-                file_grid.value_set(
-                    value=str(video_user_data.encoding_info["video_height"][1]),
-                    row=rows_loaded + row_index,
-                    col=2,
-                    user_data=video_user_data,
-                )
-
-                file_grid.value_set(
-                    value=video_user_data.encoding_info["video_format"][1],
-                    row=rows_loaded + row_index,
-                    col=3,
-                    user_data=video_user_data,
-                )
-
-                file_grid.value_set(
-                    value=(
-                        video_user_data.encoding_info["video_standard"][1]
-                        + f" : { video_user_data.encoding_info['video_scan_order'][1]}"
-                        if video_user_data.encoding_info["video_scan_order"] != ""
-                        else ""
-                    ),
-                    row=rows_loaded + row_index,
-                    col=4,
-                    user_data=video_user_data,
-                ),
-                file_grid.value_set(
-                    value=duration,
-                    row=rows_loaded + row_index,
-                    col=5,
-                    user_data=video_user_data,
+                self._populate_grid_row(
+                    file_grid=file_grid,
+                    row_index=rows_loaded + row_index,
+                    video_user_data=video_user_data,
+                    duration=duration,
                 )
 
                 file_grid.row_widget_set(
@@ -1365,6 +1342,77 @@ class File_Control:
 
                 row_index += 1
         return rejected
+
+    def _populate_grid_row(
+        self,
+        file_grid: qtg.Grid,
+        row_index: int,
+        video_user_data: Video_Data,
+        duration: str,
+    ):
+        """Populates the grid row with the video information.
+
+        Args:
+            file_grid (qtg.Grid): The grid to populate.
+            row_index (int): The index of the row to populate.
+            video_user_data (File_Control.Video_Data): The video data to populate.
+            duration (str): The duration of the video.
+
+        """
+        assert isinstance(
+            file_grid, qtg.Grid
+        ), f"{file_grid=}. Must be an instance of qtg.Grid"
+        assert isinstance(
+            video_user_data, File_Control.Video_Data
+        ), f"{video_user_data=}. Must be an instance of File_Control.Video_Data"
+        assert isinstance(duration, str), f"{duration=}. Must be str."
+
+        file_grid.value_set(
+            value=video_user_data.video_file,
+            row=row_index,
+            col=0,
+            user_data=video_user_data,
+        )
+
+        file_grid.value_set(
+            value=str(video_user_data.encoding_info["video_width"][1]),
+            row=row_index,
+            col=1,
+            user_data=video_user_data,
+        )
+
+        file_grid.value_set(
+            value=str(video_user_data.encoding_info["video_height"][1]),
+            row=row_index,
+            col=2,
+            user_data=video_user_data,
+        )
+
+        file_grid.value_set(
+            value=video_user_data.encoding_info["video_format"][1],
+            row=row_index,
+            col=3,
+            user_data=video_user_data,
+        )
+
+        file_grid.value_set(
+            value=(
+                video_user_data.encoding_info["video_standard"][1]
+                + f" : { video_user_data.encoding_info['video_scan_order'][1]}"
+                if video_user_data.encoding_info["video_scan_order"] != ""
+                else ""
+            ),
+            row=row_index,
+            col=4,
+            user_data=video_user_data,
+        )
+
+        file_grid.value_set(
+            value=duration,
+            row=row_index,
+            col=5,
+            user_data=video_user_data,
+        )
 
     def _set_project_standard_duration(self, event: qtg.Action):
         """Sets the  duration and video standard for the current project based on the selected
