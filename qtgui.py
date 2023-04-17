@@ -4375,7 +4375,6 @@ class Action(_qtpyBase):
                 "DEV Error Shutting Down, Widget Not Found -"
                 f" {self.window_id=} {container_tag=} {tag=}"
             )
-            self.parent_app.widget_dict_print()
             sys.exit(1)
 
         return widget

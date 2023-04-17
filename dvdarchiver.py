@@ -24,6 +24,7 @@
 # fmt: off
 import dataclasses
 import datetime
+from typing import Final
 
 import platformdirs
 
@@ -35,13 +36,15 @@ import sqldb
 import sys_consts
 import utils
 from archive_management import Archive_Manager
-from dvd import DVD, DVD_Config, File_Def
+from dvd import DVD, DVD_Config, File_Def, Video_Filter_Settings
 from video_cutter import Video_Cutter_Popup
 from video_file_picker import Video_File_Picker_Popup
 
 # fmt: on
 
-PERCENT_SAFTEY_BUFFER = 1  # Used to limit DVD size so that it never exceeds 100%
+PERCENT_SAFTEY_BUFFER: Final[int] = (
+    1  # Used to limit DVD size so that it never exceeds 100%
+)
 
 
 class DVD_Archiver:
@@ -435,12 +438,10 @@ class DVD_Archiver:
                 file_def.file_name = (
                     f"{user_data.video_file}{user_data.video_extension}"
                 )
-                file_def._file_info = user_data.encoding_info
+                file_def.file_info = user_data.encoding_info
+                file_def.video_filter_settings = user_data.video_filter_settings
 
                 video_file_defs.append(file_def)
-
-                # menu_image_files.append(image_file)
-                # menu_labels.append(".".join(user_data.video_file.split(".")[0:-1]))
                 menu_labels.append(user_data.video_file)
 
         result = -1
@@ -481,6 +482,7 @@ class DVD_Archiver:
                 dvd_config.timestamp_font_point_size = self._timestamp_font_point_size
 
                 dvd_config.video_standard = self._file_control.project_video_standard
+                dvd_config.video_filter_settings = user_data.video_filter_settings
 
                 self._dvd.dvd_setup = dvd_config
                 self._dvd.working_folder = dvd_folder
@@ -832,6 +834,7 @@ class File_Control:
         video_file: str
         video_extension: str
         encoding_info: dict
+        video_filter_settings: Video_Filter_Settings
 
         def __post_init__(self):
             assert (
@@ -847,6 +850,10 @@ class File_Control:
             assert isinstance(
                 self.encoding_info, dict
             ), f"{self.encoding_info=}. Must be dict"
+            assert isinstance(self.video_filter_settings, Video_Filter_Settings), (
+                f"{self.video_filter_settings=}. Must be an instance of"
+                " Video_Filter_Settings"
+            )
 
         @property
         def video_path(self) -> str:
@@ -942,9 +949,10 @@ class File_Control:
             output_folder=dvd_folder,
             encoding_info=user_data.encoding_info,
             excluded_word_list=self.common_words,
+            video_filter_settings=user_data.video_filter_settings,
         ).show()
 
-        # All this hairy string stuff to get the file properties is becaue I can only return a str from the
+        # All this hairy string stuff to get the file properties is because I can only return a str from the
         # Video Cutter popup
         if result:
             if result.endswith("T"):  # Trimmed File
@@ -1088,6 +1096,7 @@ class File_Control:
                         video_file=trimmed_file_name,
                         video_extension=trimmed_extension,
                         encoding_info=user_data.encoding_info,  # Stays the same
+                        video_filter_settings=user_data.video_filter_settings,
                     )
 
                     duration = str(
@@ -1260,7 +1269,6 @@ class File_Control:
             _, _, video_file_name, video_file_folder = file_tuple_str.split(",")
 
             video_file_path = file_handler.file_join(video_file_folder, video_file_name)
-            print(f"DBG {video_file_path=} {file_tuple_str=}")
 
             (
                 video_file_path,
@@ -1282,10 +1290,11 @@ class File_Control:
                     break
             else:  # File not in grid already
                 video_user_data = File_Control.Video_Data(
-                    video_file_path,
-                    video_file_name,
-                    video_extension,
-                    {},
+                    video_folder=video_file_path,
+                    video_file=video_file_name,
+                    video_extension=video_extension,
+                    encoding_info={},
+                    video_filter_settings=Video_Filter_Settings(),
                 )
 
                 video_user_data.encoding_info = dvdarch_utils.get_file_encoding_info(

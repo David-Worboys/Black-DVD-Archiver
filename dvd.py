@@ -42,6 +42,93 @@ SPUMUX_BUFFER: Final[int] = 43
 # ===== Public API class for class DVD use
 
 
+@dataclasses.dataclass(slots=True)
+class Video_Filter_Settings:
+    """Class to hold video filter settings"""
+
+    _normalise: bool = True
+    _denoise: bool = True
+    _white_balance: bool = True
+    _sharpen: bool = True
+    _auto_bright: bool = True
+
+    def __post_init__(self):
+        """Post init to check the filter settings are valid"""
+        assert isinstance(self._normalise, bool), f"{self._normalise=}. Must be a bool"
+        assert isinstance(self._denoise, bool), f"{self._denoise=}. Must be a bool"
+        assert isinstance(
+            self._white_balance, bool
+        ), f"{self._white_balance=}. Must be a bool"
+        assert isinstance(self._sharpen, bool), f"{self._sharpen=}. Must be a bool"
+        assert isinstance(
+            self._auto_bright, bool
+        ), f"{self._auto_bright=}. Must be a bool"
+
+    @property
+    def filters_off(self) -> bool:
+        """Return True if all the filter settings are off"""
+        return not any(
+            value
+            for value in [
+                self._normalise,
+                self._denoise,
+                self._white_balance,
+                self._sharpen,
+                self._auto_bright,
+            ]
+        )
+
+    @property
+    def normalise(self) -> bool:
+        return self._normalise
+
+    @normalise.setter
+    def normalise(self, value: bool):
+        assert isinstance(value, bool), f"{value=}. Must be a bool"
+
+        self._normalise = value
+
+    @property
+    def denoise(self) -> bool:
+        return self._denoise
+
+    @denoise.setter
+    def denoise(self, value: bool):
+        assert isinstance(value, bool), f"{value=}. Must be a bool"
+
+        self._denoise = value
+
+    @property
+    def white_balance(self) -> bool:
+        return self._white_balance
+
+    @white_balance.setter
+    def white_balance(self, value: bool):
+        assert isinstance(value, bool), f"{value=}. Must be a bool"
+
+        self._white_balance = value
+
+    @property
+    def sharpen(self) -> bool:
+        return self._sharpen
+
+    @sharpen.setter
+    def sharpen(self, value: bool):
+        assert isinstance(value, bool), f"{value=}. Must be a bool"
+
+        self._sharpen = value
+
+    @property
+    def auto_bright(self) -> bool:
+        return self._auto_bright
+
+    @auto_bright.setter
+    def auto_bright(self, value: bool):
+        assert isinstance(value, bool), f"{value=}. Must be a bool"
+
+        self._auto_bright = value
+
+
 @dataclasses.dataclass
 class File_Def:
     _path: str = ""
@@ -49,6 +136,9 @@ class File_Def:
     _menu_image_frame: int = -1
     _mneu_image_file_path: str = ""
     _file_info: dict = dataclasses.field(default_factory=dict)
+    _video_filter_settings: Video_Filter_Settings = dataclasses.field(
+        default_factory=Video_Filter_Settings
+    )
 
     @property
     def path(self) -> str:
@@ -119,6 +209,18 @@ class File_Def:
         ), f"{self.path=}, {self.file_name=}. Must be set"
 
         return file_utils.File().file_join(self.path, self.file_name)
+
+    @property
+    def video_filter_settings(self) -> Video_Filter_Settings:
+        return self._video_filter_settings
+
+    @video_filter_settings.setter
+    def video_filter_settings(self, value: Video_Filter_Settings):
+        assert isinstance(
+            value, Video_Filter_Settings
+        ), f"{value=}. Must be an instance Video_Filter_Settings"
+
+        self._video_filter_settings = value
 
 
 @dataclasses.dataclass
@@ -671,13 +773,13 @@ class DVD:
 
         # Black Video Choices
         average_bit_rate = sys_consts.AVERAGE_BITRATE
-        apply_video_filters = False
-        black_border_size = 12  # TODO Black choice for now
+
+        black_border_size = 10  # TODO Black choice for now
 
         # Black filter Choices for now TODO Allow some user configuration
         debug = False
         normalise_video_filter = (  # Try to improve exposure of video
-            "normalize=blackpt=black:whitept=white:smoothing=12:independence=1"
+            "normalize=blackpt=black:whitept=white:smoothing=11:independence=1"
         )
 
         video_denoise_filter = "nlmeans=1.0:7:5:3:3"  # Light but fairly fast denoise
@@ -693,23 +795,8 @@ class DVD:
         ]
         black_box_filter = ",".join(filter_commands)
 
-        # Tries to lighten dark videos somewhat
+        # Tries to dering and lighten dark videos somewhat
         auto_bright = "pp=dr/al"
-
-        if apply_video_filters:
-            video_filters = [
-                "-vf",  # set video filters,
-                (  # video filters applied
-                    f"{normalise_video_filter},{auto_bright},{video_denoise_filter},"
-                    f" {color_correct_filter}, {usharp_filter},"
-                    f" {black_box_filter}"
-                ),
-            ]
-        else:
-            video_filters = [
-                "-vf",  # set video filters,
-                f" {black_box_filter}",  # video filters applied
-            ]
 
         for video_file in self.dvd_setup.input_videos:
             _, file_name, _ = file_handler.split_file_path(video_file.file_path)
@@ -740,8 +827,35 @@ class DVD:
                     ),
                 )
 
-            video_width = video_file.file_info["video_width"][1]
-            video_height = video_file.file_info["video_height"][1]
+            if video_file.video_filter_settings.filters_off:
+                video_filter_options = [
+                    "-vf",  # set video filters,
+                    f" {black_box_filter}",  # video filters applied
+                ]
+            else:
+                video_filter_options = []
+
+                if video_file.video_filter_settings.normalise:
+                    video_filter_options.append(normalise_video_filter)
+
+                if video_file.video_filter_settings.denoise:
+                    video_filter_options.append(video_denoise_filter)
+
+                if video_file.video_filter_settings.white_balance:
+                    video_filter_options.append(color_correct_filter)
+
+                if video_file.video_filter_settings.sharpen:
+                    video_filter_options.append(usharp_filter)
+
+                if video_file.video_filter_settings.auto_bright:
+                    video_filter_options.append(auto_bright)
+
+                video_filter_options.append(black_box_filter)
+
+                video_filters = ["-vf", ",".join(video_filter_options)]
+
+                video_width = video_file.file_info["video_width"][1]
+                video_height = video_file.file_info["video_height"][1]
 
             if self.dvd_setup.video_standard == sys_consts.PAL:
                 frame_rate = f"{sys_consts.PAL_FRAMERATE}"
@@ -1193,7 +1307,7 @@ class DVD:
             buttons_across=buttons_across,
         )
 
-        max_button_height = canvas_height // max(num_rows,4)
+        max_button_height = canvas_height // max(num_rows, 4)
 
         ## Compute the maximum width of each rectangle based on the number of columns across all pages
         rect_width_max = (

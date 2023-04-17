@@ -35,6 +35,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from archive_management import Archive_Manager
+from dvd import Video_Filter_Settings
 
 # fmt: on
 
@@ -362,6 +363,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
     output_folder: str = ""
     encoding_info: dict = dataclasses.field(default_factory=dict)
     excluded_word_list: list[str] = dataclasses.field(default_factory=list)
+    video_filter_settings: Video_Filter_Settings = dataclasses.field(
+        default_factory=Video_Filter_Settings
+    )
 
     # Private instance variables
     _archive_manager: Archive_Manager | None = None
@@ -415,6 +419,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
         assert all(
             isinstance(excluded_word, str) for excluded_word in self.excluded_word_list
         ), f"Excluded words must be str"
+
+        assert isinstance(self.video_filter_settings, Video_Filter_Settings), (
+            f"{self.video_filter_settings=}. Must be an instance of"
+            " Video_Filter_Settings"
+        )
 
         if "video_width" in self.encoding_info:
             self._frame_width = self.encoding_info["video_width"][1]
@@ -552,6 +561,22 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         if self._process_ok(event=event) == 1:
                             self.archive_edit_list_write()
 
+                            self.video_filter_settings.normalise = event.value_get(
+                                container_tag="video_filters", tag="normalise"
+                            )
+                            self.video_filter_settings.denoise = event.value_get(
+                                container_tag="video_filters", tag="denoise"
+                            )
+                            self.video_filter_settings.auto_bright = event.value_get(
+                                container_tag="video_filters", tag="auto_levels"
+                            )
+                            self.video_filter_settings.sharpen = event.value_get(
+                                container_tag="video_filters", tag="sharpen"
+                            )
+                            self.video_filter_settings.white_balance = event.value_get(
+                                container_tag="video_filters", tag="white_balance"
+                            )
+
                             if self._media_source:
                                 self._media_source.stop()
 
@@ -665,6 +690,32 @@ class Video_Cutter_Popup(qtg.PopContainer):
             return -1
 
         self._selection_button_toggle(event=event, init=True)
+
+        event.value_set(
+            container_tag="video_filters",
+            tag="normalise",
+            value=self.video_filter_settings.normalise,
+        )
+        event.value_set(
+            container_tag="video_filters",
+            tag="denoise",
+            value=self.video_filter_settings.denoise,
+        )
+        event.value_set(
+            container_tag="video_filters",
+            tag="auto_levels",
+            value=self.video_filter_settings.auto_bright,
+        )
+        event.value_set(
+            container_tag="video_filters",
+            tag="sharpen",
+            value=self.video_filter_settings.sharpen,
+        )
+        event.value_set(
+            container_tag="video_filters",
+            tag="white_balance",
+            value=self.video_filter_settings.white_balance,
+        )
 
         return 1
 
@@ -1291,7 +1342,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         Args:
             input_file (str): Path of the input video file.
             output_file (str): Path of the output video file.
-            edit_list (List[Tuple[int, int]]): List of tuples containing start and end frames of each segment to cut.
+            edit_list (list[Tuple[int, int]]): List of tuples containing start and end frames of each segment to cut.
             cut_out (bool, optional): Whether to cut out the edit points of the video. Defaults to True.
 
         Returns:
@@ -1313,11 +1364,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
             Transforms a list of cut in points to cut out points.
 
             Args:
-                edit_list (List[Tuple[int, int]]): A list of tuples representing the cut in and cut out points of a video.
+                edit_list (list[Tuple[int, int]]): A list of tuples representing the cut in and cut out points of a video.
                 frame_count (int): The total number of frames in the video.
 
             Returns:
-            - edit_list_2 (List[Tuple[int, int]]): A new list of tuples representing the cut-out points of the video.
+            - edit_list_2 (list[Tuple[int, int]]): A new list of tuples representing the cut-out points of the video.
 
             Raises:
             - TypeError: If edit_list is not a list or frame_count is not an integer.
@@ -1688,7 +1739,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 self._video_display,
                 self._video_slider,
                 video_button_container,
-                # qtg.Spacer(),
+                qtg.Spacer(),
                 qtg.HBoxContainer().add_row(self._frame_display),
             )
 
@@ -1805,12 +1856,47 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self._frame_width if self._frame_width <= 720 else self._frame_width // 2
         )
 
-        video__cutter_container = assemble_video_cutter_container()
-        edit_list_continer = assemble_edit_list_container()
+        video_filter_container = qtg.HBoxContainer(
+            text="DVD Video Filters", tag="video_filters"
+        ).add_row(
+            qtg.Checkbox(
+                tag="normalise",
+                text="Normalise",
+                checked=True,
+                tooltip="Bring Out Shadow Details",
+            ),
+            qtg.Checkbox(
+                tag="denoise",
+                text="Denoise",
+                checked=True,
+                tooltip="Lightly Reduce Video Noise",
+            ),
+            qtg.Checkbox(
+                tag="white_balance",
+                text="White Balance",
+                checked=True,
+                tooltip="Fix White Balance Problems",
+            ),
+            qtg.Checkbox(
+                tag="sharpen",
+                text="Sharpen",
+                checked=True,
+                tooltip="Lightly Sharpen Video",
+            ),
+            qtg.Checkbox(
+                tag="auto_levels",
+                text="Auto Levels",
+                checked=True,
+                tooltip="Improve Exposure",
+            ),
+        )
 
-        video_controls_container = qtg.HBoxContainer().add_row(
-            video__cutter_container,
-            edit_list_continer,
+        video_cutter_container = assemble_video_cutter_container()
+        edit_list_container = assemble_edit_list_container()
+
+        video_controls_container = qtg.VBoxContainer(align=qtg.Align.LEFT).add_row(
+            video_filter_container,
+            qtg.HBoxContainer().add_row(video_cutter_container, edit_list_container),
         )
 
         control_container = qtg.VBoxContainer(
@@ -1819,10 +1905,12 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         control_container.add_row(
             video_controls_container,
-            qtg.Spacer(),
+            # qtg.Spacer(),
             qtg.Command_Button_Container(
                 ok_callback=self.event_handler, cancel_callback=self.event_handler
-            ),
+            ).add_row(
+                qtg.Spacer(pixel_unit=True, width=3)
+            ),  # Bit poxy for line up
         )
 
         return control_container
