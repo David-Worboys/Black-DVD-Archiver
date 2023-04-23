@@ -198,16 +198,16 @@ def Question_Button_Container(
     platform_name = platform.system()
 
     if platform_name == "Windows":
-        button_container.add_row(tag="yes", text="Yes", callback=yes_callback)
-        button_container.add_row(tag="no", text="No", callback=no_callback)
+        button_container.add_row(Button(tag="yes", text="Yes", callback=yes_callback))
+        button_container.add_row(Button(tag="no", text="No", callback=no_callback))
 
     elif platform_name == "Linux":
-        button_container.add_row(tag="no", text="No", callback=no_callback)
-        button_container.add_row(tag="yes", text="Yes", callback=yes_callback)
+        button_container.add_row(Button(tag="no", text="No", callback=no_callback))
+        button_container.add_row(Button(tag="yes", text="Yes", callback=yes_callback))
 
     elif platform_name == "Darwin":  # macOS
-        button_container.add_row(tag="yes", text="Yes", callback=yes_callback)
-        button_container.add_row(tag="no", text="No", callback=no_callback)
+        button_container.add_row(Button(tag="yes", text="Yes", callback=yes_callback))
+        button_container.add_row(Button(tag="no", text="No", callback=no_callback))
 
     return button_container
 
@@ -8710,8 +8710,14 @@ class _Grid_TableWidget(qtW.QTableWidget):
         # This is here to select the text when focus is setinto the cell by row_scroll_to
         item = self.currentItem()
 
-        if item and item.flags() & qtC.Qt.ItemIsEditable:
+        if (
+            self.item
+            and hasattr(self.item, "editItem")
+            and item
+            and item.flags() & qtC.Qt.ItemIsEditable
+        ):
             editor = self.item.editItem(item)
+
             if editor is not None:
                 editor.setSelected(True)
 
@@ -9738,6 +9744,79 @@ class Grid(_qtpyBase_Control):
                 item.setSelected(True)
 
         self._widget.setFocus()
+
+    def userdata_set(self, row: int = -1, col: int = -1, user_data: any = None):
+        """
+        Sets the user data stored on the given column referred to by row and col.
+        If row is not specified, it sets the user data stored in the current row .
+        If col is not specified it sets the user data on all the cols
+
+
+        Args:
+            row (int): Row index reference (default {-1})
+            col (int): Column index reference (default {-1})
+            user_data (any): User data to be stored (default: None)
+        """
+
+        # ====== Helper
+        def _set_user_data(user_data: any, item: qtW.QTableWidgetItem):
+            """
+            Sets the user data on the given item.
+
+            Args:
+                user_data (any): User data to be stored.
+                item (QTableWidgetItem): The item to set the user data on.
+
+            """
+            # user_data anything so no need to check
+            assert isinstance(
+                item, qtW.QTableWidgetItem
+            ), f"{item=}. Must be QTableWidgetItem"
+
+            item_data = item.data(qtC.Qt.UserRole)
+
+            if item_data.first_time:
+                item_data = item_data.replace(
+                    current_value=item_data.current_value,
+                    prev_value=item_data.prev_value,
+                    original_value=item_data.original_value,
+                    data_type=self._data_type_encode(item_data.current_value),
+                    first_time=False,
+                    user_data=user_data,
+                    widget=None,
+                    orig_row=row_index,
+                )
+            else:
+                item_data = item_data.replace(
+                    current_value=item_data.current_value,
+                    prev_value=item_data.prev_value,
+                    data_type=self._data_type_encode(item_data.current_value),
+                    user_data=user_data,
+                    widget=item_data.widget,
+                )
+
+            item.setData(qtC.Qt.UserRole, item_data)
+
+        # ====== Main
+        assert row == -1 or row >= 0, f"{row=} must be an int == -1 or int >= 0"
+        assert col == -1 or col >= 0, f"{col=} must be an int == -1 or int >= 0"
+
+        self._widget: qtW.QTableWidget
+
+        if row == -1:
+            row = self._widget.currentRow()
+        if col == -1:
+            col = self._widget.currentColumn()
+
+        row_index, col_index = self._rowcol_validate(row, col)
+
+        if col_index == -1:
+            for col_index in range(0, self._widget.columnCount()):
+                item = self._widget.item(row_index, col_index)
+                _set_user_data(user_data, item)
+        else:
+            item = self._widget.item(row_index, col_index)
+            _set_user_data(user_data, item)
 
     def userdata_get(self, row: int = -1, col: int = -1) -> any:
         """
