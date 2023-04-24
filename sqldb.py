@@ -27,7 +27,7 @@ import sqlite3 as pysqlite3
 from decimal import Decimal
 from enum import unique
 from pathlib import Path
-from typing import Callable
+from typing import Callable, overload
 
 import platformdirs
 
@@ -157,7 +157,7 @@ class ColDef:
     cascaded_update: bool = True  # FK updates cascade to children
     cascade_delete: bool = True  # FK deletes cascade to children
     index: bool = False
-    _sql_type: SQL = None
+    _sql_type: SQL = dataclasses.field(default_factory=SQL)
 
     def __post_init__(self):
         assert (
@@ -251,7 +251,7 @@ class App_Settings:
 
         :return: str : database path or empty string ""
         """
-        path = self.setting_get("dbpath")
+        path: str = self.setting_get("dbpath")
 
         file_handler = File()
 
@@ -426,6 +426,26 @@ class App_Settings:
 
                     return True
         return False
+
+    @overload
+    def setting_get(self, setting_name: str) -> str:
+        ...
+
+    @overload
+    def setting_get(self, setting_name: str) -> bool:
+        ...
+
+    @overload
+    def setting_get(self, setting_name: str) -> int:
+        ...
+
+    @overload
+    def setting_get(self, setting_name: str) -> float:
+        ...
+
+    @overload
+    def setting_get(self, setting_name: str) -> None:
+        ...
 
     def setting_get(self, setting_name: str) -> str | bool | int | float | None:
         """Gets the setting referred to bby the setting_name

@@ -164,7 +164,7 @@ class File:
         """
         return os.path.sep
 
-    def extract_title(self, name: str, excluded_words: list[str] = []) -> str:
+    def extract_title(self, name: str, excluded_words: list | None = None) -> str:
         """
         Extracts the title from a given file name by removing the file extension, replacing unwanted characters,
         and formatting the resulting string into title case. If the file name contains a date, the date is extracted
@@ -176,10 +176,15 @@ class File:
             str: The extracted title.
         """
 
+        if excluded_words is None:
+            excluded_words = []
+
         assert (
             isinstance(name, str) and name.strip() != ""
         ), f"{name=}. Must be a non-empty str"
         assert all(isinstance(word, str) for word in excluded_words)
+
+        tokens = name.split(" ")
 
         locale.setlocale(locale.LC_ALL, "")
 
@@ -231,6 +236,8 @@ class File:
         # Remove excluded words followed by a space and a number
         pattern2 = r"\b(?:{})\b\s\d+".format("|".join(excluded_words))
         name_without_extension = re.sub(pattern2, "", name_without_extension)
+
+        name_without_extension = " ".join(name_without_extension.split())
 
         # Fix capitalization and formatting
         title_text = name_without_extension.capitalize()

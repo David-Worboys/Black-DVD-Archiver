@@ -35,7 +35,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from archive_management import Archive_Manager
-from dvd import Video_Filter_Settings
+from dvd import Video_Data
 
 # fmt: on
 
@@ -341,10 +341,8 @@ class Video_Handler:
             # Check for errors
             _, stderr = process.communicate()
             if process.returncode != 0:
-                print(f"DBG Error occurred during conversion: {stderr.decode()}")
                 return -1, f"Error occurred during conversion: {stderr.decode()}"
         except subprocess.SubprocessError as e:
-            print(f"DBG Error starting conversion process: {str(e)}")
             return 1, f"Error starting conversion process: {str(e)}"
 
         return 1, ""
@@ -357,17 +355,13 @@ class Video_Cutter_Popup(qtg.PopContainer):
     tag = "Video_Cutter_Popup"
 
     title: str = ""
-    aspect_ratio: str = sys_consts.AR43
     width: int = 40
-    input_file: str = ""
+    video_file_input: list[Video_Data] = dataclasses.field(default_factory=list)
     output_folder: str = ""
-    encoding_info: dict = dataclasses.field(default_factory=dict)
     excluded_word_list: list[str] = dataclasses.field(default_factory=list)
-    video_filter_settings: Video_Filter_Settings = dataclasses.field(
-        default_factory=Video_Filter_Settings
-    )
 
     # Private instance variables
+    _aspect_ratio: str = sys_consts.AR43
     _archive_manager: Archive_Manager | None = None
     _edit_list_grid: qtg.Grid | None = None
     _frame_rate: int = 25  # Default to 25 frames per second
@@ -383,7 +377,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
     _media_source: Video_Handler | None = None
     _edit_folder: str = "edits"
     _transcode_folder: str = "transcodes"
-    _edit_files: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         """Sets-up the form"""
@@ -392,26 +385,24 @@ class Video_Cutter_Popup(qtg.PopContainer):
             isinstance(self.title, str) and self.title.strip() != ""
         ), f"{self.title=}. Must be a non-empty str"
 
-        assert isinstance(self.aspect_ratio, str) and self.aspect_ratio in (
-            sys_consts.AR169,
-            sys_consts.AR43,
-        ), f"{self.aspect_ratio=}. Must be a AR169 | AR43"
-
         assert (
             isinstance(self.width, int) and self.width > 10
         ), f"{self.width=}. Must be an int > 10"
 
+        assert self.video_file_input and isinstance(
+            self.video_file_input, list
+        ), f"{self.video_file_input=}. Must be a non-empty list"
         assert (
-            isinstance(self.input_file, str) and self.input_file.strip() != ""
-        ), f"{self.input_file=}. Must be a non-empty str"
+            isinstance(self.video_file_input[0].video_path, str)
+            and self.video_file_input[0].video_path.strip() != ""
+        ), f"{self.video_file_input[0].video_path=}. Must be a non-empty str"
+        assert (
+            len(self.video_file_input) == 1
+        ), f"{self.video_file_input=}. Must have only a single entry"
 
         assert (
             isinstance(self.output_folder, str) and self.output_folder.strip() != ""
         ), f"{self.output_folder=}. Must be a non-empty str"
-
-        assert isinstance(
-            self.encoding_info, dict
-        ), f"{self.encoding_info=}. Must be a dict"
 
         assert isinstance(
             self.excluded_word_list, list
@@ -420,22 +411,25 @@ class Video_Cutter_Popup(qtg.PopContainer):
             isinstance(excluded_word, str) for excluded_word in self.excluded_word_list
         ), f"Excluded words must be str"
 
-        assert isinstance(self.video_filter_settings, Video_Filter_Settings), (
-            f"{self.video_filter_settings=}. Must be an instance of"
-            " Video_Filter_Settings"
-        )
+        if "video_dar" in self.video_file_input[0].encoding_info:
+            self._aspect_ratio = self.video_file_input[0].encoding_info["video_dar"][1]
+        if "video_width" in self.video_file_input[0].encoding_info:
+            self._frame_width = self.video_file_input[0].encoding_info["video_width"][1]
 
-        if "video_width" in self.encoding_info:
-            self._frame_width = self.encoding_info["video_width"][1]
+        if "video_height" in self.video_file_input[0].encoding_info:
+            self._frame_height = self.video_file_input[0].encoding_info["video_height"][
+                1
+            ]
 
-        if "video_height" in self.encoding_info:
-            self._frame_height = self.encoding_info["video_height"][1]
+        if "video_frame_rate" in self.video_file_input[0].encoding_info:
+            self._frame_rate = self.video_file_input[0].encoding_info[
+                "video_frame_rate"
+            ][1]
 
-        if "video_frame_rate" in self.encoding_info:
-            self._frame_rate = self.encoding_info["video_frame_rate"][1]
-
-        if "video_frame_count" in self.encoding_info:
-            self._frame_count = self.encoding_info["video_frame_count"][1]
+        if "video_frame_count" in self.video_file_input[0].encoding_info:
+            self._frame_count = self.video_file_input[0].encoding_info[
+                "video_frame_count"
+            ][1]
 
         file_handler = file_utils.File()
 
@@ -447,7 +441,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         self.container = self.layout()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
 
-        super().__post_init__()
+        super().__post_init__()  # Must be last call in method
 
     def _video_file_system_maker(self):
         """
@@ -483,13 +477,15 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self.output_folder, self._transcode_folder
         )
 
-        if not file_handler.file_exists(self.input_file):
+        if self.video_file_input and not file_handler.file_exists(
+            self.video_file_input[0].video_path
+        ):
             # This should never happen, unless dev error or mount/drive problems
             popups.PopError(
                 title="Video File Does Not Exist",
                 message=(
                     "The input video file"
-                    f" {sys_consts.SDELIM}'{self.input_file}'{sys_consts.SDELIM} does"
+                    f" {sys_consts.SDELIM}'{self.video_file_input[0].video_path}'{sys_consts.SDELIM} does"
                     " not exist. Please ensure the file exists and try again."
                 ),
             ).show()
@@ -538,12 +534,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             event (qtg.Action): The triggering event
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
-        # print(
-        #    f"DBG EH {event.container_tag=} {event.tag=} {event.action=} {event.event=} {event.value=}"
-        # )
-        # print(
-        #   f"DBG VC {event.event=} {event.action=} {event.container_tag=} {event.tag=} {self.container_tag=} {self.tag=}"
-        # )
+
         match event.event:
             case qtg.Sys_Events.WINDOWOPEN:
                 self.window_open_handler(event)
@@ -559,27 +550,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 match event.tag:
                     case "ok":
                         if self._process_ok(event=event) == 1:
-                            self.archive_edit_list_write()
-
-                            self.video_filter_settings.normalise = event.value_get(
-                                container_tag="video_filters", tag="normalise"
-                            )
-                            self.video_filter_settings.denoise = event.value_get(
-                                container_tag="video_filters", tag="denoise"
-                            )
-                            self.video_filter_settings.auto_bright = event.value_get(
-                                container_tag="video_filters", tag="auto_levels"
-                            )
-                            self.video_filter_settings.sharpen = event.value_get(
-                                container_tag="video_filters", tag="sharpen"
-                            )
-                            self.video_filter_settings.white_balance = event.value_get(
-                                container_tag="video_filters", tag="white_balance"
-                            )
-
-                            if self._media_source:
-                                self._media_source.stop()
-
+                            self.set_result("ok")
                             super().close()
                     case "backward":
                         self._step_backward()
@@ -589,11 +560,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         )
                     case "cancel":
                         if self._process_cancel(event=event) == 1:
-                            self.archive_edit_list_write()
-
-                            if self._media_source:
-                                self._media_source.stop()
-
+                            self.set_result("cancel")
                             super().close()
                     case "assemble_segments":
                         self._assemble_segments(event)
@@ -677,6 +644,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         Args:
             event (qtg.Action): _description_
         """
+        file_handler = file_utils.File()
 
         if not self._media_source.available():
             popups.PopMessage(
@@ -694,27 +662,43 @@ class Video_Cutter_Popup(qtg.PopContainer):
         event.value_set(
             container_tag="video_filters",
             tag="normalise",
-            value=self.video_filter_settings.normalise,
+            value=self.video_file_input[0].video_filter_settings.normalise,
         )
         event.value_set(
             container_tag="video_filters",
             tag="denoise",
-            value=self.video_filter_settings.denoise,
+            value=self.video_file_input[0].video_filter_settings.denoise,
         )
         event.value_set(
             container_tag="video_filters",
             tag="auto_levels",
-            value=self.video_filter_settings.auto_bright,
+            value=self.video_file_input[0].video_filter_settings.auto_bright,
         )
         event.value_set(
             container_tag="video_filters",
             tag="sharpen",
-            value=self.video_filter_settings.sharpen,
+            value=self.video_file_input[0].video_filter_settings.sharpen,
         )
         event.value_set(
             container_tag="video_filters",
             tag="white_balance",
-            value=self.video_filter_settings.white_balance,
+            value=self.video_file_input[0].video_filter_settings.white_balance,
+        )
+
+        if (
+            self.video_file_input[0].video_filter_settings.button_title.strip() == ""
+        ):  # Attempt to extract the title from the input file name.
+            _, file_name, _ = file_handler.split_file_path(
+                self.video_file_input[0].video_path
+            )
+            dvd_menu_title = file_handler.extract_title(
+                file_name, self.excluded_word_list
+            )
+        else:
+            dvd_menu_title = self.video_file_input[0].video_filter_settings.button_title
+
+        event.value_set(
+            container_tag="dvd_settings", tag="menu_title", value=dvd_menu_title
         )
 
         return 1
@@ -801,10 +785,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             self._media_source = Video_Handler(
-                aspect_ratio=self.aspect_ratio,
-                input_file=self.input_file,
+                aspect_ratio=self._aspect_ratio,
+                input_file=self.video_file_input[0].video_path,
                 output_edit_folder=self.output_folder,
-                encoding_info=self.encoding_info,
+                encoding_info=self.video_file_input[0].encoding_info,
                 video_display=self._video_display,
                 video_slider=self._video_slider,
                 frame_display=self._frame_display,
@@ -844,7 +828,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
             ]
 
             if edit_list:
-                self._archive_manager.write_edit_cuts(self.input_file, edit_list)
+                self._archive_manager.write_edit_cuts(
+                    self.video_file_input[0].video_path, edit_list
+                )
 
     def _archive_edit_list_read(self):
         """Reads edit cuts from the archive manager and populates the edit list grid with the data.
@@ -856,7 +842,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         """
         if self._archive_manager and self._edit_list_grid:
-            edit_cuts = self._archive_manager.read_edit_cuts(self.input_file)
+            edit_cuts = self._archive_manager.read_edit_cuts(
+                self.video_file_input[0].video_path
+            )
 
             mark_in = self._edit_list_grid.colindex_get("mark_in")
             mark_out = self._edit_list_grid.colindex_get("mark_out")
@@ -905,17 +893,19 @@ class Video_Cutter_Popup(qtg.PopContainer):
             ).show()
 
             if result == "As Individual Files":
-                _, filename, extension = file_handler.split_file_path(self.input_file)
+                _, filename, extension = file_handler.split_file_path(
+                    self.video_file_input[0].video_path
+                )
 
                 assembled_file = file_handler.file_join(
                     self._edit_folder, f"{filename}_", extension
                 )
 
-                video_files = []
+                video_data = []
 
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
                     result, video_files_string = self.cut_video_with_editlist(
-                        input_file=self.input_file,
+                        input_file=self.video_file_input[0].video_path,
                         output_file=assembled_file,
                         edit_list=edit_list,
                         cut_out=False,
@@ -929,34 +919,36 @@ class Video_Cutter_Popup(qtg.PopContainer):
                             message=f"<{video_files_string}>",
                         ).show()
                     else:
-                        video_files = video_files_string.split(",")
+                        for video_file_path in video_files_string.split(","):
+                            video_path, video_file, video_extension = (
+                                file_handler.split_file_path(video_file_path)
+                            )
+                            video_data.append(
+                                Video_Data(
+                                    video_folder=video_path,
+                                    video_file=video_file,
+                                    video_extension=video_extension,
+                                    encoding_info=dvdarch_utils.get_file_encoding_info(
+                                        video_file_path
+                                    ),
+                                    video_filter_settings=self.video_file_input[
+                                        0
+                                    ].video_filter_settings,
+                                )
+                            )
 
-                if video_files:
+                if len(video_data) > 0:
                     result = File_Renamer_Popup(
-                        file_list=video_files, container_tag="file_renamer"
+                        video_data_list=video_data, container_tag="file_renamer"
                     ).show()
 
-                    file_str = ""
+                    for video_file in video_data:
+                        self.video_file_input.append(video_file)
 
-                    if result:
-                        for file_detail in result.split("|"):
-                            (
-                                user_entered_file_name,
-                                orig_rename_file_path,
-                                user_rename_file_path,
-                            ) = file_detail.split(",")
-
-                            if not user_entered_file_name.strip():
-                                continue  # Probably an error
-
-                            file_str += f"{self.input_file},{user_entered_file_name},{orig_rename_file_path},{user_rename_file_path},A|"
-
-                        # Strip the trailing "|" delimiter from the file_str
-                        file_str = file_str[:-1]
-
-                        self.set_result(file_str)
             elif result == "As A Single File":
-                _, filename, extension = file_handler.split_file_path(self.input_file)
+                _, filename, extension = file_handler.split_file_path(
+                    self.video_file_input[0].video_path
+                )
 
                 assembled_file = file_handler.file_join(
                     self._edit_folder, f"{filename}_assembled", extension
@@ -964,7 +956,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
                     result, video_files_string = self.cut_video_with_editlist(
-                        input_file=self.input_file,
+                        input_file=self.video_file_input[0].video_path,
                         output_file=assembled_file,
                         edit_list=edit_list,
                         cut_out=False,
@@ -978,26 +970,38 @@ class Video_Cutter_Popup(qtg.PopContainer):
                             message=f"<{video_files_string}>",
                         ).show()
                     else:
-                        video_files = video_files_string.split(",")
-
-                    if video_files:
                         result, message = dvdarch_utils.concatenate_videos(
-                            temp_files=video_files,
+                            temp_files=video_files_string.split(","),
                             output_file=assembled_file,
                             delete_temp_files=True,
                         )
 
                         if result == -1:
                             popups.PopError(
-                                title="Error Assembling Files...",
-                                message=f"<{video_files_string}> {message}",
+                                title="Error Concatenating Files...",
+                                message=f"<{message}>",
                             ).show()
-                        else:
-                            self._edit_files.append(
-                                f"{self.input_file},{assembled_file},T"
-                            )
 
-                            self.set_result("|".join(self._edit_files))
+                            return None
+
+                        assembled_path, assembled_filename, assembled_extension = (
+                            file_handler.split_file_path(assembled_file)
+                        )
+
+                        self.video_file_input.append(
+                            Video_Data(
+                                video_folder=assembled_path,
+                                video_file=assembled_filename,
+                                video_extension=assembled_extension,
+                                encoding_info=dvdarch_utils.get_file_encoding_info(
+                                    video_files_string
+                                ),
+                                video_filter_settings=self.video_file_input[
+                                    0
+                                ].video_filter_settings,
+                            )
+                        )
+
             else:
                 popups.PopMessage(
                     title="No Assembly Method Selected...",
@@ -1021,6 +1025,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be type qtg.Action"
 
+        dvd_menu_title = event.value_get(container_tag="dvd_settings", tag="menu_title")
         file_handler = file_utils.File()
 
         mark_in = self._edit_list_grid.colindex_get("mark_in")
@@ -1036,15 +1041,20 @@ class Video_Cutter_Popup(qtg.PopContainer):
         ]
 
         if edit_list:
-            _, filename, extension = file_handler.split_file_path(self.input_file)
+            _, filename, extension = file_handler.split_file_path(
+                self.video_file_input[0].video_path
+            )
+
+            if dvd_menu_title.strip() == "":
+                dvd_menu_title = filename
 
             output_file = file_handler.file_join(
-                self._edit_folder, f"{filename}_trimmed", extension
+                self._edit_folder, f"{dvd_menu_title}", extension
             )
 
             with qtg.sys_cursor(qtg.Cursor.hourglass):
                 result, trimmed_file = self.cut_video_with_editlist(
-                    input_file=self.input_file,
+                    input_file=self.video_file_input[0].video_path,
                     output_file=output_file,
                     edit_list=edit_list,
                 )
@@ -1057,9 +1067,22 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         message=f"<{trimmed_file}>",
                     ).show()
                 else:
-                    self._edit_files.append(f"{self.input_file},{trimmed_file},T")
+                    trimmed_path, trimmed_filename, trimmed_extension = (
+                        file_handler.split_file_path(trimmed_file)
+                    )
 
-                    self.set_result("|".join(self._edit_files))
+                    trimmed_video = Video_Data(
+                        video_folder=trimmed_path,
+                        video_file=trimmed_filename,
+                        video_extension=trimmed_extension,
+                        encoding_info=dvdarch_utils.get_file_encoding_info(
+                            trimmed_file
+                        ),
+                        video_filter_settings=self.video_file_input[
+                            0
+                        ].video_filter_settings,
+                    )
+                    self.video_file_input.append(trimmed_video)
         else:
             popups.PopMessage(
                 title="No Entries In The Edit List...",
@@ -1151,7 +1174,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         """
         Seeks the media source forwards by `_step_value` frames.
 
-        This function first calculates the frame to seek to by adding `_step_value` frames to the current frame.
+        This method first calculates the frame to seek to by adding `_step_value` frames to the current frame.
         If the calculated frame is within the bounds of the media source, the media source is paused and seeks to the calculated frame.
         If the calculated frame is greater than or equal to the total number of frames, the media source is seeked to the final frame instead.
 
@@ -1172,7 +1195,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 self._media_source.seek(seek_frame)
 
     def _selection_end(self, event: qtg.Action) -> None:
-        """Handler function for selecting the end of a media clip.
+        """Handler method for selecting the end of a media clip.
 
         Args:
             event (qtg.Action): The triggering event
@@ -1205,7 +1228,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self._selection_button_toggle(event=event)
 
     def _selection_start(self, event: qtg.Action) -> None:
-        """Handler function for selecting the start of a media clip.
+        """Handler method for selecting the start of a media clip.
 
         Args:
             event (qtg.Action): The triggering event
@@ -1560,7 +1583,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
             for temp_file in temp_files:
                 if file_handler.remove_file(temp_file) == -1:
-                    return -1, f"Faied To Remove File <{temp_file}>"
+                    return -1, f"Failed To Remove File <{temp_file}>"
 
         else:
             # We keep the temp files, as they are the new videos, and build an output file str where each video is
@@ -1578,6 +1601,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
         Returns:
             int: 1 all good, close the window. -1 keep window open
         """
+        result = 1
+
         if self.get_result:
             if (
                 popups.PopYesNo(
@@ -1589,11 +1614,17 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 ).show()
                 == "yes"
             ):
-                return 1
+                result = 1
             else:
-                return -1
+                result = -1
 
-        return 1
+        if result == 1:
+            self.archive_edit_list_write()
+
+            if self._media_source:
+                self._media_source.stop()
+
+        return result
 
     def _process_ok(self, event: qtg.Action) -> int:
         """Processes the ok selection
@@ -1604,6 +1635,33 @@ class Video_Cutter_Popup(qtg.PopContainer):
         Returns:
             int: 1 all good, close the window. -1 keep window open
         """
+        self.archive_edit_list_write()
+
+        self.video_file_input[0].video_filter_settings.normalise = event.value_get(
+            container_tag="video_filters", tag="normalise"
+        )
+        self.video_file_input[0].video_filter_settings.denoise = event.value_get(
+            container_tag="video_filters", tag="denoise"
+        )
+        self.video_file_input[0].video_filter_settings.auto_bright = event.value_get(
+            container_tag="video_filters", tag="auto_levels"
+        )
+        self.video_file_input[0].video_filter_settings.sharpen = event.value_get(
+            container_tag="video_filters", tag="sharpen"
+        )
+        self.video_file_input[0].video_filter_settings.white_balance = event.value_get(
+            container_tag="video_filters", tag="white_balance"
+        )
+
+        # dvd_menu_title = self.video_file_input[0].video_filter_settings.button_title
+
+        dvd_menu_title = event.value_get(container_tag="dvd_settings", tag="menu_title")
+
+        if dvd_menu_title.strip() != "":
+            self.video_file_input[0].video_filter_settings.button_title = dvd_menu_title
+
+        if self._media_source:
+            self._media_source.stop()
 
         return 1
 
@@ -1857,7 +1915,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         )
 
         video_filter_container = qtg.HBoxContainer(
-            text="DVD Video Filters", tag="video_filters"
+            text="Video Filters", tag="video_filters"
         ).add_row(
             qtg.Checkbox(
                 tag="normalise",
@@ -1895,7 +1953,12 @@ class Video_Cutter_Popup(qtg.PopContainer):
         edit_list_container = assemble_edit_list_container()
 
         video_controls_container = qtg.VBoxContainer(align=qtg.Align.LEFT).add_row(
-            video_filter_container,
+            qtg.VBoxContainer(tag="dvd_settings", text="DVD Settings").add_row(
+                video_filter_container,
+                qtg.LineEdit(
+                    tag="menu_title", label="Menu Title", char_length=40, width=40
+                ),
+            ),
             qtg.HBoxContainer().add_row(video_cutter_container, edit_list_container),
         )
 
@@ -1920,7 +1983,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
 class File_Renamer_Popup(qtg.PopContainer):
     """Renames video files sourced from the video cutter"""
 
-    file_list: list[str] | tuple[str] = dataclasses.field(default_factory=list)
+    video_data_list: list[Video_Data] = dataclasses.field(
+        default_factory=list
+    )  # Pass by reference
     tag = "File_Renamer_Popup"
     file_validated: bool = True
 
@@ -1930,11 +1995,11 @@ class File_Renamer_Popup(qtg.PopContainer):
     def __post_init__(self):
         """Sets-up the form"""
         assert (
-            isinstance(self.file_list, (list, tuple)) and len(self.file_list) > 0
-        ), f"{self.file_list=}. Must be a non-empty list or tuple of str"
+            isinstance(self.video_data_list, list) and len(self.video_data_list) > 0
+        ), f"{self.video_data_list=}. Must be a non-empty list of Video_Data instances"
         assert all(
-            isinstance(file, str) and file.strip() != "" for file in self.file_list
-        ), f"All elements must be str"
+            isinstance(video_data, Video_Data) for video_data in self.video_data_list
+        ), f"All elements must be Video_Data instances"
 
         self.container = self.layout()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
@@ -1950,15 +2015,17 @@ class File_Renamer_Popup(qtg.PopContainer):
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
 
         match event.event:
-            case qtg.Sys_Events.WINDOWOPEN:
+            case qtg.Sys_Events.WINDOWPOSTOPEN:
                 self._load_files(event)
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "ok":
                         if self._process_ok(event) == 1:
+                            self.set_result(event.tag)
                             super().close()
                     case "cancel":
                         if self._process_cancel(event) == 1:
+                            self.set_result(event.tag)
                             super().close()
             case qtg.Sys_Events.CLEAR_TYPING_BUFFER:
                 if isinstance(event.value, qtg.Grid_Col_Value):
@@ -2023,8 +2090,6 @@ class File_Renamer_Popup(qtg.PopContainer):
         """
         assert isinstance(event, qtg.Action), "event must be an instance qtg.Action"
 
-        file_handler = file_utils.File()
-
         file_grid: qtg.Grid = event.widget_get(
             container_tag="file_controls",
             tag="video_input_files",
@@ -2033,34 +2098,27 @@ class File_Renamer_Popup(qtg.PopContainer):
         col_index = file_grid.colindex_get("new_file_name")
         row_index = 0
 
-        for row_index, file_path in enumerate(self.file_list):
-            _, file_name, _ = file_handler.split_file_path(file_path)
-
+        for row_index, video_data in enumerate(self.video_data_list):
             file_grid.value_set(
-                value=file_name,
+                value=video_data.video_file,
                 row=row_index,
                 col=col_index,
-                user_data=file_path,
+                user_data=video_data.video_path,
             )
 
         return row_index
 
-    def _package_files(self, event: qtg.Action) -> str:
+    def _package_files(self, event: qtg.Action):
         """
-        Package the video input files into a string format and sets the result.
+        Package the video input files into the video_data_list.
 
         Args:
             event (qtg.Action): The event that triggered this method.
 
-        Returns:
-            str: A string representation of the video input files, with each file's original name and new name
-            separated by a comma, and each file separated by a vertical bar.
         """
         assert isinstance(
             event, qtg.Action
         ), f"{event=} must be an instance of qtg.Action"
-
-        file_handler = file_utils.File()
 
         file_grid: qtg.Grid = event.widget_get(
             container_tag="file_controls", tag="video_input_files"
@@ -2068,27 +2126,11 @@ class File_Renamer_Popup(qtg.PopContainer):
 
         col_index = file_grid.colindex_get("new_file_name")
 
-        file_str = ""
         for row_index in range(file_grid.row_count):
             user_entered_file_name = file_grid.value_get(row_index, col_index)
-            orig_rename_file_path: str = file_grid.userdata_get(row_index, col_index)
+            self.video_data_list[row_index].video_file = user_entered_file_name
 
-            renamed_path, _, extension = file_handler.split_file_path(
-                orig_rename_file_path
-            )
-
-            user_rename_file_path = file_handler.file_join(
-                renamed_path, user_entered_file_name, extension
-            )
-
-            file_str += f"{user_entered_file_name},{orig_rename_file_path},{user_rename_file_path}|"
-
-        # Strip the trailing "|" delimiter from the file_str
-        file_str = file_str[:-1]
-
-        self.set_result(file_str)
-
-        return file_str
+        return None
 
     def _process_cancel(self, event: qtg.Action) -> int:
         """

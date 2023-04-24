@@ -166,7 +166,7 @@ def concatenate_videos(
 
     file_handler = file_utils.File()
     out_path, _, _ = file_handler.split_file_path(output_file)
-    file_list_txt = file_handler.file_join(out_path, "file_list", "txt")
+    file_list_txt = file_handler.file_join(out_path, "video_data_list", "txt")
 
     if not file_handler.path_writeable(out_path):
         return -1, f"Can Not Be Write To {out_path}!"

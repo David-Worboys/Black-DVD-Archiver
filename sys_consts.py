@@ -91,6 +91,10 @@ PRODUCT_LINE: Final[str] = "product_line"
 ARCHIVE_FOLDER: Final[str] = "archive_folder"
 DVD_BUILD_FOLDER: Final[str] = "dvd_build_folder"
 
+PERCENT_SAFTEY_BUFFER: Final[int] = (
+    1  # Used to limit DVD size so that it never exceeds 100%
+)
+
 
 class SPECIAL_PATH(utils.strEnum):
     """Contains a enums for strings that represent special paths on the user's computer"""
