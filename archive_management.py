@@ -47,7 +47,7 @@ class Archive_Manager:
     _backup_folders: tuple[str, ...] = (DVD_IMAGE, ISO_IMAGE, VIDEO_SOURCE, MISC)
     _json_edit_cuts_file: str = "edit_cuts"
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert (
             isinstance(self.archive_folder, str) and self.archive_folder.strip() != ""
         ), f"{self.archive_folder=}. Must Be non-empty str"
@@ -309,7 +309,7 @@ class Archive_Manager:
         self,
         file_path: str,
         file_cuts: list[(int, int, str)],
-    ):
+    ) -> tuple[int, str]:
         """Store files and cuts in the archive json_file.
 
         Args:
@@ -318,7 +318,7 @@ class Archive_Manager:
                 Each cut is represented by a tuple with the cut_in value, cut_out value, and cut_name string.
 
         Returns:
-            int, str: Error code (1 Ok, -1 Fail) and Error Message ("" if all good otherwise and error message)
+            int, str: Error code (1 Ok, -1 Fail) and Error Message ("" if all good otherwise an error message)
         """
         assert (
             isinstance(file_path, str) and file_path.strip() != ""

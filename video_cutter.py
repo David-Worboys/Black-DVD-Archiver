@@ -73,7 +73,7 @@ class Video_Handler:
     _media_player: qtM.QMediaPlayer | None = None
     _video_sink: qtM.QVideoSink | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Sets-up the instance"""
         assert isinstance(self.aspect_ratio, str) and self.aspect_ratio in (
             sys_consts.AR169,
@@ -146,7 +146,7 @@ class Video_Handler:
         self._media_player.seekableChanged.connect(self._seekable_changed)
         self._media_player.positionChanged.connect(self._position_changed)
 
-    def _duration_changed(self, duration: int):
+    def _duration_changed(self, duration: int) -> None:
         """Handles a video duration change
 
         Args:
@@ -154,7 +154,7 @@ class Video_Handler:
         """
         pass
 
-    def _frame_handler(self, frame: qtM.QVideoFrame):
+    def _frame_handler(self, frame: qtM.QVideoFrame) -> None:
         """Handles displaying the video frame
 
         Args:
@@ -169,7 +169,7 @@ class Video_Handler:
             ):  # Should not need this check but on shutdown I sometimes got the  dreaded C++ object deleted error
                 self.video_display.guiwidget_get.setPixmap(pixmap)
 
-    def _media_status_change(self, media_status: qtM.QMediaPlayer.mediaStatus):
+    def _media_status_change(self, media_status: qtM.QMediaPlayer.mediaStatus) -> None:
         """When the status of the media player changes this method sets the source_state var and calls the
         state_handler if provided.
 
@@ -443,7 +443,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         super().__post_init__()  # Must be last call in method
 
-    def _video_file_system_maker(self):
+    def _video_file_system_maker(self) -> None:
         """
         Create the necessary folders for video processing, and checks if the input file exists.
 
@@ -527,7 +527,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     ),
                 ).show()
 
-    def event_handler(self, event: qtg.Action):
+    def event_handler(self, event: qtg.Action) -> None | int:
         """Handles  form events
 
         Args:
@@ -564,7 +564,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                             super().close()
                     case "assemble_segments":
                         self._assemble_segments(event)
-                    case "delete_segements":
+                    case "delete_segments":
                         self._delete_segments(event)
                     case "mark_in" | "mark_out":  # Edit List Seek
                         self._edit_list_seek(event)
@@ -612,7 +612,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._media_source.update_slider = True
                         self._sliding = False
 
-    def media_state_handler(self):
+    def media_state_handler(self) -> None:
         """Allows processing the change of Media State"""
 
         if self._media_source.source_state in ("NoMedia", "InvalidMedia"):
@@ -636,13 +636,16 @@ class Video_Cutter_Popup(qtg.PopContainer):
             pass
             # print(self._media_source.source_state)
 
-    def window_post_open_handler(self, event: qtg.Action):
+    def window_post_open_handler(self, event: qtg.Action) -> int:
         """Handles post window opening processing.
 
         Note: If media play is not available on platform or multimedia codecs not installed the window will close
 
         Args:
             event (qtg.Action): _description_
+
+        Returns:
+            int : 1 Ok, -1 Fail
         """
         file_handler = file_utils.File()
 
@@ -703,7 +706,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         return 1
 
-    def _move_edit_point(self, up: bool):
+    def _move_edit_point(self, up: bool) -> None:
         """
         Move the selected edit point up or down in the edit list grid.
 
@@ -746,7 +749,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 )
                 self._edit_list_grid.select_col(checked_items[0].row_index, 0)
 
-    def _edit_list_seek(self, event: qtg.Action):
+    def _edit_list_seek(self, event: qtg.Action) -> None:
         """
         Seeks on a frame number from the edit list when mark_in or mark_out is clicked
 
@@ -767,7 +770,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         else:
             self._media_source.seek(value.value)
 
-    def window_open_handler(self, event: qtg.Action):
+    def window_open_handler(self, event: qtg.Action) -> None:
         """
         Handles the video_cutters open event processing
 
@@ -799,7 +802,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         self._selection_button_toggle(event=event, init=True)
 
-    def archive_edit_list_write(self):
+    def archive_edit_list_write(self) -> None:
         """Writes the edit list from the GUI grid to the archive manager for the current video file.
 
         The edit list is read from the GUI grid, which has columns for the mark in, mark out,
@@ -813,6 +816,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         if self._archive_manager:
             mark_in = self._edit_list_grid.colindex_get("mark_in")
             mark_out = self._edit_list_grid.colindex_get("mark_out")
+            clip_name = self._edit_list_grid.colindex_get("clip_name")
 
             # TODO Add cut_name
             edit_list = [
@@ -822,7 +826,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._edit_list_grid.value_get(row=row_index, col=mark_out)
                         or self._frame_count
                     ),
-                    "",
+                    self._edit_list_grid.value_get(row=row_index, col=clip_name),
                 )
                 for row_index in range(self._edit_list_grid.row_count)
             ]
@@ -832,7 +836,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     self.video_file_input[0].video_path, edit_list
                 )
 
-    def _archive_edit_list_read(self):
+    def _archive_edit_list_read(self) -> None:
         """Reads edit cuts from the archive manager and populates the edit list grid with the data.
 
         If both the archive manager and the edit list grid exist, reads edit cuts for the input file from the archive
@@ -848,6 +852,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
             mark_in = self._edit_list_grid.colindex_get("mark_in")
             mark_out = self._edit_list_grid.colindex_get("mark_out")
+            clip_name = self._edit_list_grid.colindex_get("clip_name")
 
             for row, cut_tuple in enumerate(edit_cuts):
                 self._edit_list_grid.value_set(
@@ -857,13 +862,16 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 self._edit_list_grid.value_set(
                     row=row, col=mark_out, value=cut_tuple[1], user_data=cut_tuple
                 )
-                # TODO Add cut_name
 
-    def _assemble_segments(self, event: qtg.Action):
+                self._edit_list_grid.value_set(
+                    row=row, col=clip_name, value=cut_tuple[2], user_data=cut_tuple
+                )
+
+    def _assemble_segments(self, event: qtg.Action) -> None:
         """
         Takes the specified segments from the input file and makes new video files from them.
 
-        Note: Pop_Container set_result is called here and not in the _process_ok meothd
+        Note: Pop_Container set_result is called here and not in the _process_ok method
 
         Args:
             event (qtg.Action): The event that triggered this method.
@@ -875,12 +883,14 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         mark_in = self._edit_list_grid.colindex_get("mark_in")
         mark_out = self._edit_list_grid.colindex_get("mark_out")
+        clip_name = self._edit_list_grid.colindex_get("clip_name")
 
-        edit_list = [
+        edit_list: list[tuple[int, int, str]] = [
             (
                 self._edit_list_grid.value_get(row=row_index, col=mark_in),
                 self._edit_list_grid.value_get(row=row_index, col=mark_out)
                 or self._frame_count,
+                self._edit_list_grid.value_get(row=row_index, col=clip_name),
             )
             for row_index in range(self._edit_list_grid.row_count)
         ]
@@ -1013,7 +1023,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 message="Please Mark Some Edit List Entries With The [ and ] Buttone!",
             ).show()
 
-    def _delete_segments(self, event: qtg.Action):
+    def _delete_segments(self, event: qtg.Action) -> None:
         """
         Deletes the specified segments from the input file.
 
@@ -1030,12 +1040,14 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         mark_in = self._edit_list_grid.colindex_get("mark_in")
         mark_out = self._edit_list_grid.colindex_get("mark_out")
+        clip_name = self._edit_list_grid.colindex_get("clip_name")
 
         edit_list = [
             (
                 self._edit_list_grid.value_get(row=row_index, col=mark_in),
                 self._edit_list_grid.value_get(row=row_index, col=mark_out)
                 or self._frame_count,
+                self._edit_list_grid.value_get(row=row_index, col=clip_name),
             )
             for row_index in range(self._edit_list_grid.row_count)
         ]
@@ -1117,7 +1129,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
             for item in reversed(self._edit_list_grid.checkitems_get):
                 self._edit_list_grid.row_delete(item.row_index)
 
-    def _step_unit(self, event: qtg.Action):
+            if self._edit_list_grid.row_count == 0:
+                self._selection_button_toggle(event=event, init=True)
+
+    def _step_unit(self, event: qtg.Action) -> None:
         """
         Sets the value of `self._step_value` based on the value of the `event` argument.
 
@@ -1147,7 +1162,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             }
             self._step_value = step_values[value.data]
 
-    def _step_backward(self):
+    def _step_backward(self) -> None:
         """
         Seeks the media source backwards by `_step_value` frames.
 
@@ -1170,7 +1185,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 self._media_source.pause()
                 self._media_source.seek(seek_frame)
 
-    def _step_forward(self):
+    def _step_forward(self) -> None:
         """
         Seeks the media source forwards by `_step_value` frames.
 
@@ -1255,7 +1270,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         Args:
             event (qtg.Action): The triggering event
-            init (bool): True if initialising the button state fo first use, oherwise false
+            init (bool): True if initialising the button state fo first use, otherwise false
 
         """
         assert isinstance(
@@ -1301,16 +1316,19 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
-    from typing import List
-
     def create_ffmpeg_editlist(
-        self, input_file: str, frames: List[tuple], fps: float, output_file: str
+        self,
+        input_file: str,
+        frames: list[tuple[int, int]],
+        fps: float,
+        output_file: str,
     ) -> tuple[int, str]:
         """
         Creates an edit list string in ffmpeg's format based on a list of frame ranges.
 
         Args:
-            frames (List[tuple]): A list of (start_frame, end_frame) tuples representing
+            input_file (str) : Input video file
+            frames (list[tuple[int,int]]): A list of (start_frame, end_frame) tuples representing
                 the frame ranges to include in the edit list.
             fps (float): The frame rate of the input video file, in frames per second.
             output_file (str): The name of the output file to write the edit list to.
@@ -1356,7 +1374,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         self,
         input_file: str,
         output_file: str,
-        edit_list: list[tuple[int, int]],
+        edit_list: list[tuple[int, int, str]],
         cut_out: bool = True,
     ) -> tuple[int, str]:
         """
@@ -1365,7 +1383,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         Args:
             input_file (str): Path of the input video file.
             output_file (str): Path of the output video file.
-            edit_list (list[Tuple[int, int]]): List of tuples containing start and end frames of each segment to cut.
+            edit_list (list[tuple[int, int, str]]): List of tuples containing start, end frames and clip name of each segment to cut.
             cut_out (bool, optional): Whether to cut out the edit points of the video. Defaults to True.
 
         Returns:
@@ -1381,61 +1399,63 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         # ===== Helper
         def transform_cut_in_to_cut_out(
-            edit_list: list[tuple[int, int]], frame_count: int
-        ) -> list[tuple[int, int]]:
+            edit_list: list[tuple[int, int, str]], frame_count: int
+        ) -> list[tuple[int, int, str]]:
             """
             Transforms a list of cut in points to cut out points.
 
             Args:
-                edit_list (list[Tuple[int, int]]): A list of tuples representing the cut in and cut out points of a video.
+                edit_list (list[Tuple[int, int, str]]): A list of tuples representing the cut in. cut out points and clip name of a video.
                 frame_count (int): The total number of frames in the video.
 
             Returns:
-            - edit_list_2 (list[Tuple[int, int]]): A new list of tuples representing the cut-out points of the video.
-
-            Raises:
-            - TypeError: If edit_list is not a list or frame_count is not an integer.
-            - ValueError: If edit_list is empty or any tuple in edit_list has start frame greater than end frame.
+                list[tuple[int, int]]: A list of tuples representing the cut in/out points and cut name of the video.
 
             """
-            if not isinstance(edit_list, list):
-                raise TypeError("edit_list should be a list of tuples")
-            if not all(isinstance(x, tuple) and len(x) == 2 for x in edit_list):
-                raise TypeError("edit_list should contain tuples of size 2")
-            if not isinstance(frame_count, int):
-                raise TypeError("frame_count should be an integer")
-            if not edit_list:
-                raise ValueError("edit_list should not be empty")
-            if any(start_frame >= end_frame for start_frame, end_frame in edit_list):
-                raise ValueError(
-                    "start_frame should be less than end_frame in every tuple of"
-                    " edit_list"
-                )
+            assert isinstance(
+                edit_list, list
+            ), f"{edit_list=}. Must be a list of tuples"
+            assert edit_list, f"{edit_list=}. Must not be empty"
+            assert all(isinstance(x, tuple) and len(x) == 3 for x in edit_list), (
+                f"{edit_list=}. Must contain tuples of size 3"
+                " [start_frame, end_frame, cut name]"
+            )
+            assert (
+                isinstance(frame_count, int) and frame_count >= 0
+            ), f"{frame_count=}. Must be an int >= 0"
+
+            assert all(
+                start_frame < end_frame for start_frame, end_frame, _ in edit_list
+            ), "start_frame must be less than end_frame in every tuple of edit_list"
 
             prev_start = 0
             cut_out_list = []
 
-            for cut_index, (start_frame, end_frame) in enumerate(edit_list):
+            for cut_index, (start_frame, end_frame, clip_name) in enumerate(edit_list):
                 if start_frame != end_frame:
-                    new_tuple = (prev_start, start_frame)
+                    new_tuple = (prev_start, start_frame, clip_name)
                     cut_out_list.append(new_tuple)
                 prev_start = end_frame
 
                 # check for overlapping frames between consecutive tuples
                 # Note: We consider it an overlap if tuple overlap within 0.5 seconds!
                 if cut_index < len(edit_list) - 1:
-                    _, next_start_frame = edit_list[cut_index + 1]
+                    _, next_start_frame, clip_name = edit_list[cut_index + 1]
                     if (
                         next_start_frame
                         <= end_frame
                         <= next_start_frame + (self._frame_rate // 2)
                     ):
                         # merge the two tuples into a single tuple
-                        cut_out_list[-1] = (cut_out_list[-1][0], next_start_frame)
+                        cut_out_list[-1] = (
+                            cut_out_list[-1][0],
+                            next_start_frame,
+                            clip_name,
+                        )
 
-            # add the last tuple
+            # add the last tuple if needed
             if prev_start != frame_count:
-                cut_out_list.append((prev_start, frame_count))
+                cut_out_list.append((prev_start, frame_count, ""))
 
             return cut_out_list
 
@@ -1446,9 +1466,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
         assert all(
             isinstance(edit, tuple) for edit in edit_list
         ), "Each edit in edit_list must be a tuple"
-        assert all(
-            len(edit) == 2 for edit in edit_list
-        ), "Each edit tuple in edit_list must have exactly two elements"
+        assert all(len(edit) == 3 for edit in edit_list), (
+            "Each edit tuple in edit_list must have exactly three elements (start"
+            " frame, end frame, cut name)"
+        )
         assert all(
             isinstance(edit[0], int) for edit in edit_list
         ), "The start frame in each edit tuple must be an integer"
@@ -1459,9 +1480,23 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         file_handler = file_utils.File()
 
+        for edit_tuple in edit_list:
+            if edit_tuple[2] != "" and not file_handler.filename_validate(
+                edit_tuple[2]
+            ):
+                return -1, f"Invalid Clip Name: {edit_tuple[2]}!"
+
         out_path, out_file, out_extn = file_handler.split_file_path(output_file)
 
         result, message = dvdarch_utils.get_codec(input_file)
+
+        all(
+            [
+                file_handler.filename_validate(edit_tuple[2])
+                for edit_tuple in edit_list
+                if edit_tuple[2] != ""
+            ]
+        )
 
         if result == -1:
             return -1, message
@@ -1474,20 +1509,25 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 edit_list=edit_list, frame_count=self._frame_count
             )
 
-        for cut_index, (start_frame, end_frame) in enumerate(edit_list):
+        for cut_index, (start_frame, end_frame, clip_name) in enumerate(edit_list):
             if end_frame - start_frame <= 0:  # Probably should not happen
                 continue
+
+            if clip_name.strip() != "":
+                out_file = clip_name
+            else:
+                out_file = f"{file_handler.extract_title(out_file)}_{cut_index:03d}"
 
             if cut_out:
                 temp_file = file_handler.file_join(
                     out_path,
-                    f"{file_handler.extract_title(out_file)}({cut_index})",
+                    f"{out_file}({cut_index})",
                     out_extn,
                 )
             else:
                 temp_file = file_handler.file_join(
                     out_path,
-                    f"{file_handler.extract_title(out_file)}_{cut_index:03d}",
+                    out_file,
                     out_extn,
                 )
 
@@ -1653,11 +1693,13 @@ class Video_Cutter_Popup(qtg.PopContainer):
             container_tag="video_filters", tag="white_balance"
         )
 
-        # dvd_menu_title = self.video_file_input[0].video_filter_settings.button_title
+        dvd_menu_title: str = event.value_get(
+            container_tag="dvd_settings", tag="menu_title"
+        )
 
-        dvd_menu_title = event.value_get(container_tag="dvd_settings", tag="menu_title")
-
-        if dvd_menu_title.strip() != "":
+        if (
+            dvd_menu_title.strip() != "" and len(self.video_file_input) <= 2
+        ):  # Have to set the dvd menu button title if we have an Input file only, or one output file
             self.video_file_input[0].video_filter_settings.button_title = dvd_menu_title
 
         if self._media_source:
@@ -1827,13 +1869,13 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     editable=False,
                     checkable=False,
                 ),
-                # qtg.COL_DEF(
-                #     tag="controls",
-                #     label="",
-                #     width=2,
-                #     editable=False,
-                #     checkable=False,
-                # ),
+                qtg.Col_Def(
+                    tag="clip_name",
+                    label="Clip Name",
+                    width=10,
+                    editable=True,
+                    checkable=False,
+                ),
             ]
 
             self._edit_list_grid = qtg.Grid(
@@ -1856,7 +1898,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 ),
                 qtg.Button(
                     icon=file_utils.App_Path("scissors.svg"),
-                    tag="delete_segements",
+                    tag="delete_segments",
                     callback=self.event_handler,
                     tooltip="Delete Edit Points From Video",
                     width=2,
@@ -1986,13 +2028,13 @@ class File_Renamer_Popup(qtg.PopContainer):
     video_data_list: list[Video_Data] = dataclasses.field(
         default_factory=list
     )  # Pass by reference
-    tag = "File_Renamer_Popup"
+    tag: str = "File_Renamer_Popup"
     file_validated: bool = True
 
     # Private instance variable
     _db_settings: sqldb.App_Settings | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Sets-up the form"""
         assert (
             isinstance(self.video_data_list, list) and len(self.video_data_list) > 0
@@ -2006,7 +2048,7 @@ class File_Renamer_Popup(qtg.PopContainer):
 
         super().__post_init__()  # This statement must be last
 
-    def event_handler(self, event: qtg.Action):
+    def event_handler(self, event: qtg.Action) -> None:
         """Handles  form events
 
         Args:
@@ -2031,7 +2073,7 @@ class File_Renamer_Popup(qtg.PopContainer):
                 if isinstance(event.value, qtg.Grid_Col_Value):
                     grid_col_value: qtg.Grid_Col_Value = event.value
 
-                    user_file_name = grid_col_value.value
+                    user_file_name: str = grid_col_value.value
                     row = grid_col_value.row
                     col = grid_col_value.col
                     user_data = grid_col_value.user_data
@@ -2068,7 +2110,7 @@ class File_Renamer_Popup(qtg.PopContainer):
         col_index = file_grid.colindex_get("new_file_name")
 
         for row_index in range(0, file_grid.row_count):
-            file_name = file_grid.value_get(row_index, col_index)
+            file_name: str = file_grid.value_get(row_index, col_index)
             old_file: str = file_grid.userdata_get(row_index, col_index)
             _, old_file_name, _ = file_handler.split_file_path(old_file)
 
@@ -2095,7 +2137,7 @@ class File_Renamer_Popup(qtg.PopContainer):
             tag="video_input_files",
         )
 
-        col_index = file_grid.colindex_get("new_file_name")
+        col_index: int = file_grid.colindex_get("new_file_name")
         row_index = 0
 
         for row_index, video_data in enumerate(self.video_data_list):
@@ -2108,7 +2150,7 @@ class File_Renamer_Popup(qtg.PopContainer):
 
         return row_index
 
-    def _package_files(self, event: qtg.Action):
+    def _package_files(self, event: qtg.Action) -> None:
         """
         Package the video input files into the video_data_list.
 
@@ -2124,11 +2166,13 @@ class File_Renamer_Popup(qtg.PopContainer):
             container_tag="file_controls", tag="video_input_files"
         )
 
-        col_index = file_grid.colindex_get("new_file_name")
+        col_index: int = file_grid.colindex_get("new_file_name")
 
         for row_index in range(file_grid.row_count):
-            user_entered_file_name = file_grid.value_get(row_index, col_index)
-            self.video_data_list[row_index].video_file = user_entered_file_name
+            user_entered_file_name: str = file_grid.value_get(row_index, col_index)
+
+            if user_entered_file_name.strip() != "":
+                self.video_data_list[row_index].video_file = user_entered_file_name
 
         return None
 
@@ -2157,9 +2201,6 @@ class File_Renamer_Popup(qtg.PopContainer):
                 result = self._rename_files(event)
 
                 if result == 1:
-                    popups.PopMessage(
-                        title="Rename Files...", message="Files Renamed Successfully"
-                    ).show()
                     self._package_files(event)
 
                 return result
@@ -2241,7 +2282,9 @@ class File_Renamer_Popup(qtg.PopContainer):
             old_file_path, old_file_name, extension = file_handler.split_file_path(
                 old_file
             )
-            new_file_path = file_handler.file_join(old_file_path, file_name, extension)
+            new_file_path: str = file_handler.file_join(
+                old_file_path, file_name, extension
+            )
 
             if file_name.strip() != old_file_name.strip():
                 if file_handler.rename_file(old_file, new_file_path) == -1:
