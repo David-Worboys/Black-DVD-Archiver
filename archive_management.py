@@ -44,7 +44,7 @@ class Archive_Manager:
     # Private instance variables
     _error_message: str = ""
     _error_code: int = -1
-    _backup_folders: tuple[str] = dataclasses.field(default_factory=list)
+    _backup_folders: tuple[str, ...] = (DVD_IMAGE, ISO_IMAGE, VIDEO_SOURCE, MISC)
     _json_edit_cuts_file: str = "edit_cuts"
 
     def __post_init__(self):
@@ -52,7 +52,6 @@ class Archive_Manager:
             isinstance(self.archive_folder, str) and self.archive_folder.strip() != ""
         ), f"{self.archive_folder=}. Must Be non-empty str"
 
-        self._backup_folders = (DVD_IMAGE, ISO_IMAGE, VIDEO_SOURCE, MISC)
         self._error_message = self._make_folder_structure()
 
     @property
@@ -91,9 +90,11 @@ class Archive_Manager:
                         f"{sys_consts.PROGRAM_NAME} - {sys_consts.VERSION_TAG} \n Do"
                         " Not Delete Folder!"
                     )
-            except:
-                self._error_message = f"Failed To Write {readme_file} "
+            except (FileNotFoundError, PermissionError, IOError) as e:
+                self._error_message = f"Failed To Write {readme_file} {e} "
                 self._error_code = 1
+
+        return ""
 
     def archive_dvd_build(
         self,
@@ -108,6 +109,7 @@ class Archive_Manager:
 
         Args:
             dvd_name (str): The name of the DVD.
+            iso_folder (str) : The file path of the folder where the ISO build was created.
             dvd_folder (str): The file path of the folder where the DVD build was created.
             source_video_files (list[str]): A list of file paths for the source video files to be included in the DVD.
             overwrite_existing (bool): Whether to overwrite existing DVD backup folder
@@ -301,8 +303,6 @@ class Archive_Manager:
                     break
                 edit_cuts.append(tuple(edit_point))
 
-        # edit_cuts = sorted(edit_cuts, key=lambda x: x[0], reverse=False)
-
         return tuple(edit_cuts)
 
     def write_edit_cuts(
@@ -314,7 +314,7 @@ class Archive_Manager:
 
         Args:
             file_path (str): The path of the video file that owns the cuts.
-            files_cuts (list[(int,int,str)]): A  list of cuts for the file_path.
+            file_cuts (list[(int,int,str)]): A  list of cuts for the file_path.
                 Each cut is represented by a tuple with the cut_in value, cut_out value, and cut_name string.
 
         Returns:
@@ -364,7 +364,7 @@ class Archive_Manager:
                 IOError,
                 json.decoder.JSONDecodeError,
             ) as e:
-                # Ignore errors as the file might be empty or corrup. The write statement below will catch
+                # Ignore errors as the file might be empty or corrupt. The write statement below will catch
                 # real file OS errors.
                 pass
 

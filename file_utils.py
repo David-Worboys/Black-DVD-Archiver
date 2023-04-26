@@ -184,7 +184,28 @@ class File:
         ), f"{name=}. Must be a non-empty str"
         assert all(isinstance(word, str) for word in excluded_words)
 
-        tokens = name.split(" ")
+        words = []
+        numbers = []
+
+        for token in name.replace("_", " ").replace(".", " ").split(" "):
+            word = []
+            number = []
+
+            for char in token:
+                if char == "-":
+                    number.append(char)
+                elif char.isalpha():
+                    word.append(char)
+                elif char.isdigit():
+                    number.append(char)
+            if word:
+                words.append("".join(word))
+
+            if number:
+                numbers.append("".join(number))
+
+        print(f"DBG {words=} {numbers=}")
+        print(dateparser.parse("-".join(numbers)))
 
         locale.setlocale(locale.LC_ALL, "")
 
