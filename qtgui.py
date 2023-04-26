@@ -10398,7 +10398,7 @@ class _Image(qtW.QGraphicsView):
     def paintEvent(self, event: qtG.QPaintEvent) -> None:
         super().paintEvent(event)
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event) -> None:
         # self.clicked.emit()
         super().mousePressEvent(event)
 
@@ -11767,7 +11767,7 @@ class _Line_Edit(qtW.QLineEdit):
 
     event_ref = None
     owner_widget = None
-
+    
     def __init__(self, parent, owner_widget):
         """Constructor that checks parameters and sets instance variables
         Args:
@@ -11799,6 +11799,11 @@ class _Line_Edit(qtW.QLineEdit):
 
                 if result == -1:
                     return True  # Consumes Event as super not called
+        elif event.type() == qtC.QEvent.Type.MouseButtonPress:
+            result = self.owner_widget._event_handler(Sys_Events.CLICKED)
+
+            if result == -1:
+                return True  # Consumes Event as super not called
 
         super().event(event)
 
