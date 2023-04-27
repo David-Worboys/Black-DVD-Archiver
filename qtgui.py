@@ -40,7 +40,7 @@ from collections import deque, namedtuple
 from contextlib import contextmanager
 from dataclasses import field
 from enum import Enum, IntEnum
-from typing import (Callable, ClassVar, NoReturn, Optional, Union, cast,
+from typing import (Callable, ClassVar, Literal, NoReturn, Optional, Union, cast,
                     overload)
 
 import numpy as np
@@ -2547,7 +2547,7 @@ class _qtpyBase_Control(_qtpyBase):
             parent (qtW.QWidget): Parent widget hosting the owning created widget
             container_tag (str):  Parent container that owns the widget
 
-        Returns (qtw.QWidget): This will be either a low level gui widgget or frame
+        Returns (qtw.QWidget): This will be either a low level gui widget or frame
 
         """
         assert isinstance(
@@ -2778,14 +2778,14 @@ class _qtpyBase_Control(_qtpyBase):
             # self._widget.setStyle(qtW.QStyleFactory.create("Windows"))  # Debug
             return self._widget
 
-    def buddy_text_set(self, value: str):
+    def buddy_text_set(self, value: str) -> None:
         """Set the buddy text for the widget.
 
         Args:
             value (str): The text to set on the buddy widget.
         """
 
-        def _label_set(widget: _qtpyBase_Control, value: str):
+        def _label_set(widget: _qtpyBase_Control, value: str) -> None:
             """Set the label text on the buddy widget.
 
             Args:
@@ -2801,7 +2801,7 @@ class _qtpyBase_Control(_qtpyBase):
         if self.buddy_control is not None:
             _label_set(self.buddy_control, value)
 
-    def ediitable_set(self, editable: bool = False):
+    def ediitable_set(self, editable: bool = False) -> None:
         """Set the editable state of the widget.
 
         Args:
@@ -2833,7 +2833,7 @@ class _qtpyBase_Control(_qtpyBase):
         if self.allow_clear and hasattr(self._widget, "clear"):
             self._widget.clear()
 
-    def focusInEvent(self, gui_event):
+    def focusInEvent(self, gui_event) -> None:
         """Focus in event of the widget.
 
         If the widget is a FolderView or ComboBox, then call this event handler with the selectedIndexes or
@@ -2876,7 +2876,7 @@ class _qtpyBase_Control(_qtpyBase):
                         gui_event[0] if isinstance(gui_event, tuple) else gui_event
                     )
 
-    def focusOutEvent(self, gui_event: "Action"):
+    def focusOutEvent(self, gui_event: "Action") -> None:
         """Focus out event of the widget.
 
         If the widget is a FolderView or ComboBox, then call the event handler with the selectedIndexes or currentIndex as
@@ -3223,7 +3223,7 @@ class _qtpyBase_Control(_qtpyBase):
         else:
             return qtG.QFontDatabase().systemFont(qtG.QFontDatabase.GeneralFont)
 
-    def frame_style_set(self, frame: Widget_Frame):
+    def frame_style_set(self, frame: Widget_Frame) -> None:
         """Sets the frame style.
 
         Args:
@@ -3247,7 +3247,7 @@ class _qtpyBase_Control(_qtpyBase):
             self._widget.setLineWidth(frame.line_width)
             self._widget.setMidLineWidth(frame.midline_width)
 
-    def icon_set(self, icon: Optional[Union[str, qtG.QPixmap, qtG.QIcon]]):
+    def icon_set(self, icon: Optional[Union[str, qtG.QPixmap, qtG.QIcon]]) -> None:
         """Sets the icon.
 
         If the widget is a QMenu, set the icon using setIcon. If the icon is a QPixmap or QStyle.StandardPixmap,
@@ -3303,7 +3303,7 @@ class _qtpyBase_Control(_qtpyBase):
         txt_color: str = "black",
         bg_color: str = "wheat",
         border: str = "1px solid #000000",
-    ):
+    ) -> None:
         """Sets the tooltip for a widget.
 
         Note: Width setting is still being ignored TODO Find Fix
@@ -3363,7 +3363,7 @@ class _qtpyBase_Control(_qtpyBase):
         else:
             return self._widget.tooTipsVisible()
 
-    def tooltipsvisible_set(self, visible: bool):
+    def tooltipsvisible_set(self, visible: bool) -> None:
         """Sets the tooltips visibility of the widget
 
         Args:
@@ -3385,7 +3385,7 @@ class _qtpyBase_Control(_qtpyBase):
         """
         return self.translate
 
-    def trans_set(self, no_trans: bool):
+    def trans_set(self, no_trans: bool) -> None:
         """Set translate state of the object
 
         Args:
@@ -3412,8 +3412,12 @@ class _qtpyBase_Control(_qtpyBase):
         else:
             return text
 
-    def validate(self):
-        """Performs validation if validate_callback is set."""
+    def validate(self) -> bool:
+        """Performs validation if validate_callback is set.
+
+        Returns:
+            bool : True if validation ok, otherwise False
+        """
         if callable(self.validate_callback):
             validate_ok = self.validate_callback(
                 self.container_tag, self.tag, self, self.value_get()
@@ -3427,7 +3431,7 @@ class _qtpyBase_Control(_qtpyBase):
 
         return True
 
-    def value_get(self):
+    def value_get(self) -> any:
         """If the widget has a value attribute, return the value containsd in the widget. Usually overridden by
         subclasses.
 
@@ -3471,11 +3475,11 @@ class _qtpyBase_Control(_qtpyBase):
     def value_set(self, value: str):
         ...
 
-    def value_set(self, value: datetime.date) -> NoReturn:
+    def value_set(self, value: datetime.date) -> None:
         ...
 
     @overload
-    def value_set(self, value: datetime.datetime) -> NoReturn:
+    def value_set(self, value: datetime.datetime) -> None:
         ...
 
     @overload
@@ -3486,7 +3490,7 @@ class _qtpyBase_Control(_qtpyBase):
     # def value_set(self, hour: int = 0, min: int = 0, sec: int = 0, msec: int = 0):
     #     ...
 
-    def value_set(self, value: str = None):
+    def value_set(self, value: str = None) -> None:
         """Sets the widget value If the widget has a value_set method
 
         Args:
@@ -3517,7 +3521,7 @@ class _qtpyBase_Control(_qtpyBase):
                 return self._widget.isVisible()
         return True
 
-    def visible_set(self, visible: bool):
+    def visible_set(self, visible: bool) -> None:
         """Sets the visibility of the widget.
         Args:
             visible (bool): True - widget visible, False - widget hidden.
@@ -3550,7 +3554,7 @@ class QtPyApp(_qtpyBase):
         height: int = 1080,
         width: int = 1920,
         app_font: Font = Font(font_name="IBM Plex Mono", size=DEFAULT_FONT_SIZE),
-    ):
+    ) -> None:
         """
         Checks that the parameters are of the correct type and then sets some private instance variables.
 
@@ -3785,7 +3789,7 @@ class QtPyApp(_qtpyBase):
         """
         return self._app
 
-    def app_exit(self):
+    def app_exit(self) -> None:
         """Called when the user clicks the "X" button on the top right of the window or selects exit from the menu.
         Could also be called in the application"""
 
@@ -3889,7 +3893,7 @@ class QtPyApp(_qtpyBase):
 
         return Char_Pixel_Size(height=height, width=width)
 
-    def run(self, layout: "_Container", windows_ui: bool = False):
+    def run(self, layout: "_Container", windows_ui: bool = False) -> NoReturn:
         """Creates a main window, sets the title & icon, and then shows the window
 
         Args:
@@ -3974,7 +3978,7 @@ class QtPyApp(_qtpyBase):
 
     def widget_add(
         self, window_id: int, container_tag: str, tag: str, widget: _qtpyBase
-    ):
+    ) -> None:
         """Adds a widget to the widget registry
 
         Args:
@@ -4023,7 +4027,7 @@ class QtPyApp(_qtpyBase):
             window_id=window_id, container_tag=container_tag
         )
 
-    def widget_del(self, window_id: int, container_tag: str, tag: str):
+    def widget_del(self, window_id: int, container_tag: str, tag: str) -> None:
         """Deletes a widget from the registry
 
         Args:
@@ -4138,7 +4142,7 @@ class Action(_qtpyBase):
     parent_widget: _qtpyBase_Control
     control_name: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Checks the types of the arguments passed to the class and sets instance variable as needed."""
         assert (
             isinstance(self.window_id, int) and self.window_id > 0
@@ -4240,7 +4244,7 @@ class Action(_qtpyBase):
         """Debug use prints the widget dictionary"""
         self.parent_app.widget_dict_print()
 
-    def widget_del(self, container_tag: str, tag: str):
+    def widget_del(self, container_tag: str, tag: str) -> None:
         """Deletes a widget from a container
 
         Args:
@@ -4383,7 +4387,7 @@ class Action(_qtpyBase):
 class _Event_Handler(_qtpyBase):
     """Used to implement event handling."""
 
-    def __init__(self, parent_app: QtPyApp, parent: None | _qtpyBase = None):
+    def __init__(self, parent_app: QtPyApp, parent: None | _qtpyBase = None) -> None:
         """Constructor for the Event_Handler class. Checks the arguments and sets instance variables
 
         Args:
@@ -4514,7 +4518,7 @@ class _Container(_qtpyBase_Control):
     )
     _scroll_current_widget: Optional[_qtpyBase_Control] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Sets up the class variables and makes sure that the variables are of the correct type"""
 
         super().__post_init__()
@@ -5089,7 +5093,11 @@ class _Container(_qtpyBase_Control):
     def add_row(self, *controls: _qtpyBase_Control, row: int = -1) -> "VBoxContainer":
         ...
 
-    def add_row(self, *controls: _qtpyBase_Control, row: int = -1):
+    def add_row(
+        self, *controls: _qtpyBase_Control, row: int = -1
+    ) -> Union[
+        "_Container", "GridContainer", "FormContainer", "VBoxContainer", "HBoxContainer"
+    ]:
         """Adds a row to the Container. If a HBoxContainer or VBoxContainer only one row is present
         (Horizontal or Vertical respectively) and a second add row call will replace the existing controls
 
@@ -5098,7 +5106,7 @@ class _Container(_qtpyBase_Control):
             row (int): Optional, row where the controls are to be placed. Ignored with HBoxContainers or VBoxContainers
 
         Returns:
-            Union[GridContainer, HBoxContainer, VBoxContainer]: The container instance
+            Union[FormContainer, GridContainer, HBoxContainer, VBoxContainer]: The container instance
         """
         assert isinstance(row, int) and (
             row > 0 or row == -1
@@ -5141,7 +5149,7 @@ class _Container(_qtpyBase_Control):
 
         return self
 
-    def clear(self):
+    def clear(self) -> None:
         """Clears the values displayed in the gui widgets housed in this container"""
 
         if self.allow_clear:
@@ -5151,7 +5159,7 @@ class _Container(_qtpyBase_Control):
                 if widget.allow_clear and hasattr(widget.guiwidget_get, "clear"):
                     widget.guiwidget_get.clear()
 
-    def dump(self):
+    def dump(self) -> None:
         """Prints the widget dictionaryto console. Used for debugging"""
         self._parent_app.widget_dict_print()
 
@@ -5196,7 +5204,7 @@ class _Container(_qtpyBase_Control):
 
         return width, height
 
-    def widget_add(self, control: _qtpyBase_Control):
+    def widget_add(self, control: _qtpyBase_Control) -> None:
         """Adds a widget to the container
 
         Args:
@@ -5273,7 +5281,7 @@ class _Container(_qtpyBase_Control):
             window_id=window_id, container_tag=self.tag
         )
 
-    def widget_del(self, container_tag: str, tag: str):
+    def widget_del(self, container_tag: str, tag: str) -> None:
         """Deletes a widget from the designated container
 
         Args:
@@ -5378,7 +5386,7 @@ class _Container(_qtpyBase_Control):
             window_id=window_id, container_tag=container_tag, tag=tag
         )
 
-    def widgets_clear(self):
+    def widgets_clear(self) -> None:
         """Clears all the widgets from the container
 
         Returns:
@@ -5512,7 +5520,7 @@ class _Container(_qtpyBase_Control):
 
         return col_width_total
 
-    def controls_enable_state_save(self):
+    def controls_enable_state_save(self) -> None:
         """Saves the current enable state of all widgets in the container"""
         self._current_enable_settings = {}
 
@@ -5536,7 +5544,7 @@ class _Container(_qtpyBase_Control):
                         item.tag
                     ] = widget.enable_get
 
-    def controls_enable_state_restore(self):
+    def controls_enable_state_restore(self) -> None:
         """Restores the enable state of all controls in the container"""
 
         window_id = Get_Window_ID(self._parent_app, self._parent, self)
@@ -5554,7 +5562,7 @@ class _Container(_qtpyBase_Control):
                 else:
                     widget.enable_set(enabled)
 
-    def controls_enable(self, enable: bool):
+    def controls_enable(self, enable: bool) -> None:
         """Enables or disables all the widgets in the container.
 
         Args:
@@ -5901,10 +5909,10 @@ class _Container(_qtpyBase_Control):
 
         Args:
             container (_Container) : The container to serialize. Defaults to the current container.
-            tag_list : List of gathered tags. Defaults to a new list.
+            tag_list (list[tags]) : List of gathered tags. Defaults to a new list.
 
         Returns:
-            Optional[list[tags]] : list of tag instances [container_tag,tag,values,valid]
+            list[tags] : list of tag instances [container_tag,tag,values,valid]
 
         """
 
@@ -5959,7 +5967,7 @@ class _Container(_qtpyBase_Control):
 
         return tag_list
 
-    def values_clear(self):
+    def values_clear(self) -> None:
         """Clears the values of all widgets in the container that have a `clear` method"""
 
         window_id = Get_Window_ID(self.parent_app, self.parent, self)
@@ -5972,12 +5980,12 @@ class _Container(_qtpyBase_Control):
                 widget.clear()
 
     @property
-    def values_get(self):
+    def values_get(self) -> list[tags]:
         """Wrapper function around tags gather, returns a tuple list [container_tag,tag,values] of all controls in
         the current container
 
         Returns:
-            Optional[list[tags]] : list of tag instances [container_tag,tag,values,valid]
+            list[tags] : list of tag instances [container_tag,tag,values,valid]
         """
         return self.tags_gather()
 
@@ -6212,7 +6220,9 @@ class _Container(_qtpyBase_Control):
 
         return max_text_len
 
-    def print_container(self, container: _qtpyBase_Control = None, leader: str = "*"):
+    def print_container(
+        self, container: _qtpyBase_Control = None, leader: str = "*"
+    ) -> None:
         """Dumps the _Container structure to the command line.  Used for debugging
 
         Args:
@@ -6269,7 +6279,7 @@ class Button(_qtpyBase_Control):
 
     txt_align: Align = Align.CENTER
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initializes the button object."""
         super().__post_init__()
 
@@ -6313,7 +6323,7 @@ class Button(_qtpyBase_Control):
 class FormContainer(_Container):
     """Creates a`Form Container instance`"""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialises the form container."""
         super().__post_init__()
 
@@ -6346,7 +6356,7 @@ class FormContainer(_Container):
 class GridContainer(_Container):
     """Creates a`Grid Container instance`"""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialises the form container."""
         super().__post_init__()
 
@@ -6365,7 +6375,7 @@ class _Dialog(qtW.QDialog):
         container_tag: str,
         tag: str,
         title: str,
-    ):
+    ) -> None:
         """Sets up the dialogue box.
 
         Args:
@@ -6380,14 +6390,14 @@ class _Dialog(qtW.QDialog):
 
         super().__init__()
 
-        self.owner = owner
-        self.callback = callback
-        self.container_tag = container_tag
-        self.container = container
-        self.tag = tag
-        self.title = title
-        self._parent_app = parent_app
-        self._result = ""
+        self.owner: PopContainer = owner
+        self.callback: callable = callback
+        self.container_tag: str = container_tag
+        self.container: _Container = container
+        self.tag: str = tag
+        self.title: str = title
+        self._parent_app: QtPyApp = parent_app
+        self._result: str = ""
 
         assert isinstance(
             self.owner, PopContainer
@@ -6406,7 +6416,7 @@ class _Dialog(qtW.QDialog):
             self._parent_app, QtPyApp
         ), f"{self._parent_app=}. Must be instance of QtPyApp"
 
-    def set_result(self, value: str):
+    def set_result(self, value: str) -> None:
         """Sets the return value of the PopContainer
 
         Args:
@@ -6415,7 +6425,7 @@ class _Dialog(qtW.QDialog):
         assert isinstance(value, str), f"{value} must be str"
         self._result = value
 
-    def keyPressEvent(self, event: qtG.QKeyEvent):
+    def keyPressEvent(self, event: qtG.QKeyEvent) -> None:
         """Handles key presses to prevent the PopContainer being closed by anything other than a button
 
         Args:
@@ -6548,7 +6558,7 @@ class PopContainer(_qtpyBase_Control):
     _allow_close: bool = False
     _result: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Configures the dialogue for use"""
 
         _qtpyBase_Control.__post_init__(self)
@@ -6606,7 +6616,7 @@ class PopContainer(_qtpyBase_Control):
 
         return self.dialog.close()
 
-    def closeEvent(self, event: QCloseEvent):
+    def closeEvent(self, event: QCloseEvent) -> None:
         """Method called when the dialog is closed.
 
         Args:
@@ -6652,7 +6662,7 @@ class PopContainer(_qtpyBase_Control):
 
         return self._result
 
-    def set_result(self, result: str):
+    def set_result(self, result: str) -> None:
         """Sets the result of the dialogs operations into the _result variable.
 
         Args:
@@ -6732,7 +6742,7 @@ class PopContainer(_qtpyBase_Control):
 class HBoxContainer(_Container):
     """A HBoxContainer is a container that lays out its children in a horizontal row. A subclass of _Container."""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor for the HBoxContainer that checks arguments and sets instance variables."""
         super().__post_init__()
 
@@ -6764,7 +6774,7 @@ class HBoxContainer(_Container):
 class VBoxContainer(_Container):
     """A VBoxContainer is a container that lays out its children vertically. A subclass of _Container."""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__post_init__()
 
     def add_control(
@@ -6799,7 +6809,7 @@ class Checkbox(_qtpyBase_Control):
     checked: bool = False
     # tristate:bool = False #Not enabled for now
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor for the Checkbox that checks arguments and sets instance variables."""
         super().__post_init__()
 
@@ -6847,7 +6857,7 @@ class Checkbox(_qtpyBase_Control):
         self._widget: qtW.QCheckBox
         return self._widget.isChecked()
 
-    def button_toggle(self, value: bool = True):
+    def button_toggle(self, value: bool = True) -> None:
         """Toggles the checkbox on or off.
 
         Args:
@@ -6883,7 +6893,7 @@ class Checkbox(_qtpyBase_Control):
 
         return self.button_checked
 
-    def value_set(self, value: bool):
+    def value_set(self, value: bool) -> None:
         """Toggles the checkbox on or off.
 
         Args:
@@ -6932,7 +6942,7 @@ class ComboBox(_qtpyBase_Control):
         else:
             return True
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor event that checks arguments and sets internal variables."""
         """Checks class parameter types"""
         super().__post_init__()
@@ -6977,14 +6987,6 @@ class ComboBox(_qtpyBase_Control):
                         qtG.QPixmap,
                     ),
                 ), f"{item.icon=}. Must be None | str | QIcon | QPixmap"
-
-                # assert isinstance(
-                #     item.user_data,
-                #     (type(None), str, int, float, bool, bytes, list, tuple,_qtpyBase_Control),
-                # ) or hasattr(item.user_data, "__dict__"), (
-                #     f"combo item {item.user_data=} {type(item.user_data)=} must be None | str | int | float | "
-                #     f"bool|list|tuple "
-                # )
 
         elif isinstance(self.items, str):
             if pathlib.Path(self.items).exists():
@@ -7048,7 +7050,7 @@ class ComboBox(_qtpyBase_Control):
 
         return widget
 
-    def display_width_set(self, display_width: int):
+    def display_width_set(self, display_width: int) -> None:
         """
         The function sets the width of the combobox to the width of the text plus the width of the arrow
 
@@ -7075,7 +7077,7 @@ class ComboBox(_qtpyBase_Control):
 
     def icon_set(
         self, combo_index: int, icon: Union[str, qtG.QIcon, qtG.QPixmap]
-    ):  # noqa LISKOV != good
+    ) -> None:  # noqa LISKOV != good
         """Sets an icon at a given row in the combo box
 
         Args:
@@ -7295,7 +7297,7 @@ class ComboBox(_qtpyBase_Control):
         else:
             AssertionError(f"{items=}. Must be list of str | list of COMBO_ITEM")
 
-    def print_all_to_console(self):
+    def print_all_to_console(self) -> None:
         """Debug method - prints items to console"""
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
@@ -7307,7 +7309,7 @@ class ComboBox(_qtpyBase_Control):
 
         print(f"{combo_items=}")
 
-    def select_index(self, select_index):
+    def select_index(self, select_index) -> None:
         """Scrolls to an index in the combobox and  sets the current index of the widget to the select_index argument
 
         Args:
@@ -7422,7 +7424,7 @@ class ComboBox(_qtpyBase_Control):
                 user_data=user_data,
             )
 
-    def value_remove(self, index: int):
+    def value_remove(self, index: int) -> None:
         """Remove an item from the combobox a the given index.
 
         Args:
@@ -7441,7 +7443,7 @@ class ComboBox(_qtpyBase_Control):
 
         self._widget.removeItem(index)
 
-    def value_set(self, value: Union[str, Combo_Data]):  # noqa LISKOV != good
+    def value_set(self, value: Union[str, Combo_Data]) -> None:  # noqa LISKOV != good
         """Sets a value in the dropdown and scrolls to that value. if COMBO_DATA index is -1 then data and display
         values must match for scroll to happen
 
@@ -7508,7 +7510,7 @@ class _calendar_widget(qtW.QCalendarWidget):
     date
     """
 
-    def __init__(self, parent: "Dateedit"):
+    def __init__(self, parent: "Dateedit") -> None:
         """Constructor for the calendar widget.
 
         Args:
@@ -7577,7 +7579,7 @@ class _Custom_Dateedit(qtW.QWidget):
 
     min_date = qtC.QDate(1, 1, 100)  # qtC.QDate(100, 1, 1)
 
-    def __init__(self, parent: qtW.QWidget = None):
+    def __init__(self, parent: qtW.QWidget = None) -> None:
         """Constructor for the custom date edit widget that validates arguments and sets instance variables.
             Sets the input mask for the lineEdit widget to the mask returned by the get_mask() function
 
@@ -7618,12 +7620,12 @@ class _Custom_Dateedit(qtW.QWidget):
 
         self.lineEdit.setInputMask(self.get_mask())
 
-    def clear(self):
+    def clear(self) -> None:
         """Clears the text in the lineEdit widget"""
         self.lineEdit.clear()
         self.lineEdit.setText("")
 
-    def editingFinished(self):
+    def editingFinished(self) -> None:
         # Clears the text if the date is not valid when losing focus this will only work if *NO* validator is set
         if self.calendar.isVisible():
             return None
@@ -7638,7 +7640,7 @@ class _Custom_Dateedit(qtW.QWidget):
         """
         return self._date_format
 
-    def setFormat(self, format: str):
+    def setFormat(self, format: str) -> None:
         """Takes a date format string and sets the date format and edit mask for the date picker
 
         Args:
@@ -7692,7 +7694,7 @@ class _Custom_Dateedit(qtW.QWidget):
 
         return qtC.QDate.fromString(self.text(), self.format())
 
-    def setDate(self, date: qtC.QDate):
+    def setDate(self, date: qtC.QDate) -> None:
         """Sets the date of the calendar widget to the date passed in
 
         Args:
@@ -7764,11 +7766,11 @@ class _Custom_Dateedit(qtW.QWidget):
         self.clear()
         return False
 
-    def hidePopup(self):
+    def hidePopup(self) -> None:
         """Hides the calendar widget when the user clicks on the calendar icon"""
         self.calendar.hide()
 
-    def showPopup(self):
+    def showPopup(self) -> None:
         """Shows the calendar widget when the user clicks on the calendar icon"""
         pos = self.lineEdit.mapToGlobal(self.lineEdit.rect().bottomLeft())
         pos += qtC.QPoint(0, 1)
@@ -7795,7 +7797,7 @@ class _Custom_Dateedit(qtW.QWidget):
             self.dropDownButton.setDown(True)
         return super().eventFilter(source, event)
 
-    def keyPressEvent(self, event: qtC.QEvent):
+    def keyPressEvent(self, event: qtC.QEvent) -> None:
         """Processes key press events for the date picker.
             - If the user presses the down arrow or F4, the calendar will pop up. If the user presses the delete or
             backspace key,the date will be cleared
@@ -7825,7 +7827,7 @@ class Dateedit(_qtpyBase_Control):
     MINDATE = qtC.QDate(100, 1, 1)
     NODATE = qtC.QDate(1, 1, 1)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor for the Dateedit control that validates arguments and sets instance variables.
 
         - The function checks the `format` and `date` properties of the `DatePicker` class.
@@ -8049,7 +8051,7 @@ class Dateedit(_qtpyBase_Control):
             # self.clear()
         return 1
 
-    def clear(self, default_text: str = "-"):
+    def clear(self, default_text: str = "-") -> None:
         """Clears the date displayed  - has to use a nasty hack to clear the date.
             If default_text = "-" then nothing is displayed in the date edit.
             otherwise the default text is displayed in the date edit
@@ -8219,7 +8221,9 @@ class Dateedit(_qtpyBase_Control):
 
         return self.date_get(date_format, date_tuple)
 
-    def value_set(self, date: str, date_format: str = ""):  # noqa LISKOV != good
+    def value_set(
+        self, date: str, date_format: str = ""
+    ) -> None:  # noqa LISKOV != good
         """Sets the date
 
         Args:
@@ -8247,7 +8251,7 @@ class FolderView(_qtpyBase_Control):
     header_font: Optional[Font] = None
     click_expand: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor event that validates arguments and sets instance variables"""
         super().__post_init__()
 
@@ -8560,7 +8564,7 @@ class FolderView(_qtpyBase_Control):
         else:
             return 1
 
-    def change_folder(self, folder):
+    def change_folder(self, folder) -> None:
         """Changes the root folder for the directory view, clearing the view in the process.
 
         Args:
@@ -8597,7 +8601,7 @@ class FolderView(_qtpyBase_Control):
 
         return self._Value
 
-    def value_set(self, value: str):
+    def value_set(self, value: str) -> None:
         """Sets the text value of the selected node
 
         Args:
@@ -8620,7 +8624,7 @@ class _ClearTypingBufferEvent(qtC.QEvent):
 
     EVENT_TYPE = qtC.QEvent.Type(qtC.QEvent.registerEventType())
 
-    def __init__(self, data: any):
+    def __init__(self, data: any) -> None:
         """
         Constructs a _ClearTypingBufferEvent object.
 
@@ -8704,7 +8708,7 @@ class _Grid_TableWidget(qtW.QTableWidget):
             return True
         return qtW.QTableView.eventFilter(self, obj, event)
 
-    def focusInEvent(self, event: qtG.QFocusEvent):
+    def focusInEvent(self, event: qtG.QFocusEvent) -> None:
         assert isinstance(event, qtG.QFocusEvent), f"{event=} must be a QFocusEvent"
 
         # This is here to select the text when focus is setinto the cell by row_scroll_to
@@ -8902,7 +8906,7 @@ class Grid(_qtpyBase_Control):
         INT = 4
         STR = 5
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Sets up the grid control. Checks arguments and sets up the grid instance variables"""
 
         super().__post_init__()  # Checks non grid specific arguments
@@ -9583,7 +9587,7 @@ class Grid(_qtpyBase_Control):
 
         return row
 
-    def row_delete(self, row: int):
+    def row_delete(self, row: int) -> None:
         """Deletes a row
 
         Args:
@@ -9657,7 +9661,7 @@ class Grid(_qtpyBase_Control):
                     return 1
         return -1
 
-    def row_insert(self, row: int, scroll_to: bool = True):
+    def row_insert(self, row: int, scroll_to: bool = True) -> None:
         """Inserts a row at the given row index. If row is > number of rows then a new row is inserted.
 
         Args:
@@ -9680,7 +9684,7 @@ class Grid(_qtpyBase_Control):
         if scroll_to:
             self.select_row(row=row)
 
-    def select_col(self, row: int, col: int):
+    def select_col(self, row: int, col: int) -> None:
         self._widget: qtW.QTableWidget
 
         if self._widget is None:
@@ -9698,7 +9702,7 @@ class Grid(_qtpyBase_Control):
 
         self._widget.setCurrentCell(row, col)
 
-    def row_scroll_to(self, row: int, col: int = -1):
+    def row_scroll_to(self, row: int, col: int = -1) -> None:
         """
         Scrolls to the row.
 
@@ -9706,7 +9710,7 @@ class Grid(_qtpyBase_Control):
         """
         self.select_row(row, col)
 
-    def select_row(self, row: int, col: int = -1):
+    def select_row(self, row: int, col: int = -1) -> None:
         """Scrolls to the row.
 
         Args:
@@ -9745,7 +9749,7 @@ class Grid(_qtpyBase_Control):
 
         self._widget.setFocus()
 
-    def userdata_set(self, row: int = -1, col: int = -1, user_data: any = None):
+    def userdata_set(self, row: int = -1, col: int = -1, user_data: any = None) -> None:
         """
         Sets the user data stored on the given column referred to by row and col.
         If row is not specified, it sets the user data stored in the current row .
@@ -9759,7 +9763,7 @@ class Grid(_qtpyBase_Control):
         """
 
         # ====== Helper
-        def _set_user_data(user_data: any, item: qtW.QTableWidgetItem):
+        def _set_user_data(user_data: any, item: qtW.QTableWidgetItem) -> None:
             """
             Sets the user data on the given item.
 
@@ -10004,7 +10008,7 @@ class Grid(_qtpyBase_Control):
         return item_data.previous_value if item_data is not None else None
 
     @overload
-    def value_set(self, value: bool, row: int, col: int, user_data: any) -> NoReturn:
+    def value_set(self, value: bool, row: int, col: int, user_data: any) -> None:
         ...
 
     @overload
@@ -10026,15 +10030,15 @@ class Grid(_qtpyBase_Control):
         ...
 
     @overload
-    def value_set(self, value: float, row: int, col: int, user_data: any) -> NoReturn:
+    def value_set(self, value: float, row: int, col: int, user_data: any) -> None:
         ...
 
     @overload
-    def value_set(self, value: int, row: int, col: int, user_data: any) -> NoReturn:
+    def value_set(self, value: int, row: int, col: int, user_data: any) -> None:
         ...
 
     @overload
-    def value_set(self, value: str, row: int, col: int, user_data: any) -> NoReturn:
+    def value_set(self, value: str, row: int, col: int, user_data: any) -> None:
         ...
 
     def value_set(
@@ -10183,7 +10187,7 @@ class Grid(_qtpyBase_Control):
 
     def row_widget_set(
         self, row: int, col: int, widget: _qtpyBase_Control, group_text: str = ""
-    ):
+    ) -> None:
         """Sets the widget at the specified row and column
 
         Args:
@@ -10317,7 +10321,9 @@ class Grid(_qtpyBase_Control):
     def _data_type_decode(self, data_type: _Data_Type, value: str) -> qtC.QDateTime:
         ...
 
-    def _data_type_decode(self, data_type: _Data_Type, value: str):
+    def _data_type_decode(
+        self, data_type: _Data_Type, value: str
+    ) -> qtC.QDate | qtC.QDateTime | float | int | str | bool:
         """Casts a string value to the selected data_type - Ref: _data_type_encode
 
         Args:
@@ -10412,9 +10418,9 @@ class _Resizable_Rectangle(qtW.QGraphicsRectItem):
         "TOP_LEFT,TOP_MIDDLE,TOP_RIGHT,MIDDLE_LEFT,MIDDLE_RIGHT,BOTTOM_LEFT,BOTTOM_MIDDLE,BOTTOM_RIGHT,NONE",
     )
 
-    colour = ""
-    handle_size = +8.0
-    handle_space = -4.0
+    colour: str = ""
+    handle_size: float = +8.0
+    handle_space: float = -4.0
 
     handle_cursors = {
         HANDLE.TOP_LEFT: qtC.Qt.SizeFDiagCursor,
@@ -10467,7 +10473,7 @@ class _Resizable_Rectangle(qtW.QGraphicsRectItem):
             if value.contains(point):
                 return key
 
-    def hoverMoveEvent(self, event: qtW.QGraphicsSceneHoverEvent):
+    def hoverMoveEvent(self, event: qtW.QGraphicsSceneHoverEvent) -> None:
         """
         Processes mouse hovering over the shape when not pressed.
 
@@ -10480,7 +10486,7 @@ class _Resizable_Rectangle(qtW.QGraphicsRectItem):
         self.setCursor(cursor)
         super().hoverMoveEvent(event)
 
-    def hoverLeaveEvent(self, event: qtW.QGraphicsSceneHoverEvent):
+    def hoverLeaveEvent(self, event: qtW.QGraphicsSceneHoverEvent) -> None:
         """
         Processes the hovering mouse leaving the shape when not pressed .
 
@@ -10490,7 +10496,7 @@ class _Resizable_Rectangle(qtW.QGraphicsRectItem):
         self.setCursor(qtC.Qt.ArrowCursor)
         super().hoverLeaveEvent(event)
 
-    def mousePressEvent(self, event: qtW.QGraphicsSceneMouseEvent):
+    def mousePressEvent(self, event: qtW.QGraphicsSceneMouseEvent) -> None:
         """
         Process a mouse button been pressed over the shape.
 
@@ -10515,7 +10521,7 @@ class _Resizable_Rectangle(qtW.QGraphicsRectItem):
         self.click_rect = rect
         super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, event: qtW.QGraphicsSceneMouseEvent):
+    def mouseMoveEvent(self, event: qtW.QGraphicsSceneMouseEvent) -> None:
         """
         Processes mouse movements when the button is pressed
 
@@ -10591,7 +10597,7 @@ class _Resizable_Rectangle(qtW.QGraphicsRectItem):
             self.setRect(rect)
             self.update_handles_pos()
 
-    def mouseReleaseEvent(self, event: qtW.QGraphicsSceneMouseEvent):
+    def mouseReleaseEvent(self, event: qtW.QGraphicsSceneMouseEvent) -> None:
         """
         Processed the released mouse button event
 
@@ -10664,7 +10670,7 @@ class _Resizable_Rectangle(qtW.QGraphicsRectItem):
             handle_size,
         )
 
-    def interactive_resize(self, mouse_pos: qtC.QPointF):
+    def interactive_resize(self, mouse_pos: qtC.QPointF) -> None:
         """
         Performs interactive resize.
 
@@ -10842,7 +10848,7 @@ class Image(_qtpyBase_Control):
     _pix_height: int = -1
     _user_items: dict[str:_Resizable_Rectangle] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor that checks arguments and sets defaults"""
         super().__post_init__()
 
@@ -10936,7 +10942,7 @@ class Image(_qtpyBase_Control):
 
         return widget
 
-    def clear(self):
+    def clear(self) -> None:
         """Clears the visible items from the image"""
 
         self._widget: _Image
@@ -11024,7 +11030,7 @@ class Image(_qtpyBase_Control):
         height: int = -1,
         colour: str = "red",
         visible: bool = True,
-    ):
+    ) -> None:
         """Draws a rectangle on the currently loaded image
 
         Args:
@@ -11081,7 +11087,7 @@ class Image(_qtpyBase_Control):
 
     def rectangle_show(
         self, rect_id: str, visible: bool, suppress_rect_check: bool = False
-    ):
+    ) -> None:
         """Show/Hides a rectangle that has been placed into the image depending on the value of visible.
 
         Args:
@@ -11158,7 +11164,7 @@ class Image(_qtpyBase_Control):
                 )
         return changed_rectangles
 
-    def rectangle_id_change(self, old_id: str, new_id: str):
+    def rectangle_id_change(self, old_id: str, new_id: str) -> None:
         """Updates the rectangle id
 
         Args:
@@ -11244,7 +11250,7 @@ class Image(_qtpyBase_Control):
         """
         return self._image_file
 
-    def image_cache_set(self, image: qtG.QPixmap):
+    def image_cache_set(self, image: qtG.QPixmap) -> None:
         """Sets a cached image - used to speed things up if we do not want to load the image again
 
         Args:
@@ -11621,7 +11627,7 @@ class Image(_qtpyBase_Control):
 class Label(_qtpyBase_Control):
     """Instantiates a label widget."""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__post_init__()
 
     def _create_widget(
@@ -11689,7 +11695,7 @@ class LCD(_qtpyBase_Control):
     digit_count: int = 8
     txt_align: Align = Align.RIGHT
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor that checks parameters and sets instance variables"""
 
         assert isinstance(self.digit_count, int), f"{self.digit_count=}. Must be int"
@@ -11767,8 +11773,8 @@ class _Line_Edit(qtW.QLineEdit):
 
     event_ref = None
     owner_widget = None
-    
-    def __init__(self, parent, owner_widget):
+
+    def __init__(self, parent, owner_widget) -> None:
         """Constructor that checks parameters and sets instance variables
         Args:
             parent: The parent widget.
@@ -11809,11 +11815,11 @@ class _Line_Edit(qtW.QLineEdit):
 
         return True
 
-    def focusInEvent(self, *args):
+    def focusInEvent(self, *args) -> None:
         """Takes the focusInEvent from the QLineEdit and passes it to the owner QWidget"""
         self.owner_widget.focusInEvent(args)
 
-    def focusOutEvent(self, *args):
+    def focusOutEvent(self, *args) -> None:
         """Takes the focusOutEvent from the QLineEdit and passes it to the owner QWidget"""
         # print(f"@@@@@@> foe {args=}")
         self.owner_widget.focusOutEvent(args)
@@ -11835,7 +11841,7 @@ class LineEdit(_qtpyBase_Control):
     label_align: Align = Align.RIGHT
     widget_align: Align = Align.LEFT
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor that checks parameters and sets instance variables"""
         super().__post_init__()
 
@@ -11994,7 +12000,7 @@ class LineEdit(_qtpyBase_Control):
 
         return 1
 
-    def input_mask_set(self, input_mask):
+    def input_mask_set(self, input_mask) -> None:
         """Set the input mask.
 
         Args:
@@ -12033,7 +12039,7 @@ class LineEdit(_qtpyBase_Control):
         """
         return self.char_length
 
-    def max_chars_set(self, max_chars: int):
+    def max_chars_set(self, max_chars: int) -> None:
         """Sets the `char_length`  property and checks if is > 0 and < MAX_CHARS.
 
         Args:
@@ -12079,7 +12085,7 @@ class LineEdit(_qtpyBase_Control):
         else:
             return self._widget.text()
 
-    def value_set(self, value: str):
+    def value_set(self, value: str) -> None:
         """Set the LineEdit widget text to the value string
 
         Args:
@@ -12116,7 +12122,7 @@ class Menu_Element(_qtpyBase_Control):
 
     separator: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor that checks parameters and sets defaults"""
         super().__post_init__()
 
@@ -12135,7 +12141,7 @@ class _Menu_Entry(_qtpyBase_Control):
     element_items: dict[str, any] = field(default_factory=dict)
     menu: Union[None, qtG.QAction] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor that checks parameters and sets defaults"""
 
         assert isinstance(
@@ -12166,7 +12172,7 @@ class _Menu_Entry(_qtpyBase_Control):
 class Menu(_qtpyBase_Control):
     """Instantiates a Menu and associated properties"""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor that checks parameters and sets properties"""
         super().__post_init__()
 
@@ -12219,10 +12225,12 @@ class Menu(_qtpyBase_Control):
                     self.tooltip_set(_menu[key].tag, _menu[key].element.tooltip)
 
             if len(_menu[key].element_items) > 0:
-                parent_item = self._element_find(
+                parent_item: _Menu_Entry = self._element_find(
                     _menu[key].parent_tag, self._menu_items
                 )
-                menu_item = self._element_find(_menu[key].tag, self._menu_items)
+                menu_item: _Menu_Entry = self._element_find(
+                    _menu[key].tag, self._menu_items
+                )
 
                 if menu_item.guiwidget_get is None:  # Happens with sub-menus
                     menu_item.guiwidget_set(
@@ -12301,7 +12309,7 @@ class Menu(_qtpyBase_Control):
                         )
         return self._widget
 
-    def element_add(self, parent_tag: str, menu_element: Menu_Element):
+    def element_add(self, parent_tag: str, menu_element: Menu_Element) -> None:
         """Adds a menu element to the menu object
 
         Args:
@@ -12316,7 +12324,7 @@ class Menu(_qtpyBase_Control):
             menu_element, Menu_Element
         ), f"{menu_element=}. Must be an instance of Menu_Element"
 
-        menu_item = self._element_find(menu_element.tag, self._menu_items)
+        menu_item: _Menu_Entry = self._element_find(menu_element.tag, self._menu_items)
 
         assert (
             menu_item.parent_tag == "" and menu_item.tag == ""
@@ -12361,7 +12369,7 @@ class Menu(_qtpyBase_Control):
             if menu_item[key].tag == search_tag:
                 return menu_item[key]
             elif len(menu_item[key].element_items) > 0:
-                menu_element = self._element_find(
+                menu_element: _Menu_Entry = self._element_find(
                     search_tag, menu_item[key].element_items
                 )
 
@@ -12372,7 +12380,7 @@ class Menu(_qtpyBase_Control):
 
     def print_menu(
         self, menu_item: Union[dict[str, _Menu_Entry], None] = None, delim: str = "*"
-    ):
+    ) -> None:
         """Prints menu structure to command line appropriately indented with leading '*'.  For debug purposes
 
         Args:
@@ -12399,13 +12407,15 @@ class Menu(_qtpyBase_Control):
             isinstance(tag, str) and tag.strip() != ""
         ), f"{tag=}. Must be a non-empty str"
 
-        menu_item = self._element_find(tag, self._menu_items)
+        menu_item: _Menu_Entry = self._element_find(tag, self._menu_items)
 
         assert (
             menu_item.parent_tag.strip() != "" and menu_item.tag.strip() != ""
         ), f"menu item <{tag=}> not found!"
 
-        parent_item = self._element_find(menu_item.parent_tag, self._menu_items)
+        parent_item: _Menu_Entry = self._element_find(
+            menu_item.parent_tag, self._menu_items
+        )
 
         assert menu_item.guiwidget_get is not None, f"Menu Not Set On tag <{tag}>!"
 
@@ -12430,13 +12440,15 @@ class Menu(_qtpyBase_Control):
         ), f"{tag=}. Must be a non-empty str"
         assert isinstance(checked, bool), f"{checked=}. Must be bool"
 
-        menu_item = self._element_find(tag, self._menu_items)
+        menu_item: _Menu_Entry = self._element_find(tag, self._menu_items)
 
         assert (
             menu_item.parent_tag.strip() != "" and menu_item.tag.strip() != ""
         ), f"menu item <{tag=}> not found!"
 
-        parent_item = self._element_find(menu_item.parent_tag, self._menu_items)
+        parent_item: _Menu_Entry = self._element_find(
+            menu_item.parent_tag, self._menu_items
+        )
 
         assert menu_item.guiwidget_get is not None, f"Menu Not Set On tag <{tag}>!"
 
@@ -12464,13 +12476,15 @@ class Menu(_qtpyBase_Control):
             isinstance(tooltip, str) and tooltip.strip() != ""
         ), f"{tooltip=}. Must be a non-empty str"
 
-        menu_item = self._element_find(tag, self._menu_items)
+        menu_item: _Menu_Entry = self._element_find(tag, self._menu_items)
 
         assert (
             menu_item.parent_tag.strip() != "" and menu_item.tag.strip() != ""
         ), f"menu item <{tag=}> not found!"
 
-        parent_item = self._element_find(menu_item.parent_tag, self._menu_items)
+        parent_item: _Menu_Entry = self._element_find(
+            menu_item.parent_tag, self._menu_items
+        )
 
         assert menu_item.guiwidget_get is not None, f"Menu Not Set On tag <{tag}>!"
 
@@ -12501,13 +12515,15 @@ class Menu(_qtpyBase_Control):
 
         assert isinstance(visible, bool), f"{visible=}. Must be a bool"
 
-        menu_item = self._element_find(tag, self._menu_items)
+        menu_item: _Menu_Entry = self._element_find(tag, self._menu_items)
 
         assert (
             menu_item.parent_tag.strip() != "" and menu_item.tag.strip() != ""
         ), f"menu item <{tag=}> not found!"
 
-        parent_item = self._element_find(menu_item.parent_tag, self._menu_items)
+        parent_item: _Menu_Entry = self._element_find(
+            menu_item.parent_tag, self._menu_items
+        )
 
         assert menu_item.guiwidget_get is not None, f"Menu Not Set On <{tag=}>!"
 
@@ -12529,7 +12545,7 @@ class RadioButton(_qtpyBase_Control):
 
     checked: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor that checks parameters and sets properties"""
 
         super().__post_init__()
@@ -12592,7 +12608,7 @@ class RadioButton(_qtpyBase_Control):
 
         return self._widget.isChecked()
 
-    def button_toggle(self, value: bool = True):
+    def button_toggle(self, value: bool = True) -> None:
         """Set the radiobutton to checked or unchecked
 
         Args:
@@ -12633,7 +12649,7 @@ class RadioButton(_qtpyBase_Control):
 class Spacer(_qtpyBase_Control):
     """Instantiates a spacer widget and sets the properties"""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor that checks parameters and sets properties"""
         super().__post_init__()
 
@@ -12688,7 +12704,7 @@ class Switch(_qtpyBase_Control):
     txt_pad_size: int = 0
     txt_pad_unit: str = "c"  # c - Char, p - Pixel
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor that checks parameters and sets properties"""
         super().__post_init__()
 
@@ -12746,7 +12762,7 @@ class Switch(_qtpyBase_Control):
 
         return widget
 
-    def track_colour_set(self, enable: str, disable: str):
+    def track_colour_set(self, enable: str, disable: str) -> None:
         """Sets the colour of the track.
 
         Args:
@@ -12769,7 +12785,7 @@ class Switch(_qtpyBase_Control):
         self._widget: _Switch
         return self._widget.isChecked()
 
-    def button_toggle(self, value: bool = True):
+    def button_toggle(self, value: bool = True) -> None:
         """Set the widget's checked state
 
         Args:
@@ -12791,7 +12807,7 @@ class Switch(_qtpyBase_Control):
         """
         return self.button_checked
 
-    def value_set(self, value: bool):
+    def value_set(self, value: bool) -> None:
         """Sets the Checked state of the Switch.
 
         Args:
@@ -12810,7 +12826,7 @@ class _Switch(qtW.QAbstractButton):
         parent: Optional[qtW.QWidget] = None,
         track_radius: int = 9,
         thumb_radius: int = 9,
-    ):
+    ) -> None:
         """Constructor for the _Switch and associated properties.
 
         Args:
@@ -12880,7 +12896,7 @@ class _Switch(qtW.QAbstractButton):
 
         return self._offset
 
-    def write_offset(self, value: int):
+    def write_offset(self, value: int) -> None:
         """Sets offset value.
 
         Args:
@@ -12904,7 +12920,7 @@ class _Switch(qtW.QAbstractButton):
             2 * self._track_radius + 2 * self._margin,
         )
 
-    def setChecked(self, checked: bool):
+    def setChecked(self, checked: bool) -> None:
         """Sets the checked  state of the Switch
 
         Args:
@@ -12914,7 +12930,7 @@ class _Switch(qtW.QAbstractButton):
 
         self.write_offset(self._end_offset[checked]())
 
-    def resizeEvent(self, event: qtG.QResizeEvent):
+    def resizeEvent(self, event: qtG.QResizeEvent) -> None:
         """Handles the resize event.
 
         Calls the superclasses resizeEvent function, then calls the write_offset function with the appropriate offset
@@ -12929,7 +12945,7 @@ class _Switch(qtW.QAbstractButton):
 
     def paintEvent(
         self, event: qtC.QEvent
-    ):  # pylint: disable=invalid-name, unused-argument
+    ) -> None:  # pylint: disable=invalid-name, unused-argument
         """Handles the paint event to paint the switch widget
 
         Args:
@@ -12987,7 +13003,9 @@ class _Switch(qtW.QAbstractButton):
             self._thumb_text[self.isChecked()],
         )
 
-    def mouseReleaseEvent(self, event: qtG.QMouseEvent):  # pylint: disable=invalid-name
+    def mouseReleaseEvent(
+        self, event: qtG.QMouseEvent
+    ) -> None:  # pylint: disable=invalid-name
         """Handles mouse release event and performs a switch animation when the left button is released.
 
         Args:
@@ -13003,7 +13021,9 @@ class _Switch(qtW.QAbstractButton):
             self.anim.setEndValue(self._end_offset[self.isChecked()]())
             self.anim.start()
 
-    def enterEvent(self, event: qtG.QEnterEvent):  # pylint: disable=invalid-name
+    def enterEvent(
+        self, event: qtG.QEnterEvent
+    ) -> None:  # pylint: disable=invalid-name
         """Handles the mouse enter event.
 
         Changes the cursor to a pointing hand when the mouse enters the widget.
@@ -13014,7 +13034,7 @@ class _Switch(qtW.QAbstractButton):
         self.setCursor(qtC.Qt.PointingHandCursor)
         super().enterEvent(event)
 
-    def track_colour_set(self, enable: str, disable: str):
+    def track_colour_set(self, enable: str, disable: str) -> None:
         """Sets the colour of the switch track.
 
         Args:
@@ -13048,7 +13068,7 @@ class TextEdit(_qtpyBase_Control):
     max_chars: int = -1
     word_wrap: bool = True
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor checks parameters and sets associated properties"""
         super().__post_init__()
 
@@ -13112,7 +13132,7 @@ class TextEdit(_qtpyBase_Control):
 
         return widget
 
-    def _check_max_chars(self):
+    def _check_max_chars(self) -> None:
         """Checks the max characters and sets the widget to read only if max characters is reached"""
         self._widget: qtW.QTextEdit
 
@@ -13122,7 +13142,7 @@ class TextEdit(_qtpyBase_Control):
             self._widget.setText(self._widget.toPlainText()[0 : self.max_chars])
             self._widget.moveCursor(qtG.QTextCursor.End)
 
-    def value_set(self, value: str = ""):
+    def value_set(self, value: str = "") -> None:
         """Sets the text of the widget to the string value
 
         Args:
@@ -13187,7 +13207,7 @@ class Timeedit(_qtpyBase_Control):
         sec: int
         msec: int
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor checks argument and sets associated properties"""
 
         super().__post_init__()
@@ -13252,7 +13272,7 @@ class Timeedit(_qtpyBase_Control):
 
     def _create_widget(
         self, parent_app: QtPyApp, parent: qtW.QWidget, container_tag: str = ""
-    ):
+    ) -> qtW.QWidget:
         if self.height == -1:
             self.height = WIDGET_SIZE.height  # COMBOBOX_SIZE.height
 
@@ -13348,7 +13368,7 @@ class Timeedit(_qtpyBase_Control):
 
         return 1
 
-    def clear(self, default_text: str = "-"):
+    def clear(self, default_text: str = "-") -> None:
         """Clears the displayed value - has to use a nasty hack
 
         If default_text = "-" then nothing is displayed in the date edit.
@@ -13377,7 +13397,7 @@ class Timeedit(_qtpyBase_Control):
             self._widget.setTime(self._widget.minimumTime())
             self._widget.setSpecialValueText(default_text)
 
-    def time_set(self, hour: int = -1, min: int = -1, sec: int = -1, msec: int = -1):
+    def time_set(self, hour: int = -1, min: int = -1, sec: int = -1, msec: int = -1) -> None:
         """Sets the time
 
         if hour == -1 and min == -1 and sec == -1 and msec == -1 then the displayed value is cleared
@@ -13470,7 +13490,7 @@ class Timeedit(_qtpyBase_Control):
 
         return self._widget.time().toString(format)
 
-    def value_set(self, hour: int = 0, min: int = 0, sec: int = 0, msec: int = 0):
+    def value_set(self, hour: int = 0, min: int = 0, sec: int = 0, msec: int = 0) -> None:
         """Sets the time
 
         Args:
@@ -13505,7 +13525,7 @@ class Tab(_qtpyBase_Control):
         enabled: bool = True
         visible: bool = True
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor check parameters ans sets properties"""
 
         super().__post_init__()
@@ -13540,7 +13560,7 @@ class Tab(_qtpyBase_Control):
 
         return widget
 
-    def _create_pages(self):
+    def _create_pages(self) -> None:
         """Creates the tab pages for the Tab widget"""
 
         self._widget: qtW.QTabWidget
@@ -13585,7 +13605,7 @@ class Tab(_qtpyBase_Control):
     def _event_handler(
         self,
         *args,
-    ):
+    ) -> int:
         """Handles events for the Tab widget
 
         Args:
@@ -13813,7 +13833,7 @@ class Tab(_qtpyBase_Control):
 
         return self
 
-    def page_icon_set(self, tag: str, icon: Union[None, str, qtG.QPixmap, qtG.QIcon]):
+    def page_icon_set(self, tag: str, icon: Union[None, str, qtG.QPixmap, qtG.QIcon]) -> None:
         """Sets the tab page icon
 
         Args:
@@ -13846,7 +13866,7 @@ class Tab(_qtpyBase_Control):
 
             self._widget.setTabIcon(self._tab_pages[tag].index, qtG.QIcon(icon))
 
-    def pages_remove_all(self):
+    def pages_remove_all(self) -> None:
         """Removes all the pages from the Tab control"""
         for tab_page in reversed(list(self._tab_pages.values())):
             if tab_page.created:
@@ -13854,7 +13874,7 @@ class Tab(_qtpyBase_Control):
             else:
                 self._tab_pages.pop(tab_page.tag)
 
-    def page_remove(self, tag: str):
+    def page_remove(self, tag: str) -> None:
         """Removes a tab page from the tab widget
 
         Args:
@@ -13909,7 +13929,7 @@ class Tab(_qtpyBase_Control):
 
         return self._widget.isTabVisible(self._tab_pages[tag].index)
 
-    def page_visible_set(self, tag: str, visible: bool):
+    def page_visible_set(self, tag: str, visible: bool) -> None:
         """Sets the visibility of a tab page
 
         Args:
@@ -14006,7 +14026,7 @@ class Treeview(_qtpyBase_Control):
     toplevel_items: Union[list[str], tuple[str, ...]] = ()
     _parent_list: list = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Constructor checks arguments and sets properties"""
 
         super().__post_init__()
@@ -14305,7 +14325,7 @@ class Treeview(_qtpyBase_Control):
                 return 1
         return -1
 
-    def child_checked(self, treeview_path: Union[str, list, tuple], checked: bool):
+    def child_checked(self, treeview_path: Union[str, list, tuple], checked: bool) -> Literal[1, -1]:
         """Checks a child node in the treeview
 
         Args:
@@ -14362,7 +14382,7 @@ class Treeview(_qtpyBase_Control):
                     return 1
         return -1
 
-    def toplevel_add(self, items: Union[list[str], tuple[str, ...]]):
+    def toplevel_add(self, items: Union[list[str], tuple[str, ...]]) -> None:
         """Adds items to the top level of the Tree view.
 
         Args:
@@ -14409,7 +14429,7 @@ class Treeview(_qtpyBase_Control):
 
         return tuple(self._value)
 
-    def value_set(self, value: str, col: int = 0):
+    def value_set(self, value: str, col: int = 0) -> None:
         """Sets the Tree view col value of the current node
 
         Args:
@@ -14428,7 +14448,7 @@ class Treeview(_qtpyBase_Control):
             0, self.trans_str(value) if self.trans_get else str(value)
         )
 
-    def widget_set(self, treeview_path: Union[str, list, tuple], col: int, widget):
+    def widget_set(self, treeview_path: Union[str, list, tuple], col: int, widget) -> None:
         """Takes a treeview path, column number, a widget and sets the widget in the specified node in the Tree view
         TODO Needs fixing
 
@@ -14592,7 +14612,7 @@ class Slider(_qtpyBase_Control):
     single_step: int = 1
     orientation: str = "horizontal"
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initializes the slider object."""
         assert (
             isinstance(self.range_min, int) and self.range_min >= 0
@@ -14658,7 +14678,7 @@ class Slider(_qtpyBase_Control):
         """
         return self._widget.value()
 
-    def value_set(self, value: int):
+    def value_set(self, value: int) -> None:
         """Sets the value of the slider.
 
         Args:
