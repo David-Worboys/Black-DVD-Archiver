@@ -43,8 +43,8 @@ SPUMUX_BUFFER: Final[int] = 43
 
 
 @dataclasses.dataclass(slots=True)
-class Video_Filter_Settings:
-    """Class to hold video filter settings for each file comprising the DVD menu buttons"""
+class Video_File_Settings:
+    """Class to hold video file settings for each file comprising the DVD menu buttons"""
 
     _normalise: bool = True
     _denoise: bool = True
@@ -52,9 +52,10 @@ class Video_Filter_Settings:
     _sharpen: bool = True
     _auto_bright: bool = True
     _button_title: str = ""
+    _menu_button_frame: int = -1
 
     def __post_init__(self) -> None:
-        """Post init to check the filter settings are valid"""
+        """Post init to check the file settings are valid"""
         assert isinstance(self._normalise, bool), f"{self._normalise=}. Must be a bool"
         assert isinstance(self._denoise, bool), f"{self._denoise=}. Must be a bool"
         assert isinstance(
@@ -65,6 +66,11 @@ class Video_Filter_Settings:
             self._auto_bright, bool
         ), f"{self._auto_bright=}. Must be a bool"
         assert isinstance(self._button_title, str), f"{self._button_title=} must be str"
+        assert (
+            isinstance(self._menu_button_frame, int)
+            and self._menu_button_frame == -1
+            or self._menu_button_frame >= 0
+        ), f"{self._menu_button_frame=}. Must be int"
 
     @property
     def filters_off(self) -> bool:
@@ -140,6 +146,17 @@ class Video_Filter_Settings:
 
         self._button_title = value
 
+    @property
+    def menu_button_frame(self) -> int:
+        return self._menu_button_frame
+
+    @menu_button_frame.setter
+    def menu_button_frame(self, value: int) -> None:
+        assert (
+            isinstance(value, int) and value == -1 or value >= 0
+        ), f"{value=}. Must be an int == -1 or >= 0"
+        self._menu_button_frame = value
+
 
 @dataclasses.dataclass(slots=True)
 class Video_Data:
@@ -156,9 +173,9 @@ class Video_Data:
     video_file: str
     video_extension: str
     encoding_info: dict
-    video_filter_settings: Video_Filter_Settings
+    video_file_settings: Video_File_Settings
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert (
             isinstance(self.video_folder, str) and self.video_folder.strip() != ""
         ), f"{self.video_folder=} must be str"
@@ -171,10 +188,9 @@ class Video_Data:
         assert isinstance(
             self.encoding_info, dict
         ), f"{self.encoding_info=}. Must be dict"
-        assert isinstance(self.video_filter_settings, Video_Filter_Settings), (
-            f"{self.video_filter_settings=}. Must be an instance of"
-            " Video_Filter_Settings"
-        )
+        assert isinstance(
+            self.video_file_settings, Video_File_Settings
+        ), f"{self.video_file_settings=}. Must be an instance of Video_Filter_Settings"
 
     @property
     def video_path(self) -> str:
@@ -194,11 +210,10 @@ class Video_Data:
 class File_Def:
     _path: str = ""
     _file_name: str = ""
-    _menu_image_frame: int = -1
-    _mneu_image_file_path: str = ""
+    _menu_image_file_path: str = ""
     _file_info: dict = dataclasses.field(default_factory=dict)
-    _video_filter_settings: Video_Filter_Settings = dataclasses.field(
-        default_factory=Video_Filter_Settings
+    _video_file_settings: Video_File_Settings = dataclasses.field(
+        default_factory=Video_File_Settings
     )
 
     @property
@@ -239,7 +254,7 @@ class File_Def:
 
     @property
     def menu_image_file_path(self) -> str:
-        return self._mneu_image_file_path
+        return self._menu_image_file_path
 
     @menu_image_file_path.setter
     def menu_image_file_path(self, value: str) -> None:
@@ -249,19 +264,7 @@ class File_Def:
 
         assert file_utils.File().file_exists(value), f"{value=}. Path does not exist"
 
-        self._mneu_image_file_path = value
-
-    @property
-    def menu_image_frame(self) -> int:
-        return self._menu_image_frame
-
-    @menu_image_frame.setter
-    def menu_image_frame(self, value: int) -> None:
-        assert (
-            isinstance(value, int) and value >= 0
-        ), f"{value=}. Must be a non-negative integer"
-
-        self._menu_image_frame = value
+        self._menu_image_file_path = value
 
     @property
     def file_path(self) -> str:
@@ -272,16 +275,16 @@ class File_Def:
         return file_utils.File().file_join(self.path, self.file_name)
 
     @property
-    def video_filter_settings(self) -> Video_Filter_Settings:
-        return self._video_filter_settings
+    def video_file_settings(self) -> Video_File_Settings:
+        return self._video_file_settings
 
-    @video_filter_settings.setter
-    def video_filter_settings(self, value: Video_Filter_Settings) -> None:
+    @video_file_settings.setter
+    def video_file_settings(self, value: Video_File_Settings) -> None:
         assert isinstance(
-            value, Video_Filter_Settings
+            value, Video_File_Settings
         ), f"{value=}. Must be an instance Video_Filter_Settings"
 
-        self._video_filter_settings = value
+        self._video_file_settings = value
 
 
 @dataclasses.dataclass
@@ -917,7 +920,7 @@ class DVD:
                     ),
                 )
 
-            if video_file.video_filter_settings.filters_off:
+            if video_file.video_file_settings.filters_off:
                 video_filter_options = [
                     "-vf",  # set video filters,
                     f" {black_box_filter}",  # video filters applied
@@ -925,19 +928,19 @@ class DVD:
             else:
                 video_filter_options = []
 
-                if video_file.video_filter_settings.normalise:
+                if video_file.video_file_settings.normalise:
                     video_filter_options.append(normalise_video_filter)
 
-                if video_file.video_filter_settings.denoise:
+                if video_file.video_file_settings.denoise:
                     video_filter_options.append(video_denoise_filter)
 
-                if video_file.video_filter_settings.white_balance:
+                if video_file.video_file_settings.white_balance:
                     video_filter_options.append(color_correct_filter)
 
-                if video_file.video_filter_settings.sharpen:
+                if video_file.video_file_settings.sharpen:
                     video_filter_options.append(usharp_filter)
 
-                if video_file.video_filter_settings.auto_bright:
+                if video_file.video_file_settings.auto_bright:
                     video_filter_options.append(auto_bright)
 
                 video_filter_options.append(black_box_filter)
@@ -2287,13 +2290,13 @@ class DVD:
                 return -1, f"No video frame count found for {video_file.file_info}"
 
             if (
-                video_file.menu_image_frame == -1
+                video_file.video_file_settings.menu_button_frame == -1
             ):  # No frame number provided, pick a random frame
                 menu_image_frame = randint(
                     1, video_file.file_info["video_frame_count"][1]
                 )
             else:
-                menu_image_frame = video_file.menu_image_frame
+                menu_image_frame = video_file.video_file_settings.menu_button_frame
 
             if menu_image_frame > video_file.file_info["video_frame_count"][1]:
                 return (

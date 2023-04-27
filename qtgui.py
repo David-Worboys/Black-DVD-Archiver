@@ -13397,7 +13397,9 @@ class Timeedit(_qtpyBase_Control):
             self._widget.setTime(self._widget.minimumTime())
             self._widget.setSpecialValueText(default_text)
 
-    def time_set(self, hour: int = -1, min: int = -1, sec: int = -1, msec: int = -1) -> None:
+    def time_set(
+        self, hour: int = -1, min: int = -1, sec: int = -1, msec: int = -1
+    ) -> None:
         """Sets the time
 
         if hour == -1 and min == -1 and sec == -1 and msec == -1 then the displayed value is cleared
@@ -13490,7 +13492,9 @@ class Timeedit(_qtpyBase_Control):
 
         return self._widget.time().toString(format)
 
-    def value_set(self, hour: int = 0, min: int = 0, sec: int = 0, msec: int = 0) -> None:
+    def value_set(
+        self, hour: int = 0, min: int = 0, sec: int = 0, msec: int = 0
+    ) -> None:
         """Sets the time
 
         Args:
@@ -13833,7 +13837,9 @@ class Tab(_qtpyBase_Control):
 
         return self
 
-    def page_icon_set(self, tag: str, icon: Union[None, str, qtG.QPixmap, qtG.QIcon]) -> None:
+    def page_icon_set(
+        self, tag: str, icon: Union[None, str, qtG.QPixmap, qtG.QIcon]
+    ) -> None:
         """Sets the tab page icon
 
         Args:
@@ -14325,7 +14331,9 @@ class Treeview(_qtpyBase_Control):
                 return 1
         return -1
 
-    def child_checked(self, treeview_path: Union[str, list, tuple], checked: bool) -> Literal[1, -1]:
+    def child_checked(
+        self, treeview_path: Union[str, list, tuple], checked: bool
+    ) -> Literal[1, -1]:
         """Checks a child node in the treeview
 
         Args:
@@ -14448,7 +14456,9 @@ class Treeview(_qtpyBase_Control):
             0, self.trans_str(value) if self.trans_get else str(value)
         )
 
-    def widget_set(self, treeview_path: Union[str, list, tuple], col: int, widget) -> None:
+    def widget_set(
+        self, treeview_path: Union[str, list, tuple], col: int, widget
+    ) -> None:
         """Takes a treeview path, column number, a widget and sets the widget in the specified node in the Tree view
         TODO Needs fixing
 

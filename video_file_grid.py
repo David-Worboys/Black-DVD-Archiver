@@ -29,7 +29,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
-from dvd import Video_Data, Video_Filter_Settings
+from dvd import Video_Data, Video_File_Settings
 from video_cutter import Video_Cutter_Popup
 from video_file_picker import Video_File_Picker_Popup
 
@@ -122,14 +122,14 @@ class Video_File_Grid:
                 file_grid,
                 video_file_input[0].video_path,
                 video_file_input[0].video_path,
-                video_file_input[0].video_filter_settings.button_title,
+                video_file_input[0].video_file_settings.button_title,
             )
         elif len(video_file_input) == 2:  # Original & one edited file (cut/assemble)
             self._processed_trimmed(
                 file_grid,
                 video_file_input[0].video_path,
                 video_file_input[1].video_path,
-                video_file_input[0].video_filter_settings.button_title,
+                video_file_input[0].video_file_settings.button_title,
             )
         else:  # Original and multiple edited files
             self._processed_trimmed(
@@ -255,16 +255,16 @@ class Video_File_Grid:
 
                     if (
                         button_title
-                        and user_data.video_filter_settings.button_title != button_title
+                        and user_data.video_file_settings.button_title != button_title
                     ):
-                        user_data.video_filter_settings.button_title = button_title
+                        user_data.video_file_settings.button_title = button_title
 
                     updated_user_data = Video_Data(
                         video_folder=trimmed_folder,
                         video_file=trimmed_file_name,
                         video_extension=trimmed_extension,
                         encoding_info=encoding_info,
-                        video_filter_settings=user_data.video_filter_settings,
+                        video_file_settings=user_data.video_file_settings,
                     )
 
                     duration = str(
@@ -371,7 +371,7 @@ class Video_File_Grid:
                 )
 
                 if button_title.strip() != "":
-                    user_data.video_filter_settings.button_title = button_title
+                    user_data.video_file_settings.button_title = button_title
                     file_grid.value_set(
                         row=row_index, col=0, value=button_title, user_data=user_data
                     )
@@ -492,7 +492,7 @@ class Video_File_Grid:
                     video_file=video_file_name,
                     video_extension=video_extension,
                     encoding_info={},
-                    video_filter_settings=Video_Filter_Settings(),
+                    video_file_settings=Video_File_Settings(),
                 )
 
                 video_user_data.encoding_info = dvdarch_utils.get_file_encoding_info(
@@ -575,8 +575,8 @@ class Video_File_Grid:
         file_grid.value_set(
             value=(
                 video_user_data.video_file
-                if video_user_data.video_filter_settings.button_title.strip() == ""
-                else video_user_data.video_filter_settings.button_title
+                if video_user_data.video_file_settings.button_title.strip() == ""
+                else video_user_data.video_file_settings.button_title
             ),
             row=row_index,
             col=0,

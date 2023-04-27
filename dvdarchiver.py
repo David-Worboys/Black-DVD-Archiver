@@ -426,19 +426,20 @@ class DVD_Archiver:
             for row_index in range(file_grid.row_count):
                 user_data: Video_Data = file_grid.userdata_get(row_index, col=0)
 
-                if user_data.video_filter_settings.button_title.strip() == "":
-                    file_def = File_Def()
-                    file_def.path = user_data.video_folder
-                    file_def.file_name = (
-                        f"{user_data.video_file}{user_data.video_extension}"
-                    )
-                    file_def.file_info = user_data.encoding_info
-                    file_def.video_filter_settings = user_data.video_filter_settings
+                file_def = File_Def()
+                file_def.path = user_data.video_folder
+                file_def.file_name = (
+                    f"{user_data.video_file}{user_data.video_extension}"
+                )
+                file_def.file_info = user_data.encoding_info
+                file_def.video_file_settings = user_data.video_file_settings
 
-                    video_file_defs.append(file_def)
+                video_file_defs.append(file_def)
+
+                if user_data.video_file_settings.button_title.strip() == "":
                     menu_labels.append(user_data.video_file)
                 else:
-                    menu_labels.append(user_data.video_filter_settings.button_title)
+                    menu_labels.append(user_data.video_file_settings.button_title)
 
         result = -1
         message = ""
@@ -478,7 +479,6 @@ class DVD_Archiver:
                 dvd_config.timestamp_font_point_size = self._timestamp_font_point_size
 
                 dvd_config.video_standard = self._file_control.project_video_standard
-                dvd_config.video_filter_settings = user_data.video_filter_settings
 
                 self._dvd.dvd_setup = dvd_config
                 self._dvd.working_folder = dvd_folder

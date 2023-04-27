@@ -534,6 +534,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             event (qtg.Action): The triggering event
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
+        print(f"DBG {event.event=} {event.container_tag=} {event.tag=} {event.value=}")
 
         match event.event:
             case qtg.Sys_Events.WINDOWOPEN:
@@ -585,6 +586,40 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         self._selection_start(event)
                     case "selection_end":
                         self._selection_end(event)
+                    case "set_menu_image":
+                        current_frame = str(self._media_source.get_current_frame())
+                        if current_frame:
+                            event.value_set(
+                                container_tag=event.container_tag,
+                                tag="menu_frame",
+                                value=current_frame,
+                            )
+                            self.video_file_input[
+                                0
+                            ].video_file_settings.menu_button_frame = int(current_frame)
+
+                    case "menu_frame":
+                        current_frame: str = event.value_get(
+                            container_tag=event.container_tag, tag=event.tag
+                        )
+                        if current_frame:
+                            self._media_source.seek(int(current_frame))
+                    case "clear_menu_frame":
+                        if (
+                            popups.PopYesNo(
+                                title="Clear The Button Image `...",
+                                message="Clear The DVD Menu Button Image?",
+                            ).show()
+                            == "yes"
+                        ):
+                            event.value_set(
+                                container_tag=event.container_tag,
+                                tag="menu_frame",
+                                value="",
+                            )
+                            self.video_file_input[
+                                0
+                            ].video_file_settings.menu_button_frame = -1
 
             case qtg.Sys_Events.INDEXCHANGED:
                 match event.tag:
@@ -665,31 +700,31 @@ class Video_Cutter_Popup(qtg.PopContainer):
         event.value_set(
             container_tag="video_filters",
             tag="normalise",
-            value=self.video_file_input[0].video_filter_settings.normalise,
+            value=self.video_file_input[0].video_file_settings.normalise,
         )
         event.value_set(
             container_tag="video_filters",
             tag="denoise",
-            value=self.video_file_input[0].video_filter_settings.denoise,
+            value=self.video_file_input[0].video_file_settings.denoise,
         )
         event.value_set(
             container_tag="video_filters",
             tag="auto_levels",
-            value=self.video_file_input[0].video_filter_settings.auto_bright,
+            value=self.video_file_input[0].video_file_settings.auto_bright,
         )
         event.value_set(
             container_tag="video_filters",
             tag="sharpen",
-            value=self.video_file_input[0].video_filter_settings.sharpen,
+            value=self.video_file_input[0].video_file_settings.sharpen,
         )
         event.value_set(
             container_tag="video_filters",
             tag="white_balance",
-            value=self.video_file_input[0].video_filter_settings.white_balance,
+            value=self.video_file_input[0].video_file_settings.white_balance,
         )
 
         if (
-            self.video_file_input[0].video_filter_settings.button_title.strip() == ""
+            self.video_file_input[0].video_file_settings.button_title.strip() == ""
         ):  # Attempt to extract the title from the input file name.
             _, file_name, _ = file_handler.split_file_path(
                 self.video_file_input[0].video_path
@@ -698,11 +733,22 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 file_name, self.excluded_word_list
             )
         else:
-            dvd_menu_title = self.video_file_input[0].video_filter_settings.button_title
+            dvd_menu_title = self.video_file_input[0].video_file_settings.button_title
 
         event.value_set(
             container_tag="dvd_settings", tag="menu_title", value=dvd_menu_title
         )
+
+        current_frame: int = self.video_file_input[
+            0
+        ].video_file_settings.menu_button_frame
+
+        if current_frame >= 0:
+            event.value_set(
+                container_tag="video_buttons",
+                tag="menu_frame",
+                value=str(current_frame),
+            )
 
         return 1
 
@@ -941,9 +987,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
                                     encoding_info=dvdarch_utils.get_file_encoding_info(
                                         video_file_path
                                     ),
-                                    video_filter_settings=self.video_file_input[
+                                    video_file_settings=self.video_file_input[
                                         0
-                                    ].video_filter_settings,
+                                    ].video_file_settings,
                                 )
                             )
 
@@ -1006,9 +1052,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
                                 encoding_info=dvdarch_utils.get_file_encoding_info(
                                     video_files_string
                                 ),
-                                video_filter_settings=self.video_file_input[
+                                video_file_settings=self.video_file_input[
                                     0
-                                ].video_filter_settings,
+                                ].video_file_settings,
                             )
                         )
 
@@ -1090,9 +1136,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         encoding_info=dvdarch_utils.get_file_encoding_info(
                             trimmed_file
                         ),
-                        video_filter_settings=self.video_file_input[
+                        video_file_settings=self.video_file_input[
                             0
-                        ].video_filter_settings,
+                        ].video_file_settings,
                     )
                     self.video_file_input.append(trimmed_video)
         else:
@@ -1677,19 +1723,19 @@ class Video_Cutter_Popup(qtg.PopContainer):
         """
         self.archive_edit_list_write()
 
-        self.video_file_input[0].video_filter_settings.normalise = event.value_get(
+        self.video_file_input[0].video_file_settings.normalise = event.value_get(
             container_tag="video_filters", tag="normalise"
         )
-        self.video_file_input[0].video_filter_settings.denoise = event.value_get(
+        self.video_file_input[0].video_file_settings.denoise = event.value_get(
             container_tag="video_filters", tag="denoise"
         )
-        self.video_file_input[0].video_filter_settings.auto_bright = event.value_get(
+        self.video_file_input[0].video_file_settings.auto_bright = event.value_get(
             container_tag="video_filters", tag="auto_levels"
         )
-        self.video_file_input[0].video_filter_settings.sharpen = event.value_get(
+        self.video_file_input[0].video_file_settings.sharpen = event.value_get(
             container_tag="video_filters", tag="sharpen"
         )
-        self.video_file_input[0].video_filter_settings.white_balance = event.value_get(
+        self.video_file_input[0].video_file_settings.white_balance = event.value_get(
             container_tag="video_filters", tag="white_balance"
         )
 
@@ -1700,7 +1746,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         if (
             dvd_menu_title.strip() != "" and len(self.video_file_input) <= 2
         ):  # Have to set the dvd menu button title if we have an Input file only, or one output file
-            self.video_file_input[0].video_filter_settings.button_title = dvd_menu_title
+            self.video_file_input[0].video_file_settings.button_title = dvd_menu_title
 
         if self._media_source:
             self._media_source.stop()
@@ -1826,6 +1872,31 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         display_na=False,
                         translate=False,
                     ),
+                    qtg.Button(
+                        tag="set_menu_image",
+                        icon=file_utils.App_Path("camera.svg"),
+                        tooltip="Set The DVD Menu Button Image",
+                        callback=self.event_handler,
+                        height=1,
+                        width=2,
+                        # buddy_control=qtg.Label(tag="menu_frame", width=6, height=1),
+                    ),
+                    qtg.LineEdit(
+                        tag="menu_frame",
+                        width=6,
+                        height=1,
+                        char_length=6,
+                        callback=self.event_handler,
+                        editable=False,
+                        buddy_control=qtg.Button(
+                            tag="clear_menu_frame",
+                            height=1,
+                            width=1,
+                            callback=self.event_handler,
+                            icon=file_utils.App_Path("x.svg"),
+                            tooltip="Clear The DVD Menu Button Image",
+                        ),
+                    ),
                     # qtg.Spacer(width=1),
                     # qtg.Button(tag="stop",icon=qtg.SYSICON.mediastop.get(), callback=self.event_handler, width=2, height=1),
                 )
@@ -1903,7 +1974,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     tooltip="Delete Edit Points From Video",
                     width=2,
                 ),
-                qtg.Spacer(width=3),
+                qtg.Spacer(width=5),
                 qtg.Button(
                     icon=file_utils.App_Path("x.svg"),
                     tag="remove_edit_points",
