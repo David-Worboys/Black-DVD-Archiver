@@ -68,7 +68,6 @@ colors = {
     "teal": "#008080",
     "silver": "#c0c0c0",
     "transparent": "#00000000",
-    "darkgray": "#A9A9A9",
     "gainsboro": "#DCDCDC",
     "floralwhite": "#FFFAF0",
     "oldlace": "#FDF5E6",
@@ -90,23 +89,10 @@ colors = {
     "aliceblue": "#F0F8FF",
     "lavenderblush": "#FFF0F5",
     "mistyrose": "#FFE4E1",
-    "lightgray": "#d3d3d3",
-    "darkgray": "#696969",
-    "darkred": "#8b0000",
-    "darkblue": "#00008b",
-    "darkgreen": "#006400",
-    "beige": "#f5f5dc",
-    "maroon": "#800000",
-    "turquoise": "#40e0d0",
-    "lightyellow": "#ffffe0",
-    "lavender": "#e6e6fa",
-    "navy": "#000080",
-    "olive": "#808000",
     "rosybrown": "#bc8f8f",
     "saddlebrown": "#8b4513",
     "sandybrown": "#f4a460",
     "seagreen": "#2e8b57",
-    "seashell": "#fff5ee",
     "sienna": "#a0522d",
     "skyblue": "#87ceeb",
     "slateblue": "#6a5acd",
@@ -118,7 +104,6 @@ colors = {
     "tan": "#d2b48c",
     "thistle": "#d8bfd8",
     "tomato": "#ff6347",
-    "turquoise": "#40e0d0",
     "violet": "#ee82ee",
     "wheat": "#f5deb3",
     "whitesmoke": "#f5f5f5",
@@ -147,7 +132,7 @@ def concatenate_videos(
         temp_files (list[str]): List of input video files to be concatenated
         output_file (str): The output file name
         audio_codec (str, optional): The audio codec to checked against (aac is special)
-        delete_temp_files (bool, optional): Whether or not to delete the temp files, defaults to False
+        delete_temp_files (bool, optional): Whether to delete the temp files, defaults to False
 
     Returns:
         tuple[int, str]:
@@ -289,9 +274,9 @@ def get_space_available(path: str) -> tuple[int, str]:
     """
     try:
         usage = psutil.disk_usage(path)
-        return (usage.free, "")
+        return usage.free, ""
     except Exception as e:
-        return (-1, str(e))
+        return -1, str(e)
 
 
 def get_color_names() -> list:
@@ -307,7 +292,7 @@ def get_hex_color(color: str) -> str:
     """This function returns the hexadecimal value for a given color name.
 
     Args:
-        color_name (str): The name of the color to look up.
+        color (str): The name of the color to look up.
 
     Returns:
         str: The hexadecimal value for the given color name or "" if color unknown.
@@ -365,7 +350,7 @@ def get_font_example(
     background_color: str = "wheat",
     width: int = -1,
     height: int = -1,
-) -> bytes:
+) -> tuple[int,bytes]:
     """Returns a png byte string an example of what a font looks like
 
     Args:
@@ -403,7 +388,7 @@ def get_font_example(
     ), f"{height=}. Must be int > 0 or -1 to autocalc"
 
     if not os.path.exists(font_file):
-        return b""
+        return -1, b""
 
     try:
         if pointsize == -1:
@@ -415,10 +400,8 @@ def get_font_example(
             )
 
             # If the text dimensions are larger than the bounding box, return an empty string
-            if (width > 0 and text_width > width) or (
-                height > 0 and text_height > height
-            ):
-                return b""
+            if (0 < width < text_width) or (0 < height < text_height):
+                return -1, b""
 
             # Binary search for the optimal font size
             while low <= high:
@@ -428,9 +411,7 @@ def get_font_example(
                     text=text, font=font_file, pointsize=mid
                 )
 
-                if (width > 0 and text_width > width) or (
-                    height > 0 and text_height > height
-                ):
+                if (0 < width < text_width) or (0 < height < text_height):
                     high = mid - 1
                 else:
                     pointsize = mid
@@ -896,7 +877,7 @@ def stream_optimise(output_file: str) -> tuple[int, str]:
 
     Returns:
         tuple[int, str]:
-        - arg 1:  1 if if the optimization was successful, and -1 otherwise
+        - arg 1:  1 if the optimization was successful, and -1 otherwise
         - arg 2: If the optimization fails, the message will contain an error otherwise "".
     """
     assert (
@@ -996,7 +977,7 @@ def get_nearest_key_frame(
 
 def execute_check_output(
     commands: list[str],
-    env: dict = dict(),
+    env:dict | None =None,
     execute_as_string: bool = False,
     debug: bool = False,
     shell: bool = False,
@@ -1017,6 +998,9 @@ def execute_check_output(
         - arg1: 1 if the command is successful, -1 if the command fails.
         - arg2: "" if the command is successful, if the command fails, an error message.
     """
+    if env is None:
+        env = dict()
+
     assert (
         isinstance(commands, list) and len(commands) > 0
     ), f"{commands=}. Must be non-empty list of commands and options"
