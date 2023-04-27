@@ -350,7 +350,7 @@ def get_font_example(
     background_color: str = "wheat",
     width: int = -1,
     height: int = -1,
-) -> tuple[int,bytes]:
+) -> tuple[int, bytes]:
     """Returns a png byte string an example of what a font looks like
 
     Args:
@@ -977,7 +977,7 @@ def get_nearest_key_frame(
 
 def execute_check_output(
     commands: list[str],
-    env:dict | None =None,
+    env: dict | None = None,
     execute_as_string: bool = False,
     debug: bool = False,
     shell: bool = False,

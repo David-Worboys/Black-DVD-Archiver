@@ -37,7 +37,7 @@ import titlecase
 class File_Result:
     files: list[str]
     path: str
-    error_code: str
+    error_code: enum.IntEnum
     error_message: str
 
 
@@ -45,7 +45,7 @@ def App_Path(file_name: str = "", trailing_slash=False) -> str:
     """Returns the full app directory path for the supplied file_name.  Handles pyinstaller.Nuitka runtime directory
     Args:
         file_name (str, optional): Defaults to "". file name that needs to be prepended with the app path
-        training_slash(bool): Whether to append a platform appropriate trailing slash to the end of the path.
+        trailing_slash(bool): Whether to append a platform appropriate trailing slash to the end of the path.
     Returns:
         str: Expanded app directory path if the file name is supplied. The app directory path if the file name is not supplied
     """
@@ -150,6 +150,7 @@ class File:
         NOTWRITEABLE = -4
 
     Error_Dict = {
+        Path_Error.OK: "OK",
         Path_Error.EXCEPTION: "",
         Path_Error.NOTEXIST: "Path Does Not Exist",
         Path_Error.NOTIMPLEMENTED: "Not Implemented",
@@ -276,8 +277,8 @@ class File:
         """
         Copy a file from the source path to the destination path.
         Args:
-            src (source): The source path of the file to copy.
-            dst (destination_path): The destination path where the file will be copied.
+            source (str): The source path of the file to copy.
+            destination_path (str): The destination path where the file will be copied.
         Returns:
             tuple[int, str]:
                 - arg1: 1 for success, -1 for failure.
@@ -515,7 +516,7 @@ class File:
                     files=file_list,
                     path=path_ptr,
                     error_code=self.Path_Error.OK,
-                    error_message="",
+                    error_message=self.Error_Dict[self.Path_Error.OK],
                 )
 
             return File_Result(
@@ -637,7 +638,7 @@ class File:
         ), f"{file_path_name=}. Must be a non-empty str"
 
         if os.path.isdir(file_path_name):
-            return (file_path_name, "")
+            return file_path_name, ""
         elif os.path.isfile(file_path_name):
             path, file = os.path.split(file_path_name)
 
@@ -645,11 +646,11 @@ class File:
             if self.file_exists(
                 directory_path=path, file_name=file_prefix, file_extension=file_suffix
             ):
-                return (path, file)
+                return path, file
             else:
-                return ("", "")
+                return "", ""
 
-        return ("", "")
+        return "", ""
 
     def split_file_path(
         self, file_path_name: str, no_path_check: bool = False
@@ -666,19 +667,19 @@ class File:
         ), f"{file_path_name=}. Must be a non-empty str"
 
         if not no_path_check and os.path.isdir(file_path_name):
-            return (file_path_name, "", "")
+            return file_path_name, "", ""
         elif not no_path_check or os.path.isfile(file_path_name):
             path, file = os.path.split(file_path_name)
 
             file_prefix, file_suffix = os.path.splitext(file)
             if not no_path_check or self.file_exists(
-                path=path, file=file_prefix, suffix=file_suffix
+                directory_path=path, file_name=file_prefix, file_extension=file_suffix
             ):
-                return (path, file_prefix, file_suffix)
+                return path, file_prefix, file_suffix
             else:
-                return ("", "", "")
+                return "", "", ""
 
-        return ("", "", "")
+        return "", "", ""
 
     def remove_dir_contents(self, file_path_name: str) -> tuple[int, str]:
         """Removes a directory and all its contents - specified by file_path_name.
