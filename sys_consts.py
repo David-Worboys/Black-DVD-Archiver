@@ -31,7 +31,7 @@ executable_folder = file_utils.App_Path()
 file_sep = file_utils.File().ossep
 
 PROGRAM_NAME: Final[str] = "Black DVD Archiver"
-PROGRAM_VERSION: Final[str] = "0.3"
+PROGRAM_VERSION: Final[str] = "0.4"
 AUTHOR: Final[str] = "David Worboys"
 LICENCE: Final[str] = "GNU V3 GPL"
 
@@ -97,7 +97,7 @@ PERCENT_SAFTEY_BUFFER: Final[int] = (
 
 
 class SPECIAL_PATH(utils.strEnum):
-    """Contains a enums for strings that represent special paths on the user's computer"""
+    """Contains enums for strings that represent special paths on the user's computer"""
 
     DESKTOP: Final[str] = "Desktop"
     DOCUMENTS: Final[str] = "Documents"

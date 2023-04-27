@@ -1068,7 +1068,7 @@ class SQLDB:
 
                     self.table_create(table_name, table_def)
 
-                    SQL_Insert = f"({SQL.INSERTINTO} {table_name}"
+                    sql_insert = f"({SQL.INSERTINTO} {table_name}"
 
                     if has_header:
                         continue
@@ -1097,7 +1097,7 @@ class SQLDB:
 
                 sql_value = f" ({col_names}) {SQL.VALUES} ({sql_value})"
 
-                self.sql_execute(SQL_Insert + sql_value)
+                self.sql_execute(sql_insert + sql_value)
 
             self.sql_commit
 
