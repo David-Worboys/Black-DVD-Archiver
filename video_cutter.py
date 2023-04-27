@@ -534,7 +534,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
             event (qtg.Action): The triggering event
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
-        print(f"DBG {event.event=} {event.container_tag=} {event.tag=} {event.value=}")
 
         match event.event:
             case qtg.Sys_Events.WINDOWOPEN:

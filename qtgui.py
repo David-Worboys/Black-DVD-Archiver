@@ -40,8 +40,8 @@ from collections import deque, namedtuple
 from contextlib import contextmanager
 from dataclasses import field
 from enum import Enum, IntEnum
-from typing import (Callable, ClassVar, Literal, NoReturn, Optional, Union, cast,
-                    overload)
+from typing import (Callable, ClassVar, Literal, NoReturn, Optional, Union,
+                    cast, overload)
 
 import numpy as np
 import PySide6.QtCore as qtC
