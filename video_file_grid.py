@@ -383,7 +383,9 @@ class Video_File_Grid:
 
                                 duration = str(
                                     datetime.timedelta(
-                                        seconds=video_data.encoding_info["video_duration"][1]
+                                        seconds=video_data.encoding_info[
+                                            "video_duration"
+                                        ][1]
                                     )
                                 ).split(".")[0]
 
@@ -394,7 +396,9 @@ class Video_File_Grid:
                                     duration=duration,
                                 )
                                 toolbox = self._get_toolbox(video_data)
-                                file_grid.row_widget_set(row=row_index, col=6, widget=toolbox)
+                                file_grid.row_widget_set(
+                                    row=row_index, col=6, widget=toolbox
+                                )
 
             self._set_project_standard_duration(event)
         except Exception as e:
@@ -636,9 +640,7 @@ class Video_File_Grid:
             video_user_data, Video_Data
         ), f"{video_user_data=}. Must be an instance of Video_Data"
 
-        toolbox = qtg.HBoxContainer(
-            height=1, width=3, align=qtg.Align.CENTER
-        ).add_row(
+        toolbox = qtg.HBoxContainer(height=1, width=3, align=qtg.Align.CENTER).add_row(
             qtg.Button(
                 tag=f"grid_button",
                 height=1,
