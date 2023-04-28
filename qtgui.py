@@ -11390,7 +11390,7 @@ class Image(_qtpyBase_Control):
 
     def image_set(
         self,
-        image: Union[str, qtG.QPixmap],
+        image: str | qtG.QPixmap | bytes,
         height: int = -1,
         width: int = -1,
         scaled: bool = True,
@@ -11403,7 +11403,7 @@ class Image(_qtpyBase_Control):
         """Sets an image to be displayed in this control
 
         Args:
-            image (Union[str, qtG.QPixmap]): Image to be displayed
+            image (str| qtG.QPixmap| bytes): Image to be displayed
             height (int): Height of image. -1 : scaled to height
             width (int):  Width of image. -1 : scaled to width
             scaled (bool):  Scale the image to fit height and width
