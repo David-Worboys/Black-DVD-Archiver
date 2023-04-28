@@ -395,6 +395,8 @@ class Video_File_Grid:
                                 )
                                 toolbox = self._get_toolbox(video_data)
                                 file_grid.row_widget_set(row=row_index, col=6, widget=toolbox)
+
+            self._set_project_standard_duration(event)
         except Exception as e:
             popups.PopError(title="File Grid Load Error...", message=str(e)).show()
 
