@@ -17,11 +17,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import dataclasses
-import datetime
-
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+import datetime
+import shelve
+
+import platformdirs
+
 import dvdarch_utils
 import file_utils
 import popups
@@ -40,6 +42,8 @@ class Video_File_Grid:
     """This class implements the file handling of the Black DVD Archiver ui"""
 
     def __init__(self):
+        file_handler = file_utils.File()
+
         self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
         self.common_words = []
         self.project_video_standard = ""  # PAL or NTSC
@@ -47,8 +51,13 @@ class Video_File_Grid:
 
         # Private instance variables
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
+        self._db_path = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
-    def grid_events(self, event: qtg.Action):
+        self._grid_db = file_handler.file_join(
+            self._db_path, sys_consts.VIDEO_GRID_DB, "db"
+        )
+
+    def grid_events(self, event: qtg.Action) -> None:
         """Process Grid Events
         Args:
             event (Action): Action
@@ -73,7 +82,7 @@ class Video_File_Grid:
                 else:
                     file_grid.checkitemrow_set(row=event.value.row, col=0, checked=True)
 
-    def _edit_video(self, event: qtg.Action):
+    def _edit_video(self, event: qtg.Action) -> None:
         """
         Edits a video file.
         Args:
@@ -158,7 +167,7 @@ class Video_File_Grid:
         self,
         file_grid: qtg.Grid,
         source_file_path: str,
-    ):
+    ) -> None:
         """Delete the source file from the file grid.
         Args:
             file_grid (qtg.Grid): An instance of the `Grid` class.
@@ -199,7 +208,7 @@ class Video_File_Grid:
         source_file: str,
         trimmed_file: str,
         button_title: str = "",
-    ):
+    ) -> None:
         """
         Updates the file_grid with the trimmed_file detail, after finding the corresponding grid entry.
         Args:
@@ -284,7 +293,7 @@ class Video_File_Grid:
 
                     break  # Only one trimmed file
 
-    def event_handler(self, event: qtg.Action):
+    def event_handler(self, event: qtg.Action) -> None:
         """Handles  application events
         Args:
             event (Action): The triggering event
@@ -294,6 +303,10 @@ class Video_File_Grid:
         ), f"{event=}. Must be an instance of qtg.Action"
 
         match event.event:
+            case qtg.Sys_Events.APPPOSTINIT:
+                self._load_grid(event)
+            case qtg.Sys_Events.APPCLOSED:
+                self._save_grid(event)
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "bulk_select":
@@ -331,7 +344,7 @@ class Video_File_Grid:
                             file_grid.row_count > 0
                             and file_grid.checkitems_get
                             and popups.PopYesNo(
-                                title="Remove Checied...",
+                                title="Remove Checked...",
                                 message="Remove The Checked Files?",
                             ).show()
                             == "yes"
@@ -343,7 +356,79 @@ class Video_File_Grid:
                     case "rename_files":
                         self._generate_button_names(event)
 
-    def _generate_button_names(self, event):
+    def _load_grid(self, event: qtg.Action) -> None:
+        """Loads the grid from the database
+
+        Args:
+            event (qtg.Action) : Calling event
+        """
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
+        file_grid: qtg.Grid = event.widget_get(
+            container_tag="video_file_controls",
+            tag="video_input_files",
+        )
+
+        try:
+            with shelve.open(self._grid_db) as db:
+                db_data = db.get("video_grid")
+
+                if db_data:
+                    for row_index, row in enumerate(db_data):
+                        for item in row:
+                            if item[1]:
+                                video_data: Video_Data = item[1]
+
+                                duration = str(
+                                    datetime.timedelta(
+                                        seconds=video_data.encoding_info["video_duration"][1]
+                                    )
+                                ).split(".")[0]
+
+                                self._populate_grid_row(
+                                    file_grid=file_grid,
+                                    row_index=row_index,
+                                    video_user_data=video_data,
+                                    duration=duration,
+                                )
+                                toolbox = self._get_toolbox(video_data)
+                                file_grid.row_widget_set(row=row_index, col=6, widget=toolbox)
+        except Exception as e:
+            popups.PopError(title="File Grid Load Error...", message=str(e)).show()
+
+    def _save_grid(self, event: qtg.Action) -> None:
+        """Saves the grid to the database
+
+        Args:
+            event (qtg.Action) : Calling event
+        """
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
+        try:
+            with shelve.open(self._grid_db) as db:
+                row_data = []
+                file_grid: qtg.Grid = event.widget_get(
+                    container_tag="video_file_controls",
+                    tag="video_input_files",
+                )
+                for row in range(file_grid.row_count):
+                    col_value = []
+                    for col in range(file_grid.col_count):
+                        value = file_grid.value_get(row=row, col=col)
+                        user_data = file_grid.userdata_get(row=row, col=col)
+                        col_value.append((value, user_data))
+
+                    row_data.append(col_value)
+
+                db["video_grid"] = row_data
+        except Exception as e:
+            popups.PopError(title="File Grid Save Error...", message=str(e)).show()
+
+    def _generate_button_names(self, event) -> None:
         """Tries to generate sensible button names from the file title
         Args:
             event (qtg.Acton) : Calling event
@@ -378,7 +463,7 @@ class Video_File_Grid:
 
                     file_grid.userdata_set(row=row_index, user_data=user_data)
 
-    def load_video_input_files(self, event: qtg.Action):
+    def load_video_input_files(self, event: qtg.Action) -> None:
         """Loads video files into the video input grid
         Args:
             event (qtg.Acton) : Calling event
@@ -440,7 +525,7 @@ class Video_File_Grid:
 
     def _insert_files_into_grid(
         self, file_handler: file_utils.File, file_grid: qtg.Grid, selected_files: str
-    ):
+    ) -> str:
         """
         Inserts files into the file gird widget.
         Args:
@@ -508,20 +593,7 @@ class Video_File_Grid:
                     )
                     continue
 
-                toolbox = qtg.HBoxContainer(
-                    height=1, width=3, align=qtg.Align.BOTTOMCENTER
-                ).add_row(
-                    qtg.Button(
-                        tag=f"grid_button",
-                        height=1,
-                        width=1,
-                        tune_vsize=-5,
-                        callback=self.grid_events,
-                        user_data=video_user_data,
-                        icon=file_utils.App_Path("wrench.svg"),
-                        tooltip="Cut Video or Change Settings",
-                    )
-                )
+                toolbox = self._get_toolbox(video_user_data)
 
                 if video_user_data.encoding_info["video_tracks"][1] == 0:
                     rejected += (
@@ -550,13 +622,41 @@ class Video_File_Grid:
                 row_index += 1
         return rejected
 
+    def _get_toolbox(self, video_user_data: Video_Data) -> qtg.HBoxContainer:
+        """Generates a GUI toolbox for use in the grid.
+        Args:
+            video_user_data (Video_Data): The video data to use.
+
+        Returns:
+            qtg.HBoxContainer: The toolbox.
+        """
+        assert isinstance(
+            video_user_data, Video_Data
+        ), f"{video_user_data=}. Must be an instance of Video_Data"
+
+        toolbox = qtg.HBoxContainer(
+            height=1, width=3, align=qtg.Align.CENTER
+        ).add_row(
+            qtg.Button(
+                tag=f"grid_button",
+                height=1,
+                width=1,
+                tune_vsize=-5,
+                callback=self.grid_events,
+                user_data=video_user_data,
+                icon=file_utils.App_Path("wrench.svg"),
+                tooltip="Cut Video or Change Settings/Name",
+            )
+        )
+        return toolbox
+
     def _populate_grid_row(
         self,
         file_grid: qtg.Grid,
         row_index: int,
         video_user_data: Video_Data,
         duration: str,
-    ):
+    ) -> None:
         """Populates the grid row with the video information.
         Args:
             file_grid (qtg.Grid): The grid to populate.
@@ -623,7 +723,7 @@ class Video_File_Grid:
             user_data=video_user_data,
         )
 
-    def _set_project_standard_duration(self, event: qtg.Action):
+    def _set_project_standard_duration(self, event: qtg.Action) -> None:
         """Sets the  duration and video standard for the current project based on the selected
         input video files.
         Args:

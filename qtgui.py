@@ -9006,7 +9006,7 @@ class Grid(_qtpyBase_Control):
             self._widget.setHorizontalHeaderItem(col_index, item)
 
             self._widget.setColumnWidth(
-                col_index, self._col_widths[col_index] * (char_pixel_size.width)
+                col_index, self._col_widths[col_index] * char_pixel_size.width
             )
             self._widget.horizontalHeaderItem(col_index).tag = definition.label
 

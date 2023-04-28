@@ -90,6 +90,7 @@ PRODUCT_LINE: Final[str] = "product_line"
 # Database Setting Keys
 ARCHIVE_FOLDER: Final[str] = "archive_folder"
 DVD_BUILD_FOLDER: Final[str] = "dvd_build_folder"
+VIDEO_GRID_DB: Final[str] = "video_grid"
 
 PERCENT_SAFTEY_BUFFER: Final[int] = (
     1  # Used to limit DVD size so that it never exceeds 100%

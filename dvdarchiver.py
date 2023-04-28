@@ -194,6 +194,9 @@ class DVD_Archiver:
         Args:
             event (Action): The triggering event
         """
+        if self._file_control:
+            self._file_control.event_handler(event)
+
         match event.event:
             case qtg.Sys_Events.APPINIT:
                 pass
