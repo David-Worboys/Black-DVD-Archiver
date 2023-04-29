@@ -1763,7 +1763,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
             Returns:
                 qtg.HBoxContainer: A horizontal box container for the video cutter.
             """
-
             step_unit_list = [
                 qtg.Combo_Item(
                     display="Frame", data="frame", icon=None, user_data=None
@@ -1903,14 +1902,16 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
             video_cutter_container = qtg.VBoxContainer(
                 tag="video_cutter",
-                text="Video Cutter",
+                text=f"Video Cutter",
                 align=qtg.Align.CENTER,
             ).add_row(
                 self._video_display,
                 self._video_slider,
                 video_button_container,
                 qtg.Spacer(),
-                qtg.HBoxContainer().add_row(self._frame_display),
+                qtg.HBoxContainer().add_row(
+                    self._frame_display,
+                ),
             )
 
             return video_cutter_container
@@ -2065,11 +2066,21 @@ class Video_Cutter_Popup(qtg.PopContainer):
         edit_list_container = assemble_edit_list_container()
 
         video_controls_container = qtg.VBoxContainer(align=qtg.Align.LEFT).add_row(
-            qtg.VBoxContainer(tag="dvd_settings", text="DVD Settings").add_row(
-                video_filter_container,
-                qtg.LineEdit(
-                    tag="menu_title", label="Menu Title", char_length=40, width=40
+            qtg.HBoxContainer(text="Source File").add_row(
+                qtg.Label(
+                    text=f"{sys_consts.SDELIM}{self.video_file_input[0].video_file}{sys_consts.SDELIM}",
+                    width=81,
                 ),
+            ),
+            qtg.VBoxContainer(tag="dvd_settings", text="DVD Settings").add_row(
+                qtg.LineEdit(
+                    tag="menu_title",
+                    label="Menu Title",
+                    char_length=40,
+                    width=40,
+                ),
+                qtg.Spacer(width=self._display_width, pixel_unit=True),
+                video_filter_container,
             ),
             qtg.HBoxContainer().add_row(video_cutter_container, edit_list_container),
         )
