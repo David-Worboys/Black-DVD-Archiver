@@ -168,8 +168,8 @@ class File:
     def extract_title(self, name: str, excluded_words: list | None = None) -> str:
         """
         Extracts the title from a given file name by removing the file extension, replacing unwanted characters,
-        and formatting the resulting string into title case. If the file name contains a date, the date is extracted
-        and formatted according to the computer's locale, and is included in the resulting title separated by a dash (-).
+        and formatting the resulting string into title case.
+
         Args:
             name (str): The file name to extract the title from.
             excluded_words (list[str]) : The words to exclude
@@ -204,74 +204,13 @@ class File:
 
             if number:
                 numbers.append("".join(number))
-
-        print(f"DBG {words=} {numbers=}")
-        print(dateparser.parse("-".join(numbers)))
-
-        locale.setlocale(locale.LC_ALL, "")
-
-        # Extract date
-        date = dateparser.parse(name)
-
-        # Remove file extension
-        name_without_extension = re.sub(r"\.\w+$", "", name)
-
-        # Strip timestamps
-        name_without_extension = re.sub(
-            r"\b\d{2}\.\d{2}\.\d{2}\.\d{3}\b|\b\d{2}:\d{2}:\d{2}\b", "", name
+        return " ".join(
+            [
+                titlecase.titlecase(text)
+                for text in words
+                if text.upper() not in [excluded.upper() for excluded in excluded_words]
+            ]
         )
-        name_without_extension = re.sub(
-            r"\d{2}[\.:]\d{2}[\.:]\d{2}[\.:]?\d{0,3}\b", "", name_without_extension
-        )
-        name_without_extension = re.sub(r"\d{8,}", "", name_without_extension)
-        name_without_extension = re.sub(
-            r"\d{4}-\d{2}-\d{2}", "", name_without_extension
-        )
-        name_without_extension = re.sub(
-            r"\b\d{2} \d{2} \d{2} \d{3}\b", "", name_without_extension
-        )
-
-        # Replace unwanted characters
-        name_without_extension = re.sub(r"[^\w\s\-\.,']", "", name_without_extension)
-        name_without_extension = re.sub(
-            r"([A-Z]{2,})", r" \g<1>".lower(), name_without_extension
-        )
-        name_without_extension = name_without_extension.replace("_", " ")
-        name_without_extension = name_without_extension.replace("-", " ")
-        name_without_extension = name_without_extension.replace(".", " ")
-
-        # Fix spaces around numbers
-        name_without_extension = re.sub(r"(\d)\s+", r"\g<1> ", name_without_extension)
-
-        # Fix leading numbers
-        name_without_extension = re.sub(
-            r"(\A\d+)\s+", r"\g<1> ", name_without_extension
-        )
-
-        # Remove extra spaces
-        name_without_extension = re.sub(r" {2,}", " ", name_without_extension.strip())
-
-        # Remove excluded words followed by a number
-        pattern1 = r"\b(?:{})\b\d+".format("|".join(excluded_words))
-        name_without_extension = re.sub(pattern1, "", name_without_extension)
-
-        # Remove excluded words followed by a space and a number
-        pattern2 = r"\b(?:{})\b\s\d+".format("|".join(excluded_words))
-        name_without_extension = re.sub(pattern2, "", name_without_extension)
-
-        name_without_extension = " ".join(name_without_extension.split())
-
-        # Fix capitalization and formatting
-        title_text = name_without_extension.capitalize()
-        title_text = re.sub(r"([^\w\s])\s+([^\w\s])", r"\g<1>\g<2>", title_text)
-        title_text = titlecase.titlecase(title_text)
-
-        # Add date if present
-        if date:
-            date_string = date.strftime(locale.nl_langinfo(locale.D_FMT))
-            title_text = f"{date_string} - {title_text}"
-
-        return title_text.strip()
 
     def copy_file(self, source: str, destination_path: str) -> tuple[int, str]:
         """
