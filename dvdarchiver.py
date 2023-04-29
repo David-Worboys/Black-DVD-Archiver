@@ -422,12 +422,22 @@ class DVD_Archiver:
             ).show()
             return None
 
+        checked_items = file_grid.checkitems_get
+
+        if not checked_items:
+            popups.PopMessage(
+                title="No Video Files Selected...",
+                message="Please Select Video Files ForThe DVD!",
+            ).show()
+            return None
+
         video_file_defs = []
         menu_labels = []
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
-            for row_index in range(file_grid.row_count):
-                user_data: Video_Data = file_grid.userdata_get(row_index, col=0)
+            for checked_item in checked_items:
+                checked_item: qtg.Grid_Item_Tuple
+                user_data: Video_Data = checked_item.user_data
 
                 file_def = File_Def()
                 file_def.path = user_data.video_folder

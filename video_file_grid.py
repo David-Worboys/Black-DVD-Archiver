@@ -70,17 +70,7 @@ class Video_File_Grid:
             if event.tag.startswith("grid_button"):
                 self._edit_video(event)
             elif event.value.row >= 0 and event.value.col >= 0:
-                # When the user clicks on a row in the grid, toggle the switch in that row
-                file_grid: qtg.Grid = event.widget_get(
-                    container_tag="video_file_controls", tag="video_input_files"
-                )
-
-                if file_grid.checkitemrow_get(event.value.row, col=0):
-                    file_grid.checkitemrow_set(
-                        row=event.value.row, col=0, checked=False
-                    )
-                else:
-                    file_grid.checkitemrow_set(row=event.value.row, col=0, checked=True)
+                self._set_project_standard_duration(event)
 
     def _edit_video(self, event: qtg.Action) -> None:
         """
@@ -318,6 +308,8 @@ class Video_File_Grid:
                         file_grid.checkitems_all(
                             checked=event.value, col_tag="video_file"
                         )
+
+                        self._set_project_standard_duration(event)
                     case "select_files":
                         folder = self._db_settings.setting_get(
                             sys_consts.DVD_BUILD_FOLDER
@@ -746,30 +738,34 @@ class Video_File_Grid:
         self.project_duration = ""
         self.dvd_percent_used = 0
 
+        checked_items = file_grid.checkitems_get
+
         if file_grid.row_count > 0:
             encoding_info = file_grid.userdata_get(row=0, col=4).encoding_info
             self.project_video_standard = encoding_info["video_standard"][1]
 
-            for check_row_index in range(file_grid.row_count):
-                encoding_info = file_grid.userdata_get(
-                    row=check_row_index, col=4
-                ).encoding_info
+            if checked_items:
+                for checked_item in checked_items:
+                    checked_item: qtg.Grid_Item_Tuple
+                    user_data: Video_Data = checked_item.user_data
 
-                total_duration += encoding_info["video_duration"][1]
+                    encoding_info = user_data.encoding_info
 
-            self.project_duration = str(
-                datetime.timedelta(seconds=total_duration)
-            ).split(".")[0]
-            self.dvd_percent_used = (
-                round(
-                    (
-                        (sys_consts.AVERAGE_BITRATE * total_duration)
-                        / sys_consts.SINGLE_SIDED_DVD_SIZE
+                    total_duration += encoding_info["video_duration"][1]
+
+                self.project_duration = str(
+                    datetime.timedelta(seconds=total_duration)
+                ).split(".")[0]
+                self.dvd_percent_used = (
+                    round(
+                        (
+                            (sys_consts.AVERAGE_BITRATE * total_duration)
+                            / sys_consts.SINGLE_SIDED_DVD_SIZE
+                        )
+                        * 100
                     )
-                    * 100
+                    + sys_consts.PERCENT_SAFTEY_BUFFER
                 )
-                + sys_consts.PERCENT_SAFTEY_BUFFER
-            )
 
         event.value_set(
             container_tag="dvd_properties",
