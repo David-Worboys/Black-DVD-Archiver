@@ -269,9 +269,12 @@ def Get_Window_ID(
     return window_id
 
 
-Grid_Item_Tuple = namedtuple(
-    "Grid_Item_Tuple", ["row_index", "tag", "current_value", "user_data"]
-)
+@dataclasses.dataclass(slots=True)
+class Grid_Item:
+    row_index: int
+    tag: str
+    current_value: any
+    user_data: any
 
 
 # An enumeration of all the application events that can be handled by the GUI.
@@ -8706,6 +8709,7 @@ class _Grid_TableWidget(qtW.QTableWidget):
                 item.setText(current_text + text)
                 self.typing_buffer = current_text + text
             return True
+
         return qtW.QTableView.eventFilter(self, obj, event)
 
     def focusInEvent(self, event: qtG.QFocusEvent) -> None:
@@ -9075,8 +9079,6 @@ class Grid(_qtpyBase_Control):
                     elif len(arg) == 4:
                         row_prev, col_prev, row, col = arg
 
-        # print(f"DBG YXXXXY {event=} {args=} {widget_item=}")
-
         value = None
         user_data = None
         self._widget: qtW.QTableWidget  # Type hinting
@@ -9146,7 +9148,7 @@ class Grid(_qtpyBase_Control):
         else:
             return 1
 
-    def checkitemrow_get(self, row: int, col: int) -> Grid_Item_Tuple:
+    def checkitemrow_get(self, row: int, col: int) -> Grid_Item | tuple:
         """Returns an named tuple of (row_index, tag, current_value, and user_data) from the row and column specified
         if the item is checked or an empty tuple if not checked.
 
@@ -9167,7 +9169,7 @@ class Grid(_qtpyBase_Control):
         item_data = item.data(qtC.Qt.UserRole)
 
         if item.checkState() == qtC.Qt.Checked:
-            return Grid_Item_Tuple(
+            return Grid_Item(
                 row_index=row_index,
                 tag=item_data.tag,
                 current_value=item_data.current_value,
@@ -9354,6 +9356,36 @@ class Grid(_qtpyBase_Control):
             raise RuntimeError(f"{self._widget=}. Not set")
 
         return self._widget.currentColumn()
+
+    def grid_item_get(self, row: int = -1, col: int = -1) -> Grid_Item | None:
+        """
+        Returns the grid item stored on the given column referred to by row and col.
+        If row or col is not specified, it returns the grid item stored in the current row or column.
+        If no grid_item is found, returns None.
+
+        Args:
+            row (int): Row index reference (default {-1})
+            col (int): Column index reference (default {-1})
+
+        Returns:
+           Grid_Item: Grid item stored in column referred to by row and col
+        """
+        assert row == -1 or row >= 0, f"{row=} must be an int == -1 or int >= 0"
+        assert col == -1 or col >= 0, f"{col=} must be an int == -1 or int >= 0"
+
+        self._widget: qtW.QTableWidget
+
+        if row == -1:
+            row = self._widget.currentRow()
+        if col == -1:
+            col = self._widget.currentColumn()
+
+        row_index, col_index = self._rowcol_validate(row, col)
+
+        item = self._widget.item(row_index, col_index)
+        item_data = item.data(qtC.Qt.UserRole)
+
+        return item_data if item_data is not None else None
 
     def load_csv_file(
         self,
@@ -10217,7 +10249,7 @@ class Grid(_qtpyBase_Control):
         if row_index >= self._widget.rowCount():
             row_index = self.row_append
 
-        widget.tag = f"{row}{widget.tag}"
+        widget.tag = f"{row}|{widget.tag}"
 
         rowcol_widget = widget._create_widget(
             parent_app=self.parent_app,
