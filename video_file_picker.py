@@ -228,13 +228,13 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         if selected_files:
             # This is ugly,pop-up returns a str so have to transform selected files to a string!
             file_str = ""
-            for file_tuple in selected_files:
-                file_tuple: qtg.Grid_Item_Tuple  # Type hine
+            for grid_item in selected_files:
+                grid_item: qtg.Grid_Item
 
-                row = file_tuple.row_index
-                tag = file_tuple.tag
-                value = file_tuple.current_value
-                user_data = file_tuple.user_data
+                row = grid_item.row_index
+                tag = grid_item.tag
+                value = grid_item.current_value
+                user_data = grid_item.user_data
 
                 file_str += f"{row},{tag},{value},{user_data}|"
 
