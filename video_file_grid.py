@@ -50,6 +50,7 @@ class Video_File_Grid:
         self.project_duration = ""
 
         # Private instance variables
+        self._display_filename: bool = True
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
         self._db_path = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
@@ -154,6 +155,9 @@ class Video_File_Grid:
 
                 # Insert Assembled Children  Files
                 self._insert_files_into_grid(file_handler, file_grid, file_str)
+
+        self._toggle_file_button_names(event)
+
         return None
 
     def _delete_file_from_grid(
@@ -189,7 +193,7 @@ class Video_File_Grid:
             trimmed_file (str): The trimmed file to update the grid details with.
             button_title (str): The button title to update the grid details with.
         """
-        assert isinstance(file_grid, qtg.Grid), f"{file_grid=}. Must br qtg.Grid,"
+        assert isinstance(file_grid, qtg.Grid), f"{file_grid=}. Must be qtg.Grid,"
         assert isinstance(vd_id, int) and vd_id >= 0, f"{vd_id=}. Must be an int >= 0"
 
         file_handler = file_utils.File()
@@ -308,8 +312,12 @@ class Video_File_Grid:
                                 file_grid.row_delete(item[0])
 
                         self._set_project_standard_duration(event)
-                    case "rename_files":
-                        self._generate_button_names(event)
+                    case "toggle_file_button_names":
+                        if self._display_filename:
+                            self._display_filename = False
+                        else:
+                            self._display_filename = True
+                        self._toggle_file_button_names(event)
 
     def _load_grid(self, event: qtg.Action) -> None:
         """Loads the grid from the database
@@ -389,8 +397,9 @@ class Video_File_Grid:
         except Exception as e:
             popups.PopError(title="File Grid Save Error...", message=str(e)).show()
 
-    def _generate_button_names(self, event) -> None:
-        """Tries to generate sensible button names from the file title
+    def _toggle_file_button_names(self, event) -> None:
+        """Toggles between file name display and button title display depending on the value of self._display_filename
+
         Args:
             event (qtg.Acton) : Calling event
         """
@@ -401,28 +410,35 @@ class Video_File_Grid:
             tag="video_input_files",
         )
 
-        if (
-            file_grid.row_count > 0
-            and popups.PopYesNo(
-                title="Auto=Generate Button Names...",
-                message="Automatically Generate Button Names?",
-            ).show()
-            == "yes"
-        ):
-            for row_index in range(file_grid.row_count):
-                user_data: Video_Data = file_grid.userdata_get(row=row_index, col=4)
+        for row_index in range(file_grid.row_count):
+            user_data: Video_Data = file_grid.userdata_get(row=row_index, col=0)
 
+            if user_data.video_file_settings.button_title.strip() != "":
+                button_title = user_data.video_file_settings.button_title
+            else:
                 button_title = file_handler.extract_title(
                     user_data.video_file, self.common_words
                 )
+                user_data.video_file_settings.button_title = button_title
 
-                if button_title.strip() != "":
-                    user_data.video_file_settings.button_title = button_title
-                    file_grid.value_set(
-                        row=row_index, col=0, value=button_title, user_data=user_data
-                    )
-
-                    file_grid.userdata_set(row=row_index, user_data=user_data)
+            if self._display_filename:
+                file_grid.value_set(
+                    row=row_index,
+                    col=0,
+                    value=f"{user_data.video_file}{user_data.video_extension}",
+                    user_data=user_data,
+                    tooltip=(
+                        f"{sys_consts.SDELIM}{user_data.video_path}{sys_consts.SDELIM}"
+                    ),
+                )
+            else:
+                file_grid.value_set(
+                    row=row_index,
+                    col=0,
+                    value=button_title,
+                    user_data=user_data,
+                )
+            file_grid.userdata_set(row=row_index, user_data=user_data)
 
     def load_video_input_files(self, event: qtg.Action) -> None:
         """Loads video files into the video input grid
@@ -633,13 +649,18 @@ class Video_File_Grid:
 
         file_grid.value_set(
             value=(
-                video_user_data.video_file
-                if video_user_data.video_file_settings.button_title.strip() == ""
+                f"{video_user_data.video_file}{video_user_data.video_extension}"
+                if self._toggle_file_button_names
                 else video_user_data.video_file_settings.button_title
             ),
             row=row_index,
             col=0,
             user_data=video_user_data,
+            tooltip=(
+                f"{sys_consts.SDELIM}{video_user_data.video_path}{sys_consts.SDELIM}"
+                if self._toggle_file_button_names
+                else ""
+            ),
         )
 
         file_grid.value_set(
@@ -760,9 +781,9 @@ class Video_File_Grid:
         ).add_row(
             qtg.Button(
                 icon=file_utils.App_Path("text.svg"),
-                tag="rename_files",
+                tag="toggle_file_button_names",
                 callback=self.event_handler,
-                tooltip="Auto-Generate DVD Button Titles",
+                tooltip="Toggle Between File Names and Button Title Names",
                 width=2,
             ),
             qtg.Spacer(width=1),
