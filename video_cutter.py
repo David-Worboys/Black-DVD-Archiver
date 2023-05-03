@@ -761,9 +761,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
         """
         assert isinstance(up, bool), f"{up=}. Must be bool"
 
-        checked_items: tuple[qtg.Grid_Item_Tuple] = self._edit_list_grid.checkitems_get
+        checked_items: tuple[qtg.Grid_Item] = self._edit_list_grid.checkitems_get
         assert all(
-            isinstance(item, qtg.Grid_Item_Tuple) for item in checked_items
+            isinstance(item, qtg.Grid_Item) for item in checked_items
         ), f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
 
         if len(checked_items) == 0:
@@ -975,9 +975,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         ).show()
                     else:
                         for video_file_path in video_files_string.split(","):
-                            video_path, video_file, video_extension = (
-                                file_handler.split_file_path(video_file_path)
-                            )
+                            (
+                                video_path,
+                                video_file,
+                                video_extension,
+                            ) = file_handler.split_file_path(video_file_path)
                             video_data.append(
                                 Video_Data(
                                     video_folder=video_path,
@@ -1039,9 +1041,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
                             return None
 
-                        assembled_path, assembled_filename, assembled_extension = (
-                            file_handler.split_file_path(assembled_file)
-                        )
+                        (
+                            assembled_path,
+                            assembled_filename,
+                            assembled_extension,
+                        ) = file_handler.split_file_path(assembled_file)
 
                         self.video_file_input.append(
                             Video_Data(
@@ -1124,9 +1128,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         message=f"<{trimmed_file}>",
                     ).show()
                 else:
-                    trimmed_path, trimmed_filename, trimmed_extension = (
-                        file_handler.split_file_path(trimmed_file)
-                    )
+                    (
+                        trimmed_path,
+                        trimmed_filename,
+                        trimmed_extension,
+                    ) = file_handler.split_file_path(trimmed_file)
 
                     trimmed_video = Video_Data(
                         video_folder=trimmed_path,
@@ -1902,7 +1908,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
             video_cutter_container = qtg.VBoxContainer(
                 tag="video_cutter",
-                text=f"Video Cutter",
+                text="Video Cutter",
                 align=qtg.Align.CENTER,
             ).add_row(
                 self._video_display,
