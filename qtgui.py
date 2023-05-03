@@ -9368,7 +9368,7 @@ class Grid(_qtpyBase_Control):
             col (int): Column index reference (default {-1})
 
         Returns:
-           Grid_Item: Grid item stored in column referred to by row and col
+            Grid_Item: Grid item stored in column referred to by row and col
         """
         assert row == -1 or row >= 0, f"{row=} must be an int == -1 or int >= 0"
         assert col == -1 or col >= 0, f"{col=} must be an int == -1 or int >= 0"

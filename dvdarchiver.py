@@ -436,7 +436,7 @@ class DVD_Archiver:
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             for checked_item in checked_items:
-                checked_item: qtg.Grid_Item_Tuple
+                checked_item: qtg.Grid_Item
                 user_data: Video_Data = checked_item.user_data
 
                 file_def = File_Def()

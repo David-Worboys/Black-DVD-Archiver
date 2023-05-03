@@ -174,6 +174,7 @@ class Video_Data:
     video_extension: str
     encoding_info: dict
     video_file_settings: Video_File_Settings
+    vd_id: int = -1
 
     def __post_init__(self) -> None:
         assert (
@@ -191,6 +192,13 @@ class Video_Data:
         assert isinstance(
             self.video_file_settings, Video_File_Settings
         ), f"{self.video_file_settings=}. Must be an instance of Video_Filter_Settings"
+
+        assert (
+            isinstance(self.vd_id, int) and self.vd_id == -1 or self.vd_id >= 0
+        ), f"{self.vd_id=}. Must be an int == -1 or >= 0"
+
+        if self.vd_id == -1:
+            self.vd_id = id(self)
 
     @property
     def video_path(self) -> str:
@@ -1957,9 +1965,11 @@ class DVD:
         if pointer_width == -1 and pointer_height == -1:
             return -1, message
 
-        background_path_name, background_file_name, back_ground_file_extn = (
-            file_handler.split_file_path(self._background_canvas_file)
-        )
+        (
+            background_path_name,
+            background_file_name,
+            back_ground_file_extn,
+        ) = file_handler.split_file_path(self._background_canvas_file)
 
         canvas_width, canvas_height, message = dvdarch_utils.get_image_size(
             self._background_canvas_file

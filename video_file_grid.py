@@ -103,8 +103,11 @@ class Video_File_Grid:
             container_tag=event.container_tag, tag=event.tag
         )  # Data we want is on the button
 
-        user_data: Video_Data = tool_button.userdata_get()
+        row = int(
+            event.container_tag.split("|")[0]
+        )  # Grid button container tag has the row_id embedded as the 1st element and delimtered by |
 
+        user_data: Video_Data = file_grid.userdata_get(row=row, col=0)
         video_file_input: list[Video_Data] = [user_data]
 
         result = Video_Cutter_Popup(
@@ -119,21 +122,21 @@ class Video_File_Grid:
         ):  # Original, only user entered file title text might have changed
             self._processed_trimmed(
                 file_grid,
-                video_file_input[0].video_path,
+                video_file_input[0].vd_id,
                 video_file_input[0].video_path,
                 video_file_input[0].video_file_settings.button_title,
             )
         elif len(video_file_input) == 2:  # Original & one edited file (cut/assemble)
             self._processed_trimmed(
                 file_grid,
-                video_file_input[0].video_path,
+                video_file_input[0].vd_id,
                 video_file_input[1].video_path,
                 video_file_input[0].video_file_settings.button_title,
             )
         else:  # Original and multiple edited files
             self._processed_trimmed(
                 file_grid,
-                video_file_input[0].video_path,
+                video_file_input[0].vd_id,
                 video_file_input[1].video_path,
             )
             file_str = ""
@@ -147,7 +150,7 @@ class Video_File_Grid:
                 file_str = file_str[:-1]
 
                 # TODO Make user configurable perhape
-                self._delete_file_from_grid(file_grid, video_file_input[0].video_path)
+                self._delete_file_from_grid(file_grid, video_file_input[0].vd_id)
 
                 # Insert Assembled Children  Files
                 self._insert_files_into_grid(file_handler, file_grid, file_str)
@@ -156,46 +159,25 @@ class Video_File_Grid:
     def _delete_file_from_grid(
         self,
         file_grid: qtg.Grid,
-        source_file_path: str,
+        vd_id: int,
     ) -> None:
         """Delete the source file from the file grid.
         Args:
             file_grid (qtg.Grid): An instance of the `Grid` class.
-            source_file_path (str): A string representing the source folder path of the file to be deleted.
+            vd_id (int): The Video_Data ID of the source file that is to be deleted.
         """
         assert isinstance(file_grid, qtg.Grid), f"{file_grid}. Must be a Grid instance"
-        assert (
-            isinstance(source_file_path, str) and source_file_path.strip() != ""
-        ), f"{source_file_path=}. Must be a non-empty str"
-
-        file_handler = file_utils.File()
-
-        (
-            source_folder,
-            source_file,
-            source_extension,
-        ) = file_handler.split_file_path(source_file_path)
 
         for row in range(0, file_grid.row_count):
-            # File data we want is on the button object
-            row_tool_button: qtg.Button = file_grid.row_widget_get(
-                row=row, col=6, tag="grid_button"
-            )
+            user_data: Video_Data = file_grid.userdata_get(row=row, col=0)
 
-            user_data = row_tool_button.userdata_get()
-
-            if user_data is not None:
-                if (
-                    source_folder == user_data.video_folder
-                    and source_file == user_data.video_file
-                    and source_extension == user_data.video_extension
-                ):
-                    file_grid.row_delete(row)
+            if user_data and user_data.vd_id == vd_id:
+                file_grid.row_delete(row)
 
     def _processed_trimmed(
         self,
         file_grid: qtg.Grid,
-        source_file: str,
+        vd_id: int,
         trimmed_file: str,
         button_title: str = "",
     ) -> None:
@@ -203,25 +185,14 @@ class Video_File_Grid:
         Updates the file_grid with the trimmed_file detail, after finding the corresponding grid entry.
         Args:
             file_grid (qtg.Grid): The grid to update.
-            source_file (str): The name of the source file to match.
+            vd_id (int): The Video_Data ID of the source file.
             trimmed_file (str): The trimmed file to update the grid details with.
             button_title (str): The button title to update the grid details with.
         """
         assert isinstance(file_grid, qtg.Grid), f"{file_grid=}. Must br qtg.Grid,"
-        assert (
-            isinstance(source_file, str) and source_file.strip() != ""
-        ), f"{source_file=}. Must be a non-empty str"
-        assert (
-            isinstance(trimmed_file, str) and trimmed_file.strip() != ""
-        ), f"{trimmed_file=}. Must be a non-empty str."
+        assert isinstance(vd_id, int) and vd_id >= 0, f"{vd_id=}. Must be an int >= 0"
 
         file_handler = file_utils.File()
-
-        (
-            source_folder,
-            source_file_name,
-            source_extension,
-        ) = file_handler.split_file_path(source_file)
 
         (
             trimmed_folder,
@@ -231,57 +202,49 @@ class Video_File_Grid:
 
         # Scan looking for source of trimmed file
         for row in range(file_grid.row_count):
-            # Data we want is on the button object
-            row_tool_button: qtg.Button = file_grid.row_widget_get(
-                row=row, col=6, tag="grid_button"
-            )
+            user_data: Video_Data = file_grid.userdata_get(row=row, col=0)
 
-            user_data: Video_Data = row_tool_button.userdata_get()
-
-            if user_data is not None:  # Should never happen
+            if user_data and vd_id == user_data.vd_id:
+                encoding_info = dvdarch_utils.get_file_encoding_info(trimmed_file)
+                if encoding_info["error"][1]:  # Error Occurred, should not happen
+                    popups.PopError(
+                        title="Encoding Read Error...",
+                        message=encoding_info["error"][1],
+                    ).show()
+                    return
                 if (
-                    user_data.video_folder == source_folder
-                    and user_data.video_file == source_file_name
-                    and user_data.video_extension == source_extension
+                    button_title
+                    and user_data.video_file_settings.button_title != button_title
                 ):
-                    encoding_info = dvdarch_utils.get_file_encoding_info(trimmed_file)
-                    if encoding_info["error"][1]:  # Error Occurred, should not happen
-                        popups.PopError(
-                            title="Encoding Read Error...",
-                            message=encoding_info["error"][1],
-                        ).show()
-                        return
+                    user_data.video_file_settings.button_title = button_title
 
-                    if (
-                        button_title
-                        and user_data.video_file_settings.button_title != button_title
-                    ):
-                        user_data.video_file_settings.button_title = button_title
+                updated_user_data = Video_Data(
+                    video_folder=trimmed_folder,
+                    video_file=trimmed_file_name,
+                    video_extension=trimmed_extension,
+                    encoding_info=encoding_info,
+                    video_file_settings=user_data.video_file_settings,
+                )
 
-                    updated_user_data = Video_Data(
-                        video_folder=trimmed_folder,
-                        video_file=trimmed_file_name,
-                        video_extension=trimmed_extension,
-                        encoding_info=encoding_info,
-                        video_file_settings=user_data.video_file_settings,
+                duration = str(
+                    datetime.timedelta(
+                        seconds=updated_user_data.encoding_info["video_duration"][1]
+                    )
+                ).split(".")[0]
+
+                self._populate_grid_row(
+                    file_grid=file_grid,
+                    row_index=row,
+                    video_user_data=updated_user_data,
+                    duration=duration,
+                )
+
+                for col in range(0, file_grid.col_count):
+                    file_grid.userdata_set(
+                        row=row, col=col, user_data=updated_user_data
                     )
 
-                    duration = str(
-                        datetime.timedelta(
-                            seconds=updated_user_data.encoding_info["video_duration"][1]
-                        )
-                    ).split(".")[0]
-
-                    self._populate_grid_row(
-                        file_grid=file_grid,
-                        row_index=row,
-                        video_user_data=updated_user_data,
-                        duration=duration,
-                    )
-
-                    row_tool_button.userdata_set(updated_user_data)
-
-                    break  # Only one trimmed file
+                break  # Only one trimmed file
 
     def event_handler(self, event: qtg.Action) -> None:
         """Handles  application events
@@ -746,7 +709,7 @@ class Video_File_Grid:
 
             if checked_items:
                 for checked_item in checked_items:
-                    checked_item: qtg.Grid_Item_Tuple
+                    checked_item: qtg.Grid_Item
                     user_data: Video_Data = checked_item.user_data
 
                     encoding_info = user_data.encoding_info
