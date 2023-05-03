@@ -10040,37 +10040,60 @@ class Grid(_qtpyBase_Control):
         return item_data.previous_value if item_data is not None else None
 
     @overload
-    def value_set(self, value: bool, row: int, col: int, user_data: any) -> None:
+    def value_set(
+        self, value: bool, row: int, col: int, user_data: any, tooltip: str = ""
+    ) -> None:
         ...
 
     @overload
     def value_set(
-        self, value: datetime.date, row: int, col: int, user_data: any
+        self,
+        value: datetime.date,
+        row: int,
+        col: int,
+        user_data: any,
+        tooltip: str = "",
     ) -> NoReturn:
         ...
 
     @overload
     def value_set(
-        self, value: datetime.datetime, row: int, col: int, user_data: any
+        self,
+        value: datetime.datetime,
+        row: int,
+        col: int,
+        user_data: any,
+        tooltip: str = "",
     ) -> NoReturn:
         ...
 
     @overload
     def value_set(
-        self, value: datetime.time, row: int, col: int, user_data: any
+        self,
+        value: datetime.time,
+        row: int,
+        col: int,
+        user_data: any,
+        tooltip: str = "",
     ) -> NoReturn:
         ...
 
     @overload
-    def value_set(self, value: float, row: int, col: int, user_data: any) -> None:
+    def value_set(
+        self, value: float, row: int, col: int, user_data: any, tooltip: str = ""
+    ) -> None:
         ...
 
     @overload
-    def value_set(self, value: int, row: int, col: int, user_data: any) -> None:
+    def value_set(
+        self, value: int, row: int, col: int, user_data: any, tooltip: str = ""
+    ) -> None:
         ...
 
     @overload
-    def value_set(self, value: str, row: int, col: int, user_data: any) -> None:
+    def value_set(
+        self, value: str, row: int, col: int, user_data: any, tooltip: str = ""
+    ) -> None:
         ...
 
     def value_set(
@@ -10081,6 +10104,7 @@ class Grid(_qtpyBase_Control):
         row: int,
         col: int,
         user_data: any,
+        tooltip: str = "",
     ) -> None:
         """
         Sets a display value (and user data if supplied) at a given row and column.
@@ -10090,6 +10114,7 @@ class Grid(_qtpyBase_Control):
             row (int): Row index reference.
             col (int): Column index reference.
             user_data (any): User data to be stored.
+            tooltip (str): Tooltip to be displayed.
 
         Returns:
             None.
@@ -10134,6 +10159,9 @@ class Grid(_qtpyBase_Control):
         item_data = item.data(qtC.Qt.UserRole)
 
         item.setText(str(value))
+
+        if tooltip:
+            item.setToolTip(self.trans_str(tooltip))
 
         if item_data.first_time:
             item_data = item_data.replace(
