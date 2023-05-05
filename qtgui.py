@@ -9471,8 +9471,7 @@ class Grid(_qtpyBase_Control):
 
         return max_len
 
-    @property
-    def move_row_up(self) -> int:
+    def move_row_up(self, move_row: int) -> int:
         """Move the currently selected row up one position in the table.
 
         If the currently selected row is already at the top of the table, nothing happens.
@@ -9480,36 +9479,30 @@ class Grid(_qtpyBase_Control):
         Returns:
             int: The new row or -1 if the row is at the top of the table
         """
-        current_row = self.selected_row
+        self._widget: qtW.QTableWidget
+        column = self._widget.currentColumn()
 
-        if current_row > 0:
-            new_row = current_row - 1
+        if move_row > 0:
+            self._widget.insertRow(move_row - 1)
 
-            for column in range(self._widget.columnCount()):
-                current_value = self.value_get(current_row, column)
-                current_user_data = self.userdata_get(current_row, column)
+            for col in range(self._widget.columnCount()):
+                row_widget = self.row_widget_get(move_row + 1, col)
 
-                new_value = self.value_get(new_row, column)
-                new_user_data = self.userdata_get(new_row, column)
-
-                self.value_set(
-                    row=new_row,
-                    col=column,
-                    value=current_value,
-                    user_data=current_user_data,
-                )
-                self.value_set(
-                    row=current_row,
-                    col=column,
-                    value=new_value,
-                    user_data=new_user_data,
+                self._widget.setItem(
+                    move_row - 1, col, self._widget.takeItem(move_row + 1, col)
                 )
 
-            return new_row
+                if row_widget:
+                    self.row_widget_set(move_row - 1, col, row_widget)
+
+            self._widget.setCurrentCell(move_row - 1, column)
+            self._widget.removeRow(move_row + 1)
+
+            return move_row - 1
+
         return -1
 
-    @property
-    def move_row_down(self) -> int:
+    def move_row_down(self, move_row: int) -> int:
         """Move the currently selected row down one position in the table.
 
         If the currently selected row is already at the bottom of the table, nothing happens.
@@ -9517,31 +9510,26 @@ class Grid(_qtpyBase_Control):
         Returns:
             int: The new row or -1 if the row is not at the bottom of the table
         """
-        current_row = self.selected_row
+        self._widget: qtW.QTableWidget
+        column = self._widget.currentColumn()
 
-        if current_row < self._widget.rowCount() - 1:
-            new_row = current_row + 1
+        if move_row < self._widget.rowCount() - 1:
+            self._widget.insertRow(move_row + 2)
+            for col in range(self._widget.columnCount()):
+                row_widget = self.row_widget_get(move_row, col)
 
-            for column in range(self._widget.columnCount()):
-                current_value = self.value_get(current_row, column)
-                current_user_data = self.userdata_get(current_row, column)
-
-                new_value = self.value_get(new_row, column)
-                new_user_data = self.userdata_get(new_row, column)
-
-                self.value_set(
-                    row=new_row,
-                    col=column,
-                    value=current_value,
-                    user_data=current_user_data,
+                self._widget.setItem(
+                    move_row + 2, col, self._widget.takeItem(move_row, col)
                 )
-                self.value_set(
-                    row=current_row,
-                    col=column,
-                    value=new_value,
-                    user_data=new_user_data,
-                )
-            return new_row
+
+                if row_widget:
+                    self.row_widget_set(move_row + 2, col, row_widget)
+
+            self._widget.setCurrentCell(move_row + 2, column)
+            self._widget.removeRow(move_row)
+
+            return move_row + 1
+
         return -1
 
     @property
@@ -9880,6 +9868,10 @@ class Grid(_qtpyBase_Control):
         row_index, col_index = self._rowcol_validate(row, col)
 
         item = self._widget.item(row_index, col_index)
+
+        if not item:
+            return None
+
         item_data = item.data(qtC.Qt.UserRole)
 
         return item_data.user_data if item_data is not None else None
