@@ -781,9 +781,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self._edit_list_grid.select_row(checked_items[0].row_index)
 
             if up:
-                new_row = self._edit_list_grid.move_row_up
+                new_row = self._edit_list_grid.move_row_up(checked_items[0].row_index)
             else:
-                new_row = self._edit_list_grid.move_row_down
+                new_row = self._edit_list_grid.move_row_down(checked_items[0].row_index)
 
             if new_row >= 0:
                 self._edit_list_grid.checkitemrow_set(True, new_row, 0)
