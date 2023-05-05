@@ -882,9 +882,9 @@ class DVD:
         )
 
         video_denoise_filter = "nlmeans=1.0:7:5:3:3"  # Light but fairly fast denoise
-        video_denoise_filter = "nlmeans=7.0:7:5:0:9"  # Light but fairly fast denoise
+        # video_denoise_filter = "nlmeans=7.0:7:5:0:9"  # Light but fairly fast denoise
         # video_denoise_filter ="owdenoise"
-        color_correct_filter = "colorcorrect=analyze='average'"  # Fixes white balance
+        color_correct_filter = "colorcorrect=analyze='median'"  # Fixes white balance
         usharp_filter = "unsharp=luma_amount=0.2"  # Gentle sharpening of luma channel
 
         # Black frame around the video to hide things like head switching noise
@@ -1158,8 +1158,6 @@ class DVD:
 
         result, message = self._prepare_buttons(
             cell_coords=cell_coords,
-            max_cell_width=0,  # cell_width_max,
-            max_cell_height=0,  # cell_height_max,
         )
 
         if result == -1:
@@ -1381,8 +1379,8 @@ class DVD:
         # ===== Main
 
         # TODO Make these values configurable
-        header_pad = 10
-        button_padding = 10
+        header_pad = 10  # Feel good thing
+        button_padding = 20  # Min value that works with spumux
 
         # This keeps spumux happy
         if border_right < SPUMUX_BUFFER:
@@ -1408,7 +1406,9 @@ class DVD:
             buttons_across=buttons_across,
         )
 
-        max_button_height = canvas_height // max(num_rows, 4)
+        max_button_height = canvas_height // max(
+            num_rows, 4
+        )  # Do not change as spumux very sensitive to this
 
         ## Compute the maximum width of each rectangle based on the number of columns across all pages
         rect_width_max = (
@@ -1633,9 +1633,18 @@ class DVD:
 
         return 1, ""
 
-    def _prepare_buttons(
-        self, cell_coords: list[_Cell_Coords], max_cell_width: int, max_cell_height: int
-    ) -> tuple[int, str]:
+    def _prepare_buttons(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
+        """Prepares the buttons and places them on the requisite image files required to build a dvd menu.
+
+        Args:
+            cell_coords (list[_Cell_Coords]): The list of cell coordinates.
+
+        Returns:
+            tuple[int, str]: A tuple containing the following values:
+                - arg1: 1: ok, -1: fail
+                - arg2: error message or "" if ok
+        """
+
         # ===== Helper
         def _get_canvas_overlay_files(
             background_path_name: str, background_file_name: str, page_no: int
@@ -1936,6 +1945,10 @@ class DVD:
             return 1, ""
 
         # ===== Main
+        assert (
+            isinstance(cell_coords, list) and len(cell_coords) > 0
+        ), f"{cell_coords=}. Must be a non-empty list"
+
         file_handler = file_utils.File()
 
         # TODO Black Choices - make user configurable
@@ -1977,11 +1990,6 @@ class DVD:
 
         if canvas_width == -1 and canvas_height == -1:
             return -1, message
-
-        canvas_overlay_file = ""
-        canvas_select_file = ""
-        canvas_highlight_file = ""
-        canvas_images_file = ""
 
         max_page_no = 0
         prev_page = -1
@@ -2677,6 +2685,7 @@ class DVD:
         # Build menu pass
         for menu_index, input_video in enumerate(self.dvd_setup.input_videos):
             button_index += 1
+            # TODO Specifically use buttons indicies rather than relying on the auro feature of spumux
             # pgc["button"].append({"@name":f"btn-{button_index}","#text":f"jump title {menu_index + 1};"})
             pgc["button"].append(f"jump title {menu_index + 1};")
 
