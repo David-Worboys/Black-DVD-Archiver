@@ -43,7 +43,7 @@ class DVD_Archiver:
     Class for archiving DVDs.
     """
 
-    def __init__(self, args):
+    def __init__(self, args) -> None:
         self._DVD_Arch_App = qtg.QtPyApp(
             display_name=sys_consts.PROGRAM_NAME,
             callback=self.event_handler,
@@ -129,7 +129,7 @@ class DVD_Archiver:
             )
         return app_database
 
-    def _db_tables_create(self):
+    def _db_tables_create(self) -> None:
         """Create a database tables used by the DVD Archiver in the SQL database using sqldb.
 
         If the tables already exists, this method does nothing.  If an error occurs during table creation
@@ -188,7 +188,7 @@ class DVD_Archiver:
                     f" {error_status.message}"
                 )
 
-    def event_handler(self, event: qtg.Action):
+    def event_handler(self, event: qtg.Action) -> int | None:
         """Handles  application events
 
         Args:
@@ -292,7 +292,7 @@ class DVD_Archiver:
                             self._db_settings.setting_set("menu_font", event.value.data)
                             self._title_font_combo_change(event)
 
-    def _archive_folder_select(self, event):
+    def _archive_folder_select(self, event) -> None:
         """Select an archive folder and updates the settings in the database with the selected folder.
 
         Args:
@@ -323,7 +323,7 @@ class DVD_Archiver:
                 value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
             )
 
-    def _dvd_folder_select(self, event):
+    def _dvd_folder_select(self, event) -> None:
         """Select a DVD build folder and updates the settings in the database with the selected folder.
 
         Args:
@@ -354,7 +354,7 @@ class DVD_Archiver:
                 value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
             )
 
-    def _make_dvd(self, event: qtg.Action):
+    def _make_dvd(self, event: qtg.Action) -> None:
         """
         Builds a DVD with the given video files and menu attributes.
 
@@ -555,7 +555,7 @@ class DVD_Archiver:
                 return -1, message
         return 1, ""
 
-    def _menu_color_combo_change(self, event: qtg.Action):
+    def _menu_color_combo_change(self, event: qtg.Action) -> None:
         """Changes the menu colour of the colour patch when the menu colour is changed
 
         Args:
@@ -573,7 +573,7 @@ class DVD_Archiver:
 
         return None
 
-    def _title_font_combo_change(self, event: qtg.Action):
+    def _title_font_combo_change(self, event: qtg.Action) -> None:
         """Changes the font of the colour patch of the title font text when the font
         selection changes
 
