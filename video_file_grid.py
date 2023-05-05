@@ -277,6 +277,10 @@ class Video_File_Grid:
                         )
 
                         self._set_project_standard_duration(event)
+                    case "move_video_file_down":
+                        self._move_video_file(event=event, up=False)
+                    case "move_video_file_up":
+                        self._move_video_file(event=event, up=True)
                     case "select_files":
                         folder = self._db_settings.setting_get(
                             sys_consts.DVD_BUILD_FOLDER
@@ -294,30 +298,96 @@ class Video_File_Grid:
 
                         self.load_video_input_files(event)
                     case "remove_files":
-                        file_grid: qtg.Grid = event.widget_get(
-                            container_tag="video_file_controls",
-                            tag="video_input_files",
-                        )
+                        self._remove_files(event)
 
-                        if (
-                            file_grid.row_count > 0
-                            and file_grid.checkitems_get
-                            and popups.PopYesNo(
-                                title="Remove Checked...",
-                                message="Remove The Checked Files?",
-                            ).show()
-                            == "yes"
-                        ):
-                            for item in reversed(file_grid.checkitems_get):
-                                file_grid.row_delete(item[0])
-
-                        self._set_project_standard_duration(event)
                     case "toggle_file_button_names":
                         if self._display_filename:
                             self._display_filename = False
                         else:
                             self._display_filename = True
                         self._toggle_file_button_names(event)
+
+    def _remove_files(self, event: qtg.Action) -> None:
+        """Removes the selected files
+
+        Args:
+            event (qtg.Action) : Calling event
+        """
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
+        file_grid: qtg.Grid = event.widget_get(
+            container_tag="video_file_controls",
+            tag="video_input_files",
+        )
+
+        if (
+            file_grid.row_count > 0
+            and file_grid.checkitems_get
+            and popups.PopYesNo(
+                title="Remove Selected...",
+                message="Remove The Selected Files?",
+            ).show()
+            == "yes"
+        ):
+            for item in reversed(file_grid.checkitems_get):
+                item: qtg.Grid_Item
+                file_grid.row_delete(item.row_index)
+
+        self._set_project_standard_duration(event)
+
+        if event.value_get(container_tag="video_file_controls", tag="bulk_select"):
+            event.value_set(
+                container_tag="video_file_controls", tag="bulk_select", value=False
+            )
+
+    def _move_video_file(self, event: qtg.Action, up: bool) -> None:
+        """
+        Move the selected video file up or down in the file list grid.
+
+        Args:
+            event (qtg.Action) : Calling event
+            up (bool): True to move the video file up, False to move it down.
+
+        """
+        assert isinstance(up, bool), f"{up=}. Must be bool"
+
+        file_grid: qtg.Grid = event.widget_get(
+            container_tag="video_file_controls",
+            tag="video_input_files",
+        )
+
+        checked_items: tuple[qtg.Grid_Item] = file_grid.checkitems_get
+        assert all(
+            isinstance(item, qtg.Grid_Item) for item in checked_items
+        ), f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
+
+        if len(checked_items) == 0:
+            popups.PopMessage(
+                title="Select A Video file...",
+                message="Please Select A Video File To Move!",
+            ).show()
+        elif len(checked_items) > 1:
+            popups.PopMessage(
+                title="Too Many Selected Video Files...",
+                message="Select Only One Video File For A Move ",
+            ).show()
+        else:
+            file_grid.checkitemrow_set(False, checked_items[0].row_index, 0)
+            file_grid.select_row(checked_items[0].row_index)
+
+            if up:
+                new_row = file_grid.move_row_up(checked_items[0].row_index)
+            else:
+                new_row = file_grid.move_row_down(checked_items[0].row_index)
+
+            if new_row >= 0:
+                file_grid.checkitemrow_set(True, new_row, 0)
+                file_grid.select_col(new_row, 0)
+            else:
+                file_grid.checkitemrow_set(True, checked_items[0].row_index, 0)
+                file_grid.select_col(checked_items[0].row_index, 0)
 
     def _load_grid(self, event: qtg.Action) -> None:
         """Loads the grid from the database
@@ -389,6 +459,7 @@ class Video_File_Grid:
                     for col in range(file_grid.col_count):
                         value = file_grid.value_get(row=row, col=col)
                         user_data = file_grid.userdata_get(row=row, col=col)
+
                         col_value.append((value, user_data))
 
                     row_data.append(col_value)
@@ -783,7 +854,22 @@ class Video_File_Grid:
                 icon=file_utils.App_Path("text.svg"),
                 tag="toggle_file_button_names",
                 callback=self.event_handler,
-                tooltip="Toggle Between File Names and Button Title Names",
+                tooltip="Toggle Between Video File Names and Button Title Names",
+                width=2,
+            ),
+            qtg.Spacer(width=1),
+            qtg.Button(
+                icon=file_utils.App_Path("arrow-up.svg"),
+                tag="move_video_file_up",
+                callback=self.event_handler,
+                tooltip="Move This Video File Up!",
+                width=2,
+            ),
+            qtg.Button(
+                icon=file_utils.App_Path("arrow-down.svg"),
+                tag="move_video_file_down",
+                callback=self.event_handler,
+                tooltip="Move This Video File Down!",
                 width=2,
             ),
             qtg.Spacer(width=1),
@@ -791,7 +877,7 @@ class Video_File_Grid:
                 icon=file_utils.App_Path("x.svg"),
                 tag="remove_files",
                 callback=self.event_handler,
-                tooltip="Remove Checked Files From DVD Input Files",
+                tooltip="Remove Selected Video Files From DVD Input Files",
                 width=2,
             ),
             qtg.Button(
