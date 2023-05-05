@@ -1605,7 +1605,9 @@ class _Widget_Registry:
 
         if container_tag in self._widget_dict:
             if tag in self._widget_dict[container_tag]:
-                self.widget_del(container_tag, tag)
+                self.widget_del(
+                    window_id=window_id, container_tag=container_tag, tag=tag
+                )
 
         if container_tag not in self._widget_dict:
             self._widget_dict[container_tag] = {}
@@ -9483,22 +9485,36 @@ class Grid(_qtpyBase_Control):
         column = self._widget.currentColumn()
 
         if move_row > 0:
-            self._widget.insertRow(move_row - 1)
+            new_row = move_row - 1
+            self._widget.insertRow(new_row)
 
             for col in range(self._widget.columnCount()):
-                row_widget = self.row_widget_get(move_row + 1, col)
-
-                self._widget.setItem(
-                    move_row - 1, col, self._widget.takeItem(move_row + 1, col)
+                row_widget: _qtpyBase_Control | None = self.row_widget_get(
+                    move_row + 1, col
                 )
 
-                if row_widget:
-                    self.row_widget_set(move_row - 1, col, row_widget)
+                self._widget.setItem(
+                    new_row, col, self._widget.takeItem(move_row + 1, col)
+                )
 
-            self._widget.setCurrentCell(move_row - 1, column)
+                if row_widget and "|" in row_widget.tag:
+                    row_widget.tag = row_widget.tag.split("|")[1]
+                    self.row_widget_set(new_row, col, row_widget)
+
             self._widget.removeRow(move_row + 1)
 
-            return move_row - 1
+            # Row widget items have the row embedded in the tag name and this needs resetting
+            for row in range(new_row, self._widget.rowCount()):
+                for col in range(self._widget.columnCount()):
+                    row_widget: _qtpyBase_Control | None = self.row_widget_get(row, col)
+
+                    if row_widget and "|" in row_widget.tag:
+                        row_widget.tag = row_widget.tag.split("|")[1]
+                        self.row_widget_set(row, col, row_widget)
+
+            self._widget.setCurrentCell(new_row, column)
+
+            return new_row
 
         return -1
 
@@ -9514,19 +9530,32 @@ class Grid(_qtpyBase_Control):
         column = self._widget.currentColumn()
 
         if move_row < self._widget.rowCount() - 1:
-            self._widget.insertRow(move_row + 2)
-            for col in range(self._widget.columnCount()):
-                row_widget = self.row_widget_get(move_row, col)
+            new_row = move_row + 2
+            self._widget.insertRow(new_row)
 
-                self._widget.setItem(
-                    move_row + 2, col, self._widget.takeItem(move_row, col)
+            for col in range(self._widget.columnCount()):
+                row_widget: _qtpyBase_Control | None = self.row_widget_get(
+                    move_row, col
                 )
 
-                if row_widget:
-                    self.row_widget_set(move_row + 2, col, row_widget)
+                self._widget.setItem(new_row, col, self._widget.takeItem(move_row, col))
 
-            self._widget.setCurrentCell(move_row + 2, column)
+                if row_widget and "|" in row_widget.tag:
+                    row_widget.tag = row_widget.tag.split("|")[1]
+                    self.row_widget_set(new_row, col, row_widget)
+
             self._widget.removeRow(move_row)
+
+            # Row widget items have the row embedded in the tag name and this needs resetting
+            for row in range(new_row):
+                for col in range(self._widget.columnCount()):
+                    row_widget: _qtpyBase_Control | None = self.row_widget_get(row, col)
+
+                    if row_widget and "|" in row_widget.tag:
+                        row_widget.tag = row_widget.tag.split("|")[1]
+                        self.row_widget_set(row, col, row_widget)
+
+            self._widget.setCurrentCell(new_row, column)
 
             return move_row + 1
 
