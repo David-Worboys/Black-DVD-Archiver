@@ -34,265 +34,11 @@ import dvdarch_utils
 import file_utils
 import sqldb
 import sys_consts
+from configuration_classes import File_Def
 
 # fmt: on
 
 SPUMUX_BUFFER: Final[int] = 43
-
-# ===== Public API class for class DVD use
-
-
-@dataclasses.dataclass(slots=True)
-class Video_File_Settings:
-    """Class to hold video file settings for each file comprising the DVD menu buttons"""
-
-    _normalise: bool = True
-    _denoise: bool = True
-    _white_balance: bool = True
-    _sharpen: bool = True
-    _auto_bright: bool = True
-    _button_title: str = ""
-    _menu_button_frame: int = -1
-
-    def __post_init__(self) -> None:
-        """Post init to check the file settings are valid"""
-        assert isinstance(self._normalise, bool), f"{self._normalise=}. Must be a bool"
-        assert isinstance(self._denoise, bool), f"{self._denoise=}. Must be a bool"
-        assert isinstance(
-            self._white_balance, bool
-        ), f"{self._white_balance=}. Must be a bool"
-        assert isinstance(self._sharpen, bool), f"{self._sharpen=}. Must be a bool"
-        assert isinstance(
-            self._auto_bright, bool
-        ), f"{self._auto_bright=}. Must be a bool"
-        assert isinstance(self._button_title, str), f"{self._button_title=} must be str"
-        assert (
-            isinstance(self._menu_button_frame, int)
-            and self._menu_button_frame == -1
-            or self._menu_button_frame >= 0
-        ), f"{self._menu_button_frame=}. Must be int"
-
-    @property
-    def filters_off(self) -> bool:
-        """Return True if all the filter settings are off"""
-        return not any(
-            value
-            for value in [
-                self._normalise,
-                self._denoise,
-                self._white_balance,
-                self._sharpen,
-                self._auto_bright,
-            ]
-        )
-
-    @property
-    def normalise(self) -> bool:
-        return self._normalise
-
-    @normalise.setter
-    def normalise(self, value: bool) -> None:
-        assert isinstance(value, bool), f"{value=}. Must be a bool"
-
-        self._normalise = value
-
-    @property
-    def denoise(self) -> bool:
-        return self._denoise
-
-    @denoise.setter
-    def denoise(self, value: bool) -> None:
-        assert isinstance(value, bool), f"{value=}. Must be a bool"
-
-        self._denoise = value
-
-    @property
-    def white_balance(self) -> bool:
-        return self._white_balance
-
-    @white_balance.setter
-    def white_balance(self, value: bool) -> None:
-        assert isinstance(value, bool), f"{value=}. Must be a bool"
-
-        self._white_balance = value
-
-    @property
-    def sharpen(self) -> bool:
-        return self._sharpen
-
-    @sharpen.setter
-    def sharpen(self, value: bool) -> None:
-        assert isinstance(value, bool), f"{value=}. Must be a bool"
-
-        self._sharpen = value
-
-    @property
-    def auto_bright(self) -> bool:
-        return self._auto_bright
-
-    @auto_bright.setter
-    def auto_bright(self, value: bool) -> None:
-        assert isinstance(value, bool), f"{value=}. Must be a bool"
-
-        self._auto_bright = value
-
-    @property
-    def button_title(self) -> str:
-        return self._button_title
-
-    @button_title.setter
-    def button_title(self, value: str) -> None:
-        assert isinstance(value, str), f"{value=}. Must be a str"
-
-        self._button_title = value
-
-    @property
-    def menu_button_frame(self) -> int:
-        return self._menu_button_frame
-
-    @menu_button_frame.setter
-    def menu_button_frame(self, value: int) -> None:
-        assert (
-            isinstance(value, int) and value == -1 or value >= 0
-        ), f"{value=}. Must be an int == -1 or >= 0"
-        self._menu_button_frame = value
-
-
-@dataclasses.dataclass(slots=True)
-class Video_Data:
-    """
-    video data container class.
-    Attributes:
-        video_folder (str): The path to the folder containing the video.
-        video_file (str): The name of the video file.
-        video_extension (str): The file extension of the video file.
-        encoding_info (dict): Information about the encoding of the video.
-    """
-
-    video_folder: str
-    video_file: str
-    video_extension: str
-    encoding_info: dict
-    video_file_settings: Video_File_Settings
-    vd_id: int = -1
-
-    def __post_init__(self) -> None:
-        assert (
-            isinstance(self.video_folder, str) and self.video_folder.strip() != ""
-        ), f"{self.video_folder=} must be str"
-        assert (
-            isinstance(self.video_file, str) and self.video_file.strip() != ""
-        ), f"{self.video_file=} must be str"
-        assert (
-            isinstance(self.video_extension, str) and self.video_extension.strip() != ""
-        ), f"{self.video_extension=} must be str"
-        assert isinstance(
-            self.encoding_info, dict
-        ), f"{self.encoding_info=}. Must be dict"
-        assert isinstance(
-            self.video_file_settings, Video_File_Settings
-        ), f"{self.video_file_settings=}. Must be an instance of Video_Filter_Settings"
-
-        assert (
-            isinstance(self.vd_id, int) and self.vd_id == -1 or self.vd_id >= 0
-        ), f"{self.vd_id=}. Must be an int == -1 or >= 0"
-
-        if self.vd_id == -1:
-            self.vd_id = id(self)
-
-    @property
-    def video_path(self) -> str:
-        """
-        Gets the full path to the video file.
-        Returns:
-            str: The full path to the video file
-        """
-        video_path = file_utils.File().file_join(
-            self.video_folder, self.video_file, self.video_extension
-        )
-
-        return video_path
-
-
-@dataclasses.dataclass
-class File_Def:
-    _path: str = ""
-    _file_name: str = ""
-    _menu_image_file_path: str = ""
-    _file_info: dict = dataclasses.field(default_factory=dict)
-    _video_file_settings: Video_File_Settings = dataclasses.field(
-        default_factory=Video_File_Settings
-    )
-
-    @property
-    def path(self) -> str:
-        return self._path
-
-    @path.setter
-    def path(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a file path"
-
-        assert file_utils.File().path_exists(value), f"{value=}. Path does not exist"
-
-        self._path = value
-
-    @property
-    def file_name(self) -> str:
-        return self._file_name
-
-    @file_name.setter
-    def file_name(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a file name"
-
-        self._file_name = value
-
-    @property
-    def file_info(self) -> dict:
-        return self._file_info
-
-    @file_info.setter
-    def file_info(self, value: dict) -> None:
-        assert isinstance(value, dict), f"{value=}. Must be a dict of file properties"
-
-        self._file_info = value
-
-    @property
-    def menu_image_file_path(self) -> str:
-        return self._menu_image_file_path
-
-    @menu_image_file_path.setter
-    def menu_image_file_path(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a file path"
-
-        assert file_utils.File().file_exists(value), f"{value=}. Path does not exist"
-
-        self._menu_image_file_path = value
-
-    @property
-    def file_path(self) -> str:
-        assert (
-            self.path != "" and self.file_name != ""
-        ), f"{self.path=}, {self.file_name=}. Must be set"
-
-        return file_utils.File().file_join(self.path, self.file_name)
-
-    @property
-    def video_file_settings(self) -> Video_File_Settings:
-        return self._video_file_settings
-
-    @video_file_settings.setter
-    def video_file_settings(self, value: Video_File_Settings) -> None:
-        assert isinstance(
-            value, Video_File_Settings
-        ), f"{value=}. Must be an instance Video_Filter_Settings"
-
-        self._video_file_settings = value
 
 
 @dataclasses.dataclass
@@ -306,6 +52,11 @@ class DVD_Config:
     _menu_font_color: str = "gold"
     _menu_font_point_size: int = 24
     _menu_font: str = ""
+    _button_background_color: str = "darkgray"
+    _button_background_transparency: float = 0.8
+    _button_font_color: str = "white"
+    _button_font_point_size: int = 12
+    _button_font: str = ""
     _menu_aspect_ratio: str = sys_consts.AR43
     _menu_buttons_across: int = 2
     _menu_buttons_per_page: int = 4
@@ -423,6 +174,67 @@ class DVD_Config:
             for font in dvdarch_utils.get_fonts():
                 if font[0] == value:
                     self._menu_font = font[1]
+                    return
+
+        raise RuntimeError(f"{value=}. Font not found")
+
+    @property
+    def button_background_color(self) -> str:
+        return self._button_background_color
+
+    @button_background_color.setter
+    def button_background_color(self, value: str):
+        assert isinstance(value, str), "Button background color must be a string."
+        self._button_background_color = value
+
+    @property
+    def button_background_transparency(self) -> float:
+        return self._button_background_transparency
+
+    @button_background_transparency.setter
+    def button_background_transparency(self, value: float):
+        assert isinstance(
+            value, float
+        ) and 0 <= value <= 1, f"{value=}.  0 <= Must be float <= 1"
+
+
+        self._button_background_transparency = value
+
+    @property
+    def button_font_color(self) -> str:
+        return self._button_font_color
+
+    @button_font_color.setter
+    def button_font_color(self, value: str):
+        assert isinstance(value, str), "Button font color must be a string."
+        self._button_font_color = value
+
+    @property
+    def button_font_point_size(self) -> int:
+        return self._button_font_point_size
+
+    @button_font_point_size.setter
+    def button_font_point_size(self, value: int):
+        assert isinstance(value, int), "Button font point size must be an integer."
+        self._button_font_point_size = value
+
+    @property
+    def button_font(self) -> str:
+        return self._button_font
+
+    @button_font.setter
+    def button_font(self, value: str):
+        assert (
+            isinstance(value, str) and value.strip() != ""
+        ), f"{value=}. Must be a non-empty string"
+
+        if file_utils.File().file_exists(value):
+            self._button_font = value
+            return
+        else:
+            for font in dvdarch_utils.get_fonts():
+                if font[0] == value:
+                    self._button_font = font[1]
                     return
 
         raise RuntimeError(f"{value=}. Font not found")
@@ -873,7 +685,7 @@ class DVD:
         # Black Video Choices
         average_bit_rate = sys_consts.AVERAGE_BITRATE
 
-        black_border_size = 10  # TODO Black choice for now
+        black_border_size = 12  # TODO Black choice for now
 
         # Black filter Choices for now TODO Allow some user configuration
         debug = False
@@ -1243,12 +1055,12 @@ class DVD:
                 in_file=menu_button_file,
                 out_file=menu_button_text_file,
                 text=menu_text,
-                text_font=font,
-                text_pointsize=pointsize,
-                text_color="white",
+                text_font=self.dvd_setup.button_font,
+                text_pointsize=self.dvd_setup.button_font_point_size,
+                text_color=self.dvd_setup.button_font_color,
                 position="bottom",
-                background_color="black",
-                opacity=0.5,
+                background_color=self.dvd_setup.button_background_color,
+                opacity=self.dvd_setup.button_background_transparency,
                 y_offset=10,
             )
 
@@ -1523,11 +1335,6 @@ class DVD:
         assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
         assert isinstance(width, int) and width > 0, f"{height=}. Must be int > 0"
 
-        pointsize = self.dvd_setup.menu_font_point_size
-        font = self.dvd_setup.menu_font
-
-        pointsize = self.dvd_setup.menu_font_point_size
-        font = self.dvd_setup.menu_font
         menu_title = self.dvd_setup.menu_title
 
         commands = [
