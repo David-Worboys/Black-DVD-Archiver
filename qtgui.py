@@ -6658,7 +6658,7 @@ class PopContainer(_qtpyBase_Control):
 
         assert g_application is not None, f"{g_application=} is bad"
 
-        self.parent_app = cast(QtPyApp, g_application)  # TODO avoid global!
+        self.parent_app: QtPyApp = cast(QtPyApp,g_application)  # TODO avoid global!
 
         if self.height <= 0:
             self.height = 5
@@ -6675,6 +6675,29 @@ class PopContainer(_qtpyBase_Control):
             title=self.title,
             tag=self.tag,
         )
+
+        if (
+            isinstance(self.parent_app.icon, str)
+            and self.parent_app.icon.strip() != ""
+            and pathlib.Path(App_Path(self.parent_app.icon)).exists()
+        ):  # Try and load from file
+            icon_image = qtG.QPixmap(App_Path(self.parent_app.icon)).scaledToWidth(256)  # type: ignore
+
+            assert isinstance(
+                icon_image, (qtG.QIcon, qtG.QPixmap)
+            ), f"{self.parent_app.icon=} did not resolve to a QIcon or a QPixmap"
+
+            self.dialog.setWindowIcon(icon_image)
+        elif self.parent_app.icon is None or (
+            isinstance(self.parent_app.icon, str) and self.parent_app.icon.strip() == ""
+        ):
+            pass
+        elif isinstance(self.parent_app.icon, (qtG.QIcon, qtG.QPixmap)):
+            self.dialog.setWindowIcon(self.parent_app.icon)
+        else:
+            raise AssertionError(
+                f"{self.icon=} || <{type(self.icon)}> is not a file str or a QPixmap"
+            )
 
     def close(self) -> bool:
         """Closes the dialog and sets the result to the value of the _result variable
