@@ -350,6 +350,7 @@ def get_font_example(
     background_color: str = "wheat",
     width: int = -1,
     height: int = -1,
+    opacity: float = 1.0,
 ) -> tuple[int, bytes]:
     """Returns a png byte string an example of what a font looks like
 
@@ -361,6 +362,8 @@ def get_font_example(
         background_color(str): The background color of the png
         width(int): Width of png in pixels. Optional -1 autocalcs
         height(int): Height of png in pixels. Optional -1 autocalcs
+        opacity (float): The opacity level to be set for the color ,
+                        where 0.0 is fully transparent and 1.0 is fully opaque.
 
     Returns:
         tuple[int,bytes]:
@@ -386,6 +389,7 @@ def get_font_example(
     assert (
         isinstance(height, int) and height == -1 or height > 0
     ), f"{height=}. Must be int > 0 or -1 to autocalc"
+    assert 0.0 <= opacity <= 1.0, "Opacity must be between 0.0 and 1.0"
 
     if not os.path.exists(font_file):
         return -1, b""
@@ -416,11 +420,17 @@ def get_font_example(
                 else:
                     pointsize = mid
                     low = mid + 1
+
+        result, background_hex = make_opaque(color=background_color, opacity=opacity)
+
+        if result == -1:
+            return -1, b""
+
         command = [
             sys_consts.CONVERT,
             "-size",
             f"{width}x{height}",
-            f"xc:{background_color}",
+            f"xc:{background_hex}",
             "-fill",
             text_color,
             "-font",
@@ -433,6 +443,7 @@ def get_font_example(
             f"text 0,0 ' {text} '",
             "png:-",
         ]
+
         return pointsize, subprocess.check_output(command, stderr=subprocess.DEVNULL)
 
     except subprocess.CalledProcessError as e:
@@ -1300,7 +1311,7 @@ def get_file_encoding_info(video_file: str) -> dict:
         isinstance(video_file, str) and video_file.strip() != ""
     ), f"{video_file=}. Must bbe a non-empy str"
 
-    debug = True
+    debug = False
 
     fmt = "--output=XML"
 
