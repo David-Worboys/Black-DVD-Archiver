@@ -71,6 +71,8 @@ def Command_Button_Container(
     cancel_callback: Callable = None,
     apply_callback: Callable = None,
     button_width=10,
+    margin_left: int = -1,
+    margin_right: int = -1,
 ) -> "HBoxContainer":
     """
     Creates a horizontal box container for buttons, following platform UX guidelines.
@@ -80,6 +82,11 @@ def Command_Button_Container(
         cancel_callback (function, optional): Callback function for the "Cancel" button. Defaults to None.
         apply_callback (function, optional): Callback function for the "Apply" button. Defaults to None.
         button_width (int): Width of the command buttons
+        margin_left (int) : Left margin
+        margin_right (int) : Right margin
+
+    Raises:
+        AssertionError: If the callbacks are not callable.
 
     Returns:
         HBoxContainer: A horizontal box container for buttons.
@@ -94,10 +101,21 @@ def Command_Button_Container(
     assert (
         isinstance(button_width, int) and button_width >= 7
     ), f"{button_width=}. Must be int > 7"
+    assert (
+        isinstance(margin_left, int) and margin_left == -1 or margin_left >= 0
+    ), f"{margin_left=}. Must be int == -1 or >= 0"
+    assert (
+        isinstance(margin_right, int) and margin_right == -1 or margin_right >= 0
+    ), f"{margin_right=}. Must be int == -1 or >= 0"
 
     platform_name = platform.system()
 
-    button_container = HBoxContainer(align=Align.RIGHT, tag="command_buttons")
+    button_container = HBoxContainer(
+        align=Align.RIGHT,
+        tag="command_buttons",
+        margin_left=margin_left,
+        margin_right=margin_right,
+    )
 
     if platform_name == "Windows":
         button_container.add_row(
@@ -178,7 +196,10 @@ def Command_Button_Container(
 
 
 def Question_Button_Container(
-    yes_callback: Callable, no_callback: Callable
+    yes_callback: Callable,
+    no_callback: Callable,
+    margin_left: int = -1,
+    margin_right: int = -1,
 ) -> "HBoxContainer":
     """
     Displays a message box with a question prompt, following platform UX guidelines.
@@ -186,14 +207,27 @@ def Question_Button_Container(
     Args:
         yes_callback (Callable): Callback function for the "Yes" button.
         no_callback (Callable): Callback function for the "No" button.
+        margin_left (int) : Left margin
+        margin_right (int) : Right margin
 
     Returns:
         qtg.HBoxContainer: A horizontal box container for buttons.
     """
     assert callable(yes_callback), "Invalid 'yes' callback."
     assert callable(no_callback), "Invalid 'no' callback."
+    assert (
+        isinstance(margin_left, int) and margin_left == -1 or margin_left >= 0
+    ), f"{margin_left=}. Must be int == -1 or >= 0"
+    assert (
+        isinstance(margin_right, int) and margin_right == -1 or margin_right >= 0
+    ), f"{margin_right=}. Must be int == -1 or >= 0"
 
-    button_container = HBoxContainer(align=Align.RIGHT, tag="question_buttons")
+    button_container = HBoxContainer(
+        align=Align.RIGHT,
+        tag="question_buttons",
+        margin_left=margin_left,
+        margin_right=margin_right,
+    )
 
     platform_name = platform.system()
 
@@ -1932,7 +1966,7 @@ class _qtpyBase_Control(_qtpyBase):
     icon: Union[None, qtG.QIcon, qtG.QPixmap, str] = None
     translate: bool = True
     text_pad: int = 0
-    frame: Optional[Frame] = None
+    frame: Optional[Widget_Frame] = None
     enabled: bool = True
     label: str = ""
     label_align: Align = Align.RIGHT
@@ -2617,6 +2651,8 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget = qtW.QLabel(self.text, parent)
             case Slider():
                 self._widget = qtW.QSlider(parent)
+            case Spinbox():
+                self._widget = qtW.QSpinBox(parent)
             case Switch():
                 self._widget = _Switch(parent)
             case Tab():
@@ -2700,7 +2736,7 @@ class _qtpyBase_Control(_qtpyBase):
                 )
                 if isinstance(buddy_widget, qtW.QFrame):
                     pass
-                    # buddy_widget.setFrameShape(qtW.QFrame.Shape.Box)  # Debug
+                # buddy_widget.setFrameShape(qtW.QFrame.Shape.Box)  # Debug
 
             edit_group = qtW.QHBoxLayout()
             edit_group.setContentsMargins(0, 0, 0, 0)
@@ -2758,11 +2794,13 @@ class _qtpyBase_Control(_qtpyBase):
         else:
             if self.size_fixed:
                 self._widget.setFixedSize(
-                    (self.width + 1) * char_pixel_size.width, height + self.tune_vsize
+                    (self.width + 1) * (char_pixel_size.width - 1),
+                    height + self.tune_vsize,
                 )
             else:
                 self._widget.setMinimumSize(
-                    (self.width + 1) * char_pixel_size.width, height + self.tune_vsize
+                    (self.width + 1) * (char_pixel_size.width - 1),
+                    height + self.tune_vsize,
                 )
 
         self.visible_set(self.visible)
@@ -4342,6 +4380,14 @@ class Action(_qtpyBase):
         ...
 
     @overload
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "Slider":
+        ...
+
+    @overload
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "Spinbox":
+        ...
+
+    @overload
     def widget_get(self, container_tag: str = "", tag: str = "") -> "Switch":
         ...
 
@@ -4500,6 +4546,10 @@ class _Container(_qtpyBase_Control):
     controls_enabled: bool = True
     scroll_frame_off: Optional[Widget_Frame] = None
     scroll_frame_on: Optional[Widget_Frame] = None
+    margin_left: int = -1
+    margin_right: int = -1
+    margin_top: int = -1
+    margin_bottom: int = -1
 
     _scroll_width = -1
     _scroll_height = -1
@@ -4539,7 +4589,27 @@ class _Container(_qtpyBase_Control):
         ), f"{self.scroll_frame_off=}. Must be an instance of widget_frame"
         assert self.scroll_frame_on is None or isinstance(
             self.scroll_frame_on, Widget_Frame
-        ), f"{self.scroll_frame_on=}. Must be an instance of widgt_frame"
+        ), f"{self.scroll_frame_on=}. Must be an instance of widget_frame"
+        assert (
+            isinstance(self.margin_left, int)
+            and self.margin_left == -1
+            or self.margin_left >= 0
+        ), f"{self.margin_left=}. Must be int == -1 oe >=0"
+        assert (
+            isinstance(self.margin_right, int)
+            and self.margin_right == -1
+            or self.margin_right >= 0
+        ), f"{self.margin_right=}. Must be int == -1 oe >=0"
+        assert (
+            isinstance(self.margin_top, int)
+            and self.margin_top == -1
+            or self.margin_top >= 0
+        ), f"{self.margin_top=}. Must be int == -1 oe >=0"
+        assert (
+            isinstance(self.margin_bottom, int)
+            and self.margin_bottom == -1
+            or self.margin_bottom >= 0
+        ), f"{self.margin_bottom=}. Must be int == -1 oe >=0"
 
         self._scroll_deque: deque = deque()
 
@@ -4633,16 +4703,17 @@ class _Container(_qtpyBase_Control):
                             form_labels[col_control.tag] = self.trans_str(
                                 col_control.label.strip()
                             )
+
                             col_control.label = ""
                             col_control.label_pad = -1
                     elif hasattr(col_control, "label") and col_control.label_pad != -1:
                         col_control.label_pad = (
                             max_text_len - 1
                             if not isinstance(layout, qtW.QHBoxLayout)
+                            and not isinstance(layout, qtW.QVBoxLayout)
                             and row_list.index(col_control) == 0
                             else col_control.label_pad - 1
                         )
-                    # max_row_height = max(max_row_height, col_control.height)
 
             return form_labels
 
@@ -4669,10 +4740,6 @@ class _Container(_qtpyBase_Control):
 
             Returns:
                 None.
-
-            Raises:
-                AssertionError: If the parent of a menu is not an instance of `_qtpyFrame`.
-
             """
 
             row_ptr = 0
@@ -4811,31 +4878,35 @@ class _Container(_qtpyBase_Control):
 
         if isinstance(self, FormContainer):
             layout = qtW.QFormLayout()
-            layout.setContentsMargins(4, 4, 9, 4)
-            # layout.setVerticalSpacing(0)  # Debug
+            margin_left = 4 if self.margin_left == -1 else self.margin_left
+            margin_right = 9 if self.margin_right == -1 else self.margin_right
+            margin_top = 4 if self.margin_top == -1 else self.margin_top
+            margin_bottom = 4 if self.margin_bottom == -1 else self.margin_bottom
         elif isinstance(self, GridContainer):
             layout = qtW.QGridLayout()
+            margin_left = 4 if self.margin_left == -1 else self.margin_left
+            margin_right = 9 if self.margin_right == -1 else self.margin_right
+            margin_top = 4 if self.margin_top == -1 else self.margin_top
+            margin_bottom = 4 if self.margin_bottom == -1 else self.margin_bottom
 
-            layout.setHorizontalSpacing(3)  # TODO Add settings for this and alignment
+            layout.setHorizontalSpacing(0)  # TODO Add settings for this and alignment
             layout.setVerticalSpacing(3)
-            layout.setContentsMargins(4, 4, 9, 4)
-            # layout.setVerticalSpacing(0)  # Debug
         elif isinstance(self, HBoxContainer):
             layout = qtW.QHBoxLayout()
-            layout.setContentsMargins(0, 0, 0, 0)
+            margin_left = 2 if self.margin_left == -1 else self.margin_left
+            margin_right = 2 if self.margin_right == -1 else self.margin_right
+            margin_top = 2 if self.margin_top == -1 else self.margin_top
+            margin_bottom = 2 if self.margin_bottom == -1 else self.margin_bottom
         else:
             layout = qtW.QVBoxLayout()
-            layout.setSpacing(3)
-            layout.setContentsMargins(9, 4, 9, 4)
+            margin_left = 4 if self.margin_left == -1 else self.margin_left
+            margin_right = 9 if self.margin_right == -1 else self.margin_right
+            margin_top = 4 if self.margin_top == -1 else self.margin_top
+            margin_bottom = 4 if self.margin_bottom == -1 else self.margin_bottom
 
         # layout.setContentsMargins(0, 0, 0, 0) #Debug
-        # layout.setContentsMargins(3, 2, 3, 2)
-        # layout.setContentsMargins(4, 4, 4, 9)
-        # layout.setContentsMargins(4, 4, 4, 4)
-        # if isinstance(self, FormContainer):
-        #    layout.setContentsMargins(4, 4, 4, 4)
-        # else:
-        #    layout.setContentsMargins(9, 4, 9, 4)
+
+        layout.setContentsMargins(margin_left, margin_top, margin_right, margin_bottom)
 
         widget_group.setLayout(layout)
         self._widget = widget_group
@@ -5364,8 +5435,9 @@ class _Container(_qtpyBase_Control):
         "LineEdit",
         "Spacer",
         "RadioButton",
-        "Switch",
         "Slider",
+        "Spinbox",
+        "Switch",
         "Tab",
         "TextEdit",
         "Timeedit",
@@ -5975,7 +6047,7 @@ class _Container(_qtpyBase_Control):
     def values_clear(self) -> None:
         """Clears the values of all widgets in the container that have a `clear` method"""
 
-        window_id = Get_Window_ID(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self._parent_app, self._parent, self)
 
         for item in self.tags_gather():
             widget = self._parent_app.widget_get(
@@ -8848,10 +8920,10 @@ class Grid(_qtpyBase_Control):
         prev_value: any
         tag: str
         user_data: any
-        data_type: IntEnum
+        data_type: IntEnum | None
         first_time: bool
-        widget: qtW.QWidget
-        orig_row: int
+        widget: qtW.QWidget | None
+        orig_row: int | None
 
         def replace(
             self,
@@ -14745,19 +14817,21 @@ class Slider(_qtpyBase_Control):
         if self.width == -1:
             self.width = WIDGET_SIZE.width
 
-        widget: qtW.QSlider = super()._create_widget(
+        widget = super()._create_widget(
             parent_app=parent_app, parent=parent, container_tag=container_tag
         )
 
-        widget.setMinimum(self.range_min)
-        widget.setMaximum(self.range_max)
-        widget.setPageStep(self.page_step)
-        widget.setSingleStep(self.single_step)
+        self._widget: qtW.QSlider
+
+        self._widget.setMinimum(self.range_min)
+        self._widget.setMaximum(self.range_max)
+        self._widget.setPageStep(self.page_step)
+        self._widget.setSingleStep(self.single_step)
 
         if self.orientation == "horizontal":
-            widget.setOrientation(qtC.Qt.Horizontal)
+            self._widget.setOrientation(qtC.Qt.Horizontal)
         else:
-            widget.setOrientation(qtC.Qt.Vertical)
+            self._widget.setOrientation(qtC.Qt.Vertical)
 
         return widget
 
@@ -14767,6 +14841,8 @@ class Slider(_qtpyBase_Control):
         Returns:
             int: The value of the slider.
         """
+        self._widget: qtW.QSlider
+
         return self._widget.value()
 
     def value_set(self, value: int) -> None:
@@ -14780,4 +14856,94 @@ class Slider(_qtpyBase_Control):
             and value >= self.range_min
             and value <= self.range_max
         ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
+        self._widget: qtW.QSlider
+
+        self._widget.setValue(value)
+
+
+@dataclasses.dataclass
+class Spinbox(_qtpyBase_Control):
+    """Instantiates a Spinbox widget and associated properties"""
+
+    range_min: int = 0
+    range_max: int = 100
+    single_step: int = 1
+    suffix: str = ""
+    prefix: str = ""
+
+    def __post_init__(self) -> None:
+        """Initializes the spinbox object."""
+        assert (
+            isinstance(self.range_min, int) and self.range_min >= 0
+        ), f"{self.range_min=}. Must be an int >= 0"
+        assert (
+            isinstance(self.range_max, int)
+            and self.range_max > 0
+            and self.range_max > self.range_min
+        ), f"{self.range_max=}. Must be an int > 0 and < {self.range_min=}."
+        assert (
+            isinstance(self.single_step, int) and self.single_step > 0
+        ), f"{self.single_step=}. Must be an int > 0"
+        assert isinstance(self.suffix, str), f"{self.suffix=}. Must be a str"
+        assert isinstance(self.prefix, str), f"{self.prefix=}. Must be a str"
+
+        super().__post_init__()
+
+    def _create_widget(
+        self, parent_app: QtPyApp, parent: qtW.QWidget, container_tag: str = ""
+    ) -> qtW.QWidget:
+        """Creates a Spinbox widget.
+
+        Args:
+            parent_app (QtPyApp): The parent app.
+            parent (qtW.QWidget): The parent widget.
+            container_tag (str): The tag of the container that the widget is in.
+
+        Returns:
+            qtW.QWidget : The spinbox widget
+        """
+        if self.height == -1:
+            self.height = WIDGET_SIZE.height
+
+        if self.width == -1:
+            self.width = WIDGET_SIZE.width
+
+        widget = super()._create_widget(
+            parent_app=parent_app, parent=parent, container_tag=container_tag
+        )
+
+        self._widget: qtW.QSpinBox
+
+        self._widget.setRange(self.range_min, self.range_max)
+        self._widget.setSingleStep(self.single_step)
+
+        if self.suffix != "":
+            self._widget.setSuffix(self.suffix)
+        if self.prefix != "":
+            self._widget.setPrefix(self.prefix)
+
+        return widget
+
+    def value_get(self) -> int:
+        """Gets the value of the spinbox.
+
+        Returns:
+            int: The value of the spinbox.
+        """
+
+        self._widget: qtW.QSpinBox
+        return self._widget.value()
+
+    def value_set(self, value: int) -> None:
+        """Sets the value of the spinbox.
+
+        Args:
+            value (int): The value to set the spinbox to.
+        """
+        assert (
+            isinstance(value, int)
+            and value >= self.range_min
+            and value <= self.range_max
+        ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
+        self._widget: qtW.QSpinBox
         self._widget.setValue(value)
