@@ -139,6 +139,30 @@ class DVD_Menu_Settings:
 
         self._db_settings.setting_set("button_font_point_size", value)
 
+    @property
+    def buttons_across(self) -> int:
+        if not self._db_settings.setting_exist("buttons_across"):
+            self._db_settings.setting_set("buttons_across", 2)
+        return self._db_settings.setting_get("buttons_across")
+
+    @buttons_across.setter
+    def buttons_across(self, value: int):
+        assert isinstance(value, int) and 1 <= value <= 4, f"{value=}. Must be int"
+
+        self._db_settings.setting_set("buttons_across", value)
+
+    @property
+    def buttons_per_page(self) -> int:
+        if not self._db_settings.setting_exist("buttons_per_page"):
+            self._db_settings.setting_set("buttons_per_page", 4)
+        return self._db_settings.setting_get("buttons_per_page")
+
+    @buttons_per_page.setter
+    def buttons_per_page(self, value: int):
+        assert isinstance(value, int) and 1 <= value <= 6, f"{value=}. Must be int"
+
+        self._db_settings.setting_set("buttons_per_page", value)
+
 
 @dataclasses.dataclass(slots=True)
 class Video_File_Settings:
