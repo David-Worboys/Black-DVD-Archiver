@@ -35,7 +35,8 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from archive_management import Archive_Manager
-from dvd import Video_Data
+from configuration_classes import Video_Data
+from dvdarch_popups import File_Renamer_Popup
 
 # fmt: on
 
@@ -183,9 +184,6 @@ class Video_Handler:
                 self.source_state = "Loading"
             case qtM.QMediaPlayer.MediaStatus.LoadedMedia:
                 self.source_state = "Loaded"
-                # print(f"{self._media_player.hasAudio()=}")
-                # print(f"{self._media_player.hasVideo()=}")
-                # print(f"{self._media_player.isSeekable()=}")
             case qtM.QMediaPlayer.MediaStatus.StalledMedia:
                 self.source_state = "Stalled"
             case qtM.QMediaPlayer.MediaStatus.BufferingMedia:
@@ -364,6 +362,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
     _aspect_ratio: str = sys_consts.AR43
     _archive_manager: Archive_Manager | None = None
     _edit_list_grid: qtg.Grid | None = None
+    _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
     _frame_rate: int = 25  # Default to 25 frames per second
     _frame_width: int = 720
     _frame_height: int = 576
@@ -433,13 +432,12 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
         file_handler = file_utils.File()
 
-        # Group the video cutter working folders togethr and seperate from the DVD Build
+        # Group the video cutter working folders together and separate from the DVD Build
         self.output_folder = file_handler.file_join(
             self.output_folder, f"{sys_consts.PROGRAM_NAME} Video Editor"
         )
 
         self.container = self.layout()
-        self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
 
         super().__post_init__()  # Must be last call in method
 
@@ -1791,7 +1789,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 ),
             ]
 
-            # self._video_display = qtg.Label(width=edit_width -6, height=edit_height)
             self._video_display = qtg.Label(
                 width=self._display_width, height=self._display_height, pixel_unit=True
             )
@@ -1883,7 +1880,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
                         callback=self.event_handler,
                         height=1,
                         width=2,
-                        # buddy_control=qtg.Label(tag="menu_frame", width=6, height=1),
                     ),
                     qtg.LineEdit(
                         tag="menu_frame",
@@ -1901,8 +1897,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
                             tooltip="Clear The DVD Menu Button Image",
                         ),
                     ),
-                    # qtg.Spacer(width=1),
-                    # qtg.Button(tag="stop",icon=qtg.SYSICON.mediastop.get(), callback=self.event_handler, width=2, height=1),
                 )
             )
 
@@ -1914,7 +1908,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 self._video_display,
                 self._video_slider,
                 video_button_container,
-                qtg.Spacer(),
                 qtg.HBoxContainer().add_row(
                     self._frame_display,
                 ),
@@ -2092,339 +2085,15 @@ class Video_Cutter_Popup(qtg.PopContainer):
         )
 
         control_container = qtg.VBoxContainer(
-            tag="form_controls", align=qtg.Align.TOPRIGHT
+            tag="form_controls", align=qtg.Align.BOTTOMRIGHT
         )
 
         control_container.add_row(
             video_controls_container,
-            # qtg.Spacer(),
             qtg.Command_Button_Container(
-                ok_callback=self.event_handler, cancel_callback=self.event_handler
-            ).add_row(
-                qtg.Spacer(pixel_unit=True, width=3)
-            ),  # Bit poxy for line up
-        )
-
-        return control_container
-
-
-@dataclasses.dataclass
-class File_Renamer_Popup(qtg.PopContainer):
-    """Renames video files sourced from the video cutter"""
-
-    video_data_list: list[Video_Data] = dataclasses.field(
-        default_factory=list
-    )  # Pass by reference
-    tag: str = "File_Renamer_Popup"
-    file_validated: bool = True
-
-    # Private instance variable
-    _db_settings: sqldb.App_Settings | None = None
-
-    def __post_init__(self) -> None:
-        """Sets-up the form"""
-        assert (
-            isinstance(self.video_data_list, list) and len(self.video_data_list) > 0
-        ), f"{self.video_data_list=}. Must be a non-empty list of Video_Data instances"
-        assert all(
-            isinstance(video_data, Video_Data) for video_data in self.video_data_list
-        ), f"All elements must be Video_Data instances"
-
-        self.container = self.layout()
-        self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
-
-        super().__post_init__()  # This statement must be last
-
-    def event_handler(self, event: qtg.Action) -> None:
-        """Handles  form events
-
-        Args:
-            event (qtg.Action): The triggering event
-        """
-        assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
-
-        match event.event:
-            case qtg.Sys_Events.WINDOWPOSTOPEN:
-                self._load_files(event)
-            case qtg.Sys_Events.CLICKED:
-                match event.tag:
-                    case "ok":
-                        if self._process_ok(event) == 1:
-                            self.set_result(event.tag)
-                            super().close()
-                    case "cancel":
-                        if self._process_cancel(event) == 1:
-                            self.set_result(event.tag)
-                            super().close()
-            case qtg.Sys_Events.CLEAR_TYPING_BUFFER:
-                if isinstance(event.value, qtg.Grid_Col_Value):
-                    grid_col_value: qtg.Grid_Col_Value = event.value
-
-                    user_file_name: str = grid_col_value.value
-                    row = grid_col_value.row
-                    col = grid_col_value.col
-                    user_data = grid_col_value.user_data
-
-                    file_grid: qtg.Grid = event.widget_get(
-                        container_tag="file_controls",
-                        tag="video_input_files",
-                    )
-
-                    file_grid.value_set(
-                        value=user_file_name, row=row, col=col, user_data=user_data
-                    )
-
-    def _is_changed(self, event: qtg.Action) -> bool:
-        """
-        Check if any file names in the video_input_files Grid have been changed.
-
-        Args:
-            event (qtg.Action): The event that triggered this method.
-
-        Returns:
-            bool: True if any file names have been changed, False otherwise.
-        """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
-
-        file_handler = file_utils.File()
-
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="file_controls", tag="video_input_files"
-        )
-
-        col_index = file_grid.colindex_get("new_file_name")
-
-        for row_index in range(0, file_grid.row_count):
-            file_name: str = file_grid.value_get(row_index, col_index)
-            old_file: str = file_grid.userdata_get(row_index, col_index)
-            _, old_file_name, _ = file_handler.split_file_path(old_file)
-
-            if file_name is not None and file_name.strip() != old_file_name.strip():
-                return True
-
-        return False
-
-    def _load_files(self, event: qtg.Action) -> int:
-        """
-        Load the list of video input files into the GUI file controls grid.
-
-        Args:
-            event (qtg.Action): The event that triggered the method.
-
-        Returns:
-            int: The number of files loaded.
-
-        """
-        assert isinstance(event, qtg.Action), "event must be an instance qtg.Action"
-
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="file_controls",
-            tag="video_input_files",
-        )
-
-        col_index: int = file_grid.colindex_get("new_file_name")
-        row_index = 0
-
-        for row_index, video_data in enumerate(self.video_data_list):
-            file_grid.value_set(
-                value=video_data.video_file,
-                row=row_index,
-                col=col_index,
-                user_data=video_data.video_path,
-            )
-
-        return row_index
-
-    def _package_files(self, event: qtg.Action) -> None:
-        """
-        Package the video input files into the video_data_list.
-
-        Args:
-            event (qtg.Action): The event that triggered this method.
-
-        """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=} must be an instance of qtg.Action"
-
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="file_controls", tag="video_input_files"
-        )
-
-        col_index: int = file_grid.colindex_get("new_file_name")
-
-        for row_index in range(file_grid.row_count):
-            user_entered_file_name: str = file_grid.value_get(row_index, col_index)
-
-            if user_entered_file_name.strip() != "":
-                self.video_data_list[row_index].video_file = user_entered_file_name
-
-        return None
-
-    def _process_cancel(self, event: qtg.Action) -> int:
-        """
-        Handles processing the cancel button.
-
-        Args:
-            event (qtg.Action): The triggering event.
-
-        Returns:
-            int: Returns 1 if cancel process is ok, -1 otherwise.
-        """
-        self.set_result("")
-
-        if self._is_changed(event):
-            if (
-                popups.PopYesNo(
-                    title="Files Renamed...",
-                    message="Discard Renamed Files And Close Window?",
-                ).show()
-                == "yes"
-            ):
-                return 1
-            else:
-                result = self._rename_files(event)
-
-                if result == 1:
-                    self._package_files(event)
-
-                return result
-        return 1
-
-    def _process_ok(self, event: qtg.Action) -> int:
-        """
-        Handles processing the ok button.
-
-        Args:
-            event (qtg.Action): The triggering event.
-
-        Returns:
-            int: Returns 1 if the ok process id good, -1 otherwise
-
-        """
-
-        self.set_result("")
-
-        if self._is_changed(event):
-            if (
-                popups.PopYesNo(title="Rename Files...", message="Rename Files?").show()
-                == "yes"
-            ):
-                result = self._rename_files(event)
-
-                if result == 1:
-                    popups.PopMessage(
-                        title="Rename Files...", message="Files Renamed Successfully"
-                    ).show()
-                    self._package_files(event)
-
-                return result
-        else:
-            self._package_files(event)
-
-        return 1
-
-    def _rename_files(self, event: qtg.Action) -> int:
-        """
-        Handles renaming of video file if needed.
-
-        Args:
-            event (qtg.Action): The triggering event.
-
-        Returns:
-            int: Returns 1 if all file names are valid and files are, if needed, renamed successfully, -1 otherwise.
-
-        """
-        assert isinstance(event, qtg.Action), "event must be an instance qtg.Action"
-
-        file_handler = file_utils.File()
-
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="file_controls",
-            tag="video_input_files",
-        )
-
-        col_index = file_grid.colindex_get("new_file_name")
-
-        for row_index in range(0, file_grid.row_count):
-            file_name = file_grid.value_get(row_index, col_index)
-            old_file: str = file_grid.userdata_get(row_index, col_index)
-
-            if file_name is None:  # Probably an error occurred
-                continue
-
-            if file_name.strip() != "" and not file_handler.filename_validate(
-                file_name
-            ):
-                error_msg = (
-                    f"{sys_consts.SDELIM}{file_name!r}{sys_consts.SDELIM} is not a"
-                    " valid file name! Please reenter."
-                )
-                popups.PopError(title="Invalid File Name...", message=error_msg).show()
-                file_grid.select_row(row_index, col_index)
-                return -1
-
-            old_file_path, old_file_name, extension = file_handler.split_file_path(
-                old_file
-            )
-            new_file_path: str = file_handler.file_join(
-                old_file_path, file_name, extension
-            )
-
-            if file_name.strip() != old_file_name.strip():
-                if file_handler.rename_file(old_file, new_file_path) == -1:
-                    error_msg = (
-                        "Failed to rename file"
-                        f" {sys_consts.SDELIM}{old_file_path!r}{sys_consts.SDELIM} to"
-                        f" {sys_consts.SDELIM}{new_file_path!r}{sys_consts.SDELIM}"
-                    )
-
-                    popups.PopError(
-                        title="Failed To Rename File...", message=error_msg
-                    ).show()
-
-                    file_grid.select_row(row_index, col_index)
-                    return -1
-        return 1
-
-    def layout(self) -> qtg.VBoxContainer:
-        """Generate the form UI layout"""
-        file_control_container = qtg.VBoxContainer(
-            tag="file_controls", align=qtg.Align.TOPLEFT
-        )
-
-        file_col_def = (
-            qtg.Col_Def(
-                label="New File Name",
-                tag="new_file_name",
-                width=80,
-                editable=True,
-                checkable=False,
-            ),
-        )
-
-        video_input_files = qtg.Grid(
-            tag="video_input_files",
-            noselection=True,
-            height=15,
-            col_def=file_col_def,
-            callback=self.event_handler,
-        )
-
-        file_control_container.add_row(
-            video_input_files,
-        )
-
-        control_container = qtg.VBoxContainer(
-            tag="form_controls", align=qtg.Align.TOPRIGHT
-        )
-
-        control_container.add_row(
-            file_control_container,
-            qtg.Command_Button_Container(
-                ok_callback=self.event_handler, cancel_callback=self.event_handler
+                ok_callback=self.event_handler,
+                cancel_callback=self.event_handler,
+                margin_right=9,
             ),
         )
 
