@@ -155,21 +155,22 @@ class Video_File_Picker_Popup(qtg.PopContainer):
     def layout(self) -> qtg.VBoxContainer:
         """Generate the form UI layout"""
         control_container = qtg.VBoxContainer(
-            tag="form_controls", align=qtg.Align.TOPLEFT
+            tag="form_controls", align=qtg.Align.BOTTOMRIGHT
         )
-        file_control_container = qtg.FormContainer(
-            tag="file_controls", align=qtg.Align.TOPLEFT
+        file_control_container = qtg.VBoxContainer(
+            tag="file_controls", align=qtg.Align.TOPLEFT, margin_right=4
         )
 
         button_container = qtg.HBoxContainer(
-            align=qtg.Align.RIGHT, tag="command_buttons"
+            align=qtg.Align.BOTTOMRIGHT, tag="command_buttons", margin_right=0
         ).add_row(
             qtg.Button(
                 text="&Select Video Folder",
                 tag="video_import_folder",
                 callback=self.event_handler,
+                width=20,
             ),
-            qtg.Spacer(width=37),
+            qtg.Spacer(width=47),
             qtg.Command_Button_Container(
                 ok_callback=self.event_handler, cancel_callback=self.event_handler
             ),
@@ -201,10 +202,9 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                 width=11,
             ),
             video_input_files,
-            button_container,
         )
 
-        control_container.add_row(file_control_container)
+        control_container.add_row(file_control_container, button_container)
 
         return control_container
 
