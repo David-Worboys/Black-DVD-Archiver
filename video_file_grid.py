@@ -31,7 +31,8 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
-from dvd import Video_Data, Video_File_Settings
+from configuration_classes import Video_Data, Video_File_Settings
+from dvd_menu_configuration import DVD_Menu_Config_Popup
 from video_cutter import Video_Cutter_Popup
 from video_file_picker import Video_File_Picker_Popup
 
@@ -99,10 +100,6 @@ class Video_File_Grid:
         file_grid: qtg.Grid = event.widget_get(
             container_tag="video_file_controls", tag="video_input_files"
         )
-
-        tool_button: qtg.Button = event.widget_get(
-            container_tag=event.container_tag, tag=event.tag
-        )  # Data we want is on the button
 
         row = int(
             event.container_tag.split("|")[0]
@@ -277,6 +274,10 @@ class Video_File_Grid:
                         )
 
                         self._set_project_standard_duration(event)
+                    case "dvd_menu_configuration":
+                        result = DVD_Menu_Config_Popup(
+                            title="DVD Menu Configuration"
+                        ).show()
                     case "move_video_file_down":
                         self._move_video_file(event=event, up=False)
                     case "move_video_file_up":
@@ -848,8 +849,16 @@ class Video_File_Grid:
         """
 
         button_container = qtg.HBoxContainer(
-            tag="control_buttons", align=qtg.Align.RIGHT
+            tag="control_buttons", align=qtg.Align.RIGHT, margin_right=0
         ).add_row(
+            qtg.Button(
+                icon=file_utils.App_Path("grid-2.svg"),
+                tag="dvd_menu_configuration",
+                callback=self.event_handler,
+                tooltip="Configure The DVD Menu",
+                width=2,
+            ),
+            qtg.Spacer(width=1),
             qtg.Button(
                 icon=file_utils.App_Path("text.svg"),
                 tag="toggle_file_button_names",
@@ -962,7 +971,10 @@ class Video_File_Grid:
         )
 
         control_container = qtg.VBoxContainer(
-            tag="control_container", text="DVD Input Files", align=qtg.Align.TOPRIGHT
+            tag="control_container",
+            text="DVD Input Files",
+            align=qtg.Align.TOPRIGHT,
+            margin_left=9,
         ).add_row(file_control_container, button_container)
 
         return control_container
