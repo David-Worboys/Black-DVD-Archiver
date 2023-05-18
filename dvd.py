@@ -47,7 +47,7 @@ class DVD_Config:
         default_factory=tuple
     )
     _menu_labels: list[str] | tuple[str] = dataclasses.field(default_factory=tuple)
-    _menu_title: str = ""
+    _menu_title: list[str] | tuple[str] = dataclasses.field(default_factory=tuple)
     _menu_background_color: str = "wheat"
     _menu_font_color: str = "gold"
     _menu_font_point_size: int = 24
@@ -134,12 +134,15 @@ class DVD_Config:
         self._menu_background_color = value
 
     @property
-    def menu_title(self) -> str:
+    def menu_title(self) -> list[str] | tuple[str]:
         return self._menu_title
 
     @menu_title.setter
-    def menu_title(self, value: str) -> None:
-        assert isinstance(value, str), f"{value=}. Must be a string"
+    def menu_title(self, value: list[str] | tuple[str]) -> None:
+        assert isinstance(value, (list, tuple)), f"{value=}. Must be a list | tuple str"
+        assert all(
+            isinstance(title, str) for title in value
+        ), f"{value=} must be list | tuple of str"
 
         self._menu_title = value
 
@@ -193,10 +196,9 @@ class DVD_Config:
 
     @button_background_transparency.setter
     def button_background_transparency(self, value: float):
-        assert isinstance(
-            value, float
-        ) and 0 <= value <= 1, f"{value=}.  0 <= Must be float <= 1"
-
+        assert (
+            isinstance(value, float) and 0 <= value <= 1
+        ), f"{value=}.  0 <= Must be float <= 1"
 
         self._button_background_transparency = value
 
@@ -897,7 +899,6 @@ class DVD:
         """
         debug = False
 
-        menu_title_height = 0
         timestamp_height = 0
         buttons_per_page = self.dvd_setup.menu_buttons_per_page
         buttons_across = self.dvd_setup.menu_buttons_across
@@ -914,7 +915,7 @@ class DVD:
             buttons_across=buttons_across,
             button_aspect_ratio=4 / 3,
             dvd_dims=dvd_dims,
-            border_top=10 + menu_title_height,
+            border_top=10,
             border_bottom=10 + timestamp_height,
             border_left=10,  # + timestamp_height,
             border_right=10,  # + timestamp_height,
@@ -922,16 +923,6 @@ class DVD:
 
         if not cell_coords:
             return -1, message
-
-        if self.dvd_setup.menu_title:
-            _, menu_title_height = dvdarch_utils.get_text_dims(
-                text=self.dvd_setup.menu_title,
-                font=self.dvd_setup.menu_font,
-                pointsize=self.dvd_setup.menu_font_point_size,
-            )
-
-            if menu_title_height == -1:
-                return -1, "Failed To Get Menu Title Dimensions"
 
         result, message = self._create_canvas_image(
             width=dvd_dims.display_width, height=dvd_dims.display_height
@@ -1016,8 +1007,8 @@ class DVD:
         # Black Choice
         # label_line_height = 0
         # label_lines = 2
-        font: str = "DejaVu-Sans-Bold"
-        pointsize: int = 15
+        # font: str = "DejaVu-Sans-Bold"
+        # pointsize: int = 15
         # fill: str = "white"
         # fill: str = "gold"
         # stroke: str = "black"
@@ -1201,7 +1192,7 @@ class DVD:
         if border_left < SPUMUX_BUFFER:
             border_left = SPUMUX_BUFFER
 
-        if self.dvd_setup.menu_title == "":  # Header pad is only for titles
+        if not self.dvd_setup.menu_title:  # Header pad is only for titles
             header_pad = 0
 
         # Compute the canvas size and ratio
@@ -1335,8 +1326,6 @@ class DVD:
         assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
         assert isinstance(width, int) and width > 0, f"{height=}. Must be int > 0"
 
-        menu_title = self.dvd_setup.menu_title
-
         commands = [
             sys_consts.CONVERT,
             "-size",
@@ -1349,21 +1338,6 @@ class DVD:
 
         if result == -1:
             return -1, message
-
-        if menu_title.strip() != "":
-            result, message = dvdarch_utils.overlay_text(
-                in_file=self._background_canvas_file,
-                text=menu_title,
-                text_font=self.dvd_setup.menu_font,
-                text_pointsize=self.dvd_setup.menu_font_point_size,
-                text_color=self.dvd_setup.menu_font_color,
-                position="top",
-                background_color=self.dvd_setup.menu_background_color,
-                opacity=0.9,
-            )
-
-            if result == -1:
-                return -1, message
 
         if self.dvd_setup.timestamp_font and self.dvd_setup.timestamp:
             _, timestamp_height = dvdarch_utils.get_text_dims(
@@ -1747,7 +1721,7 @@ class DVD:
                         input_dict=spumux_dict, output=result_file, pretty=True
                     )
             except IOError:
-                return -1, f"Sys Error: Cound Not Write {spumux_xml}"
+                return -1, f"Sys Error: Could Not Write {spumux_xml}"
 
             return 1, ""
 
@@ -1947,6 +1921,26 @@ class DVD:
 
                 if result == -1:
                     return -1, message
+
+                if cell_coord.page <= len(self.dvd_setup.menu_title) - 1:
+                    menu_title = self.dvd_setup.menu_title[cell_coord.page]
+                else:
+                    menu_title = ""
+
+                if menu_title.strip() != "":
+                    result, message = dvdarch_utils.overlay_text(
+                        in_file=canvas_images_file,
+                        text=menu_title,
+                        text_font=self.dvd_setup.menu_font,
+                        text_pointsize=self.dvd_setup.menu_font_point_size,
+                        text_color=self.dvd_setup.menu_font_color,
+                        position="top",
+                        background_color=self.dvd_setup.menu_background_color,
+                        opacity=0.9,
+                    )
+
+                    if result == -1:
+                        return -1, message
 
                 result, message = _create_canvas_files(
                     width=canvas_width,

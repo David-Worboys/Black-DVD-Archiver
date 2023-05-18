@@ -31,7 +31,7 @@ executable_folder = file_utils.App_Path()
 file_sep = file_utils.File().ossep
 
 PROGRAM_NAME: Final[str] = "Black DVD Archiver"
-PROGRAM_VERSION: Final[str] = "0.4"
+PROGRAM_VERSION: Final[str] = "0.5"
 AUTHOR: Final[str] = "David Worboys"
 LICENCE: Final[str] = "GNU V3 GPL"
 
@@ -95,6 +95,7 @@ VIDEO_GRID_DB: Final[str] = "video_grid"
 PERCENT_SAFTEY_BUFFER: Final[int] = (
     1  # Used to limit DVD size so that it never exceeds 100%
 )
+DEFAULT_FONT: Final[str] = "IBMPlexMono-SemiBold.ttf"  # Packaged with DVD Archiver
 
 
 class SPECIAL_PATH(utils.strEnum):

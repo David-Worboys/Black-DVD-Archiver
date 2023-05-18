@@ -550,7 +550,9 @@ class PopMessage(PopContainer):
                 )
             )
 
-        button_container = HBoxContainer(align=Align.RIGHT, width=self.width)
+        button_container = HBoxContainer(
+            align=Align.RIGHT, width=self.width, margin_right=9
+        )
 
         if self.buttons is None:
             button_container.add_row(

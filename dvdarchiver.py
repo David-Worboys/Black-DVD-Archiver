@@ -32,8 +32,10 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from archive_management import Archive_Manager
-from dvd import DVD, DVD_Config, File_Def
-from video_file_grid import Video_Data, Video_File_Grid
+from configuration_classes import DVD_Menu_Settings, File_Def, Video_Data
+from dvd import DVD, DVD_Config
+from dvdarch_popups import Menu_Page_Title_Popup
+from video_file_grid import Video_File_Grid
 
 # fmt: on
 
@@ -47,13 +49,14 @@ class DVD_Archiver:
         self._DVD_Arch_App = qtg.QtPyApp(
             display_name=sys_consts.PROGRAM_NAME,
             callback=self.event_handler,
-            height=768,
+            height=600,
             # width=1024,
-            icon="gitlogo.jpg",
+            icon=file_utils.App_Path("gitlogo.jpg"),
             width=800,
         )
 
         self._startup = True
+        self._shutdown = False
 
         self._data_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
@@ -76,21 +79,9 @@ class DVD_Archiver:
 
         self._menu_title_font_size = 24
         self._timestamp_font_point_size = 9
-        self._default_font = "IBMPlexMono-SemiBold.ttf"  # Packaged with DVD Archiver
+        self._default_font = sys_consts.DEFAULT_FONT
 
         self._dvd = DVD()  # Needs DB config to be completed before calling this
-
-        if not self._db_settings.setting_exist("menu_background_color"):
-            self._db_settings.setting_set("menu_background_color", "blue")
-
-        if not self._db_settings.setting_exist("menu_font_color"):
-            self._db_settings.setting_set("menu_font_color", "yellow")
-
-        if not self._db_settings.setting_exist("menu_font_point_size"):
-            self._db_settings.setting_set("menu_font_point_size", 24)
-
-        if not self._db_settings.setting_exist("menu_font"):
-            self._db_settings.setting_set("menu_font", self._default_font)
 
     def db_init(self) -> sqldb.SQLDB:
         """
@@ -200,59 +191,24 @@ class DVD_Archiver:
         match event.event:
             case qtg.Sys_Events.APPINIT:
                 pass
-            case qtg.Sys_Events.APPEXIT:
-                if (
-                    popups.PopYesNo(
-                        title="Exit Application...",
-                        message=(
-                            "Exit The"
-                            f" {sys_consts.SDELIM}{sys_consts.PROGRAM_NAME}?{sys_consts.SDELIM}"
-                        ),
-                    ).show()
-                    == "yes"
-                ):
-                    return 1
-                else:
-                    return -1
+            case qtg.Sys_Events.APPEXIT | qtg.Sys_Events.APPCLOSED:
+                if not self._shutdown:
+                    self._shutdown = True
+                    if (
+                        popups.PopYesNo(
+                            title="Exit Application...",
+                            message=(
+                                "Exit The"
+                                f" {sys_consts.SDELIM}{sys_consts.PROGRAM_NAME}?{sys_consts.SDELIM}"
+                            ),
+                        ).show()
+                        == "yes"
+                    ):
+                        return 1
+                    else:
+                        self._shutdown = False
+                        return -1
             case qtg.Sys_Events.APPPOSTINIT:
-                file_handler = file_utils.File()
-
-                menu_background_color: str = self._db_settings.setting_get(
-                    "menu_background_color"
-                )
-                menu_font_color: str = self._db_settings.setting_get("menu_font_color")
-                menu_font_point_size = self._db_settings.setting_get(
-                    "menu_font_point_size"
-                )
-                menu_font = self._db_settings.setting_get("menu_font")
-
-                font_name = file_handler.split_head_tail(menu_font)[1]
-
-                if not font_name:
-                    font_name = self._default_font
-
-                menu_color_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="menu_properties", tag="menu_color"
-                )
-
-                text_color_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="menu_properties", tag="text_color"
-                )
-
-                font_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="menu_properties", tag="title_font"
-                )
-
-                menu_color_combo.select_text(menu_background_color, partial_match=False)
-                text_color_combo.select_text(menu_font_color, partial_match=False)
-                font_combo.select_text(font_name, partial_match=False)
-
-                # Hotwire event to reuse
-                event.container_tag = "menu_properties"
-                event.tag = "title_font"
-                event.value = menu_font
-                self._menu_color_combo_change(event)
-
                 self._startup = False
 
             case qtg.Sys_Events.CLICKED:
@@ -265,32 +221,6 @@ class DVD_Archiver:
                         self._DVD_Arch_App.app_exit()
                     case "make_dvd":
                         self._make_dvd(event)
-            case qtg.Sys_Events.INDEXCHANGED:
-                match event.tag:
-                    case "menu_color":
-                        if not self._startup and event.widget_exist(
-                            container_tag=event.container_tag, tag=event.tag
-                        ):
-                            self._db_settings.setting_set(
-                                "menu_background_color", event.value.data
-                            )
-                            self._menu_color_combo_change(event)
-
-                    case "text_color":
-                        if not self._startup and event.widget_exist(
-                            container_tag=event.container_tag, tag=event.tag
-                        ):
-                            self._db_settings.setting_set(
-                                "menu_font_color", event.value.data
-                            )
-                            self._menu_color_combo_change(event)
-
-                    case "title_font":
-                        if not self._startup and event.widget_exist(
-                            container_tag=event.container_tag, tag=event.tag
-                        ):
-                            self._db_settings.setting_set("menu_font", event.value.data)
-                            self._title_font_combo_change(event)
 
     def _archive_folder_select(self, event) -> None:
         """Select an archive folder and updates the settings in the database with the selected folder.
@@ -385,18 +315,6 @@ class DVD_Archiver:
             ).show()
             return None
 
-        menu_color_combo: qtg.ComboBox = event.widget_get(
-            container_tag="menu_properties", tag="menu_color"
-        )
-
-        text_color_combo: qtg.ComboBox = event.widget_get(
-            container_tag="menu_properties", tag="text_color"
-        )
-
-        font_combo: qtg.ComboBox = event.widget_get(
-            container_tag="menu_properties", tag="title_font"
-        )
-
         dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
         if dvd_folder is None or dvd_folder.strip() == "":
@@ -411,17 +329,6 @@ class DVD_Archiver:
             tag="video_input_files",
         )
 
-        dvd_title: str = event.value_get(
-            container_tag="menu_properties", tag="menu_title"
-        )
-
-        if dvd_title.strip() == "":
-            popups.PopMessage(
-                title="DVD Menu Title Not Entered...",
-                message="A Menu Title Must Be Entered!",
-            ).show()
-            return None
-
         checked_items = file_grid.checkitems_get
 
         if not checked_items:
@@ -431,8 +338,21 @@ class DVD_Archiver:
             ).show()
             return None
 
+        dvd_title = Menu_Page_Title_Popup(
+            title="DVD Menu Title",
+            video_data_list=[file.user_data for file in checked_items],
+        ).show()
+
+        if dvd_title.strip() == "":
+            popups.PopMessage(
+                title="DVD Menu Title Not Entered...",
+                message="A Menu Title Must Be Entered!",
+            ).show()
+            return None
+
         video_file_defs = []
         menu_labels = []
+        dvd_menu_settings = DVD_Menu_Settings()
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             for checked_item in checked_items:
@@ -482,16 +402,32 @@ class DVD_Archiver:
 
                 dvd_config.menu_labels = menu_labels
 
-                dvd_config.menu_title = dvd_title
-                dvd_config.menu_background_color = menu_color_combo.value_get().data
-                dvd_config.menu_font = font_combo.value_get().data
-                dvd_config.menu_font_color = text_color_combo.value_get().data
-                dvd_config.menu_font_point_size = self._menu_title_font_size
+                dvd_config.menu_title = dvd_title.split("|")
+                dvd_config.menu_background_color = (
+                    dvd_menu_settings.menu_background_color
+                )
+                dvd_config.menu_font = dvd_menu_settings.menu_font
+                dvd_config.menu_font_color = dvd_menu_settings.menu_font_color
+                dvd_config.menu_font_point_size = dvd_menu_settings.menu_font_point_size
+                dvd_config.button_background_color = (
+                    dvd_menu_settings.button_background_color
+                )
+                dvd_config.button_font = dvd_menu_settings.button_font
+                dvd_config.button_font_color = dvd_menu_settings.button_font_color
+                dvd_config.button_font_point_size = (
+                    dvd_menu_settings.button_font_point_size
+                )
+                dvd_config.button_background_transparency = (
+                    dvd_menu_settings.button_background_transparency / 100
+                )
 
                 dvd_config.timestamp_font = self._default_font
                 dvd_config.timestamp_font_point_size = self._timestamp_font_point_size
 
                 dvd_config.video_standard = self._file_control.project_video_standard
+
+                dvd_config.menu_buttons_across = dvd_menu_settings.buttons_across
+                dvd_config.menu_buttons_per_page = dvd_menu_settings.buttons_per_page
 
                 self._dvd.dvd_setup = dvd_config
                 self._dvd.working_folder = dvd_folder
@@ -555,74 +491,6 @@ class DVD_Archiver:
                 return -1, message
         return 1, ""
 
-    def _menu_color_combo_change(self, event: qtg.Action) -> None:
-        """Changes the menu colour of the colour patch when the menu colour is changed
-
-        Args:
-            event (qtg.Action): Triggering event
-        """
-        if event.widget_exist(container_tag=event.container_tag, tag="title_font"):
-            title_combo: qtg.ComboBox = event.widget_get(
-                container_tag=event.container_tag, tag="title_font"
-            )
-            # Hotwire event to reuse
-            event.tag = "title_font"
-            event.value = title_combo.value_get()
-
-            self._title_font_combo_change(event)
-
-        return None
-
-    def _title_font_combo_change(self, event: qtg.Action) -> None:
-        """Changes the font of the colour patch of the title font text when the font
-        selection changes
-
-        Args:
-            event (Action): _description_
-        """
-        combo_data: qtg.Combo_Data = event.value
-
-        menu_color_combo: qtg.ComboBox = event.widget_get(
-            container_tag=event.container_tag, tag="menu_color"
-        )
-
-        text_color_combo: qtg.ComboBox = event.widget_get(
-            container_tag=event.container_tag, tag="text_color"
-        )
-
-        if event.widget_exist(container_tag="menu_properties", tag="title_example"):
-            image: qtg.Image = event.widget_get(
-                container_tag="menu_properties", tag="title_example"
-            )
-
-            char_pixel_size = qtg.g_application.char_pixel_size(
-                font_path=combo_data.data
-            )
-
-            pointsize, png_bytes = dvdarch_utils.get_font_example(
-                font_file=combo_data.data,
-                # pointsize=50,
-                text=" Title Test ",
-                text_color=text_color_combo.value_get().data,
-                background_color=menu_color_combo.value_get().data,
-                width=image.width * char_pixel_size.width,
-                height=image.height * char_pixel_size.height,
-                # height=144,
-            )
-
-            if png_bytes:
-                self._menu_title_font_size = pointsize
-                image.image_set(png_bytes)
-            else:
-                popups.PopError(
-                    title="Font Can Not Be Rendered...",
-                    message=(
-                        "The font"
-                        f" {sys_consts.SDELIM} {combo_data.display} {sys_consts.SDELIM} Can"
-                        " Not Be Rendered!"
-                    ),
-                ).show()
-
     def layout(self) -> qtg.VBoxContainer:
         """Returns the Black DVD Archiver application ui layout
 
@@ -680,7 +548,7 @@ class DVD_Archiver:
                     frame=qtg.Frame.SUNKEN,
                     line_width=2,
                 ),
-                buddy_control=qtg.Label(text="%", translate=False, width=6),
+                buddy_control=qtg.Label(text="%", translate=False, width=1),
             ),
         )
 
@@ -721,6 +589,23 @@ class DVD_Archiver:
                 ),
             ),
             qtg.LineEdit(
+                text=f"{sys_consts.SDELIM}{archive_folder}{sys_consts.SDELIM}",
+                action="edit_action",
+                tag="archive_path",
+                label=f"Archive Folder",
+                width=66,
+                tooltip=f"The Folder Where The DVD Archive Is Stored",
+                editable=False,
+                buddy_control=qtg.Button(
+                    callback=self.event_handler,
+                    tag="archive_folder_select",
+                    height=1,
+                    width=1,
+                    icon=qtg.Sys_Icon.dir.get(),
+                    tooltip=f"Select The  DVD Archive Folder",
+                ),
+            ),
+            qtg.LineEdit(
                 text=f"{sys_consts.SDELIM}{dvd_build_folder}{sys_consts.SDELIM}",
                 action="edit_action",
                 tag="dvd_path",
@@ -739,82 +624,30 @@ class DVD_Archiver:
             ),
         )
 
-        menu_config = qtg.HBoxContainer().add_row(
-            qtg.ComboBox(
-                tag="menu_color",
-                label="Color",
-                width=15,
-                callback=self.event_handler,
-                items=color_list,
-                display_na=False,
-                translate=False,
-            ),
-            qtg.ComboBox(
-                tag="text_color",
-                label="Text Color",
-                width=15,
-                callback=self.event_handler,
-                items=color_list,
-                display_na=False,
-                translate=False,
-            ),
-            qtg.ComboBox(
-                tag="title_font",
-                label="Title Font",
-                width=30,
-                callback=self.event_handler,
-                items=font_list,
-                display_na=False,
-                translate=False,
-            ),
-        )
-
-        dvd_menu_properties = qtg.VBoxContainer(
-            tag="menu_properties", text="Menu Properties"
-        ).add_row(
-            qtg.LineEdit(
-                tag="menu_title",
-                label="Title",
-                width=30,
-                char_length=80,
-            ),
-            menu_config,
-            qtg.HBoxContainer(text="Menu Example").add_row(
-                qtg.Image(
-                    tag="title_example",
-                    height=4,
-                    width=20,
-                )
-            ),
-        )
-
         main_control_container = qtg.VBoxContainer(
             tag="control_buttons",
             align=qtg.Align.TOPLEFT,
             width=60,  # text="DVD Options"
         ).add_row(
-            archive_properties,
-            qtg.Spacer(),
             dvd_properties,
             qtg.Spacer(),
-            dvd_menu_properties,
             self._file_control.layout(),
         )
 
-        buttons_container = qtg.HBoxContainer().add_row(
+        buttons_container = qtg.HBoxContainer(margin_right=9).add_row(
             qtg.Button(
                 tag="make_dvd", text="Make DVD", callback=self.event_handler, width=9
             ),
-            qtg.Spacer(width=85),
+            qtg.Spacer(width=97),
             qtg.Button(
                 tag="exit_app", text="Exit", callback=self.event_handler, width=9
             ),
         )
 
-        screen_container = qtg.FormContainer(
+        screen_container = qtg.VBoxContainer(
             tag="main",
             align=qtg.Align.RIGHT,  # width=80
-        ).add_row(main_control_container, qtg.Spacer(), buttons_container)
+        ).add_row(main_control_container, buttons_container)
 
         return screen_container
 
