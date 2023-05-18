@@ -32,6 +32,7 @@ import re
 import string
 import struct
 import sys
+import time
 import uuid
 from base64 import b64decode, b64encode
 from collections.abc import MutableMapping
@@ -636,6 +637,20 @@ def Get_Unique_Id() -> str:
     )
     random.shuffle(unique_str)
     return "".join(unique_str)
+
+def Get_Unique_Int() -> int:
+    """Generates a unique integer ID using timestamp and random number.
+
+    Returns:
+        int: Unique integer ID.
+
+    """
+    timestamp = int(time.time() * 1000)  # Current timestamp in milliseconds
+    random_num = random.randint(0, 20000)  # Random number between 0 and 9999
+
+    unique_id = timestamp * 10000 + random_num  # Combine timestamp and random number
+
+    return unique_id
 
 
 def Is_Complied() -> bool:
