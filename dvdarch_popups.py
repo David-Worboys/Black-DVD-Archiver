@@ -77,10 +77,31 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                     len(self.video_data_list) / dvd_menu_settings.buttons_per_page
                 )
 
-                print(f"DBG {num_of_pages}")
+                buttons_per_page = dvd_menu_settings.buttons_per_page
 
                 for row in range(num_of_pages):
+                    video_titles = ""
+                    page_offset = row * buttons_per_page
+
+                    for video_index in range(
+                        page_offset,
+                        min(page_offset + buttons_per_page, len(self.video_data_list)),
+                    ):
+                        video_titles += (
+                            f"{self.video_data_list[video_index].video_file_settings.button_title}, "
+                        )
+
                     menu_title_grid.row_append
+                    user_data = menu_title_grid.userdata_get(row, 1)
+                    menu_title_grid.value_set(
+                        row=row,
+                        col=1,
+                        value=video_titles.strip()[:-1],
+                        user_data=user_data,
+                        tooltip=f"{sys_consts.SDELIM}{video_titles.strip()[:-1]}{sys_consts.SDELIM}",
+                    )
+
+                menu_title_grid.select_row(0, 0)
 
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
@@ -166,6 +187,13 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 tag="menu_title",
                 width=30,
                 editable=True,
+                checkable=False,
+            ),
+            qtg.Col_Def(
+                label="Videos On Menu",
+                tag="videos_on_page",
+                width=60,
+                editable=False,
                 checkable=False,
             ),
         )

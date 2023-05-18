@@ -8799,7 +8799,7 @@ class _Grid_TableWidget(qtW.QTableWidget):
             current_text = item.text()
 
             if event.key() in (qtC.Qt.Key_Return, qtC.Qt.Key_Enter):
-                self.typingBufferCleared()                
+                self.typingBufferCleared()
             elif key == qtC.Qt.Key_Backspace:
                 item.setText(current_text[:-1])
             elif text:
@@ -9700,15 +9700,15 @@ class Grid(_qtpyBase_Control):
                 widget=None,
                 orig_row=row,
             )
-            
+
             item = _Grid_TableWidget_Item("")
 
             if self.col_def[col_index].editable:
                 flags = (
                     qtC.Qt.ItemIsSelectable
-                    | qtC.Qt.ItemIsEnabled                  
-                | qtC.Qt.ItemIsEditable
-                )                
+                    | qtC.Qt.ItemIsEnabled
+                    | qtC.Qt.ItemIsEditable
+                )
             else:
                 flags = qtC.Qt.ItemIsSelectable | qtC.Qt.ItemIsEnabled
 
@@ -9854,7 +9854,7 @@ class Grid(_qtpyBase_Control):
         """
         Scrolls to the row.
 
-        Note: Deprected will be removed in a later realse. Use select_row
+        Note: Deprecated will be removed in a later release. Use select_row
         """
         self.select_row(row, col)
 
@@ -9891,14 +9891,14 @@ class Grid(_qtpyBase_Control):
         if col >= 0:
             self._widget.setCurrentCell(row, col)
             item = self._widget.item(row, col)
-                        
+
             if item is not None:
                 item.setSelected(True)
 
-            if self.col_def[col].editable:
-                self._widget.edit(self._widget.model().index(row, col))    
-
         self._widget.setFocus()
+
+        if col >= 0 and self.col_def[col].editable:
+            self._widget.edit(self._widget.model().index(row, col))
 
     def userdata_set(self, row: int = -1, col: int = -1, user_data: any = None) -> None:
         """
