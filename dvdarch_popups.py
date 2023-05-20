@@ -54,7 +54,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         ), f"{self.video_data_list=}. Must be a non-empty list of Video_Data instances"
         assert all(
             isinstance(video_data, Video_Data) for video_data in self.video_data_list
-        ), f"All elements must be Video_Data instances"
+        ), "All elements must be Video_Data instances"
 
         super().__post_init__()  # This statement must be last
 
@@ -244,7 +244,7 @@ class File_Renamer_Popup(qtg.PopContainer):
         ), f"{self.video_data_list=}. Must be a non-empty list of Video_Data instances"
         assert all(
             isinstance(video_data, Video_Data) for video_data in self.video_data_list
-        ), f"All elements must be Video_Data instances"
+        ), "All elements must be Video_Data instances"
 
         self.container = self.layout()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)

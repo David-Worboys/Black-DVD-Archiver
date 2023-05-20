@@ -50,7 +50,6 @@ class DVD_Archiver:
             display_name=sys_consts.PROGRAM_NAME,
             callback=self.event_handler,
             height=600,
-            # width=1024,
             icon=file_utils.App_Path("gitlogo.jpg"),
             width=800,
         )
@@ -90,8 +89,6 @@ class DVD_Archiver:
         Returns:
             sqldb.SQLDB: A SQLDB object representing the application database.
 
-        Raises:
-            RuntimeError: If the application data folder cannot be created or the database cannot be initialized.
         """
         file_handler = file_utils.File()
 
@@ -334,7 +331,7 @@ class DVD_Archiver:
         if not checked_items:
             popups.PopMessage(
                 title="No Video Files Selected...",
-                message="Please Select Video Files ForThe DVD!",
+                message="Please Select Video Files For The DVD!",
             ).show()
             return None
 
@@ -653,7 +650,7 @@ class DVD_Archiver:
 
     def run(self) -> None:
         """Starts the application and gets the show on the road"""
-        self._DVD_Arch_App.run(layout=self.layout(), windows_ui=False)
+        self._DVD_Arch_App.run(layout=self.layout(), windows_ui=True)
 
 
 if __name__ == "__main__":

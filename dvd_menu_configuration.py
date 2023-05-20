@@ -78,7 +78,7 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
                 if not self._startup:
                     self._font_combo_change(event)
 
-    def _font_combo_init(self, event):
+    def _font_combo_init(self, event) -> None:
         """Initializes the font combo boxes
 
         Args:

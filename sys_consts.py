@@ -19,7 +19,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import datetime
-from typing import Callable, Final
+from typing import Final
 
 import file_utils
 import utils
@@ -37,11 +37,11 @@ LICENCE: Final[str] = "GNU V3 GPL"
 
 
 # Needs Callable to keep MyPy happy. Returns a string that is either 2020 or 2020-<current year>
-COPYRIGHT_YEAR: Callable[[], str] = (
-    lambda: (
-        f"{'2022' if str(datetime.date.today().year) == '2022' else '2022-'+str(datetime.date.today().year) }"
+def COPYRIGHT_YEAR() -> str:
+    return (
+        f"{'2022' if str(datetime.date.today().year) == '2022' else '2022-' + str(datetime.date.today().year)}"
     )
-)
+
 
 VERSION_TAG = (
     f"{PROGRAM_VERSION} {LICENCE} (c){COPYRIGHT_YEAR()} {AUTHOR} (-:alumnus Moyhu"

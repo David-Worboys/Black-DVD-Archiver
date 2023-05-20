@@ -31,7 +31,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
-from configuration_classes import Video_Data, Video_File_Settings
+from configuration_classes import Video_Data
 from dvd_menu_configuration import DVD_Menu_Config_Popup
 from video_cutter import Video_Cutter_Popup
 from video_file_picker import Video_File_Picker_Popup
@@ -101,10 +101,14 @@ class Video_File_Grid:
             container_tag="video_file_controls", tag="video_input_files"
         )
 
-        row = int(
+        row_unique_id = int(
             event.container_tag.split("|")[0]
         )  # Grid button container tag has the row_id embedded as the 1st element and delimtered by |
-
+        row = file_grid.row_from_item_id(row_unique_id)
+        print(
+            "DBG B"
+            f" {event.container_tag=} {event.tag=} {row=} {event.value=} {event.event=}"
+        )
         user_data: Video_Data = file_grid.userdata_get(row=row, col=0)
         video_file_input: list[Video_Data] = [user_data]
 
@@ -131,29 +135,16 @@ class Video_File_Grid:
                 video_file_input[1].video_path,
                 video_file_input[0].video_file_settings.button_title,
             )
-        else:  # Original and multiple edited files
-            self._processed_trimmed(
+        elif len(video_file_input) > 2:  # Original and multiple edited files
+            # TODO Make user configurable perhaps
+            self._delete_file_from_grid(file_grid, video_file_input[0].vd_id)
+
+            # Insert Assembled Children  Files
+            self._insert_files_into_grid(
+                file_handler,
                 file_grid,
-                video_file_input[0].vd_id,
-                video_file_input[1].video_path,
+                [video_file_data for video_file_data in video_file_input[1:]],
             )
-            file_str = ""
-            for file_index, video_data in enumerate(video_file_input):
-                if file_index > 0:
-                    # This is the target str format for loading the file list display
-                    file_str += f"-,-,{video_data.video_file}{video_data.video_extension},{video_data.video_folder}|"
-
-            if file_str:  # Assemble Operation
-                # Strip the trailing "|" delimiter from the file_str
-                file_str = file_str[:-1]
-
-                # TODO Make user configurable perhape
-                self._delete_file_from_grid(file_grid, video_file_input[0].vd_id)
-
-                # Insert Assembled Children  Files
-                self._insert_files_into_grid(file_handler, file_grid, file_str)
-
-        self._toggle_file_button_names(event)
 
         return None
 
@@ -406,7 +397,9 @@ class Video_File_Grid:
         )
 
         try:
-            with shelve.open(self._grid_db) as db:
+            with shelve.open(
+                self._grid_db
+            ) as db:  # TODO should this be stored in the app db?
                 db_data = db.get("video_grid")
 
                 if db_data:
@@ -449,7 +442,9 @@ class Video_File_Grid:
         ), f"{event=}. Must be an instance of qtg.Action"
 
         try:
-            with shelve.open(self._grid_db) as db:
+            with shelve.open(
+                self._grid_db
+            ) as db:  # TODO should this be stored in the app db?
                 row_data = []
                 file_grid: qtg.Grid = event.widget_get(
                     container_tag="video_file_controls",
@@ -483,34 +478,35 @@ class Video_File_Grid:
         )
 
         for row_index in range(file_grid.row_count):
-            user_data: Video_Data = file_grid.userdata_get(row=row_index, col=0)
+            grid_video_data: Video_Data = file_grid.userdata_get(row=row_index, col=0)
 
-            if user_data.video_file_settings.button_title.strip() != "":
-                button_title = user_data.video_file_settings.button_title
-            else:
-                button_title = file_handler.extract_title(
-                    user_data.video_file, self.common_words
+            if grid_video_data.video_file_settings.button_title.strip() == "":
+                grid_video_data.video_file_settings.button_title = (
+                    file_handler.extract_title(grid_video_data.video_file)
                 )
-                user_data.video_file_settings.button_title = button_title
 
             if self._display_filename:
                 file_grid.value_set(
                     row=row_index,
                     col=0,
-                    value=f"{user_data.video_file}{user_data.video_extension}",
-                    user_data=user_data,
-                    tooltip=(
-                        f"{sys_consts.SDELIM}{user_data.video_path}{sys_consts.SDELIM}"
+                    value=(
+                        f"{grid_video_data.video_file}{grid_video_data.video_extension}"
                     ),
+                    user_data=grid_video_data,
+                    tooltip=f"{sys_consts.SDELIM}{grid_video_data.video_path}{sys_consts.SDELIM}",
                 )
             else:
                 file_grid.value_set(
                     row=row_index,
                     col=0,
-                    value=button_title,
-                    user_data=user_data,
+                    value=grid_video_data.video_file_settings.button_title,
+                    user_data=grid_video_data,
                 )
-            file_grid.userdata_set(row=row_index, user_data=user_data)
+
+            for col in range(0, file_grid.col_count):
+                file_grid.userdata_set(
+                    row=row_index, col=col, user_data=grid_video_data
+                )
 
     def load_video_input_files(self, event: qtg.Action) -> None:
         """Loads video files into the video input grid
@@ -521,11 +517,15 @@ class Video_File_Grid:
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        selected_files = Video_File_Picker_Popup(
-            title="Choose Video Files", container_tag="video_file_picker"
+        video_file_list: list[Video_Data] = []
+
+        Video_File_Picker_Popup(
+            title="Choose Video Files",
+            container_tag="video_file_picker",
+            video_file_list=video_file_list,  # Pass by ref
         ).show()
 
-        if selected_files.strip() != "":
+        if video_file_list != "":
             file_handler = file_utils.File()
             file_grid: qtg.Grid = event.widget_get(
                 container_tag="video_file_controls",
@@ -534,21 +534,25 @@ class Video_File_Grid:
 
             with qtg.sys_cursor(qtg.Cursor.hourglass):
                 rejected = self._insert_files_into_grid(
-                    file_handler, file_grid, selected_files
+                    file_handler, file_grid, video_file_list
                 )
 
             if file_grid.row_count > 0:
                 # First file sets project encoding standard - Project files in toto Can be PAL or NTSC not both
-                user_data: Video_Data = file_grid.userdata_get(row=0, col=4)
-                project_video_standard = user_data.encoding_info["video_standard"][1]
+                grid_video_data: Video_Data = file_grid.userdata_get(row=0, col=4)
+                project_video_standard = grid_video_data.encoding_info[
+                    "video_standard"
+                ][1]
 
                 loaded_files = []
                 for row_index in reversed(range(file_grid.row_count)):
                     file_name = file_grid.value_get(row_index, 0)
 
-                    user_data: Video_Data = file_grid.userdata_get(row=row_index, col=4)
+                    grid_video_data: Video_Data = file_grid.userdata_get(
+                        row=row_index, col=4
+                    )
 
-                    video_standard = user_data.encoding_info["video_standard"][1]
+                    video_standard = grid_video_data.encoding_info["video_standard"][1]
 
                     if project_video_standard != video_standard:
                         rejected += (
@@ -564,7 +568,7 @@ class Video_File_Grid:
 
                 # Keep a list of words common to all file names
                 self.common_words = utils.Find_Common_Words(loaded_files)
-
+            self._toggle_file_button_names(event)
             self._set_project_standard_duration(event)
 
             if rejected != "":
@@ -573,14 +577,17 @@ class Video_File_Grid:
                 ).show()
 
     def _insert_files_into_grid(
-        self, file_handler: file_utils.File, file_grid: qtg.Grid, selected_files: str
+        self,
+        file_handler: file_utils.File,
+        file_grid: qtg.Grid,
+        selected_files: list[Video_Data],
     ) -> str:
         """
-        Inserts files into the file gird widget.
+        Inserts files into the file grid widget.
         Args:
             file_handler (utils.File): An instance of a file handler.
             file_grid (qtg.Grid): The grid widget to insert the files into.
-            selected_files (str): A string containing information about the selected files.
+            selected_files (list[Video_Data]): list of video file data
         Returns:
             str: A string containing information about any rejected files.
         """
@@ -590,77 +597,61 @@ class Video_File_Grid:
         assert isinstance(
             file_grid, qtg.Grid
         ), f"{file_grid=}. Must be an instance of qtg.Grid"
-        assert isinstance(selected_files, str), f"{selected_files=}/ must be a string."
+        assert isinstance(
+            selected_files, list
+        ), f"{selected_files=}.  Must be a list of Video_Data objects"
+        assert all(
+            isinstance(item, Video_Data) for item in selected_files
+        ), f"{selected_files=}.  Must be a list of Video_Data objects"
 
         rejected = ""
         rows_loaded = file_grid.row_count
         row_index = 0
 
-        # Ugly splits here because video_file_picker/cutter can only return a string
-        for file_tuple_str in selected_files.split("|"):
-            _, _, video_file_name, video_file_folder = file_tuple_str.split(",")
-
-            video_file_path = file_handler.file_join(video_file_folder, video_file_name)
-
-            (
-                video_file_path,
-                video_file_name,
-                video_extension,
-            ) = file_handler.split_file_path(video_file_path)
-
+        for file_video_data in selected_files:
             # Check if file already loaded in grid
             for check_row_index in range(file_grid.row_count):
-                video_user_data: Video_Data = file_grid.userdata_get(
+                grid_video_data: Video_Data = file_grid.userdata_get(
                     row=check_row_index, col=0
                 )
 
-                if (
-                    video_user_data.video_file == video_file_name
-                    and video_user_data.video_folder == video_file_path
-                    and video_user_data.video_extension == video_extension
-                ):
+                if grid_video_data.video_path == file_video_data.video_path:
                     break
             else:  # File not in grid already
-                video_user_data = Video_Data(
-                    video_folder=video_file_path,
-                    video_file=video_file_name,
-                    video_extension=video_extension,
-                    encoding_info={},
-                    video_file_settings=Video_File_Settings(),
-                )
-
-                video_user_data.encoding_info = dvdarch_utils.get_file_encoding_info(
-                    video_user_data.video_path
-                )
-
-                if video_user_data.encoding_info["error"][
-                    1
-                ]:  # Error Occurred, should not happen
-                    rejected += (
-                        f"File Error {sys_consts.SDELIM}{video_file_name} :"
-                        f" {sys_consts.SDELIM} {video_user_data.encoding_info['error'][1]} \n"
+                if not file_video_data.encoding_info:
+                    file_video_data.encoding_info = (
+                        dvdarch_utils.get_file_encoding_info(file_video_data.video_path)
                     )
-                    continue
 
-                toolbox = self._get_toolbox(video_user_data)
+                    if file_video_data.encoding_info["error"][
+                        1
+                    ]:  # Error Occurred, should not happen
+                        rejected += (
+                            "File Error"
+                            f" {sys_consts.SDELIM}{file_video_data.video_path} :"
+                            f" {sys_consts.SDELIM} {file_video_data.encoding_info['error'][1]} \n"
+                        )
+                        continue
 
-                if video_user_data.encoding_info["video_tracks"][1] == 0:
+                toolbox = self._get_toolbox(file_video_data)
+
+                if file_video_data.encoding_info["video_tracks"][1] == 0:
                     rejected += (
-                        f"{sys_consts.SDELIM}{video_file_name} : {sys_consts.SDELIM}No"
-                        " Video Track \n"
+                        f"{sys_consts.SDELIM}{file_video_data.video_path} :"
+                        f" {sys_consts.SDELIM}No Video Track \n"
                     )
                     continue
 
                 duration = str(
                     datetime.timedelta(
-                        seconds=video_user_data.encoding_info["video_duration"][1]
+                        seconds=file_video_data.encoding_info["video_duration"][1]
                     )
                 ).split(".")[0]
 
                 self._populate_grid_row(
                     file_grid=file_grid,
                     row_index=rows_loaded + row_index,
-                    video_user_data=video_user_data,
+                    video_user_data=file_video_data,
                     duration=duration,
                 )
 
@@ -705,6 +696,7 @@ class Video_File_Grid:
         duration: str,
     ) -> None:
         """Populates the grid row with the video information.
+
         Args:
             file_grid (qtg.Grid): The grid to populate.
             row_index (int): The index of the row to populate.
@@ -722,7 +714,7 @@ class Video_File_Grid:
         file_grid.value_set(
             value=(
                 f"{video_user_data.video_file}{video_user_data.video_extension}"
-                if self._toggle_file_button_names
+                if self._display_filename
                 else video_user_data.video_file_settings.button_title
             ),
             row=row_index,
@@ -730,7 +722,7 @@ class Video_File_Grid:
             user_data=video_user_data,
             tooltip=(
                 f"{sys_consts.SDELIM}{video_user_data.video_path}{sys_consts.SDELIM}"
-                if self._toggle_file_button_names
+                if self._display_filename
                 else ""
             ),
         )

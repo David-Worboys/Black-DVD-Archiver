@@ -16,6 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
@@ -35,7 +36,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from archive_management import Archive_Manager
-from configuration_classes import Video_Data
+from configuration_classes import Video_Data, Video_File_Settings
 from dvdarch_popups import File_Renamer_Popup
 
 # fmt: on
@@ -408,7 +409,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         ), f"{self.excluded_word_list=}. Must be a list of str"
         assert all(
             isinstance(excluded_word, str) for excluded_word in self.excluded_word_list
-        ), f"Excluded words must be str"
+        ), "Excluded words must be str"
 
         if "video_dar" in self.video_file_input[0].encoding_info:
             self._aspect_ratio = self.video_file_input[0].encoding_info["video_dar"][1]
@@ -978,6 +979,12 @@ class Video_Cutter_Popup(qtg.PopContainer):
                                 video_file,
                                 video_extension,
                             ) = file_handler.split_file_path(video_file_path)
+
+                            video_file_settings = Video_File_Settings()
+                            video_file_settings.button_title = (
+                                file_handler.extract_title(video_file)
+                            )
+
                             video_data.append(
                                 Video_Data(
                                     video_folder=video_path,
@@ -986,9 +993,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                                     encoding_info=dvdarch_utils.get_file_encoding_info(
                                         video_file_path
                                     ),
-                                    video_file_settings=self.video_file_input[
-                                        0
-                                    ].video_file_settings,
+                                    video_file_settings=video_file_settings,
                                 )
                             )
 

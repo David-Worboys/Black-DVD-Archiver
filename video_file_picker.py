@@ -24,6 +24,8 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
+from configuration_classes import Video_Data, Video_File_Settings
+from utils import Get_Unique_Int
 
 # fmt: on
 
@@ -33,6 +35,9 @@ class Video_File_Picker_Popup(qtg.PopContainer):
     """This class is a popup that allows the user to select video files"""
 
     title: str = ""
+    video_file_list: list[Video_Data] = dataclasses.field(
+        default_factory=list
+    )  # Pass by ref
 
     def __post_init__(self):
         """Sets-up the form"""
@@ -217,6 +222,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         Returns:
             int: 1 all good, close the window. -1 keep window open
         """
+        file_handler = file_utils.File()
         file_grid: qtg.Grid = event.widget_get(
             container_tag="file_controls",
             tag="video_input_files",
@@ -237,6 +243,24 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                 user_data = grid_item.user_data
 
                 file_str += f"{row},{tag},{value},{user_data}|"
+
+                _, file_name, file_extn = file_handler.split_file_path(
+                    grid_item.current_value
+                )
+
+                video_settings = Video_File_Settings()
+                video_settings.button_title = file_handler.extract_title(file_name)
+
+                self.video_file_list.append(
+                    Video_Data(
+                        video_folder=grid_item.user_data,
+                        video_file=file_name,
+                        video_extension=file_extn,
+                        encoding_info={},
+                        video_file_settings=video_settings,
+                        vd_id=Get_Unique_Int(),
+                    )
+                )
 
             file_str = file_str[:-1]  # Strip trailing | delim
 

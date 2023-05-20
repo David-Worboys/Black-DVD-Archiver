@@ -374,7 +374,7 @@ def Dump_QtObject(qtObject: QtCore.QObject | QtWidgets.QWidget):
     try:
         parent: QtCore.QObject = qtObject.parentWidget()  # type: ignore
 
-        if parent != None:
+        if parent is not None:
             print("->", qtObject)
             Dump_QtObject(parent)
         else:
@@ -383,7 +383,7 @@ def Dump_QtObject(qtObject: QtCore.QObject | QtWidgets.QWidget):
         parent: QtWidgets.QWidget = qtObject.parentWidget()  # type: ignore
 
         try:
-            if parent != None:
+            if parent is not None:
                 print("--->", qtObject)
                 Dump_QtObject(parent)
             else:
@@ -637,6 +637,7 @@ def Get_Unique_Id() -> str:
     )
     random.shuffle(unique_str)
     return "".join(unique_str)
+
 
 def Get_Unique_Int() -> int:
     """Generates a unique integer ID using timestamp and random number.
@@ -1136,7 +1137,7 @@ def date_iso_extract(value: str, fuzzy: bool = False, year_first: bool = False) 
 
         if date is not None:
             value = date.replace(microsecond=0).isoformat()
-    except dateparse.ParserError as error:
+    except dateparse.ParserError:
         pass
 
     return value

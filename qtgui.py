@@ -40,8 +40,8 @@ from collections import deque, namedtuple
 from contextlib import contextmanager
 from dataclasses import field
 from enum import Enum, IntEnum
-from typing import (Callable, ClassVar, Literal, NoReturn, Optional, Union,
-                    cast, overload)
+from typing import (Callable, ClassVar, Literal, NoReturn, Optional, Type,
+                    Union, cast, overload)
 
 import numpy as np
 import PySide6.QtCore as qtC
@@ -51,6 +51,7 @@ import shiboken6  # type: ignore
 from attrs import define
 from PySide6.QtGui import QCloseEvent
 
+import utils
 from file_utils import App_Path
 from langtran import Lang_Tran
 from sys_consts import SDELIM
@@ -884,7 +885,6 @@ class _qtpyBase:
             raise RuntimeError(f"{parent=} is not an instance of _qtpyBase")
 
         self._parent = parent
-        window_id = -1
 
     def dump(self) -> None:
         """Prints all the attributes of an object"""
@@ -1461,7 +1461,7 @@ class _qtpyFrame(_qtpyBaseFrame):
             callback
         ), f"{callback=} is a <function|method|labda> called when a sheet opens"
 
-        widget = sheet_layout._create_widget(
+        sheet_layout._create_widget(
             parent_app=self.parent_app,
             parent=self,
             container_tag=str(uuid.uuid1()) if self.tag.strip() == "" else self.tag,
@@ -7650,9 +7650,9 @@ class SimpleDateValidator(qtG.QValidator):
             return qtG.QValidator.Acceptable, text, pos
         fmt = self.parent().format()
         _sep = set(fmt.replace("y", "").replace("M", "").replace("d", ""))
-        for l in text:
+        for char in text:
             # ensure that the typed text is either a digit or a separator
-            if not l.isdigit() and l not in _sep:
+            if not char.isdigit() and char not in _sep:
                 # print("B Stuffed")
                 return qtG.QValidator.Invalid, text, pos
         years = fmt.count("y")
@@ -8225,7 +8225,7 @@ class Dateedit(_qtpyBase_Control):
                 qtC.QLocale.system().ShortFormat
             )
         elif date_format.strip() == "":
-            format = self.format
+            date_format = self.format
 
         return date.toString(date_format)
 
@@ -8886,6 +8886,13 @@ class _Grid_TableWidget_Item(qtW.QTableWidgetItem):
     Custom QTableWidgetItem class that overrides the less than operator to allow for custom sorting of table cells.
     """
 
+    def __init__(self, label: str, item_type: qtW.QListWidgetItem.ItemType):
+        """
+        Initializes a new instance of the _Grid_TableWidget_Item class.
+        """
+        self.item_id = utils.Get_Unique_Int()
+        super().__init__(label, item_type)
+
     def __lt__(self, other: any) -> bool:
         """
         Override the less than operator to allow for custom sorting of table cells.
@@ -9347,7 +9354,6 @@ class Grid(_qtpyBase_Control):
         for row_index in range(self._widget.rowCount()):
             for col_index in range(self._widget.columnCount()):
                 item = self._widget.item(row_index, col_index)
-                item_data = item.data(qtC.Qt.UserRole)
 
                 if item.checkState() == qtC.Qt.Checked:
                     checked_items.append(self.checkitemrow_get(row_index, col_index))
@@ -9701,7 +9707,7 @@ class Grid(_qtpyBase_Control):
                 orig_row=row,
             )
 
-            item = _Grid_TableWidget_Item("")
+            item = _Grid_TableWidget_Item("", 0)
 
             if self.col_def[col_index].editable:
                 flags = (
@@ -10368,6 +10374,31 @@ class Grid(_qtpyBase_Control):
 
         return None
 
+    def row_from_item_id(self, item_id: int):
+        """Returns the row index of the item with the specified item_id
+
+        Args:
+            item_id (int): The item_id of the item you want to find the row index for
+
+        Returns:
+            int: The row index of the item with the specified item_id. -1 if item_id not found
+        """
+        assert (
+            isinstance(item_id, int) and item_id >= 0
+        ), f"{item_id=}. Must be an int >= 0"
+
+        self._widget: qtW.QTableWidget
+
+        if self._widget is None:
+            raise RuntimeError(f"{self._widget=}. Not set")
+
+        for row in range(self._widget.rowCount()):
+            for col in range(self._widget.columnCount()):
+                item = self._widget.item(row, col)
+                if item.item_id == item_id:
+                    return row
+        return -1
+
     def row_widget_set(
         self, row: int, col: int, widget: _qtpyBase_Control, group_text: str = ""
     ) -> None:
@@ -10400,15 +10431,15 @@ class Grid(_qtpyBase_Control):
         if row_index >= self._widget.rowCount():
             row_index = self.row_append
 
-        widget.tag = f"{row}|{widget.tag}"
+        item: _Grid_TableWidget_Item = self._widget.item(row_index, col_index)
+
+        widget.tag = f"{item.item_id}|{widget.tag}"
 
         rowcol_widget = widget._create_widget(
             parent_app=self.parent_app,
             parent=self._widget,
             container_tag=self.container_tag,
         )
-
-        item = self._widget.item(row_index, col_index)
 
         assert (
             rowcol_widget is not None and item is not None
@@ -11185,7 +11216,7 @@ class Image(_qtpyBase_Control):
         found = False
         rect_id = rect_id.strip()
 
-        if rect_id != "" and not rect_id in self._user_items:
+        if rect_id != "" and rect_id not in self._user_items:
             return False
 
         self._widget: _Image
@@ -12136,7 +12167,7 @@ class LineEdit(_qtpyBase_Control):
                         self._widget.cursorPosition(),
                         self._widget.text()[self._widget.cursorPosition() - 1],
                     )
-                except Exception as e:  # Hail Mary Pass
+                except Exception:  # Hail Mary Pass
                     # Had very rare errors thrown in Line Edits and this is a fix
                     value = (self._widget.cursorPosition(), " ")
             elif event == Sys_Events.SELECTIONCHANGED:
@@ -12596,9 +12627,7 @@ class Menu(_qtpyBase_Control):
             menu_item.parent_tag.strip() != "" and menu_item.tag.strip() != ""
         ), f"menu item <{tag=}> not found!"
 
-        parent_item: _Menu_Entry = self._element_find(
-            menu_item.parent_tag, self._menu_items
-        )
+        self._element_find(menu_item.parent_tag, self._menu_items)
 
         assert menu_item.guiwidget_get is not None, f"Menu Not Set On tag <{tag}>!"
 
@@ -12629,9 +12658,7 @@ class Menu(_qtpyBase_Control):
             menu_item.parent_tag.strip() != "" and menu_item.tag.strip() != ""
         ), f"menu item <{tag=}> not found!"
 
-        parent_item: _Menu_Entry = self._element_find(
-            menu_item.parent_tag, self._menu_items
-        )
+        self._element_find(menu_item.parent_tag, self._menu_items)
 
         assert menu_item.guiwidget_get is not None, f"Menu Not Set On tag <{tag}>!"
 
@@ -13474,10 +13501,6 @@ class Timeedit(_qtpyBase_Control):
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
 
-        line_edit: qtW.QLineEdit = cast(
-            qtW.QLineEdit, self._widget.findChild(qtW.QLineEdit)
-        )
-
         self._widget.setDisplayFormat(self.display_format)
         # line_edit.setInputMask(self.display_format)
 
@@ -13756,7 +13779,7 @@ class Tab(_qtpyBase_Control):
             raise RuntimeError(f"{self._widget=}. Not set")
 
         for page in self._tab_pages.values():
-            if page.created == False:
+            if page.created is False:
                 tab_widget: qtW.QWidget = page.container._create_widget(
                     parent_app=self.parent_app,
                     parent=self._widget,

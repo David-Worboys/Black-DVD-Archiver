@@ -289,6 +289,8 @@ class Video_Data:
         video_file (str): The name of the video file.
         video_extension (str): The file extension of the video file.
         encoding_info (dict): Information about the encoding of the video.
+        video_file_settings (Video_File_Settings): The video file settings.
+        vd_id (int): The id of the video data. Defaults to -1.
     """
 
     video_folder: str
