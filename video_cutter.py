@@ -657,7 +657,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
             )  # QT 6.5.0 requires this delay before the  first video frame is displayed. TODO Findout why!
             self._media_source.pause()
             self._media_source.update_slider = True
-            self._archive_edit_list_read()
 
         elif self._media_source.source_state == "InvalidMedia":
             popups.PopMessage(
@@ -747,6 +746,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 tag="menu_frame",
                 value=str(current_frame),
             )
+
+        self._archive_edit_list_read()
 
         return 1
 
@@ -889,6 +890,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
 
         """
+
         if self._archive_manager and self._edit_list_grid:
             edit_cuts = self._archive_manager.read_edit_cuts(
                 self.video_file_input[0].video_path
@@ -910,6 +912,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 self._edit_list_grid.value_set(
                     row=row, col=clip_name, value=cut_tuple[2], user_data=cut_tuple
                 )
+            self._edit_list_grid.select_row(0, clip_name)
 
     def _assemble_segments(self, event: qtg.Action) -> None:
         """

@@ -1991,9 +1991,6 @@ class _qtpyBase_Control(_qtpyBase):
 
     _widget: Optional[qtW.QWidget] = None
     _event_filter: Optional[_Event_Filter] = None
-    __doc__: str = ""
-    # _focusIn = qtC.Signal()
-    # _focusOut = qtC.Signal()
 
     def __post_init__(self):
         """
@@ -2216,6 +2213,7 @@ class _qtpyBase_Control(_qtpyBase):
 
     def _install_event_handlers(self):
         """Attaches events to the low level GUI object created in _Create_Widger"""
+
         if callable(self.callback) and hasattr(self._widget, "connect"):
             # try:
             if hasattr(self._widget, "clicked") and hasattr(
@@ -2886,18 +2884,27 @@ class _qtpyBase_Control(_qtpyBase):
             gui_event: The event that was triggered.
         """
         window_id = Get_Window_ID(self.parent_app, self.parent, self)
+        container_tag = (
+            self.container_tag.split("|")[1]
+            if "|" in self.container_tag
+            else self.container_tag
+        )
 
-        for control in self.parent_app.widget_dict_get(
-            window_id=window_id, container_tag=self.container_tag
-        ).values():
-            if (
-                hasattr(control.widget, "guiwidget_get")
-                and hasattr(control.widget.guiwidget_get, "IsDefault")
-                and hasattr(control.widget.guiwidget_get, "clearFocus")
-            ):
-                if control.widget.guiwidget_get.isDefault():
-                    if self.tag != control.widget.tag:
-                        control.widget.guiwidget_get.clearFocus()
+        if self.parent_app.widget_exist(
+            window_id=window_id, container_tag=container_tag, tag=self.tag
+        ):
+            for control in self.parent_app.widget_dict_get(
+                window_id=window_id,
+                container_tag=container_tag,
+            ).values():
+                if (
+                    hasattr(control.widget, "guiwidget_get")
+                    and hasattr(control.widget.guiwidget_get, "IsDefault")
+                    and hasattr(control.widget.guiwidget_get, "clearFocus")
+                ):
+                    if control.widget.guiwidget_get.isDefault():
+                        if self.tag != control.widget.tag:
+                            control.widget.guiwidget_get.clearFocus()
 
         if isinstance(self, FolderView):  # Bit poxy, have to watch this
             result = self._event_handler(
@@ -8815,15 +8822,10 @@ class _Grid_TableWidget(qtW.QTableWidget):
         # This is here to select the text when focus is setinto the cell by row_scroll_to
         item = self.currentItem()
 
-        if (
-            self.item
-            and hasattr(self.item, "editItem")
-            and item
-            and item.flags() & qtC.Qt.ItemIsEditable
-        ):
+        if item and hasattr(item, "editItem") and item.flags() & qtC.Qt.ItemIsEditable:
             editor = self.item.editItem(item)
 
-            if editor is not None:
+            if editor:
                 editor.setSelected(True)
 
     def focusOutEvent(self, event: qtG.QFocusEvent) -> None:
@@ -8890,6 +8892,7 @@ class _Grid_TableWidget_Item(qtW.QTableWidgetItem):
         """
         Initializes a new instance of the _Grid_TableWidget_Item class.
         """
+
         self.item_id = utils.Get_Unique_Int()
         super().__init__(label, item_type)
 
@@ -9165,41 +9168,32 @@ class Grid(_qtpyBase_Control):
         Returns:
             int: 1 if the event was handled successfully, -1 otherwise.
         """
-        # Initialize variables
+        self._widget: qtW.QTableWidget  # Type hinting
+
         row, col, row_prev, col_prev = -1, -1, -1, -1
         widget_item = None
         event = None
 
-        # Parse arguments
-        for index, arg in enumerate(args):
-            if index == 0:  # Event type is always first
-                event = arg
+        for arg in args:
+            if isinstance(arg, tuple):
+                if len(arg) == 1:
+                    widget_item = arg[0]
+                elif len(arg) == 2:
+                    row, col = arg
+                elif len(arg) == 4:
+                    row_prev, col_prev, row, col = arg
             else:
-                if isinstance(arg, tuple):
-                    if len(arg) == 1:
-                        widget_item = arg[0]
-                    elif len(arg) == 2:
-                        row, col = arg
-                    elif len(arg) == 4:
-                        row_prev, col_prev, row, col = arg
+                event = arg
 
-        value = None
-        user_data = None
-        self._widget: qtW.QTableWidget  # Type hinting
         window_id = Get_Window_ID(self.parent_app, self.parent, self)
         grid_col_value = Grid_Col_Value("", None, row, col, "")
 
-        # Handle event
         if (
             event
             and self.callback
+            and widget_item
             and (
-                (
-                    widget_item
-                    and isinstance(
-                        widget_item, (qtW.QTableWidgetItem, _Grid_TableWidget_Item)
-                    )
-                )
+                isinstance(widget_item, (qtW.QTableWidgetItem, _Grid_TableWidget_Item))
                 or event in (Sys_Events.FOCUSIN, Sys_Events.FOCUSOUT)
             )
             and self.parent_app.widget_exist(
@@ -9212,12 +9206,14 @@ class Grid(_qtpyBase_Control):
             if col == -1:
                 col = self._widget.currentColumn()
 
-            event: Sys_Events
             if event == Sys_Events.CLEAR_TYPING_BUFFER:
-                grid_col_value = widget_item  # Grid_Col_Value
+                grid_col_value = widget_item
             elif event == Sys_Events.TEXTCHANGED:
                 pass
             else:
+                value = None
+                user_data = None
+
                 if row >= 0 and col >= 0:
                     value = self.value_get(row, col)
                     user_data = self.userdata_get(row, col)
@@ -9232,6 +9228,9 @@ class Grid(_qtpyBase_Control):
                 col_tag = self.coltag_get(col)
             else:
                 col_tag = self.tag
+
+            if grid_col_value.row == -1 and grid_col_value.col == -1:
+                return 1
 
             return _Event_Handler(parent_app=self.parent_app, parent=self).event(
                 window_id=window_id,
@@ -9603,16 +9602,6 @@ class Grid(_qtpyBase_Control):
                     self.row_widget_set(new_row, col, row_widget)
 
             self._widget.removeRow(move_row + 1)
-
-            # Row widget items have the row embedded in the tag name and this needs resetting
-            for row in range(new_row, self._widget.rowCount()):
-                for col in range(self._widget.columnCount()):
-                    row_widget: _qtpyBase_Control | None = self.row_widget_get(row, col)
-
-                    if row_widget and "|" in row_widget.tag:
-                        row_widget.tag = row_widget.tag.split("|")[1]
-                        self.row_widget_set(row, col, row_widget)
-
             self._widget.setCurrentCell(new_row, column)
 
             return new_row
@@ -9646,16 +9635,6 @@ class Grid(_qtpyBase_Control):
                     self.row_widget_set(new_row, col, row_widget)
 
             self._widget.removeRow(move_row)
-
-            # Row widget items have the row embedded in the tag name and this needs resetting
-            for row in range(new_row):
-                for col in range(self._widget.columnCount()):
-                    row_widget: _qtpyBase_Control | None = self.row_widget_get(row, col)
-
-                    if row_widget and "|" in row_widget.tag:
-                        row_widget.tag = row_widget.tag.split("|")[1]
-                        self.row_widget_set(row, col, row_widget)
-
             self._widget.setCurrentCell(new_row, column)
 
             return move_row + 1
@@ -9679,24 +9658,23 @@ class Grid(_qtpyBase_Control):
 
     @property
     def row_append(self) -> int:
-        """Appends a row to the grid
+        """Appends a row to the grid.
 
         Returns:
-            int : row number inserted
-
+            int: Row number inserted.
         """
-        self._widget: qtW.QTableWidget
-
-        if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
+        assert isinstance(
+            self._widget, qtW.QTableWidget
+        ), f"{self._widget=}. Must be an instance of qtW.QTableWidget"
 
         row = self._widget.rowCount()
         self._widget.insertRow(row)
 
-        # add a new QTableWidgetItem to each cell in the new row
         for col_index in range(self._widget.columnCount()):
+            col_definition: Col_Def = self.col_def[col_index]
+
             item_data = self._Item_Data(
-                tag=self.col_def[col_index].tag,
+                tag=col_definition.tag,
                 current_value=None,
                 prev_value=None,
                 original_value=None,
@@ -9707,63 +9685,56 @@ class Grid(_qtpyBase_Control):
                 orig_row=row,
             )
 
-            item = _Grid_TableWidget_Item("", 0)
+            item = _Grid_TableWidget_Item("", qtW.QListWidgetItem.ItemType.Type)
 
-            if self.col_def[col_index].editable:
-                flags = (
-                    qtC.Qt.ItemIsSelectable
-                    | qtC.Qt.ItemIsEnabled
-                    | qtC.Qt.ItemIsEditable
-                )
-            else:
-                flags = qtC.Qt.ItemIsSelectable | qtC.Qt.ItemIsEnabled
+            flags = qtC.Qt.ItemIsSelectable | qtC.Qt.ItemIsEnabled
 
-            if self.col_def[col_index].checkable:
-                flags = flags | qtC.Qt.ItemIsUserCheckable
+            if col_definition.editable:
+                flags |= qtC.Qt.ItemIsEditable
+
+            if col_definition.checkable:
+                flags |= qtC.Qt.ItemIsUserCheckable
                 item.setCheckState(qtC.Qt.Unchecked)
 
             item.setFlags(flags)
-
             item.setData(qtC.Qt.UserRole, item_data)
 
-            # make sure the QTableWidgetItem is added to the correct cell
-            if self._widget.item(row, col_index) is None:
-                self._widget.setItem(row, col_index, item)
-            else:
+            existing_item: _Grid_TableWidget_Item = self._widget.item(row, col_index)
+
+            if existing_item:
                 self._widget.takeItem(row, col_index)
-                self._widget.setItem(row, col_index, item)
+
+            self._widget.setItem(row, col_index, item)
+
+            if col_definition.editable and item.flags() & qtC.Qt.ItemIsEditable:
+                if not isinstance(item, _Grid_TableWidget_Item):
+                    self._widget.editItem(item)
 
         self.select_row(row)
-
-        for col_index in range(self._widget.columnCount()):
-            if self.col_def[col_index].editable:
-                self._widget.edit(self._widget.model().index(row, col_index))
 
         return row
 
     def row_delete(self, row: int) -> None:
-        """Deletes a row
+        """Deletes a row.
 
         Args:
-            row (int): Row index in the grid
+            row (int): Row index in the grid.
         """
         assert (
             isinstance(row, int) and 0 <= row < self.row_count
-        ), f"{row=}. Must be int between 0 and {self.row_count}"
-
-        self._widget: qtW.QTableWidget
-
-        if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
+        ), f"{row=}. Must be an int between 0 and {self.row_count}"
+        assert isinstance(
+            self._widget, qtW.QTableWidget
+        ), f"{self._widget=}. Must be an instance of qtW.QTableWidget"
 
         assert (
             isinstance(row, int) and 0 <= row < self._widget.rowCount()
-        ), f"{row=}. Must be an int >= 0 and < {self._widget.rowCount()}"
+        ), f"{row=}. Must be an int between 0 and {self._widget.rowCount()}"
 
         col_count = len(self._col_widths)
         widgets = []
 
-        for col_num in range(0, col_count):
+        for col_num in range(col_count):
             widgets.append(self.row_widget_get(row, col_num))
 
         self._widget.removeRow(row)
@@ -9883,7 +9854,7 @@ class Grid(_qtpyBase_Control):
         assert isinstance(col, int), f"{col=}. Must be int"
 
         assert (
-            0 <= row < self._widget.rowCount()
+            0 <= row <= self._widget.rowCount()
         ), f"{row=}. Must be >= 0 and < {self._widget.rowCount()}"
         assert (
             col == -1 or 0 <= col < self._widget.columnCount()
@@ -9898,13 +9869,17 @@ class Grid(_qtpyBase_Control):
             self._widget.setCurrentCell(row, col)
             item = self._widget.item(row, col)
 
-            if item is not None:
+            if item:
                 item.setSelected(True)
 
         self._widget.setFocus()
 
         if col >= 0 and self.col_def[col].editable:
-            self._widget.edit(self._widget.model().index(row, col))
+            item = self._widget.item(row, col)
+
+            if item and item.flags() & qtC.Qt.ItemIsEditable:
+                if not isinstance(item, _Grid_TableWidget_Item):
+                    self._widget.editItem(item)
 
     def userdata_set(self, row: int = -1, col: int = -1, user_data: any = None) -> None:
         """
@@ -10345,7 +10320,7 @@ class Grid(_qtpyBase_Control):
 
         row_index, col_index = self._rowcol_validate(row, col)
 
-        item = self._widget.item(row_index, col_index)
+        item: _Grid_TableWidget_Item = self._widget.item(row_index, col_index)
         item_data = item.data(qtC.Qt.UserRole)
 
         if item_data is not None and item_data.widget is not None:
@@ -10354,27 +10329,51 @@ class Grid(_qtpyBase_Control):
             else:
                 window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
-                if container_tag != "":
-                    if self.parent_app.widget_exist(
-                        window_id=window_id,
-                        container_tag=f"{row_index}{container_tag}",
-                        tag=tag,
-                    ):
+                for item_id in self.item_ids_from_row(row_index):
+                    if container_tag:
+                        if self.parent_app.widget_exist(
+                            window_id=window_id,
+                            container_tag=container_tag,
+                            tag=f"{item_id}|{tag}",
+                        ):
+                            return self.parent_app.widget_get(
+                                window_id=window_id,
+                                container_tag=container_tag,
+                                tag=f"{item_id}|{tag}",
+                            )
+                    else:
                         return self.parent_app.widget_get(
                             window_id=window_id,
-                            container_tag=f"{row_index}{container_tag}",
-                            tag=tag,
+                            container_tag=item_data.widget.container_tag,
+                            tag=f"{item_id}|{tag}",
                         )
-                else:
-                    return self.parent_app.widget_get(
-                        window_id=window_id,
-                        container_tag=item_data.widget.container_tag,
-                        tag=tag,
-                    )
 
         return None
 
-    def row_from_item_id(self, item_id: int):
+    def item_ids_from_row(self, row: int) -> list[int]:
+        """Returns the item_ids of the items in the specified row
+
+        Args:
+            row (int): The table widget row
+
+        Returns:
+            list[int]: List of item_ids
+        """
+        assert (
+            isinstance(row, int) and row >= 0 and row < self._widget.rowCount()
+        ), f"{row=}. Must be an int >= 0 and < {self._widget.rowCount()} "
+
+        self._widget: qtW.QTableWidget
+
+        if self._widget is None:
+            raise RuntimeError(f"{self._widget=}. Not set")
+
+        return [
+            self._widget.item(row, col).item_id
+            for col in range(self._widget.columnCount())
+        ]
+
+    def row_from_item_id(self, item_id: int) -> int:
         """Returns the row index of the item with the specified item_id
 
         Args:
@@ -10465,14 +10464,14 @@ class Grid(_qtpyBase_Control):
             widget.width > 0 and widget.height > 0
         ), f"Dev Error {widget.width=} {widget.height=} Must be > 0"
 
-        rowcol_widget.setFixedSize(
-            (widget.width * size.width), (widget.height * size.height)
-        )
+        size_hint = widget.guiwidget_get.sizeHint()
 
-        self._widget.setRowHeight(row_index, widget.height * size.height)
+        rowcol_widget.setFixedSize(size_hint)
+        self._widget.setRowHeight(row_index, size_hint.height())
+        self._widget.setColumnWidth(col_index, size_hint.width())
+        self._widget.setCellWidget(row_index, col_index, rowcol_widget)
 
-        self._widget.setColumnWidth(col_index, widget.width * size.width)
-        self._widget.setIndexWidget(model.index(row_index, col_index), rowcol_widget)
+        return
 
     # ----------------------------------------------------------------------------#
     #      Class Private Methods                                                  #

@@ -105,14 +105,11 @@ class Video_File_Grid:
             event.container_tag.split("|")[0]
         )  # Grid button container tag has the row_id embedded as the 1st element and delimtered by |
         row = file_grid.row_from_item_id(row_unique_id)
-        print(
-            "DBG B"
-            f" {event.container_tag=} {event.tag=} {row=} {event.value=} {event.event=}"
-        )
+
         user_data: Video_Data = file_grid.userdata_get(row=row, col=0)
         video_file_input: list[Video_Data] = [user_data]
 
-        result = Video_Cutter_Popup(
+        Video_Cutter_Popup(
             title="Video File Cutter/Settings",
             video_file_input=video_file_input,  # list :  pass by reference, so that contents can be modified
             output_folder=dvd_folder,
@@ -160,7 +157,7 @@ class Video_File_Grid:
         """
         assert isinstance(file_grid, qtg.Grid), f"{file_grid}. Must be a Grid instance"
 
-        for row in range(0, file_grid.row_count):
+        for row in range(file_grid.row_count):
             user_data: Video_Data = file_grid.userdata_get(row=row, col=0)
 
             if user_data and user_data.vd_id == vd_id:
@@ -266,9 +263,7 @@ class Video_File_Grid:
 
                         self._set_project_standard_duration(event)
                     case "dvd_menu_configuration":
-                        result = DVD_Menu_Config_Popup(
-                            title="DVD Menu Configuration"
-                        ).show()
+                        DVD_Menu_Config_Popup(title="DVD Menu Configuration").show()
                     case "move_video_file_down":
                         self._move_video_file(event=event, up=False)
                     case "move_video_file_up":
@@ -676,7 +671,7 @@ class Video_File_Grid:
 
         toolbox = qtg.HBoxContainer(height=1, width=3, align=qtg.Align.CENTER).add_row(
             qtg.Button(
-                tag=f"grid_button",
+                tag="grid_button",
                 height=1,
                 width=1,
                 tune_vsize=-5,

@@ -169,7 +169,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                     title="Menu Page Title Not Entered..",
                     message="A Menu Page Title Must Be Entered!",
                 ).show()
-                menu_title_grid.row_scroll_to(row, col_index)
+                menu_title_grid.select_row(row, col_index)
                 return -1
         self.set_result(result[:-1])
 

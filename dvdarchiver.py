@@ -650,7 +650,7 @@ class DVD_Archiver:
 
     def run(self) -> None:
         """Starts the application and gets the show on the road"""
-        self._DVD_Arch_App.run(layout=self.layout(), windows_ui=True)
+        self._DVD_Arch_App.run(layout=self.layout(), windows_ui=False)
 
 
 if __name__ == "__main__":
