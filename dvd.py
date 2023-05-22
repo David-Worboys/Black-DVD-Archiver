@@ -769,8 +769,8 @@ class DVD:
 
                 video_filters = ["-vf", ",".join(video_filter_options)]
 
-                video_width = video_file.file_info["video_width"][1]
-                video_height = video_file.file_info["video_height"][1]
+            video_width = video_file.file_info["video_width"][1]
+            video_height = video_file.file_info["video_height"][1]
 
             if self.dvd_setup.video_standard == sys_consts.PAL:
                 frame_rate = f"{sys_consts.PAL_FRAMERATE}"
