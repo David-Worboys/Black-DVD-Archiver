@@ -2211,127 +2211,42 @@ class _qtpyBase_Control(_qtpyBase):
 
         self._widget = widget
 
+    def _install_event(
+        self, event: Sys_Events, signal: str, use_lambda: bool = False
+    ) -> None:
+        """Installs the event handler for the given event on the widget.
+
+        Note: Pyside6 6.5.1 broke lambda connects - TODO test later releases
+
+        Args:
+            event (Sys_Events): Event to install
+            signal (str): Signal to connect the event handler to
+            use_lambda (bool): True use lambda , False use functools.partial.
+        """
+
+        try:
+            widget_signal: qtC.SignalInstance = getattr(self._widget, signal)
+
+            try:
+                widget_signal.disconnect()
+            except TypeError:
+                pass
+            except RuntimeError:
+                pass
+            except ValueError:
+                pass
+
+            if use_lambda:
+                widget_signal.connect(lambda *args: self._event_handler(event, args))
+            else:
+                widget_signal.connect(functools.partial(self._event_handler, event))
+        except AttributeError:
+            pass
+
     def _install_event_handlers(self):
         """Attaches events to the low level GUI object created in _Create_Widger"""
 
         if callable(self.callback) and hasattr(self._widget, "connect"):
-            # try:
-            if hasattr(self._widget, "clicked") and hasattr(
-                self._widget.clicked, "connect"
-            ):
-                self._widget.clicked.connect(
-                    lambda *args: self._event_handler(Sys_Events.CLICKED, args)
-                )
-            if hasattr(self._widget, "cellActivated") and hasattr(
-                self._widget.cellActivated, "connect"
-            ):
-                self._widget.cellActivated.connect(
-                    lambda *args: self._event_handler(Sys_Events.ACTIVATED, args)
-                )
-            if hasattr(self._widget, "cellChanged") and hasattr(
-                self._widget.cellChanged, "connect"
-            ):
-                self._widget.cellChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
-                )
-            if hasattr(self._widget, "cellClicked") and hasattr(
-                self._widget.cellClicked, "connect"
-            ):
-                self._widget.cellClicked.connect(
-                    lambda *args: self._event_handler(Sys_Events.CLICKED, args)
-                )
-            if hasattr(self._widget, "cellDoubleClicked") and hasattr(
-                self._widget.cellDoubleClicked, "connect"
-            ):
-                self._widget.cellDoubleClicked.connect(
-                    lambda *args: self._event_handler(Sys_Events.DOUBLECLICKED, args)
-                )
-            if hasattr(self._widget, "cellEntered") and hasattr(
-                self._widget.cellEntered, "connect"
-            ):
-                self._widget.cellEntered.connect(
-                    lambda *args: self._event_handler(Sys_Events.ENTERED, args)
-                )
-            if hasattr(self._widget, "cellPressed") and hasattr(
-                self._widget.cellPressed, "connect"
-            ):
-                self._widget.cellPressed.connect(
-                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
-                )
-            if hasattr(self._widget, "typeBufferCleared") and hasattr(
-                self._widget.typeBufferCleared, "connect"
-            ):
-                self._widget.typeBufferCleared.connect(
-                    lambda *args: self._event_handler(
-                        Sys_Events.CLEAR_TYPING_BUFFER, args
-                    )
-                )
-            if hasattr(self._widget, "currentItemChanged") and hasattr(
-                self._widget.currentItemChanged, "connect"
-            ):
-                self._widget.typeBufferCleared.connect(
-                    lambda *args: self._event_handler(Sys_Events.TEXTCHANGED, args)
-                )
-            if hasattr(self._widget, "collapsed") and hasattr(
-                self._widget.collapsed, "connect"
-            ):
-                self._widget.collapsed.connect(
-                    lambda *args: self._event_handler(Sys_Events.COLLAPSED, args)
-                )
-            if hasattr(self._widget, "currentCellChanged") and hasattr(
-                self._widget.currentCellChanged, "connect"
-            ):
-                self._widget.currentCellChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
-                )
-            if hasattr(self._widget, "currentChanged") and hasattr(
-                self._widget.currentChanged, "connect"
-            ):
-                self._widget.currentChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
-                )
-            if hasattr(self._widget, "currentIndexChanged") and hasattr(
-                self._widget.currentIndexChanged, "connect"
-            ):
-                self._widget.currentIndexChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.INDEXCHANGED, args)
-                )
-            if hasattr(self._widget, "currentTextChanged") and hasattr(
-                self._widget.currentTextChanged, "connect"
-            ):
-                self._widget.currentTextChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.TEXTCHANGED, args)
-                )
-            if hasattr(self._widget, "cursorPositionChanged") and hasattr(
-                self._widget.cursorPositionChanged, "connect"
-            ):
-                self._widget.cursorPositionChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.CURSORCHANGED, args)
-                )
-            if hasattr(self._widget, "dateChanged") and hasattr(
-                self._widget.dateChanged, "connect"
-            ):
-                self._widget.dateChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.DATECHANGED, args)
-                )
-            if hasattr(self._widget, "editTextChanged") and hasattr(
-                self._widget.editTextChanged, "connect"
-            ):
-                self._widget.editTextChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.EDITCHANGED, args)
-                )
-            if hasattr(self._widget, "editingFinished") and hasattr(
-                self._widget.editingFinished, "connect"
-            ):
-                self._widget.editingFinished.connect(
-                    lambda *args: self._event_handler(Sys_Events.EDITCHANGED, args)
-                )
-            if hasattr(self._widget, "expanded") and hasattr(
-                self._widget.expanded, "connect"
-            ):
-                self._widget.expanded.connect(
-                    lambda *args: self._event_handler(Sys_Events.EXPANDED, args)
-                )
             if hasattr(self._event_filter, "focusIn") and hasattr(
                 self._event_filter.focusIn, "connect"
             ):
@@ -2346,71 +2261,6 @@ class _qtpyBase_Control(_qtpyBase):
                     lambda *args: (self.focusOutEvent(args))
                 )
 
-            if hasattr(self._widget, "highlighted") and hasattr(
-                self._widget.highlighted, "connect"
-            ):
-                self._widget.highlighted.connect(
-                    lambda *args: self._event_handler(Sys_Events.HIGHLIGHTED, args)
-                )
-            if hasattr(self._widget, "inputRejected"):
-                if hasattr(self._widget.inputRejected, "connect"):
-                    self._widget.inputRejected.connect(
-                        lambda *args: self._event_handler(Sys_Events.BADINPUT, args)
-                    )
-            if hasattr(self._widget, "itemActivated") and hasattr(
-                self._widget.itemActivated, "connect"
-            ):
-                self._widget.itemActivated.connect(
-                    lambda *args: self._event_handler(Sys_Events.ACTIVATED, args)
-                )
-            if hasattr(self._widget, "itemCollapsed") and hasattr(
-                self._widget.itemCollapsed, "connect"
-            ):
-                self._widget.itemCollapsed.connect(
-                    lambda *args: self._event_handler(Sys_Events.COLLAPSED, args)
-                )
-            if hasattr(self._widget, "itemChanged") and hasattr(
-                self._widget.itemChanged, "connect"
-            ):
-                self._widget.itemChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
-                )
-            if hasattr(self._widget, "itemClicked") and hasattr(
-                self._widget.itemClicked, "connect"
-            ):
-                self._widget.itemClicked.connect(
-                    lambda *args: self._event_handler(Sys_Events.CLICKED, args)
-                )
-            if hasattr(self._widget, "itemDoubleClicked") and hasattr(
-                self._widget.itemDoubleClicked, "connect"
-            ):
-                self._widget.itemDoubleClicked.connect(
-                    lambda *args: self._event_handler(Sys_Events.DOUBLECLICKED, args)
-                )
-            if hasattr(self._widget, "itemEntered") and hasattr(
-                self._widget.itemEntered, "connect"
-            ):
-                self._widget.itemEntered.connect(
-                    lambda *args: self._event_handler(Sys_Events.ENTERED, args)
-                )
-            if hasattr(self._widget, "itemExpanded") and hasattr(
-                self._widget.itemExpanded, "connect"
-            ):
-                self._widget.itemExpanded.connect(
-                    lambda *args: self._event_handler(Sys_Events.EXPANDED, args)
-                )
-            if hasattr(self._widget, "itemPressed") and hasattr(
-                self._widget.itemPressed, "connect"
-            ):
-                self._widget.itemPressed.connect(
-                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
-                )
-            if hasattr(self._widget, "itemSelectionChanged") and hasattr(
-                self._widget.itemSelectionChanged, "connect"
-            ):
-                self._widget.itemSelectionChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.SELECTIONCHANGED, args)
-                )
             if hasattr(self._event_filter, "mousePressed") and hasattr(
                 self._event_filter.mousePressed, "connect"
             ):
@@ -2418,161 +2268,53 @@ class _qtpyBase_Control(_qtpyBase):
                     lambda *args: self._event_handler(Sys_Events.PRESSED, args)
                 )
 
-            # if hasattr(self._widget, "popupSignal"):
-            # if (
-            #     hasattr(self._event_filter, "popupSignal")
-            #     and self.popup_callback is not None
-            # ):
-            #     print(f"AB?????? {self.popup_callback=}")
-            #     # self._event_filter.popupSignal.connect(lambda: self.popup_callback)
-            #     # self._event_filter.popupSignal.connect(lambda *args: self._event_handler(SYSEVENTS.PRESSED, args))
-            if hasattr(self._widget, "pressed") and hasattr(
-                self._widget.pressed, "connect"
-            ):
-                self._widget.pressed.connect(
-                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
-                )
-            if hasattr(self._widget, "released") and hasattr(
-                self._widget.released, "connect"
-            ):
-                self._widget.released.connect(
-                    lambda *args: self._event_handler(Sys_Events.RELEASED, args)
-                )
-            if hasattr(self._widget, "returnPressed") and hasattr(
-                self._widget.returnPressed, "connect"
-            ):
-                self._widget.returnPressed.connect(
-                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
-                )
-            if hasattr(self._event_filter, "returnPressed") and hasattr(
-                self._event_filter.mousePressed, "connect"
-            ):
-                self._event_filter.returnPressed.connect(
-                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
-                )
-            if hasattr(self._widget, "selectionChanged") and hasattr(
-                self._widget.selectionChanged, "connect"
-            ):
-                self._widget.selectionChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.SELECTIONCHANGED, args)
-                )
-            if hasattr(self._widget, "stateChanged") and hasattr(
-                self._widget.stateChanged, "connect"
-            ):
-                self._widget.stateChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
-                )
-            if hasattr(self._widget, "tabBarClicked") and hasattr(
-                self._widget.tabBarClicked, "connect"
-            ):
-                self._widget.tabBarClicked.connect(
-                    lambda *args: self._event_handler(Sys_Events.CLICKED, args)
-                )
-            if hasattr(self._widget, "tabBarDoubleClicked") and hasattr(
-                self._widget.tabBarDoubleClicked, "connect"
-            ):
-                self._widget.tabBarDoubleClicked.connect(
-                    lambda *args: self._event_handler(Sys_Events.DOUBLECLICKED, args)
-                )
-            if hasattr(self._widget, "tabCloseRequested") and hasattr(
-                self._widget.tabCloseRequested, "connect"
-            ):
-                self._widget.tabCloseRequested.connect(
-                    lambda *args: self._event_handler(Sys_Events.CLOSED, args)
-                )
-            if hasattr(self._widget, "textChanged") and hasattr(
-                self._widget.textChanged, "connect"
-            ):
-                self._widget.textChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.TEXTCHANGED, args)
-                )
-            if hasattr(self._widget, "textEdited") and hasattr(
-                self._widget.textEdited, "connect"
-            ):
-                self._widget.textEdited.connect(
-                    lambda *args: self._event_handler(Sys_Events.TEXTEDIT, args)
-                )
-            if hasattr(self._widget, "timeChanged") and hasattr(
-                self._widget.timeChanged, "connect"
-            ):
-                self._widget.toggled.connect(
-                    lambda *args: self._event_handler(Sys_Events.TIMECHANGED, args)
-                )
-            if hasattr(self._widget, "toggled") and hasattr(
-                self._widget.toggled, "connect"
-            ):
-                self._widget.toggled.connect(
-                    lambda *args: self._event_handler(Sys_Events.TOGGLED, args)
-                )
-
-            if hasattr(self._widget, "actionTriggered") and hasattr(
-                self._widget.actionTriggered, "connect"
-            ):
-                self._widget.actionTriggered.connect(
-                    lambda *args: self._event_handler(Sys_Events.TRIGGERED, args)
-                )
-
-            if hasattr(self._widget, "sliderMoved") and hasattr(
-                self._widget.sliderMoved, "connect"
-            ):
-                self._widget.sliderMoved.connect(
-                    lambda *args: self._event_handler(Sys_Events.MOVED, args)
-                )
-            if hasattr(self._widget, "rangeChanged") and hasattr(
-                self._widget.rangeChanged, "connect"
-            ):
-                self._widget.rangeChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.CHANGED, args)
-                )
-            if hasattr(self._widget, "sliderPressed") and hasattr(
-                self._widget.sliderPressed, "connect"
-            ):
-                self._widget.sliderPressed.connect(
-                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
-                )
-            if hasattr(self._widget, "sliderReleased") and hasattr(
-                self._widget.sliderReleased, "connect"
-            ):
-                self._widget.sliderReleased.connect(
-                    lambda *args: self._event_handler(Sys_Events.RELEASED, args)
-                )
-            if hasattr(self._widget, "valueChanged") and hasattr(
-                self._widget.valueChanged, "connect"
-            ):
-                self._widget.valueChanged.connect(
-                    lambda *args: self._event_handler(Sys_Events.EDITCHANGED, args)
-                )
-
-            # keyPressevent #TODO implement event if needed
-
-            if hasattr(self._widget, "itemExpanded") and hasattr(
-                self._widget.itemExpanded, "connect"
-            ):
-                self._widget.itemExpanded.connect(
-                    lambda *args: self._event_handler(Sys_Events.EXPANDED, args)
-                )
-        # if isinstance(self, Dateedit):
-        #     pass
-        #     # action = Action(self._container_tag,tag=self._owner_widget.tag,event=event,action="",value=None.)
-        #
-        #     # self._fevent_filter.popupSignal.connect(
-        #     #    lambda *args: self._event_handler(SYSEVENTS.POPCAL, args)
-        #     # )
-        #
-        # if callable(self.popup_callback):
-        #     # if hasattr(self._widget, "popupSignal"):
-        #     if (
-        #         hasattr(self._event_filter, "popupSignal")
-        #         # hasattr(self._widget, "popupSignal")
-        #         and self.popup_callback is not None
-        #     ):
-        #         print(f"BB?????? {self.popup_callback=}")
-        #         # self._event_filter.popupSignal.connect(lambda: self.popup_callback)
-        #         # self._widget.popupSignal.connect(lambda: self.popup_callback)
-        # except Exception as e:
-        #    raise AssertionError(
-        #        f" ====> {e=} {self._widget=}:{self._widget.dumpObjectInfo()}"
-        #    )
+            self._install_event(Sys_Events.CLICKED, "clicked")
+            self._install_event(Sys_Events.ACTIVATED, "cellActivated")
+            self._install_event(Sys_Events.CHANGED, "cellChanged")
+            self._install_event(Sys_Events.CLICKED, "cellClicked")
+            self._install_event(Sys_Events.DOUBLECLICKED, "cellDoubleClicked")
+            self._install_event(Sys_Events.ENTERED, "cellEntered")
+            self._install_event(Sys_Events.PRESSED, "cellPressed")
+            self._install_event(Sys_Events.CLEAR_TYPING_BUFFER, "typeBufferCleared")
+            self._install_event(Sys_Events.TEXTCHANGED, "currentTextChanged")
+            self._install_event(Sys_Events.COLLAPSED, "collapsed")
+            self._install_event(Sys_Events.CHANGED, "currentCellChanged")
+            self._install_event(Sys_Events.CHANGED, "currentChanged")
+            self._install_event(Sys_Events.INDEXCHANGED, "currentIndexChanged")
+            self._install_event(Sys_Events.TEXTCHANGED, "currentTextChanged")
+            self._install_event(Sys_Events.CURSORCHANGED, "cursorPositionChanged")
+            self._install_event(Sys_Events.DATECHANGED, "dateChanged")
+            self._install_event(Sys_Events.EDITCHANGED, "editTextChanged")
+            self._install_event(Sys_Events.EDITCHANGED, "editingFinished")
+            self._install_event(Sys_Events.EXPANDED, "expanded")
+            self._install_event(Sys_Events.HIGHLIGHTED, "highlighted")
+            self._install_event(Sys_Events.BADINPUT, "inputRejected")
+            self._install_event(Sys_Events.ACTIVATED, "itemActivated")
+            self._install_event(Sys_Events.COLLAPSED, "itemCollapsed")
+            self._install_event(Sys_Events.CHANGED, "itemChanged")
+            self._install_event(Sys_Events.CLICKED, "itemClicked")
+            self._install_event(Sys_Events.DOUBLECLICKED, "itemDoubleClicked")
+            self._install_event(Sys_Events.ENTERED, "itemEntered")
+            self._install_event(Sys_Events.EXPANDED, "itemExpanded")
+            self._install_event(Sys_Events.PRESSED, "itemPressed")
+            self._install_event(Sys_Events.SELECTIONCHANGED, "itemSelectionChanged")
+            self._install_event(Sys_Events.PRESSED, "pressed")
+            self._install_event(Sys_Events.RELEASED, "released")
+            self._install_event(Sys_Events.PRESSED, "returnPressed")
+            self._install_event(Sys_Events.SELECTIONCHANGED, "selectionChanged")
+            self._install_event(Sys_Events.CHANGED, "stateChanged")
+            self._install_event(Sys_Events.CLICKED, "tabBarClicked")
+            self._install_event(Sys_Events.DOUBLECLICKED, "tabBarDoubleClicked")
+            self._install_event(Sys_Events.CLOSED, "tabCloseRequested")
+            self._install_event(Sys_Events.TEXTCHANGED, "textChanged")
+            self._install_event(Sys_Events.TEXTEDIT, "textEdited")
+            self._install_event(Sys_Events.TIMECHANGED, "timeChanged")
+            self._install_event(Sys_Events.TOGGLED, "toggled")
+            self._install_event(Sys_Events.TRIGGERED, "actionTriggered")
+            self._install_event(Sys_Events.CHANGED, "rangeChanged")
+            self._install_event(Sys_Events.MOVED, "sliderMoved")
+            self._install_event(Sys_Events.PRESSED, "sliderPressed")
+            self._install_event(Sys_Events.RELEASED, "sliderReleased")
 
     def _create_widget(
         self, parent_app: "QtPyApp", parent: qtW.QWidget, container_tag: str = ""
@@ -2630,6 +2372,7 @@ class _qtpyBase_Control(_qtpyBase):
                 self._widget = _Custom_Dateedit(parent)
             case Grid():
                 self._widget = _Grid_TableWidget(parent)  # qtW.QTableWidget(parent)
+                self._widget.grid = self
             case FolderView():
                 self._widget = qtW.QTreeView(parent)
             case Image():
@@ -8759,6 +8502,24 @@ class Grid_Col_Value:
     row: int
     col: int
     existing_value: any
+    _grid: "Grid" = None
+
+    def __post_init__(self):
+        assert self._grid is None or isinstance(
+            self._grid, Grid
+        ), f"{self._grid=}. Must a Grid instance"
+
+    @property
+    def grid(self) -> Optional["Grid"]:
+        return self._grid
+
+    @grid.setter
+    def grid(self, value: Optional["Grid"]) -> None:
+        assert value is None or isinstance(
+            value, Grid
+        ), f"{value=}. Must a Grid instance"
+
+        self._grid = value
 
 
 class _Grid_TableWidget(qtW.QTableWidget):
@@ -8779,6 +8540,19 @@ class _Grid_TableWidget(qtW.QTableWidget):
         self.typing_buffer = ""
         self.setFocusPolicy(qtC.Qt.StrongFocus)
         self.installEventFilter(self)
+        self.grid: Optional[Grid] = None
+
+    @property
+    def grid(self) -> Optional["Grid"]:
+        return self._grid
+
+    @grid.setter
+    def grid(self, value: Optional["Grid"]) -> None:
+        assert value is None or isinstance(
+            value, Grid
+        ), f"{value=}. Must a Grid instance"
+
+        self._grid = value
 
     def eventFilter(self, obj: qtC.QObject, event: qtC.QEvent) -> bool:
         """Filters key press events and modifies cell text accordingly.
@@ -8873,9 +8647,12 @@ class _Grid_TableWidget(qtW.QTableWidget):
                     item.row(),
                     item.column(),
                     item_data.current_value if item_data is not None else None,
+                    self.grid,
                 )
             else:
-                grid_col_value = Grid_Col_Value(self.typing_buffer, None, -1, -1, None)
+                grid_col_value = Grid_Col_Value(
+                    self.typing_buffer, None, -1, -1, None, self.grid
+                )
 
             event = _ClearTypingBufferEvent(grid_col_value)
             qtW.QApplication.postEvent(self, event)
@@ -9175,18 +8952,25 @@ class Grid(_qtpyBase_Control):
         event = None
 
         for arg in args:
-            if isinstance(arg, tuple):
+            
+            if isinstance(arg, Sys_Events):
+                event = arg
+            elif isinstance(arg, tuple):
                 if len(arg) == 1:
                     widget_item = arg[0]
                 elif len(arg) == 2:
                     row, col = arg
                 elif len(arg) == 4:
                     row_prev, col_prev, row, col = arg
-            else:
-                event = arg
+            elif isinstance(arg, qtC.QModelIndex):
+                row = arg.row()
+                col = arg.column()
+
+                if row >= 0 and col >= 0:
+                    widget_item = self._widget.item(row, col)
 
         window_id = Get_Window_ID(self.parent_app, self.parent, self)
-        grid_col_value = Grid_Col_Value("", None, row, col, "")
+        grid_col_value = Grid_Col_Value("", None, row, col, "", self)
 
         if (
             event
@@ -9222,7 +9006,7 @@ class Grid(_qtpyBase_Control):
                         value = widget_item.text()
                     user_data = None
 
-                grid_col_value = Grid_Col_Value(value, user_data, row, col, value)
+                grid_col_value = Grid_Col_Value(value, user_data, row, col, value, self)
 
             if col >= 0:
                 col_tag = self.coltag_get(col)
@@ -9252,7 +9036,7 @@ class Grid(_qtpyBase_Control):
             return 1
 
     def checkitemrow_get(self, row: int, col: int) -> Grid_Item | tuple:
-        """Returns an named tuple of (row_index, tag, current_value, and user_data) from the row and column specified
+        """Returns ans named tuple of (row_index, tag, current_value, and user_data) from the row and column specified
         if the item is checked or an empty tuple if not checked.
 
         Args:
@@ -10460,9 +10244,11 @@ class Grid(_qtpyBase_Control):
 
         size = self.pixel_char_size(char_height=1, char_width=1)
 
-        assert (
-            widget.width > 0 and widget.height > 0
-        ), f"Dev Error {widget.width=} {widget.height=} Must be > 0"
+        assert widget.width > 0 and widget.height > 0, (
+            "Dev Error"
+            f" {widget.container_tag=} {widget.tag=} {type(widget)=} {widget.width=} {widget.height=} Must"
+            " be > 0"
+        )
 
         size_hint = widget.guiwidget_get.sizeHint()
 
