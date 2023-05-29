@@ -598,6 +598,7 @@ class Font_Style(IntEnum):
     NORMAL = 0
     ITALIC = 1
     OBLIQUE = 2
+    UNDERLINE = 3
 
 
 # Widget frame appearance
@@ -2339,6 +2340,75 @@ class _qtpyBase_Control(_qtpyBase):
             isinstance(container_tag, str) and container_tag.strip() != ""
         ), f"{container_tag=}. Must be a non-empty str"
 
+        # ===== Helper
+        def _run_widget_factory() -> None:
+            """Creates the appropriate lowlevel qt widget"""
+
+            match self:
+                case Button():
+                    self._widget = qtW.QPushButton(self.text, parent)
+                    self._widget.setStyleSheet(Align_SS_Text[self.txt_align])
+                case Checkbox():
+                    self._widget = qtW.QCheckBox(self.text, parent)
+                case ComboBox():
+                    self._widget = qtW.QComboBox(parent)
+                    self._widget.setStyleSheet(
+                        "QComboBox QAbstractItemView  { border: 2px solid darkgray;}"
+                        " QComboBox { combobox-popup: 0; } "
+                    )
+                case Dateedit():
+                    self._widget = _Custom_Dateedit(
+                        parent
+                    )  # self._widget = qtW.QDateEdit(parent)
+                case Grid():
+                    self._widget = _Grid_TableWidget(parent)  # qtW.QTableWidget(parent)
+                    self._widget.grid = self
+                case FolderView():
+                    self._widget = qtW.QTreeView(parent)
+                case Image():
+                    self._widget = _Image(parent)
+                case Label():
+                    self._widget = qtW.QLabel(self.text.replace("\00", ""), parent)
+                case LCD():
+                    self._widget = qtW.QLCDNumber(parent)
+                    self._widget.setStyleSheet(Align_SS_Text[self.txt_align])
+                case LineEdit():
+                    self._widget = _Line_Edit(
+                        parent, self
+                    )  # qtW.QLineEdit(parent) #_Line_Edit(parent_app, parent, self, container_tag)
+                case RadioButton():
+                    self._widget = qtW.QRadioButton(self.text, parent)
+                case Spacer():
+                    self._widget = qtW.QLabel(self.text, parent)
+                case Slider():
+                    self._widget = qtW.QSlider(parent)
+                case Spinbox():
+                    self._widget = qtW.QSpinBox(parent)
+                case Switch():
+                    self._widget = _Switch(parent)
+                case Tab():
+                    self._widget: qtW.QTabWidget = qtW.QTabWidget(parent)
+                    self._widget.setUsesScrollButtons(True)
+                case TextEdit():
+                    self._widget = qtW.QTextEdit(self.text.strip("*"), parent)
+                case Timeedit():
+                    self._widget = qtW.QTimeEdit(parent=parent)
+                case Treeview():
+                    self._widget = qtW.QTreeWidget(parent)
+
+            if self._widget is None:
+                raise RuntimeError(
+                    f"{self.container_tag=} {self.tag=} {self._widget=} . Failed to"
+                    " create widget!"
+                )
+
+            if not shiboken6.isValid(self._widget):
+                raise RuntimeError(
+                    f"{self.container_tag=}-{self.tag=}. Create widget failed!"
+                )
+
+        # ===== Main
+
         window_id = Get_Window_ID(parent_app, parent, self)
 
         parent_app.widget_add(
@@ -2355,67 +2425,7 @@ class _qtpyBase_Control(_qtpyBase):
 
         label_height = 0
 
-        match self:
-            case Button():
-                self._widget = qtW.QPushButton(self.text, parent)
-                self._widget.setStyleSheet(Align_SS_Text[self.txt_align])
-            case Checkbox():
-                self._widget = qtW.QCheckBox(self.text, parent)
-            case ComboBox():
-                self._widget = qtW.QComboBox(parent)
-                self._widget.setStyleSheet(
-                    "QComboBox QAbstractItemView  { border: 2px solid darkgray;}"
-                    " QComboBox { combobox-popup: 0; } "
-                )
-            case Dateedit():
-                # self._widget = qtW.QDateEdit(parent)
-                self._widget = _Custom_Dateedit(parent)
-            case Grid():
-                self._widget = _Grid_TableWidget(parent)  # qtW.QTableWidget(parent)
-                self._widget.grid = self
-            case FolderView():
-                self._widget = qtW.QTreeView(parent)
-            case Image():
-                self._widget = _Image(parent)
-            case Label():
-                self._widget = qtW.QLabel(self.text.replace("\00", ""), parent)
-            case LCD():
-                self._widget = qtW.QLCDNumber(parent)
-                self._widget.setStyleSheet(Align_SS_Text[self.txt_align])
-            case LineEdit():
-                self._widget = _Line_Edit(
-                    parent, self
-                )  # qtW.QLineEdit(parent) #_Line_Edit(parent_app, parent, self, container_tag)
-            case RadioButton():
-                self._widget = qtW.QRadioButton(self.text, parent)
-            case Spacer():
-                self._widget = qtW.QLabel(self.text, parent)
-            case Slider():
-                self._widget = qtW.QSlider(parent)
-            case Spinbox():
-                self._widget = qtW.QSpinBox(parent)
-            case Switch():
-                self._widget = _Switch(parent)
-            case Tab():
-                self._widget: qtW.QTabWidget = qtW.QTabWidget(parent)
-                self._widget.setUsesScrollButtons(True)
-            case TextEdit():
-                self._widget = qtW.QTextEdit(self.text.strip("*"), parent)
-            case Timeedit():
-                self._widget = qtW.QTimeEdit(parent=parent)
-            case Treeview():
-                self._widget = qtW.QTreeWidget(parent)
-
-        if self._widget is None:
-            raise RuntimeError(
-                f"{self.container_tag=} {self.tag=} {self._widget=} . Failed to create"
-                " widget!"
-            )
-
-        if not shiboken6.isValid(self._widget):
-            raise RuntimeError(
-                f"{self.container_tag=}-{self.tag=}. Create widget failed!"
-            )
+        _run_widget_factory()
 
         self._widget.setObjectName(self.tag)
 
@@ -2423,21 +2433,20 @@ class _qtpyBase_Control(_qtpyBase):
             parent_app=parent_app, owner_widget=self, container_tag=container_tag
         )
 
-        if self._widget is not None:  # Should not happen, caught above
-            self._widget.installEventFilter(self._event_filter)
+        self._widget.installEventFilter(self._event_filter)
 
-            widget_font = (
-                parent_app.app_font_def if self.txt_font is None else self.txt_font
-            )
-            widget_font.size = self.txt_fontsize
+        widget_font = (
+            parent_app.app_font_def if self.txt_font is None else self.txt_font
+        )
+        widget_font.size = self.txt_fontsize
 
-            if self.bold:
-                widget_font.weight = Font_Weight.BOLD
+        if self.bold:
+            widget_font.weight = Font_Weight.BOLD
 
-            if self.italic:
-                widget_font.style = Font_Style.ITALIC
+        if self.italic:
+            widget_font.style = Font_Style.ITALIC
 
-            self.font_set(app_font=parent_app.app_font_def, widget_font=widget_font)
+        self.font_set(app_font=parent_app.app_font_def, widget_font=widget_font)
 
         char_pixel_size = self.pixel_char_size(1, 1)
 
@@ -2477,7 +2486,7 @@ class _qtpyBase_Control(_qtpyBase):
                 )
                 if isinstance(buddy_widget, qtW.QFrame):
                     pass
-                # buddy_widget.setFrameShape(qtW.QFrame.Shape.Box)  # Debug
+                    # buddy_widget.setFrameShape(qtW.QFrame.Shape.Box)  # Debug
 
             edit_group = qtW.QHBoxLayout()
             edit_group.setContentsMargins(0, 0, 0, 0)
@@ -2504,7 +2513,6 @@ class _qtpyBase_Control(_qtpyBase):
         if hasattr(self._widget, "enabled"):
             self.enable_set(self.enabled)
 
-        # print(f"DEBUG {self=}")
         pixel_size = self.pixel_char_size(self.height, self.width)
 
         if self.icon is not None:
@@ -2544,6 +2552,8 @@ class _qtpyBase_Control(_qtpyBase):
                     height + self.tune_vsize,
                 )
 
+        # self._widget.resize(self._widget.minimumSizeHint())
+
         self.visible_set(self.visible)
         self.ediitable_set(self.editable)
 
@@ -2558,7 +2568,6 @@ class _qtpyBase_Control(_qtpyBase):
             # edit_frame.setFrameShape(qtW.QFrame.Shape.Box)  # Debug
             return edit_frame
         else:
-            # print(f"DBG {qtW.QStyleFactory.keys()=}")
             # self._widget.setStyle(qtW.QStyleFactory.create("Windows"))  # Debug
             return self._widget
 
@@ -2806,9 +2815,7 @@ class _qtpyBase_Control(_qtpyBase):
         font_metrics = qtG.QFontMetrics(font)
 
         # Monspaced all the same width, proportional this might not be quite right
-        width = math.ceil(
-            font_metrics.horizontalAdvance("W" * char_width) * width_fudge
-        )
+        width = math.ceil(font_metrics.horizontalAdvance("W", char_width) * width_fudge)
         height = math.ceil(font_metrics.height() * char_height * height_fudge)
 
         return Char_Pixel_Size(height=height, width=width)
@@ -2855,31 +2862,16 @@ class _qtpyBase_Control(_qtpyBase):
         Returns:
             None
         """
-
-        # print(f"A==> {app_font=} {widget_font=}") #Debug
         assert isinstance(app_font, Font), f"{app_font=}. Must be an instance of Font "
-
-        if widget_font is None:
-            raise RuntimeError(f"{widget_font=}.Must be an instance of Font")
-
         assert isinstance(
-            widget_font, (Font)
+            widget_font, Font
         ), f"{widget_font=}. Must be an instance of Font"
 
-        if widget is None:
-            widget_instance = self._widget
-        else:
-            widget_instance = widget
-
-        if widget_instance is None:
-            raise RuntimeError(
-                f"{widget_instance=} || {self.tag=} can not be None and must be an"
-                " instance of QWidget"
-            )
+        widget_instance = widget or self._widget
 
         assert isinstance(
             widget_instance, qtW.QWidget
-        ), f"{widget_instance=} || {self.tag=} must be an instance of QWidget"
+        ), f"{widget_instance=} must be an instance of QWidget"
 
         colour = Colors(self)
 
@@ -2917,8 +2909,8 @@ class _qtpyBase_Control(_qtpyBase):
 
         if widget_font.font_name not in system_fonts:
             print(
-                f"\\n{self.tag=}\nwidget_font <{widget_font=}>  is not available on"
-                " this system.\n\n"
+                f"\n{self.tag=}\nwidget_font <{widget_font=}> is not available on this"
+                " system.\n\n"
                 + "".join("'" + fontname + "';" for fontname in system_fonts)
             )
 
@@ -2927,19 +2919,14 @@ class _qtpyBase_Control(_qtpyBase):
 
             print(f"substituting with system widget_font <{font_family}>")
 
-        if hasattr(self._widget, "font"):
-            local_widget = self._widget
-            control_font = local_widget.font()  # qtG.QFont()
-        else:
-            control_font = qtG.QFont()
-
+        control_font = (
+            widget_instance.font() if hasattr(widget_instance, "font") else qtG.QFont()
+        )
         control_font.setFamily(widget_font.font_name)
         control_font.setWeight(widget_font.weight.value)
         control_font.setPointSize(widget_font.size)
 
-        if widget_font.style == Font_Style.NORMAL:
-            pass
-        elif widget_font.style == Font_Style.ITALIC:
+        if widget_font.style == Font_Style.ITALIC:
             control_font.setItalic(True)
         elif widget_font.style == Font_Style.UNDERLINE:
             control_font.setUnderline(True)
@@ -2950,57 +2937,44 @@ class _qtpyBase_Control(_qtpyBase):
         qml_text = ""
 
         if isinstance(self.guiwidget_get, _Menu_Entry):
-            widget_instance = self._widget.parent()  # get_menu_parent(widget_instance)
+            widget_instance = self._widget.parent()
 
             if widget_font.selectback != "" and widget_font.selectfore != "":
                 qml_text = (
-                    "QMenu::item:selected { background-color: "
-                    + widget_font.selectback
-                    + ";color:"
-                    + widget_font.selectfore
-                    + "}"
+                    "QMenu::item:selected { background-color:"
+                    f" {widget_font.selectback}; color: {widget_font.selectfore} }}"
                 )
             elif widget_font.selectback != "" and widget_font.selectfore == "":
                 qml_text = (
-                    "QMenu::item:selected { background-color: "
-                    + widget_font.selectback
-                    + "}"
+                    "QMenu::item:selected { background-color:"
+                    f" {widget_font.selectback} }}"
                 )
-
             elif widget_font.backcolor != "" and widget_font.forecolor != "":
                 qml_text = (
-                    "QMenu {background-color:"
-                    + widget_font.backcolor
-                    + ";color: "
-                    + widget_font.forecolor
-                    + " }"
-                    + qml_text
+                    f"QMenu {{ background-color: {widget_font.backcolor}; color:"
+                    f" {widget_font.forecolor} }} {qml_text}"
                 )
             elif widget_font.backcolor != "" and widget_font.forecolor == "":
                 qml_text = (
-                    "QMenu {background-color:" + widget_font.backcolor + "}" + qml_text
+                    f"QMenu {{ background-color: {widget_font.backcolor} }} {qml_text}"
                 )
             elif widget_font.backcolor == "" and widget_font.forecolor != "":
-                qml_text = "QMenu {color:" + widget_font.forecolor + "}" + qml_text
+                qml_text = f"QMenu {{ color: {widget_font.forecolor} }} {qml_text}"
 
-            # Leave here in case can get stylesheets working for menu action items
-            # self.guiwidget_get.defaultWidget().setStyleSheet("color: " + forecolor)
-            # self.guiwidget_get.setStyleSheet("color: " + forecolor)
+            widget_instance.setStyleSheet(qml_text)
         else:
             if widget_font.backcolor != "" and widget_font.forecolor != "":
                 qml_text = (
-                    "background: "
-                    + widget_font.backcolor
-                    + ";color:"
-                    + widget_font.forecolor
+                    f"background: {widget_font.backcolor}; color:"
+                    f" {widget_font.forecolor}"
                 )
             elif widget_font.backcolor != "" and widget_font.forecolor == "":
-                qml_text = "background: " + widget_font.backcolor
+                qml_text = f"background: {widget_font.backcolor}"
             elif widget_font.backcolor == "" and widget_font.forecolor != "":
-                qml_text = "color: " + widget_font.forecolor
+                qml_text = f"color: {widget_font.forecolor}"
 
-        if qml_text != "":
-            widget_instance.setStyleSheet(qml_text)
+            if qml_text != "":
+                widget_instance.setStyleSheet(qml_text)
 
     def font_system_get(self, fixed: bool = True) -> qtG.QFont:
         """Returns the system font.
@@ -3701,6 +3675,8 @@ class QtPyApp(_qtpyBase):
 
         if windows_ui:
             self.app_get.setStyle(qtW.QStyleFactory.create("Windows"))
+        # else: # Stuffs grid col sizing
+        #    self.app_get.setStyle(qtW.QStyleFactory.create("Fusion"))
 
         if callable(self.callback):
             result = _Event_Handler(parent_app=self).event(
@@ -8597,6 +8573,9 @@ class _Grid_TableWidget(qtW.QTableWidget):
         item = self.currentItem()
 
         if item and hasattr(item, "editItem") and item.flags() & qtC.Qt.ItemIsEditable:
+            self.grid.guiwidget_get.setEditTriggers(
+                qtW.QAbstractItemView.EditTrigger.AnyKeyPressed
+            )
             editor = self.item.editItem(item)
 
             if editor:
@@ -8837,20 +8816,16 @@ class Grid(_qtpyBase_Control):
         ), f"{parent=}. Must be an instance of qtW.QWidget"
         assert isinstance(container_tag, str), f"{container_tag=}. Must be a string"
 
-        widget = cast(
-            qtW.QTableWidget,
-            super()._create_widget(
-                parent_app=parent_app, parent=parent, container_tag=container_tag
-            ),
+        widget: _Grid_TableWidget = super()._create_widget(
+            parent_app=parent_app, parent=parent, container_tag=container_tag
         )
 
-        self._widget: qtW.QTableWidget  # Type hinting
+        self._widget: _Grid_TableWidget  # Type hinting
 
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
 
         labels = []
-        num_cols = 0
 
         self._col_widths = {}
 
@@ -8862,10 +8837,7 @@ class Grid(_qtpyBase_Control):
             else:
                 self._col_widths[col_index] = definition.width
 
-        if len(labels) > 0:
-            num_cols = len(labels)
-
-        self._widget.setColumnCount(num_cols)
+        self._widget.setColumnCount(len(labels))
 
         char_pixel_size = self.pixel_char_size(char_height=1, char_width=1)
 
@@ -8894,7 +8866,7 @@ class Grid(_qtpyBase_Control):
             self._widget.setHorizontalHeaderItem(col_index, item)
 
             self._widget.setColumnWidth(
-                col_index, self._col_widths[col_index] * char_pixel_size.width
+                col_index, (self._col_widths[col_index] * char_pixel_size.width)
             )
             self._widget.horizontalHeaderItem(col_index).tag = definition.label
 
@@ -8925,6 +8897,11 @@ class Grid(_qtpyBase_Control):
             self._widget.setSortingEnabled(False)
             self._widget.horizontalHeader().setSectionsClickable(False)
 
+        # TODO make this user settable - #E8F0FE is pale blue
+        self._widget.setStyleSheet(
+            "QTableView::item:selected { background-color: #E8F0FE;color: black; }"
+        )
+
         if self.width <= 1:  # Override auto-calculated grid width
             self.width = grid_width + 3  # Scroll bar space
 
@@ -8952,7 +8929,6 @@ class Grid(_qtpyBase_Control):
         event = None
 
         for arg in args:
-            
             if isinstance(arg, Sys_Events):
                 event = arg
             elif isinstance(arg, tuple):
@@ -9492,6 +9468,9 @@ class Grid(_qtpyBase_Control):
 
             if col_definition.editable and item.flags() & qtC.Qt.ItemIsEditable:
                 if not isinstance(item, _Grid_TableWidget_Item):
+                    self._widget.setEditTriggers(
+                        qtW.QAbstractItemView.EditTrigger.AnyKeyPressed
+                    )
                     self._widget.editItem(item)
 
         self.select_row(row)
@@ -9663,6 +9642,9 @@ class Grid(_qtpyBase_Control):
 
             if item and item.flags() & qtC.Qt.ItemIsEditable:
                 if not isinstance(item, _Grid_TableWidget_Item):
+                    self._widget.setEditTriggers(
+                        qtW.QAbstractItemView.EditTrigger.AnyKeyPressed
+                    )
                     self._widget.editItem(item)
 
     def userdata_set(self, row: int = -1, col: int = -1, user_data: any = None) -> None:
@@ -10252,7 +10234,7 @@ class Grid(_qtpyBase_Control):
 
         size_hint = widget.guiwidget_get.sizeHint()
 
-        rowcol_widget.setFixedSize(size_hint)
+        # rowcol_widget.setFixedSize(size_hint)
         self._widget.setRowHeight(row_index, size_hint.height())
         self._widget.setColumnWidth(col_index, size_hint.width())
         self._widget.setCellWidget(row_index, col_index, rowcol_widget)
