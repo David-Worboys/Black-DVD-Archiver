@@ -43,6 +43,7 @@ class Video_File_Grid:
     """This class implements the file handling of the Black DVD Archiver ui"""
 
     def __init__(self):
+        """Sets up the instance for use"""
         file_handler = file_utils.File()
 
         self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
@@ -106,7 +107,9 @@ class Video_File_Grid:
         )  # Grid button container tag has the row_id embedded as the 1st element and delimtered by |
         row = file_grid.row_from_item_id(row_unique_id)
 
-        user_data: Video_Data = file_grid.userdata_get(row=row, col=0)
+        user_data: Video_Data = file_grid.userdata_get(
+            row=row, col=file_grid.colindex_get("video_file")
+        )
         video_file_input: list[Video_Data] = [user_data]
 
         Video_Cutter_Popup(
@@ -138,8 +141,7 @@ class Video_File_Grid:
 
             # Insert Assembled Children  Files
             self._insert_files_into_grid(
-                file_handler,
-                file_grid,
+                event,
                 [video_file_data for video_file_data in video_file_input[1:]],
             )
 
@@ -158,7 +160,9 @@ class Video_File_Grid:
         assert isinstance(file_grid, qtg.Grid), f"{file_grid}. Must be a Grid instance"
 
         for row in range(file_grid.row_count):
-            user_data: Video_Data = file_grid.userdata_get(row=row, col=0)
+            user_data: Video_Data = file_grid.userdata_get(
+                row=row, col=file_grid.colindex_get("video_file")
+            )
 
             if user_data and user_data.vd_id == vd_id:
                 file_grid.row_delete(row)
@@ -191,7 +195,9 @@ class Video_File_Grid:
 
         # Scan looking for source of trimmed file
         for row in range(file_grid.row_count):
-            user_data: Video_Data = file_grid.userdata_get(row=row, col=0)
+            user_data: Video_Data = file_grid.userdata_get(
+                row=row, col=file_grid.colindex_get("video_file")
+            )
 
             if user_data and vd_id == user_data.vd_id:
                 encoding_info = dvdarch_utils.get_file_encoding_info(trimmed_file)
@@ -264,6 +270,8 @@ class Video_File_Grid:
                         self._set_project_standard_duration(event)
                     case "dvd_menu_configuration":
                         DVD_Menu_Config_Popup(title="DVD Menu Configuration").show()
+                    case "group_files":
+                        self._group_files(event)
                     case "move_video_file_down":
                         self._move_video_file(event=event, up=False)
                     case "move_video_file_up":
@@ -293,6 +301,8 @@ class Video_File_Grid:
                         else:
                             self._display_filename = True
                         self._toggle_file_button_names(event)
+                    case "ungroup_files":
+                        self._ungroup_files(event)
 
     def _remove_files(self, event: qtg.Action) -> None:
         """Removes the selected files
@@ -334,10 +344,10 @@ class Video_File_Grid:
         Move the selected video file up or down in the file list grid.
 
         Args:
-            event (qtg.Action) : Calling event
+            event (qtg.Action): Calling event
             up (bool): True to move the video file up, False to move it down.
-
         """
+
         assert isinstance(up, bool), f"{up=}. Must be bool"
 
         file_grid: qtg.Grid = event.widget_get(
@@ -348,33 +358,121 @@ class Video_File_Grid:
         checked_items: tuple[qtg.Grid_Item] = file_grid.checkitems_get
         assert all(
             isinstance(item, qtg.Grid_Item) for item in checked_items
-        ), f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
+        ), f"{checked_items=}. Must be a list of 'qtg.Grid_Item_Tuple'"
 
         if len(checked_items) == 0:
             popups.PopMessage(
                 title="Select A Video file...",
                 message="Please Select A Video File To Move!",
             ).show()
+            return
         elif len(checked_items) > 1:
             popups.PopMessage(
                 title="Too Many Selected Video Files...",
-                message="Select Only One Video File For A Move ",
+                message="Select Only One Video File For A Move",
             ).show()
+            return
+
+        file_grid.checkitemrow_set(
+            False, checked_items[0].row_index, file_grid.colindex_get("video_file")
+        )
+        file_grid.select_row(checked_items[0].row_index)
+
+        current_row = checked_items[0].row_index
+        group_disp = file_grid.value_get(current_row, file_grid.colindex_get("group"))
+        group_id = int(group_disp) if group_disp else -1
+        current_video_data: Video_Data = file_grid.userdata_get(
+            current_row, file_grid.colindex_get("group")
+        )
+
+        if up:
+            if current_row > 1:
+                # look backward for group id to use if no group id is found in the current row
+                look_backward_group_id = ""
+                if current_row > 2:
+                    look_backward_group_id = file_grid.value_get(
+                        current_row - 2, file_grid.colindex_get("group")
+                    )
+
+                prev_group_id = file_grid.value_get(
+                    current_row - 1, file_grid.colindex_get("group")
+                )
+
+                if not prev_group_id and look_backward_group_id:
+                    prev_group_id = look_backward_group_id
+
+                if prev_group_id:
+                    prev_video_data: Video_Data = file_grid.userdata_get(
+                        current_row - 1, file_grid.colindex_get("group")
+                    )
+                    group_id = int(prev_group_id)
+                    current_video_data.video_file_settings.menu_group = (
+                        prev_video_data.video_file_settings.menu_group
+                    )
+                else:
+                    group_id = -1
+
         else:
-            file_grid.checkitemrow_set(False, checked_items[0].row_index, 0)
-            file_grid.select_row(checked_items[0].row_index)
+            if current_row < file_grid.row_count - 1:
+                # look ahead for group id to use if no group id is found in the current row
+                look_forward_group_id = ""
+                if current_row < file_grid.row_count - 2:
+                    look_forward_group_id = file_grid.value_get(
+                        current_row + 2, file_grid.colindex_get("group")
+                    )
 
-            if up:
-                new_row = file_grid.move_row_up(checked_items[0].row_index)
-            else:
-                new_row = file_grid.move_row_down(checked_items[0].row_index)
+                next_group_id = file_grid.value_get(
+                    current_row + 1, file_grid.colindex_get("group")
+                )
 
-            if new_row >= 0:
-                file_grid.checkitemrow_set(True, new_row, 0)
-                file_grid.select_col(new_row, 0)
-            else:
-                file_grid.checkitemrow_set(True, checked_items[0].row_index, 0)
-                file_grid.select_col(checked_items[0].row_index, 0)
+                if not next_group_id and look_forward_group_id:
+                    next_group_id = look_forward_group_id
+
+                if next_group_id:
+                    next_video_data: Video_Data = file_grid.userdata_get(
+                        current_row + 1, file_grid.colindex_get("group")
+                    )
+                    group_id = int(next_group_id)
+                    current_video_data.video_file_settings.menu_group = (
+                        next_video_data.video_file_settings.menu_group
+                    )
+                else:
+                    group_id = -1
+
+        file_grid.value_set(
+            row=current_row,
+            col=file_grid.colindex_get("group"),
+            value=str(group_id) if group_id >= 0 else "",
+            user_data=current_video_data,
+        )
+
+        for col in range(file_grid.col_count):
+            file_grid.userdata_set(
+                row=current_row,
+                col=col,
+                user_data=current_video_data,
+            )
+
+        new_row = (
+            file_grid.move_row_up(current_row)
+            if up
+            else file_grid.move_row_down(current_row)
+        )
+
+        if new_row >= 0:
+            file_grid.checkitemrow_set(
+                True, new_row, file_grid.colindex_get("video_file")
+            )
+            file_grid.select_col(new_row, file_grid.colindex_get("video_file"))
+        else:
+            file_grid.checkitemrow_set(
+                True,
+                checked_items[0].row_index,
+                file_grid.colindex_get("video_file"),
+            )
+            file_grid.select_col(
+                checked_items[0].row_index, file_grid.colindex_get("video_file")
+            )
 
     def _load_grid(self, event: qtg.Action) -> None:
         """Loads the grid from the database
@@ -419,9 +517,11 @@ class Video_File_Grid:
                                 )
                                 toolbox = self._get_toolbox(video_data)
                                 file_grid.row_widget_set(
-                                    row=row_index, col=6, widget=toolbox
+                                    row=row_index,
+                                    col=file_grid.colindex_get("settings"),
+                                    widget=toolbox,
                                 )
-
+            file_grid.row_scroll_to(0)
             self._set_project_standard_duration(event)
         except Exception as e:
             popups.PopError(title="File Grid Load Error...", message=str(e)).show()
@@ -473,7 +573,9 @@ class Video_File_Grid:
         )
 
         for row_index in range(file_grid.row_count):
-            grid_video_data: Video_Data = file_grid.userdata_get(row=row_index, col=0)
+            grid_video_data: Video_Data = file_grid.userdata_get(
+                row=row_index, col=file_grid.colindex_get("video_file")
+            )
 
             if grid_video_data.video_file_settings.button_title.strip() == "":
                 grid_video_data.video_file_settings.button_title = (
@@ -483,7 +585,7 @@ class Video_File_Grid:
             if self._display_filename:
                 file_grid.value_set(
                     row=row_index,
-                    col=0,
+                    col=file_grid.colindex_get("video_file"),
                     value=(
                         f"{grid_video_data.video_file}{grid_video_data.video_extension}"
                     ),
@@ -493,14 +595,148 @@ class Video_File_Grid:
             else:
                 file_grid.value_set(
                     row=row_index,
-                    col=0,
+                    col=file_grid.colindex_get("video_file"),
                     value=grid_video_data.video_file_settings.button_title,
                     user_data=grid_video_data,
                 )
 
-            for col in range(0, file_grid.col_count):
+            for col in range(file_grid.col_count):
                 file_grid.userdata_set(
                     row=row_index, col=col, user_data=grid_video_data
+                )
+
+    def _get_max_group_num(self, file_grid: qtg.Grid) -> int:
+        """
+        Scan all items in the file_grid and return the maximum menu_group number.
+
+        Args:
+            file_grid (qtg.Grid): The grid containing the items.
+
+        Returns:
+            int: The maximum menu_group number.
+        """
+        assert isinstance(
+            file_grid, qtg.Grid
+        ), f"{file_grid=}. Must be an instance of qtg.Grid"
+
+        max_group_num = 0
+
+        for row in range(file_grid.row_count):
+            video_item = file_grid.userdata_get(
+                row=row, col=file_grid.colindex_get("video_file")
+            )
+            if isinstance(video_item, Video_Data):
+                menu_group = video_item.video_file_settings.menu_group
+                if menu_group > max_group_num:
+                    max_group_num = menu_group
+
+        return max_group_num
+
+    def _group_files(self, event: qtg.Action) -> None:
+        """
+        Groups selected files by assigning them to the same menu_group.
+
+        Args:
+            event (qtg.Action): The event triggering the grouping.
+        """
+
+        file_grid: qtg.Grid = event.widget_get(
+            container_tag="video_file_controls",
+            tag="video_input_files",
+        )
+
+        checked_items = file_grid.checkitems_get
+
+        if not checked_items:
+            popups.PopError(
+                title="No Files Selected", message="Please Select Files To Group"
+            ).show()
+            return None
+
+        grouped = []
+        ungrouped = []
+        group_id = -1
+        max_group_val = self._get_max_group_num(file_grid)
+
+        for item in checked_items:
+            video_item: Video_Data = item.user_data
+            print(f"DBG {video_item.video_file_settings.menu_group=}")
+            if video_item.video_file_settings.menu_group >= 0:
+                grouped.append(video_item)
+            else:
+                ungrouped.append(item)
+
+        print(f"DBG {grouped=} {ungrouped=}")
+
+        if grouped:
+            for video_item in grouped:
+                if video_item.video_file_settings.menu_group >= 0:
+                    if (
+                        group_id >= 0
+                        and group_id != video_item.video_file_settings.menu_group
+                    ):
+                        popups.PopError(
+                            title="Grouping Error...",
+                            message="All Files Must Be In The Same Group",
+                        ).show()
+                        return None
+
+                    group_id = video_item.video_file_settings.menu_group
+
+        group_value = group_id if group_id >= 0 else max_group_val + 1
+
+        for item in ungrouped:
+            video_item: Video_Data = item.user_data
+            video_item.video_file_settings.menu_group = group_value
+            file_grid.value_set(
+                row=item.row_index,
+                col=file_grid.colindex_get("group"),
+                value=f"{group_value}",
+                user_data=video_item,
+            )
+
+    def _ungroup_files(self, event: qtg.Action) -> None:
+        """
+        Ungroups selected files by setting their menu_group to -1.
+
+        Args:
+            event (qtg.Action): The event triggering the ungrouping.
+
+        Returns:
+            None
+        """
+
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
+        file_grid: qtg.Grid = event.widget_get(
+            container_tag="video_file_controls",
+            tag="video_input_files",
+        )
+
+        checked_items = file_grid.checkitems_get
+
+        if not checked_items:
+            popups.PopError(
+                title="No Files Selected", message="Please Select Files To Ungroup"
+            ).show()
+            return None
+
+        if (
+            popups.PopYesNo(
+                title="Ungroup Files", message="Ungroup Selected Files?"
+            ).show()
+            == "yes"
+        ):
+            for item in checked_items:
+                video_item: Video_Data = item.user_data
+                video_item.video_file_settings.menu_group = -1
+                file_grid.value_set(
+                    row=item.row_index,
+                    col=file_grid.colindex_get("group"),
+                    value="",
+                    user_data=video_item,
                 )
 
     def load_video_input_files(self, event: qtg.Action) -> None:
@@ -528,13 +764,13 @@ class Video_File_Grid:
             )
 
             with qtg.sys_cursor(qtg.Cursor.hourglass):
-                rejected = self._insert_files_into_grid(
-                    file_handler, file_grid, video_file_list
-                )
+                rejected = self._insert_files_into_grid(event, video_file_list)
 
             if file_grid.row_count > 0:
                 # First file sets project encoding standard - Project files in toto Can be PAL or NTSC not both
-                grid_video_data: Video_Data = file_grid.userdata_get(row=0, col=4)
+                grid_video_data: Video_Data = file_grid.userdata_get(
+                    row=0, col=file_grid.colindex_get("settings")
+                )
                 project_video_standard = grid_video_data.encoding_info[
                     "video_standard"
                 ][1]
@@ -544,7 +780,7 @@ class Video_File_Grid:
                     file_name = file_grid.value_get(row_index, 0)
 
                     grid_video_data: Video_Data = file_grid.userdata_get(
-                        row=row_index, col=4
+                        row=row_index, col=file_grid.colindex_get("settings")
                     )
 
                     video_standard = grid_video_data.encoding_info["video_standard"][1]
@@ -570,34 +806,37 @@ class Video_File_Grid:
                 popups.PopMessage(
                     title="These Files Are Not Permitted...", message=rejected
                 ).show()
+        return None
 
     def _insert_files_into_grid(
         self,
-        file_handler: file_utils.File,
-        file_grid: qtg.Grid,
+        event: qtg.Action,
         selected_files: list[Video_Data],
     ) -> str:
         """
         Inserts files into the file grid widget.
+
         Args:
-            file_handler (utils.File): An instance of a file handler.
-            file_grid (qtg.Grid): The grid widget to insert the files into.
+            event (qrg.Action) : Triggering event
             selected_files (list[Video_Data]): list of video file data
         Returns:
             str: A string containing information about any rejected files.
         """
         assert isinstance(
-            file_handler, file_utils.File
-        ), f"{file_handler=}. Must be an instance of utils.File"
-        assert isinstance(
-            file_grid, qtg.Grid
-        ), f"{file_grid=}. Must be an instance of qtg.Grid"
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
         assert isinstance(
             selected_files, list
         ), f"{selected_files=}.  Must be a list of Video_Data objects"
         assert all(
             isinstance(item, Video_Data) for item in selected_files
         ), f"{selected_files=}.  Must be a list of Video_Data objects"
+
+        file_handler: file_utils.File
+        file_grid: qtg.Grid = event.widget_get(
+            container_tag="video_file_controls",
+            tag="video_input_files",
+        )
 
         rejected = ""
         rows_loaded = file_grid.row_count
@@ -607,7 +846,7 @@ class Video_File_Grid:
             # Check if file already loaded in grid
             for check_row_index in range(file_grid.row_count):
                 grid_video_data: Video_Data = file_grid.userdata_get(
-                    row=check_row_index, col=0
+                    row=check_row_index, col=file_grid.colindex_get("video_file")
                 )
 
                 if grid_video_data.video_path == file_video_data.video_path:
@@ -651,7 +890,9 @@ class Video_File_Grid:
                 )
 
                 file_grid.row_widget_set(
-                    row=rows_loaded + row_index, col=6, widget=toolbox
+                    row=rows_loaded + row_index,
+                    col=file_grid.colindex_get("settings"),
+                    widget=toolbox,
                 )
 
                 row_index += 1
@@ -669,12 +910,14 @@ class Video_File_Grid:
             video_user_data, Video_Data
         ), f"{video_user_data=}. Must be an instance of Video_Data"
 
-        toolbox = qtg.HBoxContainer(height=1, width=3, align=qtg.Align.CENTER).add_row(
+        toolbox = qtg.HBoxContainer(
+            height=1, width=3, align=qtg.Align.CENTER, margin_left=0, margin_right=0
+        ).add_row(
             qtg.Button(
                 tag="grid_button",
                 height=1,
                 width=1,
-                tune_vsize=-5,
+                # tune_vsize=-5,
                 callback=self.grid_events,
                 user_data=video_user_data,
                 icon=file_utils.App_Path("wrench.svg"),
@@ -713,7 +956,7 @@ class Video_File_Grid:
                 else video_user_data.video_file_settings.button_title
             ),
             row=row_index,
-            col=0,
+            col=file_grid.colindex_get("video_file"),
             user_data=video_user_data,
             tooltip=(
                 f"{sys_consts.SDELIM}{video_user_data.video_path}{sys_consts.SDELIM}"
@@ -725,48 +968,67 @@ class Video_File_Grid:
         file_grid.value_set(
             value=str(video_user_data.encoding_info["video_width"][1]),
             row=row_index,
-            col=1,
+            col=file_grid.colindex_get("width"),
             user_data=video_user_data,
         )
 
         file_grid.value_set(
             value=str(video_user_data.encoding_info["video_height"][1]),
             row=row_index,
-            col=2,
-            user_data=video_user_data,
-        )
-
-        file_grid.value_set(
-            value=video_user_data.encoding_info["video_format"][1],
-            row=row_index,
-            col=3,
+            col=file_grid.colindex_get("height"),
             user_data=video_user_data,
         )
 
         file_grid.value_set(
             value=(
-                video_user_data.encoding_info["video_standard"][1]
-                + f" : { video_user_data.encoding_info['video_scan_order'][1]}"
+                video_user_data.encoding_info["video_format"][1]
+                + f":{ video_user_data.encoding_info['video_scan_order'][1]}"
                 if video_user_data.encoding_info["video_scan_order"] != ""
                 else ""
             ),
             row=row_index,
-            col=4,
+            col=file_grid.colindex_get("encoder"),
             user_data=video_user_data,
         )
 
         file_grid.value_set(
             value=duration,
             row=row_index,
-            col=5,
+            col=file_grid.colindex_get("duration"),
+            user_data=video_user_data,
+        )
+
+        file_grid.value_set(
+            value=video_user_data.encoding_info["video_standard"][1],
+            row=row_index,
+            col=file_grid.colindex_get("standard"),
+            user_data=video_user_data,
+        )
+
+        file_grid.value_set(
+            value=(
+                f"{video_user_data.video_file_settings.menu_group}"
+                if video_user_data.video_file_settings.menu_group >= 0
+                else ""
+            ),
+            row=row_index,
+            col=file_grid.colindex_get("group"),
+            user_data=video_user_data,
+        )
+
+        file_grid.userdata_set(
+            row=row_index,
+            col=file_grid.colindex_get("settings"),
             user_data=video_user_data,
         )
 
     def _set_project_standard_duration(self, event: qtg.Action) -> None:
-        """Sets the  duration and video standard for the current project based on the selected
+        """
+        Sets the duration and video standard for the current project based on the selected
         input video files.
+
         Args:
-            event (qtg.Action): The calling event .
+            event (qtg.Action): The calling event.
         """
         assert isinstance(
             event, qtg.Action
@@ -781,34 +1043,33 @@ class Video_File_Grid:
         self.project_duration = ""
         self.dvd_percent_used = 0
 
-        checked_items = file_grid.checkitems_get
-
         if file_grid.row_count > 0:
-            encoding_info = file_grid.userdata_get(row=0, col=4).encoding_info
+            for row_index, checked_item in enumerate(file_grid.checkitems_get):
+                checked_item: qtg.Grid_Item
+                video_data: Video_Data = checked_item.user_data
+
+                encoding_info = video_data.encoding_info
+
+                total_duration += encoding_info["video_duration"][1]
+
+            encoding_info = file_grid.userdata_get(
+                row=0, col=file_grid.colindex_get("settings")
+            ).encoding_info
             self.project_video_standard = encoding_info["video_standard"][1]
 
-            if checked_items:
-                for checked_item in checked_items:
-                    checked_item: qtg.Grid_Item
-                    user_data: Video_Data = checked_item.user_data
-
-                    encoding_info = user_data.encoding_info
-
-                    total_duration += encoding_info["video_duration"][1]
-
-                self.project_duration = str(
-                    datetime.timedelta(seconds=total_duration)
-                ).split(".")[0]
-                self.dvd_percent_used = (
-                    round(
-                        (
-                            (sys_consts.AVERAGE_BITRATE * total_duration)
-                            / sys_consts.SINGLE_SIDED_DVD_SIZE
-                        )
-                        * 100
+            self.project_duration = str(
+                datetime.timedelta(seconds=total_duration)
+            ).split(".")[0]
+            self.dvd_percent_used = (
+                round(
+                    (
+                        (sys_consts.AVERAGE_BITRATE * total_duration)
+                        / sys_consts.SINGLE_SIDED_DVD_SIZE
                     )
-                    + sys_consts.PERCENT_SAFTEY_BUFFER
+                    * 100
                 )
+                + sys_consts.PERCENT_SAFTEY_BUFFER
+            )
 
         event.value_set(
             container_tag="dvd_properties",
@@ -831,8 +1092,9 @@ class Video_File_Grid:
 
     def layout(self) -> qtg.VBoxContainer:
         """Generates the file handler ui
+
         Returns:
-            qtg.VBoxContainer: THe container that houses the file handler ui layout
+            qtg.VBoxContainer: The container that houses the file handler ui layout
         """
 
         button_container = qtg.HBoxContainer(
@@ -846,6 +1108,20 @@ class Video_File_Grid:
                 width=2,
             ),
             qtg.Spacer(width=1),
+            qtg.Button(
+                icon=file_utils.App_Path("layer-group.svg"),
+                tag="group_files",
+                callback=self.event_handler,
+                tooltip="Group Selected Video Files On The Same DVD Menu Page",
+                width=2,
+            ),
+            qtg.Button(
+                icon=file_utils.App_Path("object-ungroup.svg"),
+                tag="ungroup_files",
+                callback=self.event_handler,
+                tooltip="Ungroup Selected Video Files",
+                width=2,
+            ),
             qtg.Button(
                 icon=file_utils.App_Path("text.svg"),
                 tag="toggle_file_button_names",
@@ -888,6 +1164,20 @@ class Video_File_Grid:
 
         file_col_def = (
             qtg.Col_Def(
+                label="",
+                tag="settings",
+                width=3,
+                editable=False,
+                checkable=False,
+            ),
+            qtg.Col_Def(
+                label="Grp",
+                tag="group",
+                width=3,
+                editable=False,
+                checkable=False,
+            ),
+            qtg.Col_Def(
                 label="Video File",
                 tag="video_file",
                 width=64,
@@ -909,36 +1199,29 @@ class Video_File_Grid:
                 checkable=False,
             ),
             qtg.Col_Def(
-                label="Enc",
+                label="Encoder",
                 tag="encoder",
-                width=5,
-                editable=False,
-                checkable=False,
-            ),
-            qtg.Col_Def(
-                label="Standard",
-                tag="Standard",
-                width=10,
-                editable=False,
-                checkable=False,
-            ),
-            qtg.Col_Def(
-                label="Duration",
-                tag="Duration",
                 width=7,
                 editable=False,
                 checkable=False,
             ),
             qtg.Col_Def(
-                label="",
-                tag="settings",
-                width=2,
+                label="System",
+                tag="standard",
+                width=7,
+                editable=False,
+                checkable=False,
+            ),
+            qtg.Col_Def(
+                label="Duration",
+                tag="duration",
+                width=7,
                 editable=False,
                 checkable=False,
             ),
         )
         file_control_container = qtg.VBoxContainer(
-            tag="video_file_controls", align=qtg.Align.TOPLEFT
+            tag="video_file_controls", align=qtg.Align.TOPLEFT, margin_right=20
         )
 
         file_control_container.add_row(

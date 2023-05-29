@@ -477,6 +477,7 @@ class PopMessage(PopContainer):
 
     def __post_init__(self):
         """Initializes the PopMessage, checks arguments are Ok and sets instance variables."""
+
         super().__post_init__()
 
         assert (
@@ -926,7 +927,7 @@ class PopYesNo(PopMessage):
                 Sys_Icon.messagequestion.get(iconformat=False)
             )
 
-        # Add  Yes and No Buttone to the  GUI if none supplied.
+        # Add  Yes and No Buttons to the  GUI if none supplied.
         if self.buttons is None:
             self.buttons = (
                 Button(text="&Yes", tag="yes"),

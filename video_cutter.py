@@ -72,8 +72,8 @@ class Video_Handler:
     _frame_num: int = 0
     _frame_width: int = 720
     _frame_height: int = 576
-    _media_player: qtM.QMediaPlayer | None = None
-    _video_sink: qtM.QVideoSink | None = None
+    _media_player: qtM.QMediaPlayer | None = qtM.QMediaPlayer()
+    _video_sink: qtM.QVideoSink | None = qtM.QVideoSink()
 
     def __post_init__(self) -> None:
         """Sets-up the instance"""
@@ -133,8 +133,12 @@ class Video_Handler:
 
         # media_format = qtM.QMediaFormat()
 
-        self._media_player = qtM.QMediaPlayer()
-        self._video_sink = qtM.QVideoSink()
+        # self._media_player = qtM.QMediaPlayer()
+        # self._video_sink = qtM.QVideoSink()
+
+        assert (
+            self._media_player is not None and self._video_sink is not None
+        ), "Failed to get multi-meda started"
 
         # Hook up sink signals
         self._video_sink.videoFrameChanged.connect(self._frame_handler)

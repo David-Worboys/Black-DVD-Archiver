@@ -19,9 +19,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+from typing import cast
 
 import platformdirs
 
@@ -46,6 +46,13 @@ class DVD_Archiver:
     """
 
     def __init__(self, args) -> None:
+        """
+        Sets up the instance of the class, and initializes all its attributes.
+
+        Args:
+            args: Passed in  command line arguments
+
+        """
         self._DVD_Arch_App = qtg.QtPyApp(
             display_name=sys_consts.PROGRAM_NAME,
             callback=self.event_handler,
@@ -266,7 +273,7 @@ class DVD_Archiver:
             folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
 
         folder = popups.PopFolderGet(
-            title=f"Select A DVD Buld Folder....",
+            title=f"Select A DVD Build Folder....",
             root_dir=folder,
             create_folder=True,
             folder_edit=False,
@@ -335,41 +342,48 @@ class DVD_Archiver:
             ).show()
             return None
 
-        dvd_title = Menu_Page_Title_Popup(
-            title="DVD Menu Title",
-            video_data_list=[file.user_data for file in checked_items],
-        ).show()
-
-        if dvd_title.strip() == "":
-            popups.PopMessage(
-                title="DVD Menu Title Not Entered...",
-                message="A Menu Title Must Be Entered!",
+        menu_video_data: list[Video_Data] = [file.user_data for file in checked_items]
+        menu_layout: list[tuple[str, list[Video_Data]]] = []
+        if (
+            Menu_Page_Title_Popup(
+                title="DVD Menu Title",
+                video_data_list=menu_video_data,  # Pass by reference
+                menu_layout=menu_layout,  # Pass by reference
             ).show()
+            == "cancel"
+        ):
             return None
+
+        # video_data = [file.user_data for file in checked_items]
+        # self._file_control._insert_files_into_grid(event, video_data)
 
         video_file_defs = []
         menu_labels = []
+        menu_title = []
         dvd_menu_settings = DVD_Menu_Settings()
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
-            for checked_item in checked_items:
-                checked_item: qtg.Grid_Item
-                user_data: Video_Data = checked_item.user_data
+            for menu_item in menu_layout:
+                menu_title.append(menu_item[0])
+                video_data_items: list[Video_Data] = menu_item[1]
 
-                file_def = File_Def()
-                file_def.path = user_data.video_folder
-                file_def.file_name = (
-                    f"{user_data.video_file}{user_data.video_extension}"
-                )
-                file_def.file_info = user_data.encoding_info
-                file_def.video_file_settings = user_data.video_file_settings
+                for video_data in video_data_items:
+                    video_data = cast(Video_Data, video_data)
 
-                video_file_defs.append(file_def)
+                    file_def = File_Def()
+                    file_def.path = video_data.video_folder
+                    file_def.file_name = (
+                        f"{video_data.video_file}{video_data.video_extension}"
+                    )
+                    file_def.file_info = video_data.encoding_info
+                    file_def.video_file_settings = video_data.video_file_settings
 
-                if user_data.video_file_settings.button_title.strip() == "":
-                    menu_labels.append(user_data.video_file)
-                else:
-                    menu_labels.append(user_data.video_file_settings.button_title)
+                    if video_data.video_file_settings.button_title.strip() == "":
+                        menu_labels.append(video_data.video_file)
+                    else:
+                        menu_labels.append(video_data.video_file_settings.button_title)
+
+                    video_file_defs.append(file_def)
 
         result = -1
         message = ""
@@ -549,28 +563,6 @@ class DVD_Archiver:
             ),
         )
 
-        archive_properties = qtg.FormContainer(
-            tag="archive_properties", text="Archive Properties"
-        ).add_row(
-            qtg.LineEdit(
-                text=f"{sys_consts.SDELIM}{archive_folder}{sys_consts.SDELIM}",
-                action="edit_action",
-                tag="archive_path",
-                label=f"Archive Folder",
-                width=66,
-                tooltip=f"The Folder Where The DVD Archive Is Stored",
-                editable=False,
-                buddy_control=qtg.Button(
-                    callback=self.event_handler,
-                    tag="archive_folder_select",
-                    height=1,
-                    width=1,
-                    icon=qtg.Sys_Icon.dir.get(),
-                    tooltip=f"Select The  DVD Archive Folder",
-                ),
-            ),
-        )
-
         dvd_properties = qtg.FormContainer(
             tag="dvd_properties", text="DVD Properties"
         ).add_row(
@@ -589,9 +581,9 @@ class DVD_Archiver:
                 text=f"{sys_consts.SDELIM}{archive_folder}{sys_consts.SDELIM}",
                 action="edit_action",
                 tag="archive_path",
-                label=f"Archive Folder",
+                label="Archive Folder",
                 width=66,
-                tooltip=f"The Folder Where The DVD Archive Is Stored",
+                tooltip="The Folder Where The DVD Archive Is Stored",
                 editable=False,
                 buddy_control=qtg.Button(
                     callback=self.event_handler,
@@ -606,9 +598,9 @@ class DVD_Archiver:
                 text=f"{sys_consts.SDELIM}{dvd_build_folder}{sys_consts.SDELIM}",
                 action="edit_action",
                 tag="dvd_path",
-                label=f"DVD Build Folder",
+                label="DVD Build Folder",
                 width=66,
-                tooltip=f"The Folder Where The DVD Image Is Stored",
+                tooltip="The Folder Where The DVD Image Is Stored",
                 editable=False,
                 buddy_control=qtg.Button(
                     callback=self.event_handler,

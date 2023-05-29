@@ -10063,7 +10063,7 @@ class Grid(_qtpyBase_Control):
         Args:
             row (int): Grid row index. If -1, the current row is used.
             col (int): Grid column index. If -1, the current column is used.
-            container_tag (str): Container tag is only needed if the desired widget is in a container
+            container_tag (str): Container tag is needed if the desired widget is in a container
             tag (str): control tag name. If "-" is supplied, the container is returned.
 
         Returns:
@@ -10077,6 +10077,7 @@ class Grid(_qtpyBase_Control):
         assert isinstance(col, int) and (
             col == -1 or col >= 0
         ), f"{col=}. Must be an int == -1 or int >= 0"
+        assert isinstance(container_tag, str), f"{container_tag=}. Must be a str"
         assert isinstance(tag, str) and (
             tag.strip() != "" or tag == "-"
         ), f"{tag=}. Must be a non-empty str or '-'"
@@ -10092,22 +10093,29 @@ class Grid(_qtpyBase_Control):
         if item_data is not None and item_data.widget is not None:
             if tag == "-":  # Return container/widget
                 return item_data.widget
-            else:
+            elif container_tag and isinstance(
+                item_data.widget, (FormContainer, VBoxContainer, HBoxContainer)
+            ):  # Rummage through containers for our widget
+                for widget_list in item_data.widget.control_list_get:
+                    for widget in widget_list:
+                        container_tag = (
+                            widget.container_tag.split("|")[1]
+                            if "|" in widget.container_tag
+                            else widget.container_tag
+                        )
+                        tag = widget.tag
+
+                        if container_tag == container_tag and tag == widget.tag:
+                            return widget
+            else:  # Naked tag search, widget is not in a container
                 window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
                 for item_id in self.item_ids_from_row(row_index):
-                    if container_tag:
-                        if self.parent_app.widget_exist(
-                            window_id=window_id,
-                            container_tag=container_tag,
-                            tag=f"{item_id}|{tag}",
-                        ):
-                            return self.parent_app.widget_get(
-                                window_id=window_id,
-                                container_tag=container_tag,
-                                tag=f"{item_id}|{tag}",
-                            )
-                    else:
+                    if self.parent_app.widget_exist(
+                        window_id=window_id,
+                        container_tag=item_data.widget.container_tag,
+                        tag=f"{item_id}|{tag}",
+                    ):
                         return self.parent_app.widget_get(
                             window_id=window_id,
                             container_tag=item_data.widget.container_tag,
@@ -11746,7 +11754,8 @@ class LCD(_qtpyBase_Control):
                 "^[0-9\.]*$", value.strip()
             ), f"{value=}. Must be a number"  # pylint: disable=W1401
 
-        return self._widget.display(value)
+        if shiboken6.isValid(self._widget):
+            self._widget.display(value)
 
 
 class _Line_Edit(qtW.QLineEdit):
@@ -14678,7 +14687,8 @@ class Slider(_qtpyBase_Control):
         ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
         self._widget: qtW.QSlider
 
-        self._widget.setValue(value)
+        if shiboken6.isValid(self._widget):
+            self._widget.setValue(value)
 
 
 @dataclasses.dataclass

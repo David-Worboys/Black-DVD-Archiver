@@ -16,11 +16,13 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import dataclasses
-import math
-
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+import dataclasses
+import math
+import sys
+from typing import Optional, cast
+
 import file_utils
 import popups
 import qtgui as qtg
@@ -40,9 +42,13 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
     video_data_list: list[Video_Data] = dataclasses.field(
         default_factory=list
     )  # Pass by reference
+    menu_layout: list[tuple[str, list[Video_Data]]] = dataclasses.field(
+        default_factory=list
+    )  # Pass by reference
 
     # Private instance variable
     _db_settings: sqldb.App_Settings | None = None
+    _current_button_grid: Optional[qtg.Grid] = None
 
     def __post_init__(self) -> None:
         """Sets-up the form"""
@@ -67,50 +73,35 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         match event.event:
             case qtg.Sys_Events.WINDOWPOSTOPEN:
-                dvd_menu_settings = DVD_Menu_Settings()
-                menu_title_grid: qtg.Grid = event.widget_get(
-                    container_tag="menu_page_controls",
-                    tag="menu_titles",
-                )
-
-                num_of_pages = math.ceil(
-                    len(self.video_data_list) / dvd_menu_settings.buttons_per_page
-                )
-
-                buttons_per_page = dvd_menu_settings.buttons_per_page
-
-                for row in range(num_of_pages):
-                    video_titles = ""
-                    page_offset = row * buttons_per_page
-
-                    for video_index in range(
-                        page_offset,
-                        min(page_offset + buttons_per_page, len(self.video_data_list)),
-                    ):
-                        video_titles += (
-                            f"{self.video_data_list[video_index].video_file_settings.button_title}, "
-                        )
-
-                    menu_title_grid.row_append
-                    user_data = menu_title_grid.userdata_get(row, 1)
-                    menu_title_grid.value_set(
-                        row=row,
-                        col=1,
-                        value=video_titles.strip()[:-1],
-                        user_data=user_data,
-                        tooltip=f"{sys_consts.SDELIM}{video_titles.strip()[:-1]}{sys_consts.SDELIM}",
-                    )
-
-                menu_title_grid.select_row(0, 0)
+                self._post_open_handler(event)
 
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "ok":
                         if self._process_ok(event) == 1:
+                            self.set_result("ok")
                             super().close()
                     case "cancel":
                         if self._process_cancel(event) == 1:
+                            self.set_result("cancel")
                             super().close()
+                    case "button_title_grid":
+                        if hasattr(event.value, "grid"):
+                            self._current_button_grid: qtg.Grid = event.value.grid
+
+                    case "move_button_title_down":
+                        if self._current_button_grid is not None:
+                            self._move_button_title(
+                                button_title_grid=self._current_button_grid,
+                                up=False,
+                            )
+                    case "move_button_title_up":
+                        if self._current_button_grid is not None:
+                            self._move_button_title(
+                                button_title_grid=self._current_button_grid,
+                                up=True,
+                            )
+
             case qtg.Sys_Events.CLEAR_TYPING_BUFFER:
                 if isinstance(event.value, qtg.Grid_Col_Value):
                     grid_col_value: qtg.Grid_Col_Value = event.value
@@ -129,6 +120,164 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                         value=menu_title, row=row, col=col, user_data=user_data
                     )
 
+    def _post_open_handler(self, event: qtg.Action) -> None:
+        """
+        The _post_open_handler method is called after the window has opened.
+
+        Creates a new row in the menu_titles grid for each DVD menu page of videos sourced from video_data_list.
+
+        The number of buttons per page is determined by DVD_Menu_Settings().buttons_per_page, which defaults to 6.
+        If there are more videos than buttons_per_page, it will add another row and continue until all videos have been
+        added.
+
+        Args:
+            event (qtg.Action): The triggering event.
+
+        """
+        max_group_id = -1
+        min_group_id = sys.maxsize
+        temp_video_list = self.video_data_list.copy()
+
+        for item in temp_video_list:
+            if item.video_file_settings.menu_group > max_group_id:
+                max_group_id = item.video_file_settings.menu_group
+            if item.video_file_settings.menu_group < min_group_id:
+                min_group_id = item.video_file_settings.menu_group
+
+        if min_group_id >= 0 and max_group_id < sys.maxsize:  # Have groups
+            group_id = min_group_id
+            start_row = 0
+            for row, item in enumerate(temp_video_list):
+                if item.video_file_settings.menu_group == -1:
+                    for inner_row in range(start_row, len(temp_video_list)):
+                        temp_item = temp_video_list[inner_row]
+                        temp_item.video_file_settings.menu_group = group_id
+                        if inner_row == row:
+                            start_row = inner_row + 1
+                            break
+                    group_id += 1
+                else:
+                    group_id = item.video_file_settings.menu_group
+
+            temp_video_list.sort(key=lambda item: item.video_file_settings.menu_group)
+
+        dvd_menu_settings = DVD_Menu_Settings()
+        menu_title_grid: qtg.Grid = event.widget_get(
+            container_tag="menu_page_controls",
+            tag="menu_titles",
+        )
+        num_of_pages = math.ceil(
+            len(self.video_data_list) / dvd_menu_settings.buttons_per_page
+        )
+        buttons_per_page = dvd_menu_settings.buttons_per_page
+        button_pages = []
+
+        for row in range(num_of_pages):
+            page_offset = row * buttons_per_page
+
+            videos = []
+            for video_index in range(
+                page_offset,
+                min(page_offset + buttons_per_page, len(self.video_data_list)),
+            ):
+                videos.append(temp_video_list[video_index])
+            button_pages.append(videos)
+
+        for row, menu_page in enumerate(button_pages):
+            row_grid = qtg.Grid(
+                tag="row_grid",
+                height=buttons_per_page + 1,
+                col_def=[
+                    qtg.Col_Def(
+                        label="Button Title",
+                        tag="button_title_grid",
+                        width=30,
+                        editable=True,
+                        checkable=True,
+                    )
+                ],
+                callback=self.event_handler,
+            )
+
+            control_box = qtg.VBoxContainer(
+                tag="control_box",
+                width=10,
+                height=buttons_per_page + 3,
+                align=qtg.Align.TOPRIGHT,
+            ).add_row(
+                row_grid,
+                qtg.HBoxContainer(tag="command_buttons", margin_right=0).add_row(
+                    qtg.Button(
+                        icon=file_utils.App_Path("arrow-up.svg"),
+                        tag=f"move_button_title_up",
+                        callback=self.event_handler,
+                        tooltip="Move This Button Title Up!",
+                        width=2,
+                    ),
+                    qtg.Button(
+                        icon=file_utils.App_Path("arrow-down.svg"),
+                        tag="move_button_title_down",
+                        callback=self.event_handler,
+                        tooltip="Move This Button Title Down!",
+                        width=2,
+                    ),
+                ),
+            )
+
+            menu_title_grid.row_widget_set(row=row, col=1, widget=control_box)
+
+            for grid_row, video_data in enumerate(menu_page):
+                row_grid.value_set(
+                    row=grid_row,
+                    col=0,
+                    value=video_data.video_file_settings.button_title,
+                    user_data=video_data,
+                )
+
+        menu_title_grid.select_row(0, 0)
+
+    def _move_button_title(self, button_title_grid: qtg.Grid, up: bool) -> None:
+        """
+        Move the selected button title up or down in the button title grid on a given row.
+
+        Args:
+            button_tite_grid (qtg.Grid): The button title grid on a given row
+            up (bool): True to move the edit point up, False to move it down.
+
+        """
+        assert isinstance(up, bool), f"{up=}. Must be bool"
+
+        checked_items: tuple[qtg.Grid_Item] = button_title_grid.checkitems_get
+        assert all(
+            isinstance(item, qtg.Grid_Item) for item in checked_items
+        ), f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
+
+        if len(checked_items) == 0:
+            popups.PopMessage(
+                title="Select An Edit Point...",
+                message="Please Check An Edit Point To Move!",
+            ).show()
+        elif len(checked_items) > 1:
+            popups.PopMessage(
+                title="Too Many Checked Edit Points...",
+                message="Check Only One Edit Point For A Move ",
+            ).show()
+        else:
+            button_title_grid.checkitemrow_set(False, checked_items[0].row_index, 0)
+            button_title_grid.select_row(checked_items[0].row_index)
+
+            if up:
+                new_row = button_title_grid.move_row_up(checked_items[0].row_index)
+            else:
+                new_row = button_title_grid.move_row_down(checked_items[0].row_index)
+
+            if new_row >= 0:
+                button_title_grid.checkitemrow_set(True, new_row, 0)
+                button_title_grid.select_col(new_row, 0)
+            else:
+                button_title_grid.checkitemrow_set(True, checked_items[0].row_index, 0)
+                button_title_grid.select_col(checked_items[0].row_index, 0)
+
     def _process_cancel(self, event: qtg.Action) -> int:
         """
         Handles processing the cancel button.
@@ -137,8 +286,13 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         Returns:
             int: Returns 1 if cancel process is ok, -1 otherwise.
         """
-        self.set_result("")
-
+        if (
+            popups.PopYesNo(
+                title="Discard Changes..", message="Discard Changes & Stop DVD Build?"
+            ).show()
+            == "ok"
+        ):
+            return 1
         return 1
 
     def _process_ok(self, event: qtg.Action) -> int:
@@ -157,22 +311,49 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             tag="menu_titles",
         )
 
-        col_index = menu_title_grid.colindex_get("menu_title")
+        menu_title_col_index = menu_title_grid.colindex_get("menu_title")
+        video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
         result = ""
 
         for row in range(menu_title_grid.row_count):
-            menu_title = menu_title_grid.value_get(row, col_index)
-            result += f"{menu_title}|"
+            menu_title = menu_title_grid.value_get(row=row, col=menu_title_col_index)
+            row_grid = cast(
+                qtg.Grid,
+                menu_title_grid.row_widget_get(
+                    row=row,
+                    col=video_titles_col_index,
+                    container_tag="control_box",
+                    tag="row_grid",
+                ),
+            )
+            menu_items = []
+            for row in range(row_grid.row_count):
+                button_title = row_grid.value_get(row=row, col=0)
+                video_data = row_grid.userdata_get(row=row, col=0)
+                if (
+                    video_data.video_file_settings.button_title.strip()
+                    != button_title.strip()
+                ):
+                    video_data.video_file_settings.button_title = button_title
+                menu_items.append(video_data)
 
-            if menu_title.strip() == "":
-                popups.PopError(
-                    title="Menu Page Title Not Entered..",
-                    message="A Menu Page Title Must Be Entered!",
-                ).show()
-                menu_title_grid.select_row(row, col_index)
-                return -1
-        self.set_result(result[:-1])
+            self.menu_layout.append((menu_title, menu_items.copy()))
 
+            for row_index, menu_item in enumerate( self.menu_layout):
+                if menu_item[0].strip() == "":
+                    if (
+                        popups.PopYesNo(
+                            title="Menu Page Title Not Entered..",
+                            message=(
+                                "Menu "
+                                f" {sys_consts.SDELIM}{row_index + 1}{sys_consts.SDELIM} Title"
+                                " Has Not Been Entered. Continue?"
+                            ),
+                        ).show()
+                        == "no"
+                    ):
+                        menu_title_grid.select_row(row_index, menu_title_col_index)
+                        return -1
         return 1
 
     def layout(self) -> qtg.VBoxContainer:
@@ -192,7 +373,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             qtg.Col_Def(
                 label="Videos On Menu",
                 tag="videos_on_page",
-                width=60,
+                width=35,
                 editable=False,
                 checkable=False,
             ),
@@ -274,6 +455,7 @@ class File_Renamer_Popup(qtg.PopContainer):
             case qtg.Sys_Events.CLEAR_TYPING_BUFFER:
                 if isinstance(event.value, qtg.Grid_Col_Value):
                     grid_col_value: qtg.Grid_Col_Value = event.value
+                    grid_col_value.grid = self
 
                     user_file_name: str = grid_col_value.value
                     row = grid_col_value.row
