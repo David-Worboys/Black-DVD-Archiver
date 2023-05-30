@@ -230,6 +230,74 @@ class Archive_Manager:
 
         return 1, ""
 
+    def delete_edit_cuts(self, file_path: str) -> tuple[int, str]:
+        """
+        Deletes all edit cuts associated with the given file that are stored in the edit cuts JSON file
+
+        Args:
+            file_path (str): The path of the video file.
+
+        Returns:
+            tuple[int,str]:
+                arg 1 - error_code
+                arg 2 - error message
+        """
+        self._error_message = ""
+        self._error_code = 1
+
+        file_handler = file_utils.File()
+        json_cuts_file = file_handler.file_join(
+            self.archive_folder, self._json_edit_cuts_file, "json"
+        )
+
+        if not file_handler.path_exists(self.archive_folder):
+            self._error_message = f"{self.archive_folder} does not exist"
+            self._error_code = -1
+            return self._error_code, self._error_message
+
+        if not file_handler.path_writeable(self.archive_folder):
+            self._error_message = f"{self.archive_folder} is not writable"
+            self._error_code = -1
+            return self._error_code, self._error_message
+
+        if not file_handler.file_exists(json_cuts_file):
+            self._error_message = f"{json_cuts_file} does not exist"
+            self._error_code = 1  # May not be an actual error
+            return self._error_code, self._error_message
+
+        try:
+            with open(json_cuts_file, "r") as json_file:
+                json_data_dict = json.load(json_file)
+        except (
+            FileNotFoundError,
+            PermissionError,
+            IOError,
+            json.decoder.JSONDecodeError,
+        ) as e:
+            self._error_message = f"Can not read {json_cuts_file}. {e}"
+            self._error_code = -1
+            return self._error_code, self._error_message
+
+        if file_path in json_data_dict:
+            del json_data_dict[file_path]
+
+            # Write the JSON file
+            try:
+                with open(json_cuts_file, "w") as json_file:
+                    json.dump(json_data_dict, json_file)
+            except (
+                FileNotFoundError,
+                PermissionError,
+                IOError,
+                json.decoder.JSONDecodeError,
+            ) as e:
+                self._error_message = f"Unable to write to JSON file: {e}"
+                self._error_code = -1
+
+                return self._error_code, self._error_message
+
+        return 1, ""
+
     def read_edit_cuts(self, file_path: str) -> tuple[(int, int, str)] | tuple:
         """
         Read edit cuts for a video file from a JSON file.

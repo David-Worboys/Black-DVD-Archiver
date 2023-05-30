@@ -867,7 +867,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
             mark_out = self._edit_list_grid.colindex_get("mark_out")
             clip_name = self._edit_list_grid.colindex_get("clip_name")
 
-            # TODO Add cut_name
             edit_list = [
                 (
                     int(self._edit_list_grid.value_get(row=row_index, col=mark_in)),
@@ -881,9 +880,18 @@ class Video_Cutter_Popup(qtg.PopContainer):
             ]
 
             if edit_list:
-                self._archive_manager.write_edit_cuts(
+                result, message = self._archive_manager.write_edit_cuts(
                     self.video_file_input[0].video_path, edit_list
                 )
+            else:
+                result, message = self._archive_manager.delete_edit_cuts(
+                    self.video_file_input[0].video_path
+                )
+
+            if result == -1:
+                popups.PopError(
+                    title="Archive Edit List", message=f"Write Failed : {message}"
+                ).show()
 
     def _archive_edit_list_read(self) -> None:
         """Reads edit cuts from the archive manager and populates the edit list grid with the data.
@@ -899,6 +907,14 @@ class Video_Cutter_Popup(qtg.PopContainer):
             edit_cuts = self._archive_manager.read_edit_cuts(
                 self.video_file_input[0].video_path
             )
+
+            if not edit_cuts:
+                if self._archive_manager.get_error_code == -1:
+                    popups.PopError(
+                        title="Archive Edit List",
+                        message=f"Read Failed : {self._archive_manager.get_error}",
+                    ).show()
+                    return None
 
             mark_in = self._edit_list_grid.colindex_get("mark_in")
             mark_out = self._edit_list_grid.colindex_get("mark_out")
