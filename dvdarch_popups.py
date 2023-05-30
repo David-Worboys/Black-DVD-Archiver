@@ -147,8 +147,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         if min_group_id >= 0 and max_group_id < sys.maxsize:  # Have groups
             group_id = min_group_id
             start_row = 0
-            for row, item in enumerate(temp_video_list):
-                if item.video_file_settings.menu_group == -1:
+            for row, item in enumerate(temp_video_list):  # Fill in blank groups
+                if item.video_file_settings.menu_group == -1:  # Blank group
+                    # Fill in blank group with the group_id of the prior non-blank group
                     for inner_row in range(start_row, len(temp_video_list)):
                         temp_item = temp_video_list[inner_row]
                         temp_item.video_file_settings.menu_group = group_id
@@ -166,21 +167,26 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             container_tag="menu_page_controls",
             tag="menu_titles",
         )
-        num_of_pages = math.ceil(
-            len(self.video_data_list) / dvd_menu_settings.buttons_per_page
-        )
+
         buttons_per_page = dvd_menu_settings.buttons_per_page
         button_pages = []
+        videos = []
 
-        for row in range(num_of_pages):
-            page_offset = row * buttons_per_page
+        # Allocate videos to a menu page
+        for video_index, video in enumerate(temp_video_list):
+            videos.append(video)
 
-            videos = []
-            for video_index in range(
-                page_offset,
-                min(page_offset + buttons_per_page, len(self.video_data_list)),
+            # Check if a new page should start or a group break has occurred
+            if len(videos) >= buttons_per_page or (
+                video_index + 1 < len(temp_video_list)
+                and video.video_file_settings.menu_group
+                != temp_video_list[video_index + 1].video_file_settings.menu_group
             ):
-                videos.append(temp_video_list[video_index])
+                button_pages.append(videos)
+                videos = []
+
+        # Add any remaining videos if not enough for a full page
+        if len(videos) > 0:
             button_pages.append(videos)
 
         for row, menu_page in enumerate(button_pages):
@@ -339,7 +345,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
             self.menu_layout.append((menu_title, menu_items.copy()))
 
-            for row_index, menu_item in enumerate( self.menu_layout):
+            for row_index, menu_item in enumerate(self.menu_layout):
                 if menu_item[0].strip() == "":
                     if (
                         popups.PopYesNo(

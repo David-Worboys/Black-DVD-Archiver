@@ -413,7 +413,7 @@ class DVD_Archiver:
 
                 dvd_config.menu_labels = menu_labels
 
-                dvd_config.menu_title = dvd_title.split("|")
+                dvd_config.menu_title = menu_title
                 dvd_config.menu_background_color = (
                     dvd_menu_settings.menu_background_color
                 )
