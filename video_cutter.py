@@ -72,8 +72,8 @@ class Video_Handler:
     _frame_num: int = 0
     _frame_width: int = 720
     _frame_height: int = 576
-    _media_player: qtM.QMediaPlayer | None = qtM.QMediaPlayer()
-    _video_sink: qtM.QVideoSink | None = qtM.QVideoSink()
+    _media_player: qtM.QMediaPlayer | None = None
+    _video_sink: qtM.QVideoSink | None = None
 
     def __post_init__(self) -> None:
         """Sets-up the instance"""
@@ -133,8 +133,8 @@ class Video_Handler:
 
         # media_format = qtM.QMediaFormat()
 
-        # self._media_player = qtM.QMediaPlayer()
-        # self._video_sink = qtM.QVideoSink()
+        self._media_player = qtM.QMediaPlayer()
+        self._video_sink = qtM.QVideoSink()
 
         assert (
             self._media_player is not None and self._video_sink is not None
@@ -657,7 +657,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         elif self._media_source.source_state == "Loaded":
             self._media_source.play()
             sleep(
-                0.6
+                0.5
             )  # QT 6.5.0 requires this delay before the  first video frame is displayed. TODO Findout why!
             self._media_source.pause()
             self._media_source.update_slider = True
@@ -1095,7 +1095,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         else:
             popups.PopMessage(
                 title="No Entries In The Edit List...",
-                message="Please Mark Some Edit List Entries With The [ and ] Buttone!",
+                message="Please Mark Some Edit List Entries With The [ and ] Button!",
             ).show()
 
     def _delete_segments(self, event: qtg.Action) -> None:
@@ -1175,7 +1175,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         else:
             popups.PopMessage(
                 title="No Entries In The Edit List...",
-                message="Please Mark Some Edit List Entries With The [ and ] Buttone!",
+                message="Please Mark Some Edit List Entries With The [ and ] Button!",
             ).show()
 
     def _remove_edit_points(self, event: qtg.Action) -> None:
@@ -2033,8 +2033,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     tooltip="Select All Edit Points",
                     width=11,
                 ),
-                self._edit_list_grid,
-                edit_list_buttons,
+                qtg.VBoxContainer(align=qtg.Align.BOTTOMRIGHT).add_row(
+                    self._edit_list_grid, edit_list_buttons
+                ),
             )
 
             edit_list_container = qtg.VBoxContainer(
