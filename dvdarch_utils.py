@@ -35,6 +35,7 @@ import xmltodict
 import file_utils
 import sys_consts
 import utils
+from configuration_classes import Encoding_Details
 
 # fmt: on
 
@@ -1276,16 +1277,14 @@ def generate_menu_image_from_file(
     return 1, image_file
 
 
-def get_file_encoding_info(video_file: str) -> dict:
+def get_file_encoding_info(video_file: str) -> Encoding_Details:
     """Returns the pertinent file encoding information as required for DVD creation
 
     Args:
         video_file (str): The video file being checked
 
     Returns:
-        dict: Dict of key value pairs describing the various encoding parameters.
-            Value is a list, Indices 0: Group, 1 the value, 2 Description
-            Check video_details["error"][1] if it is not an empty string an error occurred
+        Video_Details: Check video_details.error if it is not an empty string an error occurred
 
     """
 
@@ -1318,25 +1317,7 @@ def get_file_encoding_info(video_file: str) -> dict:
 
     fmt = "--output=XML"
 
-    video_details = {
-        "error": ["Error", "", "error"],
-        "audio_tracks": ["General", 0, "AudioCount"],
-        "video_tracks": ["General", 0, "VideoCount"],
-        "audio_format": ["Audio", "", "Format"],
-        "audio_channels": ["Audio", 0, "Channels"],
-        "video_format": ["Video", "", "Format"],
-        "video_width": ["Video", 0, "Width"],
-        "video_height": ["Video", 0, "Height"],
-        "video_ar": ["Video", 0.0, ""],
-        "video_par": ["Video", 0.0, "PixelAspectRatio"],
-        "video_dar": ["Video", 0, 0, "DisplayAspectRatio"],
-        "video_duration": ["Video", 0.0, "Duration"],
-        "video_scan_order": ["Video", "", "ScanOrder_Original"],
-        "video_scan_type": ["Video", "", "ScanType_Original"],
-        "video_frame_rate": ["Video", 0.0, "FrameRate"],
-        "video_standard": ["Video", "", "Standard"],
-        "video_frame_count": ["Video", 0, "FrameCount"],
-    }
+    video_file_details = Encoding_Details()
 
     try:
         mi = subprocess.check_output(
@@ -1362,54 +1343,71 @@ def get_file_encoding_info(video_file: str) -> dict:
                     if key == "@type":
                         track_type = value
 
-                    for track_def in video_details.values():
-                        if track_def[0] == track_type and key == track_def[2]:
-                            if type(track_def[1]) is int:
-                                track_def[1] = int(value)
-                            elif type(track_def[1]) is float:
-                                track_def[1] = float(value)
-                            else:
-                                track_def[1] = value
+                    if track_type == "General":
+                        match key:
+                            case "AudioCount":
+                                video_file_details.audio_tracks = int(value)
+                            case "VideoCount":
+                                video_file_details.video_tracks = int(value)
+                    if track_type == "Video":
+                        match key:
+                            case "Format":
+                                video_file_details.video_format = value
+                            case "Width":
+                                video_file_details.video_width = int(value)
+                            case "Height":
+                                video_file_details.video_height = int(value)
+                            case "PixelAspectRatio":
+                                video_file_details.video_par = float(value)
+                            case "DisplayAspectRatio":
+                                video_file_details.video_dar = float(value)
 
-        if (
-            video_details["video_width"][1] > 0
-            and video_details["video_height"][1] > 0
-            and video_details["video_par"][1] > 0
-        ):
-            video_details["video_ar"][1] = (
-                video_details["video_width"][1] / video_details["video_height"][1]
-            ) * video_details["video_par"][1]
+                                if value.startswith("1.33"):
+                                    video_file_details.video_ar = sys_consts.AR43
+                                else:
+                                    video_file_details.video_ar = sys_consts.AR169
+                            case "Duration":
+                                video_file_details.video_duration = float(value)
+                            case "ScanOrder_Original" | "ScanOrder":
+                                video_file_details.video_scan_order = value
+                            case "ScanType_Original" | "ScanType":
+                                video_file_details.video_scan_type = value
+                            case "FrameRate":
+                                video_file_details.video_frame_rate = float(value)
+                            case "Standard":
+                                video_file_details.video_standard = value
+                            case "FrameCount":
+                                video_file_details.video_frame_count = int(value)
+                    if track_type == "Audio":
+                        match key:
+                            case "Format":
+                                video_file_details.audio_format = value
+                            case "Channels":
+                                video_file_details.audio_channels = int(value)
 
-        ar = str(video_details["video_ar"][1])
-
-        if ar.startswith("1.33"):  # 4:3
-            video_details["video_dar"][1] = sys_consts.AR43
-        else:
-            video_details["video_dar"][1] = sys_consts.AR169
+                    if key == "@type":
+                        track_type = value
 
     except subprocess.CalledProcessError as call_error:
-        video_details["error"][1] = f"{call_error}"
-        print(f"{call_error=}")
-
         if call_error.returncode == 127:  # Should not happen
-            video_details["error"][1] = f"{sys_consts.MEDIAINFO} Not Found"
+            video_file_details.error = f"{sys_consts.MEDIAINFO} Not Found"
         elif call_error.returncode <= 125:
-            video_details["error"][
-                1
-            ] = f" {call_error.returncode} {sys_consts.MEDIAINFO} Failed!\n {fmt}"
+            video_file_details.error = (
+                f" {call_error.returncode} {sys_consts.MEDIAINFO} Failed!\n {fmt}"
+            )
         else:
-            video_details["error"][
-                1
-            ] = f" {call_error.returncode} {sys_consts.MEDIAINFO} Crashed!\n {fmt}"
+            video_file_details.error = (
+                f" {call_error.returncode} {sys_consts.MEDIAINFO} Crashed!\n {fmt}"
+            )
     except OSError as call_error:
-        video_details["error"][1] = f"{sys_consts.MEDIAINFO} Failed! To Run\n {fmt}"
+        video_file_details.error = f"{sys_consts.MEDIAINFO} Failed! To Run\n {fmt}"
 
     if debug and not utils.Is_Complied():
         print(f"=========== video_details Debug {video_file} ===========")
-        pprint.pprint(video_details)
+        pprint.pprint(video_file_details)
         print("=========== video_details Debug ===========")
 
-    return video_details
+    return video_file_details  # video_details
 
 
 def resize_image(

@@ -346,6 +346,449 @@ class DVD_Menu_Settings:
 
 
 @dataclasses.dataclass(slots=True)
+class Encoding_Details:
+    """
+    The Encoding_Details class is used to store the details of a video. as well as the error message associated
+    with the video.
+    """
+
+    _error: str = ""
+    _audio_tracks: int = 0
+    _video_tracks: int = 0
+    _audio_format: str = ""
+    _audio_channels: int = 0
+    _video_format: str = ""
+    _video_width: int = 0
+    _video_height: int = 0
+    _video_ar: str = ""
+    _video_par: float = 0.0
+    _video_dar: float = 0.0
+    _video_duration: float = 0.0
+    _video_scan_order: str = ""
+    _video_scan_type: str = ""
+    _video_frame_rate: float = 0.0
+    _video_standard: str = ""
+    _video_frame_count: int = 0
+
+    def __post_init__(self) -> None:
+        pass
+
+    @property
+    def error(self) -> str:
+        """
+        The error method returns the error message associated with a video.
+
+        Returns:
+            str: The error message from the video
+
+        """
+        return self._error
+
+    @error.setter
+    def error(self, value: str) -> None:
+        """
+        The error method sets the error message associated with a video.
+
+        Args:
+            value (str): Set the error message for the video
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._error = value
+
+    @property
+    def audio_tracks(self) -> int:
+        """
+        The audio_tracks method returns the number of audio tracks in a video.
+
+        Returns:
+            int: The number of audio tracks in the video
+
+        """
+        return self._audio_tracks
+
+    @audio_tracks.setter
+    def audio_tracks(self, value: int) -> None:
+        """
+        The audio_tracks method sets the number of audio tracks in a video.
+
+        Args:
+            value (int): Set the number of audio tracks in the video
+
+        """
+        assert isinstance(value, int), f"{value=}. Must be int"
+
+        self._audio_tracks = value
+
+    @property
+    def audio_format(self) -> str:
+        """
+        The audio_format method returns the audio format of a video.
+
+        Returns:
+            str: The audio format of the video
+
+        """
+        return self._audio_format
+
+    @audio_format.setter
+    def audio_format(self, value: str) -> None:
+        """
+        The audio_format method sets the audio format of a video.
+
+        Args:
+            value (str): Set the audio format of the video
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._audio_format = value
+
+    @property
+    def audio_channels(self) -> int:
+        """
+        The audio_channels method returns the number of audio channels in a video.
+
+        Returns:
+            int: The number of audio channels in the video
+
+        """
+        return self._audio_channels
+
+    @audio_channels.setter
+    def audio_channels(self, value: int) -> None:
+        """
+        The audio_channels method sets the number of audio channels in a video.
+
+        Args:
+            value (int): Set the number of audio channels in the video
+
+        """
+        assert isinstance(value, int), f"{value=}. Must be int"
+
+        self._audio_channels = value
+
+    @property
+    def video_tracks(self) -> int:
+        """
+        The video_tracks method returns the number of video tracks in a video.
+
+        Returns:
+            int: The number of video tracks in the video
+
+        """
+        return self._video_tracks
+
+    @video_tracks.setter
+    def video_tracks(self, value: int) -> None:
+        """
+        The video_tracks method sets the number of video tracks in a video.
+
+        Args:
+            value (int): Set the number of video tracks in the video
+
+        """
+        assert isinstance(value, int), f"{value=}. Must be int"
+
+        self._video_tracks = value
+
+    @property
+    def video_format(self) -> str:
+        """
+        The video_format method returns the video format of a video.
+
+        Returns:
+            str: The video format of the video
+
+        """
+        return self._video_format
+
+    @video_format.setter
+    def video_format(self, value: str) -> None:
+        """
+        The video_format method sets the video format of a video.
+
+        Args:
+            value (str): Set the video format of the video
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._video_format = value
+
+    @property
+    def video_width(self) -> int:
+        """
+        The video_width method returns the width of a video.
+
+        Returns:
+            int: The width of the video
+
+        """
+        return self._video_width
+
+    @video_width.setter
+    def video_width(self, value: int) -> None:
+        """
+        The video_width method sets the width of a video.
+
+        Args:
+            value (int): Set the width of the video
+
+        """
+        assert isinstance(value, int), f"{value=}. Must be int"
+
+        self._video_width = value
+
+    @property
+    def video_height(self) -> int:
+        """
+        The video_height method returns the height of a video.
+
+        Returns:
+            int: The height of the video
+
+        """
+        return self._video_height
+
+    @video_height.setter
+    def video_height(self, value: int) -> None:
+        """
+        The video_height method sets the height of a video.
+
+        Args:
+            value (int): Set the height of the video
+
+        """
+        assert isinstance(value, int), f"{value=}. Must be int"
+
+        self._video_height = value
+
+    @property
+    def video_ar(self) -> str:
+        """
+        The video_ar method returns the aspect ratio of a video.
+
+        Returns:
+            str: The aspect ratio of the video
+
+        """
+        return self._video_ar
+
+    @video_ar.setter
+    def video_ar(self, value: str) -> None:
+        """
+        The video_ar method sets the aspect ratio of a video.
+
+        Args:
+            value (str): Set the aspect ratio of the video
+
+        """
+        assert isinstance(value, str) and value in (
+            sys_consts.AR43,
+            sys_consts.AR169,
+        ), f"{value=}. Must be either {sys_consts.AR43} or  {sys_consts.AR169}"
+
+        self._video_ar = value
+
+    @property
+    def video_par(self) -> float:
+        """
+        The video_par method returns the pixel aspect ratio of a video.
+
+        Returns:
+            float: The pixel aspect ratio of the video
+
+        """
+        return self._video_par
+
+    @video_par.setter
+    def video_par(self, value: float):
+        """
+        The video_par method sets the pixel aspect ratio of a video.
+
+        Args:
+            value (float): Set the pixel aspect ratio of the video
+
+        """
+        assert isinstance(value, float), f"{value=}. Must be float"
+
+        self._video_par = value
+
+    @property
+    def video_dar(self) -> float:
+        """
+        The video_dar method returns the display aspect ratio of a video.
+
+        Returns:
+            float: The display aspect ratio of the video
+
+        """
+        return self._video_dar
+
+    @video_dar.setter
+    def video_dar(self, value: float) -> None:
+        """
+        The video_dar method sets the display aspect ratio of a video.
+
+        Args:
+            value (float): Set the display aspect ratio of the video
+
+        """
+        assert isinstance(value, float), f"{value=}. Must be float"
+
+        self._video_dar = value
+
+    @property
+    def video_duration(self) -> float:
+        """
+        The video_duration method returns the duration of a video.
+
+        Returns:
+            float: The duration of the video
+
+        """
+        return self._video_duration
+
+    @video_duration.setter
+    def video_duration(self, value: float) -> None:
+        """
+        The video_duration method sets the duration of a video.
+
+        Args:
+            value (float): Set the duration of the video
+
+        """
+        assert isinstance(value, float), f"{value=}. Must be float"
+
+        self._video_duration = value
+
+    @property
+    def video_frame_rate(self) -> float:
+        """
+        The video_frame_rate method returns the frame rate of a video.
+
+        Returns:
+            float: The frame rate of the video
+
+        """
+        return self._video_frame_rate
+
+    @video_frame_rate.setter
+    def video_frame_rate(self, value: float) -> None:
+        """
+        The video_frame_rate method sets the frame rate of a video.
+
+        Args:
+            value (float): Set the frame rate of the video
+
+        """
+        assert isinstance(value, float), f"{value=}. Must be float"
+
+        self._video_frame_rate = value
+
+    @property
+    def video_standard(self) -> str:
+        """
+        The video_standard method returns the video standard of a video PAL/NTSC.
+
+        Returns:
+            str: The video standard of the video
+
+        """
+        return self._video_standard
+
+    @video_standard.setter
+    def video_standard(self, value: str) -> None:
+        """
+        The video_standard method sets the video standard of a video PAL/NTSC.
+
+        Args:
+            value (str): Set the video standard of the video
+
+        """
+        assert isinstance(value, str) and value.upper() in (
+            sys_consts.PAL,
+            sys_consts.NTSC,
+        ), f"{value=}. Must be PAL or NTSC"
+
+        self._video_standard = value.upper()
+
+    @property
+    def video_frame_count(self) -> int:
+        """
+        The video_frame_count method returns the number of frames in a video.
+
+        Returns:
+            int: The number of frames in the video
+
+        """
+        return self._video_frame_count
+
+    @video_frame_count.setter
+    def video_frame_count(self, value: int) -> None:
+        """
+        The video_frame_count method sets the number of frames in a video.
+
+        Args:
+            value (int): Set the number of frames in the video
+
+        """
+        assert isinstance(value, int), f"{value=}. Must be int"
+
+        self._video_frame_count = value
+
+    @property
+    def video_scan_order(self) -> str:
+        """
+        The video_scan_order method returns the scan order of an interlaced video.
+
+        Returns:
+            str: The scan order of the video
+
+        """
+        return self._video_scan_order
+
+    @video_scan_order.setter
+    def video_scan_order(self, value: str) -> None:
+        """
+        The video_scan_order method sets the scan order of an interlaced video.
+
+        Args:
+            value (str): Set the scan order of the video
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._video_scan_order = value
+
+    @property
+    def video_scan_type(self) -> str:
+        """
+        The video_scan_type method returns the scan type of an interlaced video.
+
+        Returns:
+            str: The scan type of the video
+
+        """
+        return self._video_scan_type
+
+    @video_scan_type.setter
+    def video_scan_type(self, value: str) -> None:
+        """
+        The video_scan_type method sets the scan type of an interlaced video.
+
+        Args:
+            value (str): Set the scan type of the video
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._video_scan_type = value
+
+
+@dataclasses.dataclass(slots=True)
 class Video_File_Settings:
     """Class to hold video file settings for each file comprising the DVD menu buttons"""
 
@@ -637,7 +1080,7 @@ class Video_Data:
         video_folder (str): The path to the folder containing the video.
         video_file (str): The name of the video file.
         video_extension (str): The file extension of the video file.
-        encoding_info (dict): Information about the encoding of the video.
+        encoding_info (Video_Details): Information about the encoding of the video.
         video_file_settings (Video_File_Settings): The video file settings.
         vd_id (int): The id of the video data. Defaults to -1.
     """
@@ -645,7 +1088,7 @@ class Video_Data:
     video_folder: str
     video_file: str
     video_extension: str
-    encoding_info: dict
+    encoding_info: Encoding_Details
     video_file_settings: Video_File_Settings
     vd_id: int = -1
 
@@ -663,8 +1106,8 @@ class Video_Data:
             isinstance(self.video_extension, str) and self.video_extension.strip() != ""
         ), f"{self.video_extension=} must be str"
         assert isinstance(
-            self.encoding_info, dict
-        ), f"{self.encoding_info=}. Must be dict"
+            self.encoding_info, Encoding_Details
+        ), f"{self.encoding_info=}. Must be Encoding_Details"
         assert isinstance(
             self.video_file_settings, Video_File_Settings
         ), f"{self.video_file_settings=}. Must be an instance of Video_Filter_Settings"
@@ -699,7 +1142,9 @@ class File_Def:
     _path: str = ""
     _file_name: str = ""
     _menu_image_file_path: str = ""
-    _file_info: dict = dataclasses.field(default_factory=dict)
+    _encoding_info: Encoding_Details = dataclasses.field(
+        default_factory=Encoding_Details
+    )
     _video_file_settings: Video_File_Settings = dataclasses.field(
         default_factory=Video_File_Settings
     )
@@ -770,28 +1215,30 @@ class File_Def:
         self._file_name = value
 
     @property
-    def file_info(self) -> dict:
+    def encoding_info(self) -> Encoding_Details:
         """
         The file_info method is used to get the video file information.
 
         Returns:
-            dict: The file information
+            Video_Details: The file information
         """
 
-        return self._file_info
+        return self._encoding_info
 
-    @file_info.setter
-    def file_info(self, value: dict) -> None:
+    @encoding_info.setter
+    def encoding_info(self, value: Encoding_Details) -> None:
         """
         The file_info method is used to set the video file information.
 
         Args:
-            value: (dict): The file information
+            value: (Video_Details): The file information
 
         """
-        assert isinstance(value, dict), f"{value=}. Must be a dict of file properties"
+        assert isinstance(
+            value, Encoding_Details
+        ), f"{value=}. Must be a dict of file properties"
 
-        self._file_info = value
+        self._encoding_info = value
 
     @property
     def menu_image_file_path(self) -> str:

@@ -24,7 +24,8 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
-from configuration_classes import Video_Data, Video_File_Settings
+from configuration_classes import (Encoding_Details, Video_Data,
+                                   Video_File_Settings)
 from utils import Get_Unique_Int
 
 # fmt: on
@@ -248,7 +249,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                         video_folder=grid_item.user_data,
                         video_file=file_name,
                         video_extension=file_extn,
-                        encoding_info={},
+                        encoding_info=Encoding_Details(),
                         video_file_settings=video_settings,
                         vd_id=Get_Unique_Int(),
                     )

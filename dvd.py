@@ -718,28 +718,18 @@ class DVD:
             vob_file = file_handler.file_join(self._vob_folder, file_name, "vob")
 
             if (
-                "video_height" not in video_file.file_info
-                or "video_width" not in video_file.file_info
+                video_file.encoding_info.video_height <= 0
+                or video_file.encoding_info.video_width <= 0
             ):
                 return (
                     -1,
                     f"{video_file.file_path=}. Does Not Specify Height and/or Width",
                 )
 
-            if "video_ar" not in video_file.file_info:
-                return -1, f"{video_file.file_path=}. Does Not Video Aspect Ratio"
-
-            if str(video_file.file_info["video_ar"][1]).startswith("1.33"):
-                aspect_ratio = sys_consts.AR43
-            elif str(video_file.file_info["video_ar"][1]).startswith("1.78"):
-                aspect_ratio = sys_consts.AR169
-            else:
+            if not video_file.encoding_info.video_ar:
                 return (
                     -1,
-                    (
-                        "Unrecognised Aspect Ratio :"
-                        f" {video_file.file_info['video_ar'][1]}"
-                    ),
+                    f"Unrecognised Aspect Ratio : {video_file.encoding_info.video_ar}",
                 )
 
             if video_file.video_file_settings.filters_off:
@@ -769,8 +759,8 @@ class DVD:
 
                 video_filters = ["-vf", ",".join(video_filter_options)]
 
-            video_width = video_file.file_info["video_width"][1]
-            video_height = video_file.file_info["video_height"][1]
+            video_width = video_file.encoding_info.video_width
+            video_height = video_file.encoding_info.video_height
 
             if self.dvd_setup.video_standard == sys_consts.PAL:
                 frame_rate = f"{sys_consts.PAL_FRAMERATE}"
@@ -808,18 +798,15 @@ class DVD:
                 command_header = [sys_consts.FFMPG]
 
             interlaced_flags = []
-            if "video_scan_type" in video_file.file_info:
-                if (
-                    str(video_file.file_info["video_scan_type"][1])
-                    .lower()
-                    .startswith("interlaced")
-                ):
-                    interlaced_flags = [
-                        "-flags:v:0",  # video flags for the first video stream
-                        "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
-                        "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
-                        "1",  # alternate scan value is 1
-                    ]
+            if video_file.encoding_info.video_scan_type.lower().startswith(
+                "interlaced"
+            ):
+                interlaced_flags = [
+                    "-flags:v:0",  # video flags for the first video stream
+                    "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
+                    "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
+                    "1",  # alternate scan value is 1
+                ]
 
             command = (
                 command_header
@@ -838,7 +825,7 @@ class DVD:
                     "-c:v:0",  # codec for the first video stream
                     "mpeg2video",  # use mpeg2video codec
                     "-aspect",  # set aspect ratio
-                    aspect_ratio,  # aspect ratio value
+                    video_file.encoding_info.video_ar,  # aspect ratio value
                     "-s",  # set resolution
                     video_size,  # resolution value
                     "-r",  # set frame rate
@@ -2105,24 +2092,24 @@ class DVD:
             - arg2: error message or "" if ok
         """
         for video_file in self.dvd_setup.input_videos:
-            if "video_frame_count" not in video_file.file_info:
-                return -1, f"No video frame count found for {video_file.file_info}"
+            if video_file.encoding_info.video_frame_count <= 0:
+                return -1, f"No video frame count found for {video_file.file_path}"
 
             if (
                 video_file.video_file_settings.menu_button_frame == -1
             ):  # No frame number provided, pick a random frame
                 menu_image_frame = randint(
-                    1, video_file.file_info["video_frame_count"][1]
+                    1, video_file.encoding_info.video_frame_count
                 )
             else:
                 menu_image_frame = video_file.video_file_settings.menu_button_frame
 
-            if menu_image_frame > video_file.file_info["video_frame_count"][1]:
+            if menu_image_frame > video_file.encoding_info.video_frame_count:
                 return (
                     -1,
                     (
                         f"{menu_image_frame=} is greater than video frame count"
-                        f" {video_file.file_info['video_frame_count'][1]}"
+                        f" {video_file.encoding_info.video_frame_count}"
                     ),
                 )
 

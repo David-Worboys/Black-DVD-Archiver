@@ -375,7 +375,7 @@ class DVD_Archiver:
                     file_def.file_name = (
                         f"{video_data.video_file}{video_data.video_extension}"
                     )
-                    file_def.file_info = video_data.encoding_info
+                    file_def.encoding_info = video_data.encoding_info
                     file_def.video_file_settings = video_data.video_file_settings
 
                     if video_data.video_file_settings.button_title.strip() == "":

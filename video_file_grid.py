@@ -213,10 +213,10 @@ class Video_File_Grid:
 
             if user_data and vd_id == user_data.vd_id:
                 encoding_info = dvdarch_utils.get_file_encoding_info(trimmed_file)
-                if encoding_info["error"][1]:  # Error Occurred, should not happen
+                if encoding_info.error:  # Error Occurred
                     popups.PopError(
                         title="Encoding Read Error...",
-                        message=encoding_info["error"][1],
+                        message=encoding_info.error,
                     ).show()
                     return
                 if (
@@ -235,7 +235,7 @@ class Video_File_Grid:
 
                 duration = str(
                     datetime.timedelta(
-                        seconds=updated_user_data.encoding_info["video_duration"][1]
+                        seconds=updated_user_data.encoding_info.video_duration
                     )
                 ).split(".")[0]
 
@@ -665,9 +665,7 @@ class Video_File_Grid:
 
                                     duration = str(
                                         datetime.timedelta(
-                                            seconds=video_data.encoding_info[
-                                                "video_duration"
-                                            ][1]
+                                            seconds=video_data.encoding_info.video_duration
                                         )
                                     ).split(".")[0]
 
@@ -930,8 +928,7 @@ class Video_File_Grid:
             video_file_list=video_file_list,  # Pass by ref
         ).show()
 
-        if video_file_list != "":
-            file_handler = file_utils.File()
+        if video_file_list:
             file_grid: qtg.Grid = event.widget_get(
                 container_tag="video_file_controls",
                 tag="video_input_files",
@@ -945,9 +942,7 @@ class Video_File_Grid:
                 grid_video_data: Video_Data = file_grid.userdata_get(
                     row=0, col=file_grid.colindex_get("settings")
                 )
-                project_video_standard = grid_video_data.encoding_info[
-                    "video_standard"
-                ][1]
+                project_video_standard = grid_video_data.encoding_info.video_standard
 
                 loaded_files = []
                 for row_index in reversed(range(file_grid.row_count)):
@@ -957,7 +952,7 @@ class Video_File_Grid:
                         row=row_index, col=file_grid.colindex_get("settings")
                     )
 
-                    video_standard = grid_video_data.encoding_info["video_standard"][1]
+                    video_standard = grid_video_data.encoding_info.video_standard
 
                     if project_video_standard != video_standard:
                         rejected += (
@@ -1026,24 +1021,22 @@ class Video_File_Grid:
                 if grid_video_data.video_path == file_video_data.video_path:
                     break
             else:  # File not in grid already
-                if not file_video_data.encoding_info:
+                if file_video_data.encoding_info.video_tracks <= 0:
                     file_video_data.encoding_info = (
                         dvdarch_utils.get_file_encoding_info(file_video_data.video_path)
                     )
 
-                    if file_video_data.encoding_info["error"][
-                        1
-                    ]:  # Error Occurred, should not happen
+                    if file_video_data.encoding_info.error:  # Error Occurred
                         rejected += (
                             "File Error"
                             f" {sys_consts.SDELIM}{file_video_data.video_path} :"
-                            f" {sys_consts.SDELIM} {file_video_data.encoding_info['error'][1]} \n"
+                            f" {sys_consts.SDELIM} {file_video_data.encoding_info.error} \n"
                         )
                         continue
 
                 toolbox = self._get_toolbox(file_video_data)
 
-                if file_video_data.encoding_info["video_tracks"][1] == 0:
+                if file_video_data.encoding_info.video_tracks == 0:
                     rejected += (
                         f"{sys_consts.SDELIM}{file_video_data.video_path} :"
                         f" {sys_consts.SDELIM}No Video Track \n"
@@ -1052,7 +1045,7 @@ class Video_File_Grid:
 
                 duration = str(
                     datetime.timedelta(
-                        seconds=file_video_data.encoding_info["video_duration"][1]
+                        seconds=file_video_data.encoding_info.video_duration
                     )
                 ).split(".")[0]
 
@@ -1140,14 +1133,14 @@ class Video_File_Grid:
         )
 
         file_grid.value_set(
-            value=str(video_user_data.encoding_info["video_width"][1]),
+            value=str(video_user_data.encoding_info.video_width),
             row=row_index,
             col=file_grid.colindex_get("width"),
             user_data=video_user_data,
         )
 
         file_grid.value_set(
-            value=str(video_user_data.encoding_info["video_height"][1]),
+            value=str(video_user_data.encoding_info.video_height),
             row=row_index,
             col=file_grid.colindex_get("height"),
             user_data=video_user_data,
@@ -1155,9 +1148,9 @@ class Video_File_Grid:
 
         file_grid.value_set(
             value=(
-                video_user_data.encoding_info["video_format"][1]
-                + f":{ video_user_data.encoding_info['video_scan_order'][1]}"
-                if video_user_data.encoding_info["video_scan_order"] != ""
+                video_user_data.encoding_info.video_format
+                + f":{ video_user_data.encoding_info.video_scan_order}"
+                if video_user_data.encoding_info.video_scan_order != ""
                 else ""
             ),
             row=row_index,
@@ -1173,7 +1166,7 @@ class Video_File_Grid:
         )
 
         file_grid.value_set(
-            value=video_user_data.encoding_info["video_standard"][1],
+            value=video_user_data.encoding_info.video_standard,
             row=row_index,
             col=file_grid.colindex_get("standard"),
             user_data=video_user_data,
@@ -1224,12 +1217,12 @@ class Video_File_Grid:
 
                 encoding_info = video_data.encoding_info
 
-                total_duration += encoding_info["video_duration"][1]
+                total_duration += encoding_info.video_duration
 
             encoding_info = file_grid.userdata_get(
                 row=0, col=file_grid.colindex_get("settings")
             ).encoding_info
-            self.project_video_standard = encoding_info["video_standard"][1]
+            self.project_video_standard = encoding_info.video_standard
 
             self.project_duration = str(
                 datetime.timedelta(seconds=total_duration)

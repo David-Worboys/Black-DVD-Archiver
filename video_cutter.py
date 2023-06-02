@@ -36,7 +36,8 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from archive_management import Archive_Manager
-from configuration_classes import Video_Data, Video_File_Settings
+from configuration_classes import (Encoding_Details, Video_Data,
+                                   Video_File_Settings)
 from dvdarch_popups import File_Renamer_Popup
 
 # fmt: on
@@ -68,7 +69,7 @@ class Video_Handler:
 
     # Private instance variables
     _frame_count: int = 0
-    _frame_rate: int = 25  # Default to 25 frames per second
+    _frame_rate: float = 25  # Default to 25 frames per second
     _frame_num: int = 0
     _frame_width: int = 720
     _frame_height: int = 576
@@ -92,7 +93,7 @@ class Video_Handler:
         ), f"{self.output_edit_folder=}. Must be a non-empty str"
 
         assert isinstance(
-            self.encoding_info, dict
+            self.encoding_info, Encoding_Details
         ), f"{self.encoding_info=}. Must be a dict"
 
         assert isinstance(
@@ -119,19 +120,10 @@ class Video_Handler:
             self.update_slider, bool
         ), f"{self.update_slider=}. Must be a bool"
 
-        if "video_width" in self.encoding_info:
-            self._frame_width = self.encoding_info["video_width"][1]
-
-        if "video_height" in self.encoding_info:
-            self._frame_height = self.encoding_info["video_height"][1]
-
-        if "video_frame_rate" in self.encoding_info:
-            self._frame_rate = self.encoding_info["video_frame_rate"][1]
-
-        if "video_frame_count" in self.encoding_info:
-            self._frame_count = self.encoding_info["video_frame_count"][1]
-
-        # media_format = qtM.QMediaFormat()
+        self._frame_width = self.encoding_info.video_width
+        self._frame_height = self.encoding_info.video_height
+        self._frame_rate = self.encoding_info.video_frame_rate
+        self._frame_count = self.encoding_info.video_frame_count
 
         self._media_player = qtM.QMediaPlayer()
         self._video_sink = qtM.QVideoSink()
@@ -368,7 +360,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
     _archive_manager: Archive_Manager | None = None
     _edit_list_grid: qtg.Grid | None = None
     _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
-    _frame_rate: int = 25  # Default to 25 frames per second
+    _frame_rate: float = 25  # Default to 25 frames per second
     _frame_width: int = 720
     _frame_height: int = 576
     _video_display: qtg.Label | None = None
@@ -415,25 +407,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
             isinstance(excluded_word, str) for excluded_word in self.excluded_word_list
         ), "Excluded words must be str"
 
-        if "video_dar" in self.video_file_input[0].encoding_info:
-            self._aspect_ratio = self.video_file_input[0].encoding_info["video_dar"][1]
-        if "video_width" in self.video_file_input[0].encoding_info:
-            self._frame_width = self.video_file_input[0].encoding_info["video_width"][1]
-
-        if "video_height" in self.video_file_input[0].encoding_info:
-            self._frame_height = self.video_file_input[0].encoding_info["video_height"][
-                1
-            ]
-
-        if "video_frame_rate" in self.video_file_input[0].encoding_info:
-            self._frame_rate = self.video_file_input[0].encoding_info[
-                "video_frame_rate"
-            ][1]
-
-        if "video_frame_count" in self.video_file_input[0].encoding_info:
-            self._frame_count = self.video_file_input[0].encoding_info[
-                "video_frame_count"
-            ][1]
+        self._aspect_ratio = self.video_file_input[0].encoding_info.video_ar
+        self._frame_width = self.video_file_input[0].encoding_info.video_width
+        self._frame_height = self.video_file_input[0].encoding_info.video_height
+        self._frame_rate = self.video_file_input[0].encoding_info.video_frame_rate
+        self._frame_count = self.video_file_input[0].encoding_info.video_frame_count
 
         file_handler = file_utils.File()
 
