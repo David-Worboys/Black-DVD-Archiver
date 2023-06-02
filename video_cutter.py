@@ -379,8 +379,8 @@ class Video_Cutter_Popup(qtg.PopContainer):
     _display_width: int = -1
     _step_value: int = 1
     _media_source: Video_Handler | None = None
-    _edit_folder: str = "edits"
-    _transcode_folder: str = "transcodes"
+    _edit_folder: str = sys_consts.EDIT_FOLDER
+    _transcode_folder: str = sys_consts.TRANSCODE_FOLDER
 
     def __post_init__(self):
         """Sets-up the form"""
@@ -478,7 +478,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         )
         self._edit_folder = file_handler.file_join(
             self.output_folder, self._transcode_folder
-        )
+        )  # TODO Remove and same in video_file grid
 
         if self.video_file_input and not file_handler.file_exists(
             self.video_file_input[0].video_path

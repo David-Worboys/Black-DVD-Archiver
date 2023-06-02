@@ -60,6 +60,25 @@ class Video_File_Grid:
             self._db_path, sys_consts.VIDEO_GRID_DB, "db"
         )
 
+    @property
+    def _get_dvd_build_folder(self) -> str:
+        """Gets the DVD build folder
+
+        Returns:
+            str: The DVD build folder
+        """
+        dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
+
+        if dvd_folder is None or dvd_folder.strip() == "":
+            popups.PopError(
+                title="DVD Build Folder Error...",
+                message=(
+                    "A DVD Build Folder Must Be Entered Before Making A Video Edit!"
+                ),
+            ).show()
+            return ""
+        return dvd_folder
+
     def grid_events(self, event: qtg.Action) -> None:
         """Process Grid Events
         Args:
@@ -86,16 +105,9 @@ class Video_File_Grid:
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        file_handler = file_utils.File()
-        dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
+        dvd_folder = self._get_dvd_build_folder
 
-        if dvd_folder is None or dvd_folder.strip() == "":
-            popups.PopError(
-                title="DVD Build Folder Error...",
-                message=(
-                    "A DVD Build Folder Must Be Entered Before Making A Video Edit!"
-                ),
-            ).show()
+        if not dvd_folder:
             return None
 
         file_grid: qtg.Grid = event.widget_get(
@@ -272,6 +284,8 @@ class Video_File_Grid:
                         DVD_Menu_Config_Popup(title="DVD Menu Configuration").show()
                     case "group_files":
                         self._group_files(event)
+                    case "join_files":
+                        self._join_files(event)
                     case "move_video_file_down":
                         self._move_video_file(event=event, up=False)
                     case "move_video_file_up":
@@ -303,6 +317,144 @@ class Video_File_Grid:
                         self._toggle_file_button_names(event)
                     case "ungroup_files":
                         self._ungroup_files(event)
+
+    def _join_files(self, event: qtg.Action) -> None:
+        """
+        Joins selected files. The joined files are concatenated onto the first selected file
+
+        Args:
+            event (qtg.Action): The event triggering the ungrouping.
+
+        Returns:
+            None
+        """
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
+        file_grid: qtg.Grid = event.widget_get(
+            container_tag="video_file_controls",
+            tag="video_input_files",
+        )
+
+        file_handler = file_utils.File()
+        dvd_folder = self._get_dvd_build_folder
+
+        if not dvd_folder:
+            return None
+
+        edit_folder = file_handler.file_join(dvd_folder, sys_consts.EDIT_FOLDER)
+        edit_folder = file_handler.file_join(
+            dvd_folder, sys_consts.TRANSCODE_FOLDER
+        )  # TODO Remove and same in video_cutter
+
+        if not file_handler.file_exists(edit_folder):
+            if file_handler.make_dir(edit_folder) == -1:
+                popups.PopError(
+                    title="Error Creating Edit Folder",
+                    message=(
+                        "Error Creating Edit Folder!\n"
+                        f"{sys_consts.SDELIM}{edit_folder}{sys_consts.SDELIM}"
+                    ),
+                ).show()
+                return None
+
+        checked_items = file_grid.checkitems_get
+
+        if not checked_items:
+            popups.PopError(
+                title="No Files Selected", message="Please Select Files To Join"
+            ).show()
+            return None
+
+        if (
+            popups.PopYesNo(title="Join Files", message="Join Selected Files?").show()
+            == "yes"
+        ):
+            concatenating_files = []
+            removed_files = []
+            output_file = ""
+            vd_id = -1
+            button_title = ""
+
+            for item in checked_items:
+                item: qtg.Grid_Item
+                video_data: Video_Data = item.user_data
+
+                if not output_file:  # Happens on first iteration
+                    vd_id = video_data.vd_id
+                    button_title = video_data.video_file_settings.button_title
+
+                    output_file = file_handler.file_join(
+                        dir_path=video_data.video_folder,
+                        file_name=f"{video_data.video_file}_joined",
+                        ext=video_data.video_extension,
+                    )
+                else:
+                    removed_files.append(video_data)
+
+                concatenating_files.append(video_data.video_path)
+
+            if concatenating_files and output_file:
+                with qtg.sys_cursor(qtg.Cursor.hourglass):
+                    result, message = dvdarch_utils.concatenate_videos(
+                        temp_files=concatenating_files, output_file=output_file
+                    )
+
+                if result == -1:
+                    popups.PopError(
+                        title="Error Joining Files",
+                        message=(
+                            "File Join"
+                            f" Failed!\n{sys_consts.SDELIM}{message}{sys_consts.SDELIM}"
+                        ),
+                    ).show()
+
+                    return None
+
+                self._processed_trimmed(
+                    file_grid,
+                    vd_id,
+                    output_file,
+                    button_title,
+                )
+
+                removed_file_txt = "\n".join(
+                    video_data.video_path for video_data in removed_files
+                )
+
+                delete_source = False
+                if (
+                    popups.PopYesNo(
+                        width=80,
+                        title="Remove Source Video Files?",
+                        message=(
+                            "Delete Source Video Files?"
+                            f" {sys_consts.SDELIM}\n{removed_file_txt}{sys_consts.SDELIM}"
+                        ),
+                    ).show()
+                    == "yes"
+                ):
+                    delete_source = True
+
+                failed = []
+                with qtg.sys_cursor(qtg.Cursor.hourglass):
+                    for video_data in removed_files:
+                        self._delete_file_from_grid(file_grid, video_data.vd_id)
+                        if delete_source:
+                            if file_handler.remove_file(video_data.video_path) == -1:
+                                failed.append(video_data.video_path)
+
+                if failed:
+                    failed_txt = "\n".join(failed)
+                    popups.PopError(
+                        width=80,
+                        title="Error Removing Video Files...",
+                        message=(
+                            "Failed To Remove Source Video Files:"
+                            f" {sys_consts.SDELIM}{failed_txt}{sys_consts.SDELIM}"
+                        ),
+                    ).show()
 
     def _remove_files(self, event: qtg.Action) -> None:
         """Removes the selected files
@@ -489,40 +641,61 @@ class Video_File_Grid:
             tag="video_input_files",
         )
 
+        file_handler = file_utils.File()
+        removed_files = []
+
         try:
-            with shelve.open(
-                self._grid_db
-            ) as db:  # TODO should this be stored in the app db?
-                db_data = db.get("video_grid")
+            with qtg.sys_cursor(qtg.Cursor.hourglass):
+                with shelve.open(
+                    self._grid_db
+                ) as db:  # TODO should this be stored in the app db?
+                    db_data = db.get("video_grid")
 
-                if db_data:
-                    for row_index, row in enumerate(db_data):
-                        for item in row:
-                            if item[1]:
-                                video_data: Video_Data = item[1]
+                    if db_data:
+                        for row_index, row in enumerate(db_data):
+                            for item in row:
+                                if item[1]:
+                                    video_data: Video_Data = item[1]
 
-                                duration = str(
-                                    datetime.timedelta(
-                                        seconds=video_data.encoding_info[
-                                            "video_duration"
-                                        ][1]
+                                    if not file_handler.file_exists(
+                                        video_data.video_path
+                                    ):
+                                        removed_files.append(video_data.video_path)
+                                        break
+
+                                    duration = str(
+                                        datetime.timedelta(
+                                            seconds=video_data.encoding_info[
+                                                "video_duration"
+                                            ][1]
+                                        )
+                                    ).split(".")[0]
+
+                                    self._populate_grid_row(
+                                        file_grid=file_grid,
+                                        row_index=row_index,
+                                        video_user_data=video_data,
+                                        duration=duration,
                                     )
-                                ).split(".")[0]
+                                    toolbox = self._get_toolbox(video_data)
+                                    file_grid.row_widget_set(
+                                        row=row_index,
+                                        col=file_grid.colindex_get("settings"),
+                                        widget=toolbox,
+                                    )
+                file_grid.row_scroll_to(0)
+                self._set_project_standard_duration(event)
 
-                                self._populate_grid_row(
-                                    file_grid=file_grid,
-                                    row_index=row_index,
-                                    video_user_data=video_data,
-                                    duration=duration,
-                                )
-                                toolbox = self._get_toolbox(video_data)
-                                file_grid.row_widget_set(
-                                    row=row_index,
-                                    col=file_grid.colindex_get("settings"),
-                                    widget=toolbox,
-                                )
-            file_grid.row_scroll_to(0)
-            self._set_project_standard_duration(event)
+                if removed_files:
+                    removed_file_list = "\n".join(removed_files)
+                    popups.PopMessage(
+                        title="Source Files Not Found...",
+                        message=(
+                            "The following video files do not exist and were removed"
+                            " from the project:"
+                            f"{sys_consts.SDELIM}{removed_file_list}{sys_consts.SDELIM}"
+                        ),
+                    ).show()
         except Exception as e:
             popups.PopError(title="File Grid Load Error...", message=str(e)).show()
 
@@ -537,25 +710,26 @@ class Video_File_Grid:
         ), f"{event=}. Must be an instance of qtg.Action"
 
         try:
-            with shelve.open(
-                self._grid_db
-            ) as db:  # TODO should this be stored in the app db?
-                row_data = []
-                file_grid: qtg.Grid = event.widget_get(
-                    container_tag="video_file_controls",
-                    tag="video_input_files",
-                )
-                for row in range(file_grid.row_count):
-                    col_value = []
-                    for col in range(file_grid.col_count):
-                        value = file_grid.value_get(row=row, col=col)
-                        user_data = file_grid.userdata_get(row=row, col=col)
+            with qtg.sys_cursor(qtg.Cursor.hourglass):
+                with shelve.open(
+                    self._grid_db
+                ) as db:  # TODO should this be stored in the app db?
+                    row_data = []
+                    file_grid: qtg.Grid = event.widget_get(
+                        container_tag="video_file_controls",
+                        tag="video_input_files",
+                    )
+                    for row in range(file_grid.row_count):
+                        col_value = []
+                        for col in range(file_grid.col_count):
+                            value = file_grid.value_get(row=row, col=col)
+                            user_data = file_grid.userdata_get(row=row, col=col)
 
-                        col_value.append((value, user_data))
+                            col_value.append((value, user_data))
 
-                    row_data.append(col_value)
+                        row_data.append(col_value)
 
-                db["video_grid"] = row_data
+                    db["video_grid"] = row_data
         except Exception as e:
             popups.PopError(title="File Grid Save Error...", message=str(e)).show()
 
@@ -660,13 +834,11 @@ class Video_File_Grid:
 
         for item in checked_items:
             video_item: Video_Data = item.user_data
-            print(f"DBG {video_item.video_file_settings.menu_group=}")
+
             if video_item.video_file_settings.menu_group >= 0:
                 grouped.append(video_item)
             else:
                 ungrouped.append(item)
-
-        print(f"DBG {grouped=} {ungrouped=}")
 
         if grouped:
             for video_item in grouped:
@@ -694,6 +866,7 @@ class Video_File_Grid:
                 value=f"{group_value}",
                 user_data=video_item,
             )
+        file_grid.checkitems_all(checked=False)
 
     def _ungroup_files(self, event: qtg.Action) -> None:
         """
@@ -1123,6 +1296,13 @@ class Video_File_Grid:
                 width=2,
             ),
             qtg.Button(
+                icon=file_utils.App_Path("film.svg"),
+                tag="join_files",
+                callback=self.event_handler,
+                tooltip="Join The Selected Files",
+                width=2,
+            ),
+            qtg.Button(
                 icon=file_utils.App_Path("text.svg"),
                 tag="toggle_file_button_names",
                 callback=self.event_handler,
@@ -1166,7 +1346,7 @@ class Video_File_Grid:
             qtg.Col_Def(
                 label="",
                 tag="settings",
-                width=3,
+                width=1,
                 editable=False,
                 checkable=False,
             ),

@@ -91,6 +91,8 @@ PRODUCT_LINE: Final[str] = "product_line"
 ARCHIVE_FOLDER: Final[str] = "archive_folder"
 DVD_BUILD_FOLDER: Final[str] = "dvd_build_folder"
 VIDEO_GRID_DB: Final[str] = "video_grid"
+EDIT_FOLDER: Final[str] = "edits"
+TRANSCODE_FOLDER: Final[str] = "transcodes"
 
 PERCENT_SAFTEY_BUFFER: Final[int] = (
     1  # Used to limit DVD size so that it never exceeds 100%

@@ -156,6 +156,10 @@ def concatenate_videos(
     if not file_handler.path_writeable(out_path):
         return -1, f"Can Not Be Write To {out_path}!"
 
+    for video_file in temp_files:
+        if not file_handler.file_exists(video_file):
+            return -1, f"File {video_file} Does Not Exist!"
+
     # Generate a file list for ffmpeg
     result, message = file_handler.write_list_to_txt_file(
         str_list=[f"file '{file}'" for file in temp_files], text_file=file_list_txt
@@ -590,7 +594,6 @@ def overlay_file(
     """
     # Image magick V6 Composite works magick V7 magick composite does not
     command = [
-        # "composite",
         sys_consts.COMPOSITE,
         "-geometry",
         f"+{x}+{y}",
@@ -1045,7 +1048,7 @@ def execute_check_output(
                 stderr=subprocess.STDOUT,
                 env=env,
             )
-    except subprocess.CalledProcessError as call_error:
+    except (subprocess.CalledProcessError, FileNotFoundError) as call_error:
         if debug:
             print(f"DBG Call Error *** {call_error.returncode=} {call_error=}")
 

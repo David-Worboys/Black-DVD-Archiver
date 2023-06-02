@@ -625,9 +625,9 @@ class DVD_Archiver:
 
         buttons_container = qtg.HBoxContainer(margin_right=9).add_row(
             qtg.Button(
-                tag="make_dvd", text="Make DVD", callback=self.event_handler, width=9
+                tag="make_dvd", text="Make DVD", callback=self.event_handler, width=13
             ),
-            qtg.Spacer(width=97),
+            qtg.Spacer(width=98),
             qtg.Button(
                 tag="exit_app", text="Exit", callback=self.event_handler, width=9
             ),
