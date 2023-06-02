@@ -74,9 +74,11 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                 match event.tag:
                     case "ok":
                         if self._process_ok(event) == 1:
+                            self.set_result("ok")
                             super().close()
 
                     case "cancel":
+                        self.set_result("cancel")
                         super().close()
                     case "bulk_select":
                         file_grid: qtg.Grid = event.widget_get(
@@ -229,20 +231,10 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         )
 
         selected_files = file_grid.checkitems_get
-        self.set_result("")
 
         if selected_files:
-            # This is ugly,pop-up returns a str so have to transform selected files to a string!
-            file_str = ""
             for grid_item in selected_files:
                 grid_item: qtg.Grid_Item
-
-                row = grid_item.row_index
-                tag = grid_item.tag
-                value = grid_item.current_value
-                user_data = grid_item.user_data
-
-                file_str += f"{row},{tag},{value},{user_data}|"
 
                 _, file_name, file_extn = file_handler.split_file_path(
                     grid_item.current_value
@@ -262,9 +254,6 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                     )
                 )
 
-            file_str = file_str[:-1]  # Strip trailing | delim
-
-            self.set_result(file_str)
         return 1
 
     def grid_events(self, event: qtg.Action):

@@ -689,6 +689,7 @@ class Video_File_Grid:
                 if removed_files:
                     removed_file_list = "\n".join(removed_files)
                     popups.PopMessage(
+                        width=80,
                         title="Source Files Not Found...",
                         message=(
                             "The following video files do not exist and were removed"
