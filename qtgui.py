@@ -8301,9 +8301,8 @@ class FolderView(_qtpyBase_Control):
 
         event: Sys_Events = args[0]
 
-        if len(args) > 1 and len(args[1]) > 0:
-            selected_index = args[1][0]  # It is a tuple
-
+        if len(args) > 1:
+            selected_index: qtC.QModelIndex = args[1]
             selected_node = namedtuple(
                 "selected_node", "name, path, size, modified, date_modified type, isdir"
             )
@@ -8342,7 +8341,7 @@ class FolderView(_qtpyBase_Control):
                         date_modified = (
                             f"{selected_index.model().lastModified(selected_index).toPython():%Y-%m-%d %H:%M:%S%z}"
                         )
-
+                        
                         file.append(
                             selected_node(
                                 name=selected_index.model().fileName(selected_index),
