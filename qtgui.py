@@ -8341,7 +8341,7 @@ class FolderView(_qtpyBase_Control):
                         date_modified = (
                             f"{selected_index.model().lastModified(selected_index).toPython():%Y-%m-%d %H:%M:%S%z}"
                         )
-                        
+
                         file.append(
                             selected_node(
                                 name=selected_index.model().fileName(selected_index),
@@ -9095,15 +9095,11 @@ class Grid(_qtpyBase_Control):
                         self.checkitemrow_set(checked, row_index, col_index)
 
     @property
-    def checkitems_get(self) -> tuple:
+    def checkitems_get(self) -> tuple[Grid_Item]:
         """Get the checked items.
 
         Returns:
-            tuple: A tuple of named tuples with the following fields:
-                - row_index
-                - tag
-                - current_value
-                - user_data
+            tuple: A tuple of Grid_items
         """
         assert self._widget is not None, f"{self._widget=} not set"
 
@@ -9116,7 +9112,10 @@ class Grid(_qtpyBase_Control):
                 if item.checkState() == qtC.Qt.Checked:
                     checked_items.append(self.checkitemrow_get(row_index, col_index))
 
-        return tuple(checked_items)
+        if checked_items:
+            return tuple(checked_items)
+        else:
+            return ()
 
     def clear(self):
         """Clears the grid the right way leaving the column layout alone"""
@@ -9331,6 +9330,28 @@ class Grid(_qtpyBase_Control):
                 )
 
         return max_len
+
+    def move_checked_block_up(self) -> None:
+        """Move the currently selected block up one position in the table.
+
+        If the currently selected block is already at the top of the table, nothing happens.
+
+        Returns:
+
+        """
+        for item in self.checkitems_get:
+            self.move_row_up(item.row_index)
+
+    def move_checked_block_down(self):
+        """Move the currently selected block down one position in the table.
+
+        If the currently selected block is already at the bottom of the table, nothing happens.
+
+        Returns:
+
+        """
+        for item in reversed(self.checkitems_get):
+            self.move_row_down(item.row_index)
 
     def move_row_up(self, move_row: int) -> int:
         """Move the currently selected row up one position in the table.
