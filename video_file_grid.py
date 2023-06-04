@@ -507,38 +507,63 @@ class Video_File_Grid:
             tag="video_input_files",
         )
 
-        checked_items: tuple[qtg.Grid_Item] = file_grid.checkitems_get
+        checked_items: tuple[qtg.Grid_Item] = (
+            file_grid.checkitems_get
+            if up
+            else tuple(reversed(file_grid.checkitems_get))
+        )
+
         assert all(
             isinstance(item, qtg.Grid_Item) for item in checked_items
         ), f"{checked_items=}. Must be a list of 'qtg.Grid_Item_Tuple'"
 
-        if len(checked_items) == 0:
+        if not checked_items:
             popups.PopMessage(
                 title="Select A Video file...",
                 message="Please Select A Video File To Move!",
             ).show()
             return
-        elif len(checked_items) > 1:
+
+        if (
+            all(
+                checked_items[i].row_index == checked_items[i + 1].row_index + 1
+                for i in range(len(checked_items) - 1)
+            )
+            if up
+            else all(
+                checked_items[i].row_index == checked_items[i + 1].row_index - 1
+                for i in range(len(checked_items) - 1)
+            )
+        ):  # Contiguous block check
             popups.PopMessage(
-                title="Too Many Selected Video Files...",
-                message="Select Only One Video File For A Move",
+                title="Selected Video files Not Contiguous...",
+                message="Selected Video files Must Be A Contiguous Block!",
             ).show()
             return
 
-        file_grid.checkitemrow_set(
-            False, checked_items[0].row_index, file_grid.colindex_get("video_file")
-        )
-        file_grid.select_row(checked_items[0].row_index)
+        for checked_item in checked_items:
+            if up:
+                if checked_item.row_index == 0:
+                    break
+            else:
+                if checked_item.row_index == file_grid.row_count - 1:
+                    break
 
-        current_row = checked_items[0].row_index
-        group_disp = file_grid.value_get(current_row, file_grid.colindex_get("group"))
-        group_id = int(group_disp) if group_disp else -1
-        current_video_data: Video_Data = file_grid.userdata_get(
-            current_row, file_grid.colindex_get("group")
-        )
+            file_grid.checkitemrow_set(
+                False, checked_item.row_index, file_grid.colindex_get("video_file")
+            )
+            file_grid.select_row(checked_item.row_index)
 
-        if up:
-            if current_row > 1:
+            current_row = checked_item.row_index
+            group_disp = file_grid.value_get(
+                current_row, file_grid.colindex_get("group")
+            )
+            group_id = int(group_disp) if group_disp else -1
+            current_video_data: Video_Data = file_grid.userdata_get(
+                current_row, file_grid.colindex_get("group")
+            )
+
+            if up and current_row > 1:
                 # look backward for group id to use if no group id is found in the current row
                 look_backward_group_id = ""
                 if current_row > 2:
@@ -549,7 +574,6 @@ class Video_File_Grid:
                 prev_group_id = file_grid.value_get(
                     current_row - 1, file_grid.colindex_get("group")
                 )
-
                 if not prev_group_id and look_backward_group_id:
                     prev_group_id = look_backward_group_id
 
@@ -564,8 +588,7 @@ class Video_File_Grid:
                 else:
                     group_id = -1
 
-        else:
-            if current_row < file_grid.row_count - 1:
+            elif not up and current_row < file_grid.row_count - 1:
                 # look ahead for group id to use if no group id is found in the current row
                 look_forward_group_id = ""
                 if current_row < file_grid.row_count - 2:
@@ -576,7 +599,6 @@ class Video_File_Grid:
                 next_group_id = file_grid.value_get(
                     current_row + 1, file_grid.colindex_get("group")
                 )
-
                 if not next_group_id and look_forward_group_id:
                     next_group_id = look_forward_group_id
 
@@ -591,40 +613,40 @@ class Video_File_Grid:
                 else:
                     group_id = -1
 
-        file_grid.value_set(
-            row=current_row,
-            col=file_grid.colindex_get("group"),
-            value=str(group_id) if group_id >= 0 else "",
-            user_data=current_video_data,
-        )
-
-        for col in range(file_grid.col_count):
-            file_grid.userdata_set(
+            file_grid.value_set(
                 row=current_row,
-                col=col,
+                col=file_grid.colindex_get("group"),
+                value=str(group_id) if group_id >= 0 else "",
                 user_data=current_video_data,
             )
 
-        new_row = (
-            file_grid.move_row_up(current_row)
-            if up
-            else file_grid.move_row_down(current_row)
-        )
+            for col in range(file_grid.col_count):
+                file_grid.userdata_set(
+                    row=current_row,
+                    col=col,
+                    user_data=current_video_data,
+                )
 
-        if new_row >= 0:
-            file_grid.checkitemrow_set(
-                True, new_row, file_grid.colindex_get("video_file")
+            new_row = (
+                file_grid.move_row_up(current_row)
+                if up
+                else file_grid.move_row_down(current_row)
             )
-            file_grid.select_col(new_row, file_grid.colindex_get("video_file"))
-        else:
-            file_grid.checkitemrow_set(
-                True,
-                checked_items[0].row_index,
-                file_grid.colindex_get("video_file"),
-            )
-            file_grid.select_col(
-                checked_items[0].row_index, file_grid.colindex_get("video_file")
-            )
+
+            if new_row >= 0:
+                file_grid.checkitemrow_set(
+                    True, new_row, file_grid.colindex_get("video_file")
+                )
+                file_grid.select_col(new_row, file_grid.colindex_get("video_file"))
+            else:
+                file_grid.checkitemrow_set(
+                    True,
+                    checked_items[0].row_index,
+                    file_grid.colindex_get("video_file"),
+                )
+                file_grid.select_col(
+                    checked_items[0].row_index, file_grid.colindex_get("video_file")
+                )
 
     def _load_grid(self, event: qtg.Action) -> None:
         """Loads the grid from the database
