@@ -522,24 +522,23 @@ class Video_File_Grid:
                 title="Select A Video file...",
                 message="Please Select A Video File To Move!",
             ).show()
-            return
+            return None
+
+        checked_indices = [item.row_index for item in checked_items]
+        index_range = (
+            list(range(min(checked_indices), max(checked_indices) + 1))
+            if up
+            else list(range(max(checked_indices), min(checked_indices) - 1, -1))
+        )
 
         if (
-            all(
-                checked_items[i].row_index == checked_items[i + 1].row_index + 1
-                for i in range(len(checked_items) - 1)
-            )
-            if up
-            else all(
-                checked_items[i].row_index == checked_items[i + 1].row_index - 1
-                for i in range(len(checked_items) - 1)
-            )
-        ):  # Contiguous block check
+            len(checked_indices) > 1 and checked_indices != index_range
+        ):  # Contiguous block check failed
             popups.PopMessage(
                 title="Selected Video files Not Contiguous...",
                 message="Selected Video files Must Be A Contiguous Block!",
             ).show()
-            return
+            return None
 
         for checked_item in checked_items:
             if up:

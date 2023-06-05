@@ -19,7 +19,6 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
-import math
 import sys
 from typing import Optional, cast
 
@@ -247,42 +246,67 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         Move the selected button title up or down in the button title grid on a given row.
 
         Args:
-            button_tite_grid (qtg.Grid): The button title grid on a given row
+            button_title_grid (qtg.Grid): The button title grid on a given row
             up (bool): True to move the edit point up, False to move it down.
 
         """
         assert isinstance(up, bool), f"{up=}. Must be bool"
 
-        checked_items: tuple[qtg.Grid_Item] = button_title_grid.checkitems_get
+        checked_items: tuple[qtg.Grid_Item] = (
+            button_title_grid.checkitems_get
+            if up
+            else tuple(reversed(button_title_grid.checkitems_get))
+        )
+
         assert all(
             isinstance(item, qtg.Grid_Item) for item in checked_items
         ), f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
 
-        if len(checked_items) == 0:
+        if not checked_items:
             popups.PopMessage(
                 title="Select An Edit Point...",
                 message="Please Check An Edit Point To Move!",
             ).show()
-        elif len(checked_items) > 1:
+            return None
+
+        checked_indices = [item.row_index for item in checked_items]
+        index_range = (
+            list(range(min(checked_indices), max(checked_indices) + 1))
+            if up
+            else list(range(max(checked_indices), min(checked_indices) - 1, -1))
+        )
+
+        if (
+            len(checked_indices) > 1 and checked_indices != index_range
+        ):  # Contiguous block check failed
             popups.PopMessage(
-                title="Too Many Checked Edit Points...",
-                message="Check Only One Edit Point For A Move ",
+                title="Selected Button Titles Not Contiguous...",
+                message="Selected Button Titles Must Be A Contiguous Block!",
             ).show()
-        else:
-            button_title_grid.checkitemrow_set(False, checked_items[0].row_index, 0)
-            button_title_grid.select_row(checked_items[0].row_index)
+            return None
+
+        for checked_item in checked_items:
+            if up:
+                if checked_item.row_index == 0:
+                    break
+            else:
+                if checked_item.row_index == button_title_grid.row_count - 1:
+                    break
+
+            button_title_grid.checkitemrow_set(False, checked_item.row_index, 0)
+            button_title_grid.select_row(checked_item.row_index)
 
             if up:
-                new_row = button_title_grid.move_row_up(checked_items[0].row_index)
+                new_row = button_title_grid.move_row_up(checked_item.row_index)
             else:
-                new_row = button_title_grid.move_row_down(checked_items[0].row_index)
+                new_row = button_title_grid.move_row_down(checked_item.row_index)
 
             if new_row >= 0:
                 button_title_grid.checkitemrow_set(True, new_row, 0)
                 button_title_grid.select_col(new_row, 0)
             else:
-                button_title_grid.checkitemrow_set(True, checked_items[0].row_index, 0)
-                button_title_grid.select_col(checked_items[0].row_index, 0)
+                button_title_grid.checkitemrow_set(True, checked_item.row_index, 0)
+                button_title_grid.select_col(checked_item.row_index, 0)
 
     def _process_cancel(self, event: qtg.Action) -> int:
         """

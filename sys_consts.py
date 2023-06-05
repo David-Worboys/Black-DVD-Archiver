@@ -31,13 +31,20 @@ executable_folder = file_utils.App_Path()
 file_sep = file_utils.File().ossep
 
 PROGRAM_NAME: Final[str] = "Black DVD Archiver"
-PROGRAM_VERSION: Final[str] = "0.6"
+PROGRAM_VERSION: Final[str] = "0.6.5.3"
 AUTHOR: Final[str] = "David Worboys"
 LICENCE: Final[str] = "GNU V3 GPL"
 
 
-# Needs Callable to keep MyPy happy. Returns a string that is either 2020 or 2020-<current year>
 def COPYRIGHT_YEAR() -> str:
+    """
+    The COPYRIGHT_YEAR function returns the current year if it is 2022, otherwise it returns a string of the
+    form '2022-&lt;current_year&gt;'.
+
+    Returns:
+        str: The current year, or the current year and the next if it's 2022
+
+    """
     return (
         f"{'2022' if str(datetime.date.today().year) == '2022' else '2022-' + str(datetime.date.today().year)}"
     )
@@ -66,7 +73,7 @@ DOUBLE_SIDED_DVD_SIZE: Final[int] = 72453177  # kb ~ 8.5GB DVD9
 VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp", 
                     "3g2", "mj2","mkv","mpg","mpeg","ts", "m2ts", "mts","qt",
                     "wmv", "asf","flv","f4v","ogg","ogv","rm", "rmvb","divx","mxf",
-                    "dv")
+                    "dv","mts")
 # fmt: on
 
 COMPOSITE: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}composite"

@@ -1313,7 +1313,7 @@ def get_file_encoding_info(video_file: str) -> Encoding_Details:
         isinstance(video_file, str) and video_file.strip() != ""
     ), f"{video_file=}. Must bbe a non-empy str"
 
-    debug = False
+    debug = True
 
     fmt = "--output=XML"
 
