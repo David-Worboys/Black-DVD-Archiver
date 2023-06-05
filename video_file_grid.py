@@ -265,6 +265,11 @@ class Video_File_Grid:
         match event.event:
             case qtg.Sys_Events.APPPOSTINIT:
                 self._load_grid(event)
+
+                # Hot wire to show title names instead of file names #TODO:  make this user settable
+                event.event = qtg.Sys_Events.CLICKED
+                event.tag = "toggle_file_button_names"
+                self.event_handler(event)
             case qtg.Sys_Events.APPCLOSED:
                 self._save_grid(event)
             case qtg.Sys_Events.CLICKED:
@@ -344,9 +349,6 @@ class Video_File_Grid:
             return None
 
         edit_folder = file_handler.file_join(dvd_folder, sys_consts.EDIT_FOLDER)
-        edit_folder = file_handler.file_join(
-            dvd_folder, sys_consts.TRANSCODE_FOLDER
-        )  # TODO Remove and same in video_cutter
 
         if not file_handler.file_exists(edit_folder):
             if file_handler.make_dir(edit_folder) == -1:
@@ -792,6 +794,7 @@ class Video_File_Grid:
                     col=file_grid.colindex_get("video_file"),
                     value=grid_video_data.video_file_settings.button_title,
                     user_data=grid_video_data,
+                    tooltip=f"{sys_consts.SDELIM}{grid_video_data.video_path}{sys_consts.SDELIM}",
                 )
 
             for col in range(file_grid.col_count):

@@ -454,9 +454,6 @@ class Video_Cutter_Popup(qtg.PopContainer):
         self._edit_folder = file_handler.file_join(
             self.output_folder, self._edit_folder
         )
-        self._edit_folder = file_handler.file_join(
-            self.output_folder, self._transcode_folder
-        )  # TODO Remove and same in video_file grid
 
         if self.video_file_input and not file_handler.file_exists(
             self.video_file_input[0].video_path
@@ -1129,50 +1126,56 @@ class Video_Cutter_Popup(qtg.PopContainer):
         ]
 
         if edit_list:
-            _, filename, extension = file_handler.split_file_path(
-                self.video_file_input[0].video_path
-            )
-
-            if dvd_menu_title.strip() == "":
-                dvd_menu_title = filename
-
-            output_file = file_handler.file_join(
-                self._edit_folder, f"{dvd_menu_title}", extension
-            )
-
-            with qtg.sys_cursor(qtg.Cursor.hourglass):
-                result, trimmed_file = self.cut_video_with_editlist(
-                    input_file=self.video_file_input[0].video_path,
-                    output_file=output_file,
-                    edit_list=edit_list,
+            if (
+                popups.PopYesNo(
+                    title="Cut Edit Points...", message="Cut Edit Points From File?"
+                ).show()
+                == "yes"
+            ):
+                _, filename, extension = file_handler.split_file_path(
+                    self.video_file_input[0].video_path
                 )
 
-                if (
-                    result == -1
-                ):  # trimmed file is the error message and not the file name
-                    popups.PopError(
-                        title="Error Cutting File...",
-                        message=f"<{trimmed_file}>",
-                    ).show()
-                else:
-                    (
-                        trimmed_path,
-                        trimmed_filename,
-                        trimmed_extension,
-                    ) = file_handler.split_file_path(trimmed_file)
+                if dvd_menu_title.strip() == "":
+                    dvd_menu_title = filename
 
-                    trimmed_video = Video_Data(
-                        video_folder=trimmed_path,
-                        video_file=trimmed_filename,
-                        video_extension=trimmed_extension,
-                        encoding_info=dvdarch_utils.get_file_encoding_info(
-                            trimmed_file
-                        ),
-                        video_file_settings=self.video_file_input[
-                            0
-                        ].video_file_settings,
+                output_file = file_handler.file_join(
+                    self._edit_folder, f"{dvd_menu_title}", extension
+                )
+
+                with qtg.sys_cursor(qtg.Cursor.hourglass):
+                    result, trimmed_file = self.cut_video_with_editlist(
+                        input_file=self.video_file_input[0].video_path,
+                        output_file=output_file,
+                        edit_list=edit_list,
                     )
-                    self.video_file_input.append(trimmed_video)
+
+                    if (
+                        result == -1
+                    ):  # trimmed file is the error message and not the file name
+                        popups.PopError(
+                            title="Error Cutting File...",
+                            message=f"<{trimmed_file}>",
+                        ).show()
+                    else:
+                        (
+                            trimmed_path,
+                            trimmed_filename,
+                            trimmed_extension,
+                        ) = file_handler.split_file_path(trimmed_file)
+
+                        trimmed_video = Video_Data(
+                            video_folder=trimmed_path,
+                            video_file=trimmed_filename,
+                            video_extension=trimmed_extension,
+                            encoding_info=dvdarch_utils.get_file_encoding_info(
+                                trimmed_file
+                            ),
+                            video_file_settings=self.video_file_input[
+                                0
+                            ].video_file_settings,
+                        )
+                        self.video_file_input.append(trimmed_video)
         else:
             popups.PopMessage(
                 title="No Entries In The Edit List...",
