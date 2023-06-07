@@ -24,6 +24,7 @@ import subprocess
 from time import sleep
 from typing import Callable, Literal
 
+import psutil
 import PySide6.QtCore as qtC
 import PySide6.QtGui as qtG
 import PySide6.QtMultimedia as qtM
@@ -48,7 +49,7 @@ class Video_Handler:
     aspect_ratio: str
     input_file: str
     output_edit_folder: str
-    encoding_info: dict
+    encoding_info: Encoding_Details
     video_display: qtg.Label
     video_slider: qtg.Slider
     frame_display: qtg.LCD
@@ -73,6 +74,7 @@ class Video_Handler:
     _frame_num: int = 0
     _frame_width: int = 720
     _frame_height: int = 576
+    _audio_output: qtM.QAudioOutput | None = None
     _media_player: qtM.QMediaPlayer | None = None
     _video_sink: qtM.QVideoSink | None = None
 
@@ -94,7 +96,7 @@ class Video_Handler:
 
         assert isinstance(
             self.encoding_info, Encoding_Details
-        ), f"{self.encoding_info=}. Must be a dict"
+        ), f"{self.encoding_info=}. Must be an instance of Encoding_Details"
 
         assert isinstance(
             self.video_display, qtg.Label
@@ -130,7 +132,14 @@ class Video_Handler:
 
         assert (
             self._media_player is not None and self._video_sink is not None
-        ), "Failed to get multi-meda started"
+        ), "Failed to get multi-media started"
+
+        # Create the audio output
+        self._audio_output = qtM.QAudioOutput()
+        self._audio_output.setVolume(1)
+
+        # Set the audio output for the media player
+        self._media_player.setAudioOutput(self._audio_output)
 
         # Hook up sink signals
         self._video_sink.videoFrameChanged.connect(self._frame_handler)
@@ -181,6 +190,9 @@ class Video_Handler:
                 self.source_state = "Loading"
             case qtM.QMediaPlayer.MediaStatus.LoadedMedia:
                 self.source_state = "Loaded"
+                # A bit of a bodge but it works, cf with event_handler in video Cuter
+                # When video loaded start playing, pause it in the Video cutter WINDOWPOSTOPEN event handler
+                self.play()
             case qtM.QMediaPlayer.MediaStatus.StalledMedia:
                 self.source_state = "Stalled"
             case qtM.QMediaPlayer.MediaStatus.BufferingMedia:
@@ -261,11 +273,15 @@ class Video_Handler:
             time_offset = int((1000 / self._frame_rate) * frame)
             self._media_player.setPosition(time_offset)
 
-    def stop(self) -> None:
+    def shutdown(self) -> None:
         """
-        Stops playing the media and resets the player's position to the beginning.
+        Stops playing the media and releases the player's ewsources.
         """
+
         self._media_player.stop()
+
+        self._media_player.setVideoSink(None)
+        self._media_player.setAudioOutput(None)
 
     def state(self) -> str:
         """
@@ -518,11 +534,14 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 self.window_open_handler(event)
                 self.set_result("")
             case qtg.Sys_Events.WINDOWPOSTOPEN:
+                # video playing at this point, so pause it.
+                # This is a bit of a bodge, cf Video Handler media_state_change
+                self._media_source.pause()
                 return self.window_post_open_handler(event)
             case qtg.Sys_Events.WINDOWCLOSED:
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
                     if self._media_source:
-                        self._media_source.stop()
+                        self._media_source.shutdown()
 
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
@@ -630,13 +649,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         if self._media_source.source_state in ("NoMedia", "InvalidMedia"):
             print("No Media Loaded")
         elif self._media_source.source_state == "Loaded":
-            self._media_source.play()
-            sleep(
-                0.5
-            )  # QT 6.5.0 requires this delay before the  first video frame is displayed. TODO Findout why!
-            self._media_source.pause()
             self._media_source.update_slider = True
-
         elif self._media_source.source_state == "InvalidMedia":
             popups.PopMessage(
                 title="Media Playback Error...",
@@ -1018,7 +1031,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                                 )
                             )
 
-                if len(video_data) > 0:
+                if video_data:
                     result = File_Renamer_Popup(
                         video_data_list=video_data, container_tag="file_renamer"
                     ).show()
@@ -1093,7 +1106,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         else:
             popups.PopMessage(
                 title="No Entries In The Edit List...",
-                message="Please Mark Some Edit List Entries With The [ and ] Button!",
+                message="Please Mark Edit List Entries With The [ and ] Button!",
             ).show()
 
     def _delete_segments(self, event: qtg.Action) -> None:
@@ -1565,19 +1578,17 @@ class Video_Cutter_Popup(qtg.PopContainer):
             if edit_tuple[2] != "" and not file_handler.filename_validate(
                 edit_tuple[2]
             ):
-                return -1, f"Invalid Clip Name: {edit_tuple[2]}!"
+                return (
+                    -1,
+                    (
+                        "Invalid Clip"
+                        f" Name:{sys_consts.SDELIM}{edit_tuple[2]}{sys_consts.SDELIM}!"
+                    ),
+                )
 
         out_path, out_file, out_extn = file_handler.split_file_path(output_file)
 
         result, message = dvdarch_utils.get_codec(input_file)
-
-        all(
-            [
-                file_handler.filename_validate(edit_tuple[2])
-                for edit_tuple in edit_list
-                if edit_tuple[2] != ""
-            ]
-        )
 
         if result == -1:
             return -1, message
@@ -1618,7 +1629,13 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 result = file_handler.remove_file(temp_file)
 
                 if result == -1:
-                    return -1, f"Failed To Remove {temp_file}"
+                    return (
+                        -1,
+                        (
+                            "Failed To Remove"
+                            f" {sys_consts.SDELIM}{temp_file}{sys_consts.SDELIM}"
+                        ),
+                    )
 
             # Calculate the start and end times of the segment based on the frame numbers
             start_time = start_frame / self._frame_rate
@@ -1654,39 +1671,34 @@ class Video_Cutter_Popup(qtg.PopContainer):
             command = [sys_consts.FFMPG, "-i", input_file]
 
             # Check if re-encoding is necessary
-            if before_key_frame is None or after_key_frame is None:
+            command += ["-map", "0:v", "-map", "0:a"]
+
+            if before_key_frame is not None and after_key_frame is not None:
                 # Re-encode the segment
+                print(f"DBG Re-Encode Seg {before_key_frame=} {after_key_frame=}")
+                command += ["-force_key_frames", f"{before_key_frame}+1"]
+                command += ["-tune", "fastdecode"]
                 command += ["-ss", str(segment_start)]
                 command += ["-t", str(segment_duration)]
                 command += ["-avoid_negative_ts", "make_zero"]
-                command += ["-map", "0:v", "-map", "0:a"]
                 command += ["-c:v", codec]
                 command += ["-c:a", "copy"]
-
-                if before_key_frame is not None:
-                    command += ["-force_key_frames", f"{before_key_frame}+1"]
-                if after_key_frame is not None:
-                    command += ["-tune", "fastdecode"]
+                command += [
+                    "-threads",
+                    str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+                ]
                 command += [temp_file, "-y"]
-
             else:
                 # Copy the segment
-                if before_key_frame is not None:
-                    command += ["-ss", str(segment_start)]
+                print("DBG Copy Seg")
+                command += ["-ss", str(segment_start)]
+                command += ["-t", str(segment_duration)]
+                command += ["-avoid_negative_ts", "make_zero"]
+                command += ["-c", "copy"]
                 command += [
-                    "-t",
-                    str(segment_duration),
-                    "-avoid_negative_ts",
-                    "make_zero",
+                    "-threads",
+                    str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
                 ]
-
-                command += ["-map", "0:v", "-map", "0:a", "-c", "copy"]
-
-                if before_key_frame is not None:
-                    command += ["-force_key_frames", f"{before_key_frame}+1"]
-                if after_key_frame is not None:
-                    command += ["-force_key_frames", f"{after_key_frame}"]
-
                 command += [temp_file, "-y"]
 
             result, message = dvdarch_utils.execute_check_output(command, debug=False)
@@ -1743,7 +1755,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self.archive_edit_list_write()
 
             if self._media_source:
-                self._media_source.stop()
+                self._media_source.shutdown()
 
         return result
 
@@ -1784,7 +1796,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             self.video_file_input[0].video_file_settings.button_title = dvd_menu_title
 
         if self._media_source:
-            self._media_source.stop()
+            self._media_source.shutdown()
 
         return 1
 

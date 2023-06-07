@@ -202,9 +202,10 @@ def concatenate_videos(
             "-movflags",
             "+faststart",
             output_file,
+            "-threads",
+            str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
             "-y",
         ],
-        debug=False,
     )
 
     if result == -1:
@@ -957,6 +958,10 @@ def get_nearest_key_frame(
         "frame=pkt_pts_time",
         "-of",
         "csv=print_section=0",
+        "-read_intervals",
+        "%+#10",  # Specify 10 sec frane duration to analyze
+        "-threads",
+        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
         input_file,
     ]
 
