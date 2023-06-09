@@ -2376,6 +2376,8 @@ class _qtpyBase_Control(_qtpyBase):
                     self._widget = _Line_Edit(
                         parent, self
                     )  # qtW.QLineEdit(parent) #_Line_Edit(parent_app, parent, self, container_tag)
+                case ProgressBar():
+                    self._widget = qtW.QProgressBar(parent)
                 case RadioButton():
                     self._widget = qtW.QRadioButton(self.text, parent)
                 case Spacer():
@@ -4102,6 +4104,10 @@ class Action(_qtpyBase):
         ...
 
     @overload
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "ProgressBar":
+        ...
+
+    @overload
     def widget_get(self, container_tag: str = "", tag: str = "") -> "RadioButton":
         ...
 
@@ -5160,6 +5166,7 @@ class _Container(_qtpyBase_Control):
         "Label",
         "LineEdit",
         "Spacer",
+        "ProgressBar",
         "RadioButton",
         "Slider",
         "Spinbox",
@@ -12543,6 +12550,114 @@ class Menu(_qtpyBase_Control):
             raise AssertionError(
                 f"Unknown menu property for menu <{tag=}> || <{menu_item}>"
             )
+
+
+@dataclasses.dataclass
+class ProgressBar(_qtpyBase_Control):
+    """Instantiates a progressbar and associated properties"""
+
+    range_min: int = 0
+    range_max: int = 100
+    horizontal: bool = True
+    width: int = 10
+    height: int = 1
+
+    def __post_init__(self) -> None:
+        """Initializes the progressbar object."""
+        assert (
+            isinstance(self.range_min, int) and self.range_min >= 0
+        ), f"{self.range_min=}. Must be an int >= 0"
+        assert (
+            isinstance(self.range_max, int)
+            and self.range_max > 0
+            and self.range_max > self.range_min
+        ), f"{self.range_max=}. Must be an int > 0 and < {self.range_min=}."
+        assert isinstance(self.horizontal, bool), f"{self.horizontal=}. Must be a bool"
+        assert (
+            isinstance(self.width, int) and self.width > 0
+        ), f"{self.width=}. Must be an int > 0"
+        assert (
+            isinstance(self.height, int) and self.height > 0
+        ), f"{self.height=}. Must be an int > 0"
+
+        super().__post_init__()
+
+    def _create_widget(
+        self, parent_app: QtPyApp, parent: qtW.QWidget, container_tag: str = ""
+    ) -> qtW.QWidget:
+        """Creates a progressbar widget.
+
+        Args:
+            parent_app (QtPyApp): The parent app.
+            parent (qtW.QWidget): The parent widget.
+            container_tag (str): The tag of the container that the widget is in.
+
+        Returns:
+            qtW.QWidget : The progressbar widget
+        """
+        if self.height == -1:
+            self.height = WIDGET_SIZE.height
+
+        if self.width == -1:
+            self.width = WIDGET_SIZE.width
+
+        widget = super()._create_widget(
+            parent_app=parent_app, parent=parent, container_tag=container_tag
+        )
+
+        self._widget: qtW.QProgressBar
+
+        self._widget.setRange(self.range_min, self.range_max)
+
+        if self.horizontal:
+            self._widget.setOrientation(qtC.Qt.Horizontal)
+        else:
+            self._widget.setOrientation(qtC.Qt.Vertical)
+
+        return widget
+
+    def range_set(self, min: int, max: int) -> None:
+        """Sets the range of the progressbar.
+
+        Args:
+            min (int): The minimum value of the progressbar.
+            max (int): The maximum value of the progressbar.
+        """
+        assert isinstance(min, int) and min >= 0, f"{min=}. Must be an int >= 0"
+        assert (
+            isinstance(max, int) and max > 0 and max > min
+        ), f"{max=}. Must be an int > 0 and < {min=}."
+        self._widget: qtW.QProgressBar
+        self._widget.setRange(min, max)
+
+    def reset(self) -> None:
+        """Resets the progressbar to the minimum value"""
+        self._widget: qtW.QProgressBar
+        self._widget.reset()
+
+    def value_get(self) -> int:
+        """Gets the value of the progressbar.
+
+        Returns:
+            int: The value of the progressbar.
+        """
+
+        self._widget: qtW.QProgressBar
+        return self._widget.value()
+
+    def value_set(self, value: int) -> None:
+        """Sets the value of the progressbar.
+
+        Args:
+            value (int): The value to set the progressbar to.
+        """
+        assert (
+            isinstance(value, int)
+            and value >= self.range_min
+            and value <= self.range_max
+        ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
+        self._widget: qtW.QProgressBar
+        self._widget.setValue(value)
 
 
 @dataclasses.dataclass
