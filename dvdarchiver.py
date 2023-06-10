@@ -19,6 +19,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+from time import sleep
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 from typing import cast
@@ -32,6 +33,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from archive_management import Archive_Manager
+from background_task_manager import Task_Manager
 from configuration_classes import DVD_Menu_Settings, File_Def, Video_Data
 from dvd import DVD, DVD_Config
 from dvdarch_popups import Menu_Page_Title_Popup
@@ -43,14 +45,16 @@ from video_file_grid import Video_File_Grid
 class DVD_Archiver:
     """
     Class for archiving DVDs.
+
     """
 
-    def __init__(self, args) -> None:
+    def __init__(self, background_task_manager: Task_Manager) -> None:
         """
         Sets up the instance of the class, and initializes all its attributes.
 
-        Args:
-            args: Passed in  command line arguments
+        Attributes:
+
+
 
         """
         self._DVD_Arch_App = qtg.QtPyApp(
@@ -66,11 +70,17 @@ class DVD_Archiver:
 
         self._data_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
-        self._file_control = Video_File_Grid()
+        self._background_task_manager = Task_Manager()
+        self._background_task_manager.start()
+
+        self._file_control = Video_File_Grid(
+            background_task_manager=self._background_task_manager
+        )
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
 
         # A problem in the next 3 lines can shut down startup as database initialization failed
         if self._db_settings.error_code == -1:
+            self._background_task_manager.stop()
             raise RuntimeError(
                 f"Failed To Start {sys_consts.PROGRAM_NAME} -"
                 f" {self._db_settings.error_message}"
@@ -208,6 +218,21 @@ class DVD_Archiver:
                         ).show()
                         == "yes"
                     ):
+                        if self._background_task_manager.list_running_tasks():
+                            if (
+                                popups.PopYesNo(
+                                    title="Background Tasks Running...",
+                                    message="Kill Background Tasks And Exit?",
+                                ).show()
+                                == "yes"
+                            ):
+                                self._background_task_manager.stop()
+                                return 1
+                            else:
+                                self._shutdown = False
+                                return -1
+
+                        self._background_task_manager.stop()
                         return 1
                     else:
                         self._shutdown = False

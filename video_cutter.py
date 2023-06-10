@@ -37,6 +37,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from archive_management import Archive_Manager
+from background_task_manager import Task_Manager
 from configuration_classes import (Encoding_Details, Video_Data,
                                    Video_File_Settings)
 from dvdarch_popups import File_Renamer_Popup
@@ -127,9 +128,13 @@ class Video_Handler:
         self._frame_rate = self.encoding_info.video_frame_rate
         self._frame_count = self.encoding_info.video_frame_count
 
+        self._setup_media_player()
+
+    @qtC.Slot()  # Slots seem to help a great deal with stability (Qt 6.5.1)
+    def _setup_media_player(self):
+        """Sets-up the media player"""
         self._media_player = qtM.QMediaPlayer()
         self._video_sink = qtM.QVideoSink()
-
         assert (
             self._media_player is not None and self._video_sink is not None
         ), "Failed to get multi-media started"
@@ -143,7 +148,6 @@ class Video_Handler:
 
         # Hook up sink signals
         self._video_sink.videoFrameChanged.connect(self._frame_handler)
-
         self._media_player.setVideoSink(self._video_sink)
         self._media_player.setSource(qtC.QUrl.fromLocalFile(self.input_file))
 
@@ -152,7 +156,9 @@ class Video_Handler:
         self._media_player.durationChanged.connect(self._duration_changed)
         self._media_player.seekableChanged.connect(self._seekable_changed)
         self._media_player.positionChanged.connect(self._position_changed)
+        self._media_player.errorOccurred.connect(self._player_error)
 
+    @qtC.Slot()
     def _duration_changed(self, duration: int) -> None:
         """Handles a video duration change
 
@@ -161,6 +167,7 @@ class Video_Handler:
         """
         pass
 
+    @qtC.Slot()
     def _frame_handler(self, frame: qtM.QVideoFrame) -> None:
         """Handles displaying the video frame
 
@@ -176,6 +183,7 @@ class Video_Handler:
             ):  # Should not need this check but on shutdown I sometimes got the  dreaded C++ object deleted error
                 self.video_display.guiwidget_get.setPixmap(pixmap)
 
+    @qtC.Slot()
     def _media_status_change(self, media_status: qtM.QMediaPlayer.mediaStatus) -> None:
         """When the status of the media player changes this method sets the source_state var and calls the
         state_handler if provided.
@@ -207,6 +215,7 @@ class Video_Handler:
         if self.state_handler and isinstance(self.state_handler, Callable):
             self.state_handler()
 
+    @qtC.Slot()
     def _position_changed(self, position_milliseconds: int) -> None:
         """
         A callback function that is called when the position of the media player changes.
@@ -222,6 +231,7 @@ class Video_Handler:
             self.video_slider.value_set(frame_number)
         self.frame_display.value_set(frame_number)
 
+    @qtC.Slot()
     def _seekable_changed(self, seekable: bool) -> None:
         """
         A callback function that is called when the seekable status of the media player changes.
@@ -233,6 +243,7 @@ class Video_Handler:
         # TODO enable/disable seek controls based on this
         pass
 
+    @qtC.Slot()
     def get_current_frame(self) -> int:
         """
         Returns the current frame number based on the current position of the media player and the frame rate of the video.
@@ -242,6 +253,7 @@ class Video_Handler:
         """
         return int(self._media_player.position() / (1000 / self._frame_rate))
 
+    @qtC.Slot()
     def available(self) -> bool:
         """Checks if the media player is supported on the platform
 
@@ -250,18 +262,21 @@ class Video_Handler:
         """
         return self._media_player.isAvailable()
 
+    @qtC.Slot()
     def play(self) -> None:
         """
         Starts playing the media.
         """
         self._media_player.play()
 
+    @qtC.Slot()
     def pause(self) -> None:
         """
         Pauses the media.
         """
         self._media_player.pause()
 
+    @qtC.Slot()
     def seek(self, frame: int) -> None:
         """
         Seeks to the specified frame number.
@@ -273,16 +288,38 @@ class Video_Handler:
             time_offset = int((1000 / self._frame_rate) * frame)
             self._media_player.setPosition(time_offset)
 
+    @qtC.Slot()
     def shutdown(self) -> None:
         """
-        Stops playing the media and releases the player's ewsources.
+        Stops playing the media and releases the player's resources.
         """
 
-        self._media_player.stop()
+        try:
+            if self._media_player is not None and shiboken6.isValid(self._media_player):
+                if (
+                    self._media_player.playbackState()
+                    != qtM.QMediaPlayer.PlaybackState.StoppedState
+                ):
+                    # The following is a magic sequence to stop the media player and release its resources.
+                    # This is a workaround because the media player does not stop the audio, when the media player is
+                    # stopped. If this sequence is changed it will eventually crash the app (Qt 6.5.1)
+                    self._media_player.stop()
+                    self._media_player.pause()
+                    self._media_player.setSource(None)
+                    self._audio_output.setVolume(0)
+                    self._media_player.stop()
+                    self._media_player.setAudioOutput(None)
+                    self._media_player.setVideoSink(None)
 
-        self._media_player.setVideoSink(None)
-        self._media_player.setAudioOutput(None)
+        except Exception as e:  # Not expecting this to ever happen
+            print("Exception occurred during Video Cutter shutdown:", str(e))
 
+    @qtC.Slot(qtM.QMediaPlayer.Error, str)
+    def _player_error(self, error, error_string):
+        """Called when the media player encounters an error."""
+        print(f"Error: {error} - {error_string}")
+
+    @qtC.Slot()
     def state(self) -> str:
         """
         Returns the current playback state of the media player.
@@ -370,6 +407,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
     video_file_input: list[Video_Data] = dataclasses.field(default_factory=list)
     output_folder: str = ""
     excluded_word_list: list[str] = dataclasses.field(default_factory=list)
+    background_task_manager: Task_Manager = dataclasses.field(
+        default_factory=Task_Manager
+    )
 
     # Private instance variables
     _aspect_ratio: str = sys_consts.AR43
@@ -382,6 +422,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
     _video_display: qtg.Label | None = None
     _video_slider: qtg.Slider | None = None
     _frame_display: qtg.LCD | None = None
+    _progress_bar: qtg.ProgressBar | None = None
     _sliding: bool = False
     _display_height: int = -1
     _display_width: int = -1
@@ -389,6 +430,13 @@ class Video_Cutter_Popup(qtg.PopContainer):
     _media_source: Video_Handler | None = None
     _edit_folder: str = sys_consts.EDIT_FOLDER
     _transcode_folder: str = sys_consts.TRANSCODE_FOLDER
+    _shutdown_called: bool = False
+
+    # Used for task background processing
+    _task_errored_task_errored = False
+    _task_status: int = -1
+    _task_message: str = ""
+    _tasks_submitted: int = 0
 
     def __post_init__(self):
         """Sets-up the form"""
@@ -539,9 +587,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 self._media_source.pause()
                 return self.window_post_open_handler(event)
             case qtg.Sys_Events.WINDOWCLOSED:
-                with qtg.sys_cursor(qtg.Cursor.hourglass):
-                    if self._media_source:
-                        self._media_source.shutdown()
+                pass
+                # if not self._shutdown_called and self._media_source is not None:
+                #    self._media_source.shutdown()
+                # self._shutdown_called = True
 
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
@@ -1490,8 +1539,22 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 - arg 1 (int): -1
                 - arg 2 (str): An error message.
         """
+        self._task_errored = False
+        self._task_status = -1
+        self._task_message = ""
+        self._tasks_submitted = 0
 
         # ===== Helper
+        def notification_call_back(status: int, message: str, output: str, name):
+            if status == -1:
+                self._task_status = status
+                self._task_message = message
+                self._task_errored = True
+
+            self._tasks_submitted -= 1
+
+            self._progress_bar.value_set((len(edit_list) - 1) - self._tasks_submitted)
+
         def transform_cut_in_to_cut_out(
             edit_list: list[tuple[int, int, str]], frame_count: int
         ) -> list[tuple[int, int, str]]:
@@ -1600,7 +1663,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
             edit_list = transform_cut_in_to_cut_out(
                 edit_list=edit_list, frame_count=self._frame_count
             )
-
+        self._progress_bar.range_set(0, len(edit_list) - 1)
         for cut_index, (start_frame, end_frame, clip_name) in enumerate(edit_list):
             if end_frame - start_frame <= 0:  # Probably should not happen
                 continue
@@ -1701,10 +1764,19 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 ]
                 command += [temp_file, "-y"]
 
-            result, message = dvdarch_utils.execute_check_output(command, debug=False)
+            self._tasks_submitted += 1
+            self.background_task_manager.add_task(
+                name=f"cut_video_{cut_index}",
+                command=command,
+                callback=notification_call_back,
+            )
 
-            if result == -1:
-                return -1, message
+        while self._tasks_submitted > 0 and not self._task_errored:
+            if self._task_errored:
+                self._progress_bar.reset()
+                return -1, self._task_message
+            sleep(0.5)
+        self._progress_bar.reset()
 
         if cut_out:  # Concat temp file for final file and remove the temp files
             result, message = dvdarch_utils.concatenate_videos(
@@ -1750,13 +1822,16 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 result = 1
             else:
                 result = -1
-
+        print(f"DBG A")
         if result == 1:
+            print(f"DBG B")
             self.archive_edit_list_write()
-
-            if self._media_source:
+            print(f"DBG C")
+            if self._media_source is not None:
+                print(f"DBG DA")
                 self._media_source.shutdown()
-
+                print(f"DBG E")
+        print(f"DBG F")
         return result
 
     def _process_ok(self, event: qtg.Action) -> int:
@@ -1795,7 +1870,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
         ):  # Have to set the dvd menu button title if we have an Input file only, or one output file
             self.video_file_input[0].video_file_settings.button_title = dvd_menu_title
 
-        if self._media_source:
+        if self._media_source is not None:
             self._media_source.shutdown()
 
         return 1
@@ -2041,13 +2116,18 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 ),
             )
 
+            self._progress_bar = qtg.ProgressBar(tag="file_progress")
             edit_file_list = qtg.VBoxContainer(align=qtg.Align.TOPLEFT).add_row(
-                qtg.Checkbox(
-                    text="Select All",
-                    tag="bulk_select",
-                    callback=self.event_handler,
-                    tooltip="Select All Edit Points",
-                    width=11,
+                qtg.HBoxContainer(margin_left=4).add_row(
+                    qtg.Checkbox(
+                        text="Select All",
+                        tag="bulk_select",
+                        callback=self.event_handler,
+                        tooltip="Select All Edit Points",
+                        width=11,
+                    ),
+                    qtg.Spacer(width=12, tune_hsize=-13),
+                    self._progress_bar,
                 ),
                 qtg.VBoxContainer(align=qtg.Align.BOTTOMRIGHT).add_row(
                     self._edit_list_grid, edit_list_buttons

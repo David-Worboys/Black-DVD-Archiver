@@ -31,6 +31,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
+from background_task_manager import Task_Manager
 from configuration_classes import Video_Data
 from dvd_menu_configuration import DVD_Menu_Config_Popup
 from video_cutter import Video_Cutter_Popup
@@ -42,8 +43,13 @@ from video_file_picker import Video_File_Picker_Popup
 class Video_File_Grid:
     """This class implements the file handling of the Black DVD Archiver ui"""
 
-    def __init__(self):
-        """Sets up the instance for use"""
+    def __init__(self, background_task_manager: Task_Manager) -> None:
+        """Initializes the instance for use"""
+        assert isinstance(
+            background_task_manager, Task_Manager
+        ), f"{background_task_manager=}. Must be an instance of Task_Manager"
+
+        self._background_task_manager = background_task_manager
         file_handler = file_utils.File()
 
         self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
@@ -129,6 +135,7 @@ class Video_File_Grid:
             video_file_input=video_file_input,  # list :  pass by reference, so that contents can be modified
             output_folder=dvd_folder,
             excluded_word_list=self.common_words,
+            background_task_manager=self._background_task_manager,
         ).show()
 
         if (
