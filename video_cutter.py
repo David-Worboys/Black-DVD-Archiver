@@ -36,6 +36,7 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
+import utils
 from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
 from configuration_classes import (Encoding_Details, Video_Data,
@@ -1738,7 +1739,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
 
             if before_key_frame is not None and after_key_frame is not None:
                 # Re-encode the segment
-                print(f"DBG Re-Encode Seg {before_key_frame=} {after_key_frame=}")
+                if not utils.Is_Complied():
+                    print(f"DBG Re-Encode Seg {before_key_frame=} {after_key_frame=}")
+
                 command += ["-force_key_frames", f"{before_key_frame}+1"]
                 command += ["-tune", "fastdecode"]
                 command += ["-ss", str(segment_start)]
@@ -1753,7 +1756,9 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 command += [temp_file, "-y"]
             else:
                 # Copy the segment
-                print("DBG Copy Seg")
+                if not utils.Is_Complied():
+                    print("DBG Copy Seg")
+
                 command += ["-ss", str(segment_start)]
                 command += ["-t", str(segment_duration)]
                 command += ["-avoid_negative_ts", "make_zero"]
@@ -1822,16 +1827,13 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 result = 1
             else:
                 result = -1
-        print(f"DBG A")
+
         if result == 1:
-            print(f"DBG B")
             self.archive_edit_list_write()
-            print(f"DBG C")
+
             if self._media_source is not None:
-                print(f"DBG DA")
                 self._media_source.shutdown()
-                print(f"DBG E")
-        print(f"DBG F")
+
         return result
 
     def _process_ok(self, event: qtg.Action) -> int:

@@ -1341,7 +1341,7 @@ def get_file_encoding_info(video_file: str) -> Encoding_Details:
         video_details: dict[str, list[str, int, str]]
         track_info = list(find_keys(video_info, "track"))
 
-        for tracks in track_info:            
+        for tracks in track_info:
             for track_dict in tracks:
                 track_type = ""
                 for key, value in track_dict.items():
