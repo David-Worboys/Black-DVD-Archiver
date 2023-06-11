@@ -2176,6 +2176,7 @@ class Video_Cutter_Popup(qtg.PopContainer):
                 text="White Balance",
                 checked=True,
                 tooltip="Fix White Balance Problems",
+                width=16,
             ),
             qtg.Checkbox(
                 tag="sharpen",
