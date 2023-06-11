@@ -10235,11 +10235,14 @@ class Grid(_qtpyBase_Control):
 
         widget.tag = f"{item.item_id}|{widget.tag}"
 
-        rowcol_widget = widget._create_widget(
-            parent_app=self.parent_app,
-            parent=self._widget,
-            container_tag=self.container_tag,
-        )
+        if widget._widget is None:
+            rowcol_widget = widget._create_widget(
+                parent_app=self.parent_app,
+                parent=self._widget,
+                container_tag=self.container_tag,
+            )
+        else:
+            rowcol_widget = widget.guiwidget_get
 
         assert (
             rowcol_widget is not None and item is not None
