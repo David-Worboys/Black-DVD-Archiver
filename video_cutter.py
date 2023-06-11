@@ -294,26 +294,14 @@ class Video_Handler:
         """
         Stops playing the media and releases the player's resources.
         """
-
-        try:
-            if self._media_player is not None and shiboken6.isValid(self._media_player):
-                if (
-                    self._media_player.playbackState()
-                    != qtM.QMediaPlayer.PlaybackState.StoppedState
-                ):
-                    # The following is a magic sequence to stop the media player and release its resources.
-                    # This is a workaround because the media player does not stop the audio, when the media player is
-                    # stopped. If this sequence is changed it will eventually crash the app (Qt 6.5.1)
-                    self._media_player.stop()
-                    self._media_player.pause()
-                    self._media_player.setSource(None)
-                    self._audio_output.setVolume(0)
-                    self._media_player.stop()
-                    self._media_player.setAudioOutput(None)
-                    self._media_player.setVideoSink(None)
-
-        except Exception as e:  # Not expecting this to ever happen
-            print("Exception occurred during Video Cutter shutdown:", str(e))
+        if self._media_player is not None and shiboken6.isValid(self._media_player):
+            if (
+                self._media_player.playbackState()
+                != qtM.QMediaPlayer.PlaybackState.StoppedState
+            ):
+                self._media_player.pause()
+                # self._media_player.stop() # In thory I should just do this but Qt 6.5.1 will lock up the app
+        return None
 
     @qtC.Slot(qtM.QMediaPlayer.Error, str)
     def _player_error(self, error, error_string):

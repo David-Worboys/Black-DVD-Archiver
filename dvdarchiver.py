@@ -20,6 +20,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 from time import sleep
+
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 from typing import cast
