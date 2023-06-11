@@ -674,12 +674,10 @@ class Video_Cutter_Popup(qtg.PopContainer):
             case qtg.Sys_Events.EDITCHANGED:
                 match event.tag:
                     case "video_slider":
-                        # self._media_source.update_slider = False
                         self._media_source.seek(event.value)
             case qtg.Sys_Events.MOVED:
                 match event.tag:
                     case "video_slider":
-                        # self._media_source.update_slider = False
                         self._media_source.seek(event.value)
             case qtg.Sys_Events.PRESSED:
                 match event.tag:
@@ -692,6 +690,11 @@ class Video_Cutter_Popup(qtg.PopContainer):
                     case "video_slider":
                         self._media_source.update_slider = True
                         self._sliding = False
+                        self._media_source.seek(event.value)
+            case qtg.Sys_Events.TRIGGERED:
+                match event.tag:
+                    case "video_slider":
+                        self._media_source.seek(event.value)
 
     def media_state_handler(self) -> None:
         """Allows processing the change of Media State"""
