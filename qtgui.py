@@ -46,10 +46,10 @@ from typing import (Callable, ClassVar, Literal, NoReturn, Optional, Union,
 import numpy as np
 import PySide6.QtCore as qtC
 import PySide6.QtGui as qtG
+import PySide6.QtMultimedia as qtM
 import PySide6.QtWidgets as qtW
 import shiboken6  # type: ignore
 from attrs import define
-from PySide6.QtGui import QCloseEvent
 
 import utils
 from file_utils import App_Path
@@ -774,6 +774,7 @@ def sys_cursor(cursor: Cursor):
         qtW.QApplication.setOverrideCursor(qtG.QCursor(cursor.value))
         yield
     finally:
+        pass
         qtW.QApplication.restoreOverrideCursor()
 
 
@@ -1395,7 +1396,7 @@ class _qtpyFrame(_qtpyBaseFrame):
         self.setMinimumWidth(self.max_width)
         self.resize(self.max_width, self.max_height)
 
-    def closeEvent(self, event: QCloseEvent):
+    def closeEvent(self, event: qtG.QCloseEvent):
         """
         The function is called when the sheet is closed. Overrides the closeEvent method of QWidget.
         - If the window has a callback method, then the callback function is called.
@@ -1403,7 +1404,7 @@ class _qtpyFrame(_qtpyBaseFrame):
         - If the callback method returns 0, then the window is not closed.
         - If the window does not have a callback method, then the window is closed.
         Args:
-            event (QCloseEvent): The event that was trigger of the closeEvent.
+            event (qtG.QCloseEvent): The event that was trigger of the closeEvent.
         """
         if self.callback is not None:
             qtpyevent: Sys_Events = Sys_Events.APPCLOSED
@@ -4760,19 +4761,22 @@ class _Container(_qtpyBase_Control):
 
                 if isinstance(widget_group, qtW.QGroupBox):
                     widget_group.setMaximumSize(
-                        # widget_group.setFixedSize(
                         self._width,
                         self._height,
                     )
                 else:
                     widget_group.setMaximumSize(
-                        # widget_group.setFixedSize(
                         self._width,
                         self._height,
                     )
 
         # parent.dumpObjectTree() #Debug
         # self.dump() #Debug
+        if debug:
+            if hasattr(self._widget, "setFrameStyle") and isinstance(
+                self, VBoxContainer
+            ):
+                self._widget.setFrameStyle(Frame_Style.BOX.value)  # Debug
 
         return self._widget
 
@@ -5494,10 +5498,10 @@ class _Container(_qtpyBase_Control):
             if not widget_def.widget.guiwidget_get.visibleRegion().isEmpty():
                 widgets_visible[widget_def.widget.tag] = widget_def
 
-        window_id = Get_Window_ID(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(self._parent_app, self._parent, self)
 
         if callable(self.callback):
-            result = _Event_Handler(parent_app=parent_app, parent=self).event(
+            result = _Event_Handler(parent_app=self._parent_app, parent=self).event(
                 window_id=window_id,
                 callback=self.callback,
                 container_tag="",
@@ -6449,11 +6453,11 @@ class PopContainer(_qtpyBase_Control):
 
         return self.dialog.close()
 
-    def closeEvent(self, event: QCloseEvent) -> None:
+    def closeEvent(self, event: qtG.QCloseEvent) -> None:
         """Method called when the dialog is closed.
 
         Args:
-            QCloseEvent: This is the event that is being passed to the function.
+            qtG.QCloseEvent: This is the event that is being passed to the function.
         """
         self.dialog.closeEvent(event)
 
@@ -13639,7 +13643,7 @@ class Tab(_qtpyBase_Control):
     class _Page_Def:
         """Internal page definition class"""
 
-        container: _qtpyBase_Control
+        container: HBoxContainer | VBoxContainer | GridContainer | FormContainer = None
         created: bool = False
         tag: str = ""
         title: str = ""
@@ -13686,45 +13690,63 @@ class Tab(_qtpyBase_Control):
 
     def _create_pages(self) -> None:
         """Creates the tab pages for the Tab widget"""
-
-        self._widget: qtW.QTabWidget
-
         if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
+            raise RuntimeError(f"{self._widget=} is not set")
+
+        char_pixel_size = self.pixel_char_size(1, 1)
+        page_width = (
+            self.width - 16
+        ) * char_pixel_size.width  # 16 is magic but it fits right
+        page_height = (
+            self.height - 2
+        ) * char_pixel_size.height  # 2 is magic but it fits right
 
         for page in self._tab_pages.values():
-            if page.created is False:
-                tab_widget: qtW.QWidget = page.container._create_widget(
-                    parent_app=self.parent_app,
-                    parent=self._widget,
-                    container_tag=self.tag,
-                )
+            if page.created:
+                continue
 
-                tab_page_layout = qtW.QFormLayout(self._widget)
-                tab_page_layout.addWidget(tab_widget)
+            tab_widget = page.container._create_widget(
+                parent_app=self.parent_app,
+                parent=self._widget,
+                container_tag=self.tag,
+            )
 
-                tab_page = qtW.QWidget(self._widget)
+            tab_page_layout = qtW.QGridLayout()
+            tab_page_layout.addWidget(tab_widget)
+            tab_page_layout.setContentsMargins(0, 0, 0, 0)
 
-                # tab_page.setFixedSize(tab_widget.width(),tab_widget.height())
+            # Set size policy for child widgets
+            for page_index in range(tab_page_layout.count()):
+                page_item = tab_page_layout.itemAt(page_index)
+                if page_item is not None:
+                    page_widget = page_item.widget()
+                    if page_widget is not None:
+                        child_layout = page_widget.layout()
+                        for child_index in range(child_layout.count()):
+                            child_item = child_layout.itemAt(child_index)
+                            if child_item is not None:
+                                child_widget = child_item.widget()
+                                if child_widget is not None:
+                                    child_widget.setFixedHeight(page_height - 45) # More magic to fit
+                                    # child_widget.setFrameStyle(Frame_Style.BOX.value)  # Debug
 
-                tab_page.setLayout(tab_page_layout)
-                # tab_page.setFixedWidth(300)
+            tab_page = qtW.QWidget(self._widget)
+            tab_page.setLayout(tab_page_layout)
+            tab_page.setFixedWidth(page_width)
+            tab_widget.setFixedHeight(page_height + char_pixel_size.height)
+            
+            page.index = self._widget.addTab(tab_page, page.title)
 
-                page.index = self._widget.addTab(
-                    tab_page,
-                    page.title,
-                )
+            if page.icon is not None:
+                self.page_icon_set(page.tag, page.icon)
 
-                if page.icon is not None:
-                    self.page_icon_set(page.tag, page.icon)
+            if page.tooltip != "":
+                self.tooltip_set(page.tag, page.tooltip)
 
-                if page.tooltip != "":
-                    self.tooltip_set(page.tag, page.tooltip)
+            self.enable_set(page.tag, page.enabled)
+            self.page_visible_set(page.tag, page.visible)
 
-                self.enable_set(page.tag, page.enabled)
-                self.page_visible_set(page.tag, page.visible)
-
-                page.created = True
+            page.created = True
 
     def _event_handler(
         self,
@@ -13917,15 +13939,15 @@ class Tab(_qtpyBase_Control):
         ), f"{control=}. Must be a descendant of _qtpyBase_Control or _Container"
 
         tab_page_container = VBoxContainer(
-            tag=tag, width=self.width, height=self.height
+            # text="test",
+            tag=tag,
+            height=40,
+            margin_left=10,
+            margin_right=10,
+            margin_top=10,
+            margin_bottom=20,
+            align=Align.CENTER,            
         )
-
-        if isinstance(control, _Container):
-            control.height = self.height + 1  # - 5
-            control.width = self.width - 1  # - 8
-        elif isinstance(control, Tab):
-            control.height = self.height - 3  # - 5
-            control.width = self.width - 4  # - 8
 
         control.scroll = True
 
@@ -13956,6 +13978,19 @@ class Tab(_qtpyBase_Control):
             self._create_pages()
 
         return self
+
+    def select_tab(self, tag_name: str):
+        """Selects the tab page with the given tag name
+
+        Args:
+            tag_name (str): The tag name of the tab page to be selected
+        """
+        assert isinstance(tag_name, str), f"{tag_name=}. Must be str"
+        assert (
+            tag_name in self._tab_pages
+        ), f"{tag_name=}. Not found in tab pages: {self._tab_pages=}"
+
+        self._widget.setCurrentIndex(self._tab_pages[tag_name].index)
 
     def page_icon_set(
         self, tag: str, icon: Union[None, str, qtG.QPixmap, qtG.QIcon]
@@ -14802,6 +14837,38 @@ class Slider(_qtpyBase_Control):
 
         return widget
 
+    def range_min_set(self, range_min: int) -> None:
+        """Sets the minimum value of the slider.
+
+        Args:
+            range_min (int): The minimum value of the slider.
+        """
+        assert (
+            isinstance(range_min, int) and range_min >= 0
+        ), f"{range_min=}. Must be an int >= 0"
+
+        self.range_min = range_min
+
+        self._widget: qtW.QSlider
+
+        self._widget.setMinimum(range_min)
+
+    def range_max_set(self, range_max: int) -> None:
+        """Sets the maximum value of the slider.
+
+        Args:
+            range_max (int): The maximum value of the slider.
+        """
+        assert (
+            isinstance(range_max, int) and range_max > 0 and range_max > self.range_min
+        ), f"{range_max=}. Must be an int > 0 and < {self.range_min=}."
+
+        self.range_max = range_max
+
+        self._widget: qtW.QSlider
+
+        self._widget.setMaximum(range_max)
+
     def value_get(self) -> int:
         """Gets the value of the slider.
 
@@ -14825,8 +14892,7 @@ class Slider(_qtpyBase_Control):
         ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
         self._widget: qtW.QSlider
 
-        if shiboken6.isValid(self._widget):
-            self._widget.setValue(value)
+        self._widget.setValue(value)
 
 
 @dataclasses.dataclass
@@ -14915,3 +14981,252 @@ class Spinbox(_qtpyBase_Control):
         ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
         self._widget: qtW.QSpinBox
         self._widget.setValue(value)
+
+
+class Video_Player(qtC.QObject):
+    """
+    Implements a custom video player object
+    """
+
+    current_frame_handler = qtC.Signal(int)
+    duration_changed_handler = qtC.Signal(int)
+    frame_changed_handler = qtC.Signal(qtG.QPixmap)
+    _frame_changed_handler = qtC.Signal(qtM.QVideoFrame)
+    is_available_handler = qtC.Signal(bool)
+    media_status_changed_handler = qtC.Signal(str)
+    position_changed_handler = qtC.Signal(int)
+    seekable_changed_handler = qtC.Signal(bool)
+
+    def __init__(
+        self,
+        parent: qtC.QObject | None = None,
+        display_width: int = -1,
+        display_height: int = -1,
+    ) -> None:
+        """
+        Sets up the video_player object for use
+
+        Args:
+            parent (qtC.QObject | None): Set the parent of the object
+            input_file (str): Set the source file of the media player
+
+        """
+        super().__init__(parent)
+
+        assert parent is None or isinstance(
+            parent, qtC.QObject
+        ), f"{parent =} must be None or a qtC.QObject"
+        assert (
+            isinstance(display_width, int) and display_width > 0
+        ), f"{display_width =} must be an int > 0"
+        assert (
+            isinstance(display_height, int) and display_height > 0
+        ), f"{display_height =} must be an int > 0"
+
+        self.source_state = "no_media"
+
+        self._display_width = display_width
+        self._display_height = display_height
+
+        self._current_position = -1
+        self._display_width = display_width
+        self._display_height = display_height
+        self._frame_rate: float = -1.0
+        self._input_file = ""
+
+        self._video_sink = qtM.QVideoSink()
+        self._audio_output = qtM.QAudioOutput()
+
+        self._media_player = qtM.QMediaPlayer()
+        self._media_player.setVideoSink(self._video_sink)
+        self._media_player.setAudioOutput(self._audio_output)
+        self._audio_output.setVolume(1)
+
+        # Hook up signals
+        self._video_sink.videoFrameChanged.connect(self._frame_handler)
+        self._media_player.durationChanged.connect(self._duration_changed)
+        self._media_player.positionChanged.connect(self._position_changed)
+        self._media_player.errorOccurred.connect(self._player_error)
+        self._media_player.mediaStatusChanged.connect(self._media_status_change)
+        self._media_player.seekableChanged.connect(self._seekable_changed)
+        self._frame_changed_handler.connect(self._video_sink.setVideoFrame)
+
+        self.is_available_handler.connect(self._media_player.isAvailable)
+
+    def available(self) -> bool:
+        """
+        Returns whether the media player is available
+
+        Returns:
+            bool: True if Available, False if not
+
+        """
+
+        return self._media_player.isAvailable()
+
+    def current_frame(self) -> int:
+        return int(self._media_player.position() / (1000 / self._frame_rate))
+
+    def pause(self) -> None:
+        """Pauses the video"""
+        self._media_player.pause()
+
+    def play(self) -> None:
+        """
+        Plays the video
+        """
+        self._media_player.play()
+
+    @qtC.Slot()
+    def seek(self, frame: int) -> None:
+        """
+        Seeks to a position
+
+        Args:
+            position (int): THe position in milliseconds to move to
+        """
+        time_offset = int((1000 / self._frame_rate) * frame)
+
+        if (
+            self._media_player.isSeekable()
+            and self._media_player.mediaStatus()
+            == qtM.QMediaPlayer.MediaStatus.BufferedMedia
+        ):
+            self._media_player.setPosition(time_offset)
+
+    def state(self) -> str:
+        playback_state = self._media_player.playbackState()
+
+        if playback_state == qtM.QMediaPlayer.PlaybackState.PlayingState:
+            return "playing"
+        elif playback_state == qtM.QMediaPlayer.PlaybackState.PausedState:
+            return "paused"
+        elif playback_state == qtM.QMediaPlayer.PlaybackState.StoppedState:
+            return "stop"
+
+    def stop(self):
+        self._media_player.stop()
+        self._media_player.setVideoSink(None)
+        self._media_player.setAudioOutput(None)
+
+    def set_source(self, input_file: str, frame_rate: float) -> None:
+        """Sets the source of the media player
+
+        Args:
+            input_file (str): The source file of the media player
+            frame_rate (float): The frame rate of the media player
+        """
+        assert (
+            isinstance(frame_rate, float) and frame_rate > 0
+        ), f"{frame_rate =}. Must be float > 0"
+
+        assert (
+            isinstance(input_file, str) and input_file.strip() != ""
+        ), f"{input_file =} must be a non-empty str"
+
+        self._input_file = input_file
+        self._frame_rate = frame_rate
+
+        self._media_player.stop()
+        self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
+        assert (
+            isinstance(input_file, str) and input_file.strip() != ""
+        ), f"{input_file =} must be a non-empty str"
+
+        assert (
+            isinstance(frame_rate, float) and frame_rate > 0
+        ), f"{frame_rate =}. Must be float > 0"
+
+        self._input_file = input_file
+        self._frame_rate = frame_rate
+
+        self._media_player.stop()
+        self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
+
+        # Folloing loads the first frame into the viewer
+        self._media_player.play()
+        time.sleep(0.01)  # Needed to see frame
+        self._media_player.pause()
+        # time.sleep(0.01)
+
+    @qtC.Slot()
+    def _duration_changed(self, duration: int) -> None:
+        """Handles a video duration change
+
+        Args:
+            duration (int): The length of the video
+        """
+        self.duration_changed_handler.emit(duration)
+
+    @qtC.Slot()
+    def _frame_handler(self, frame: qtM.QVideoFrame) -> None:
+        """Handles the video frame changing signal
+
+        Args:
+            frame (qtM.QVideoFrame): The video frame to be displayed
+        """
+        if frame.isValid():
+            image: qtG.QImage = (
+                frame.toImage()
+                .convertToFormat(qtG.QImage.Format.Format_RGB32)
+                .scaled(self._display_width, self._display_height)
+            )
+            pixmap: qtG.QPixmap = qtG.QPixmap.fromImage(image)
+
+            self.frame_changed_handler.emit(pixmap)
+
+    @qtC.Slot()
+    def _position_changed(self, position_milliseconds: int) -> None:
+        """
+        Handles the position changing signal
+
+        Args:
+            position_milliseconds (int): The current position of the media player in milliseconds.
+        """
+        self.position_changed_handler.emit(
+            int(position_milliseconds * self._frame_rate // 1000)
+        )
+
+    @qtC.Slot(qtM.QMediaPlayer.Error, str)
+    def _player_error(self, error, error_string):
+        """Called when the media player encounters an error."""
+        print(f"Error: {error} - {error_string}")
+
+    @qtC.Slot()
+    def _media_status_change(self, media_status: qtM.QMediaPlayer.mediaStatus) -> None:
+        """Signals the state of the media has changed
+
+        Args:
+            media_status (qtM.QMediaPlayer.mediaStatus): The status of the media player
+        """
+        match media_status:
+            case qtM.QMediaPlayer.MediaStatus.NoMedia:
+                self.source_state = "no_media"
+            case qtM.QMediaPlayer.MediaStatus.LoadingMedia:
+                self.source_state = "loading"
+            case qtM.QMediaPlayer.MediaStatus.LoadedMedia:
+                self.source_state = "loaded"
+            case qtM.QMediaPlayer.MediaStatus.StalledMedia:
+                self.source_state = "stalled"
+            case qtM.QMediaPlayer.MediaStatus.BufferingMedia:
+                self.source_state = "buffering"
+            case qtM.QMediaPlayer.MediaStatus.BufferedMedia:
+                self.source_state = "buffered"
+            case qtM.QMediaPlayer.MediaStatus.EndOfMedia:
+                self.source_state = "end_of_media"
+            case qtM.QMediaPlayer.MediaStatus.InvalidMedia:
+                self.source_state = "invalid_media"
+            case _:
+                self.source_state = "invalid_media"
+
+        self.media_status_changed_handler.emit(self.source_state)
+
+    @qtC.Slot()
+    def _seekable_changed(self, seekable: bool) -> None:
+        """
+        Signals the seekable status has changed
+
+        Args:
+            seekable (bool): True if the media player is seekable, False otherwise.
+        """
+        self.seekable_changed_handler.emit(seekable)
