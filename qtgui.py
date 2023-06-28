@@ -11838,6 +11838,15 @@ class _Line_Edit(qtW.QLineEdit):
 
         return True
 
+    def focusInEvent(self, *args) -> None:
+        """Takes the focusInEvent from the QLineEdit and passes it to the owner QWidget"""
+        self.owner_widget.focusInEvent(args)
+
+    def focusOutEvent(self, *args) -> None:
+        """Takes the focusOutEvent from the QLineEdit and passes it to the owner QWidget"""
+        # print(f"@@@@@@> foe {args=}")
+        self.owner_widget.focusOutEvent(args)
+
 
 @dataclasses.dataclass
 class LineEdit(_qtpyBase_Control):
