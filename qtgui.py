@@ -774,7 +774,6 @@ def sys_cursor(cursor: Cursor):
         qtW.QApplication.setOverrideCursor(qtG.QCursor(cursor.value))
         yield
     finally:
-        pass
         qtW.QApplication.restoreOverrideCursor()
 
 
@@ -11839,15 +11838,6 @@ class _Line_Edit(qtW.QLineEdit):
 
         return True
 
-    def focusInEvent(self, *args) -> None:
-        """Takes the focusInEvent from the QLineEdit and passes it to the owner QWidget"""
-        self.owner_widget.focusInEvent(args)
-
-    def focusOutEvent(self, *args) -> None:
-        """Takes the focusOutEvent from the QLineEdit and passes it to the owner QWidget"""
-        # print(f"@@@@@@> foe {args=}")
-        self.owner_widget.focusOutEvent(args)
-
 
 @dataclasses.dataclass
 class LineEdit(_qtpyBase_Control):
@@ -13727,14 +13717,16 @@ class Tab(_qtpyBase_Control):
                             if child_item is not None:
                                 child_widget = child_item.widget()
                                 if child_widget is not None:
-                                    child_widget.setFixedHeight(page_height - 45) # More magic to fit
+                                    child_widget.setFixedHeight(
+                                        page_height - 45
+                                    )  # More magic to fit
                                     # child_widget.setFrameStyle(Frame_Style.BOX.value)  # Debug
 
             tab_page = qtW.QWidget(self._widget)
             tab_page.setLayout(tab_page_layout)
             tab_page.setFixedWidth(page_width)
             tab_widget.setFixedHeight(page_height + char_pixel_size.height)
-            
+
             page.index = self._widget.addTab(tab_page, page.title)
 
             if page.icon is not None:
@@ -13760,12 +13752,11 @@ class Tab(_qtpyBase_Control):
         Returns:
             int: 1. If the event is accepted, -1. If the event is rejected
         """
+        assert isinstance(args[0], Sys_Events), f"{args[0]=}. Must be Sys_Events"
+        assert isinstance(args[1], int), f"{args[1]=}. Must be int"
+
         event = args[0]
-
-        assert isinstance(args[1], tuple), f"{args[1]=}. Must be tuple"
-        assert isinstance(args[1][0], int), f"{args[1][0]=}. Must be int"
-
-        tab_index = args[1][0]
+        tab_index = args[1]
 
         if callable(self.callback):
             tag = ""
@@ -13946,7 +13937,7 @@ class Tab(_qtpyBase_Control):
             margin_right=10,
             margin_top=10,
             margin_bottom=20,
-            align=Align.CENTER,            
+            align=Align.CENTER,
         )
 
         control.scroll = True
@@ -15007,9 +14998,7 @@ class Video_Player(qtC.QObject):
         Sets up the video_player object for use
 
         Args:
-            parent (qtC.QObject | None): Set the parent of the object
-            input_file (str): Set the source file of the media player
-
+            parent (qtC.QObject | None): The parent of the object
         """
         super().__init__(parent)
 
@@ -15033,6 +15022,11 @@ class Video_Player(qtC.QObject):
         self._display_height = display_height
         self._frame_rate: float = -1.0
         self._input_file = ""
+
+        self._setup_media_player()
+
+    def _setup_media_player(self) -> None:
+        """Sets up the media_player and connects signals"""
 
         self._video_sink = qtM.QVideoSink()
         self._audio_output = qtM.QAudioOutput()
@@ -15105,6 +15099,7 @@ class Video_Player(qtC.QObject):
             return "stop"
 
     def stop(self):
+        """Stops the video"""
         self._media_player.stop()
         self._media_player.setVideoSink(None)
         self._media_player.setAudioOutput(None)
@@ -15128,26 +15123,16 @@ class Video_Player(qtC.QObject):
         self._frame_rate = frame_rate
 
         self._media_player.stop()
-        self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
-        assert (
-            isinstance(input_file, str) and input_file.strip() != ""
-        ), f"{input_file =} must be a non-empty str"
 
-        assert (
-            isinstance(frame_rate, float) and frame_rate > 0
-        ), f"{frame_rate =}. Must be float > 0"
+        # Heavy-handed but under certain circumstance the app would lock
+        self._setup_media_player()
 
-        self._input_file = input_file
-        self._frame_rate = frame_rate
-
-        self._media_player.stop()
         self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
 
-        # Folloing loads the first frame into the viewer
-        self._media_player.play()
-        time.sleep(0.01)  # Needed to see frame
+        # Following loads the first frame into the viewer
+        self._media_player.setPosition(1)
+        self._media_player.setPosition(0)
         self._media_player.pause()
-        # time.sleep(0.01)
 
     @qtC.Slot()
     def _duration_changed(self, duration: int) -> None:
