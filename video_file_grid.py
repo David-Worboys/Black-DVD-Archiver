@@ -153,46 +153,10 @@ class Video_File_Grid(DVD_Archiver_Base):
         self._frame_height = video_file_input[0].encoding_info.video_height
         self._frame_rate = video_file_input[0].encoding_info.video_frame_rate
         self._frame_count = video_file_input[0].encoding_info.video_frame_count
-        count = 0
-        # self._video_player.set_source(video_file_input[0].video_file)
+
         event.tag = "video_editor"
         event.value = video_file_input
         self._parent.event_handler(event)  # Processed in DVD Archiver!
-        return None
-        while count < 1:
-            Video_Cutter_Popup(
-                title="Video File Cutter/Settings",
-                video_file_input=video_file_input,  # list :  pass by reference, so that contents can be modified
-                output_folder=dvd_folder,
-                excluded_word_list=self.common_words,
-                background_task_manager=self._background_task_manager,
-            ).show()
-            count += 1
-
-        if (
-            len(video_file_input) == 1
-        ):  # Original, only user entered file title text might have changed
-            self._processed_trimmed(
-                file_grid,
-                video_file_input[0].vd_id,
-                video_file_input[0].video_path,
-                video_file_input[0].video_file_settings.button_title,
-            )
-        elif len(video_file_input) == 2:  # Original & one edited file (cut/assemble)
-            self._processed_trimmed(
-                file_grid,
-                video_file_input[0].vd_id,
-                video_file_input[1].video_path,
-                video_file_input[0].video_file_settings.button_title,
-            )
-        elif len(video_file_input) > 2:  # Original and multiple edited files
-            # TODO Make user configurable perhaps
-            self._delete_file_from_grid(file_grid, video_file_input[0].vd_id)
-
-            # Insert Assembled Children  Files
-            self._insert_files_into_grid(
-                [video_file_data for video_file_data in video_file_input[1:]],
-            )
 
         return None
 
@@ -255,7 +219,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                         title="Encoding Read Error...",
                         message=encoding_info.error,
                     ).show()
-                    return
+                    return None
+
                 if (
                     button_title
                     and user_data.video_file_settings.button_title != button_title
@@ -1168,8 +1133,6 @@ class Video_File_Grid(DVD_Archiver_Base):
             user_data=video_user_data,
             tooltip=(
                 f"{sys_consts.SDELIM}{video_user_data.video_path}{sys_consts.SDELIM}"
-                if self._display_filename
-                else ""
             ),
         )
 
@@ -1461,7 +1424,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             tag="control_container",
             text="DVD Input Files",
             align=qtg.Align.TOPRIGHT,
-            margin_left=9,            
+            margin_left=9,
         ).add_row(file_control_container, button_container)
 
         return control_container

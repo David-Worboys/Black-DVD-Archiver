@@ -750,7 +750,7 @@ def Transcode_H26x(
     interlaced: bool = True,
     bottom_field_first: bool = True,
     h265: bool = False,
-    high_quality = True
+    high_quality=True,
 ) -> tuple[int, str]:
     """Converts an input video to H.264/5 at supplied resolution and frame rate.
     The video is transcoded to a file in the output folder.
@@ -765,7 +765,7 @@ def Transcode_H26x(
         bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
         h265 (bool, optional): Whether to use H.265. Defaults to False.
         high_quality (bool, optional): Use a high quality encode. Defaults to True.
-    
+
     Returns:
         tuple[int, str]:
             arg 1: 1 if ok, -1 if error
@@ -794,7 +794,7 @@ def Transcode_H26x(
 
     output_file = file_handler.file_join(output_folder, f"{input_file_name}_edit.mp4")
 
-    # Construct the FFmpeg command    
+    # Construct the FFmpeg command
     if h265:
         encoder = "libx265"
     else:
@@ -822,7 +822,7 @@ def Transcode_H26x(
     command = [
         sys_consts.FFMPG,
         "-i",
-        input_file,        
+        input_file,
         *video_filter,
         "-r",
         str(frame_rate),

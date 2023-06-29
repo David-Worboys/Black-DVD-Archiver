@@ -543,9 +543,9 @@ class DVD_Archiver(DVD_Archiver_Base):
             isinstance(video_file, Video_Data) for video_file in video_file_input
         ), f"{video_file_input=}. Must be list of Video_Data"
 
-        # pprint.pprint(video_file_input)
-
-        self._file_control.process_edited_video_files(video_file_input=video_file_input)
+        # Note when changing tabpages I call process_edited_video_files and that makes this call
+        # redundant - worse it would fire twice!. TODO Consider This Unintended Conseqence!
+        # self._file_control.process_edited_video_files(video_file_input=video_file_input)
         self._control_tab.select_tab(tag_name="control_tab")
         self._control_tab.enable_set(tag="video_editor_tab", enable=False)
 
@@ -663,7 +663,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         main_control_container = qtg.VBoxContainer(
             tag="control_buttons",
             align=qtg.Align.TOPLEFT,
-            width=60,  # text="DVD Options"            
+            width=60,  # text="DVD Options"
         ).add_row(
             dvd_properties,
             qtg.Spacer(),

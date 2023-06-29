@@ -320,9 +320,9 @@ class Video_Editor(DVD_Archiver_Base):
             )
 
         if self._menu_frame.modified:
-            self._video_file_input[0].video_file_settings.menu_button_frame = (
-                int(self._menu_frame.value_get())
-            )    
+            self._video_file_input[0].video_file_settings.menu_button_frame = int(
+                self._menu_frame.value_get()
+            )
 
         self._video_file_input[0].video_file_settings.normalise = (
             self._video_filter_container.widget_get(
@@ -369,7 +369,9 @@ class Video_Editor(DVD_Archiver_Base):
         self._menu_title.value_set(dvd_menu_title)
 
         if self._video_file_input[0].video_file_settings.menu_button_frame >= 0:
-            self._menu_frame.value_set(str(self._video_file_input[0].video_file_settings.menu_button_frame))
+            self._menu_frame.value_set(
+                str(self._video_file_input[0].video_file_settings.menu_button_frame)
+            )
 
         self._video_filter_container.widget_get(
             container_tag="video_filters",
@@ -666,6 +668,17 @@ class Video_Editor(DVD_Archiver_Base):
 
         # ===== Helper
         def notification_call_back(status: int, message: str, output: str, name):
+            """
+            The notification_call_back function is called by the task_submit function.
+            It's purpose is to update the progress bar and check for processing errors.
+
+            Args:
+                status: int: Determine if the task was successful or not
+                message: str: Pass a message to the user
+                output: str: Return the output of the task
+                name: Identify the task that has completed
+
+            """
             if status == -1:
                 self._task_status = status
                 self._task_message = message
@@ -926,8 +939,6 @@ class Video_Editor(DVD_Archiver_Base):
         """
         Deletes the specified segments from the input file.
 
-        Note: Pop_Container set_result is called here and not in the _process_ok method
-
         Args:
             event (qtg.Action): The event that triggered this method.
 
@@ -966,7 +977,7 @@ class Video_Editor(DVD_Archiver_Base):
                     dvd_menu_title = filename
 
                 output_file = file_handler.file_join(
-                    self._edit_folder, f"{dvd_menu_title}", extension
+                    self._edit_folder, f"{dvd_menu_title}_cut", extension
                 )
 
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
@@ -1156,15 +1167,27 @@ class Video_Editor(DVD_Archiver_Base):
         Converts the current position in milliseconds to the corresponding frame number,
         updates the video slider if necessary, and emits a signal indicating that the position has changed.
         Args:
-            frame (int): The currentmedia player frame.
+            frame (int): The current-media player frame.
         """
         self._sliding = True
 
         if self._sliding and self._video_slider is not None:
             self._video_slider.value_set(frame)
-        self._frame_display.value_set(frame)    
+        self._frame_display.value_set(frame)
 
     def _seek(self, frame: int) -> None:
+        """
+        The _seek function seeks to that frame in the video handler.
+
+        Args:
+            frame: int: Set the current frame to a specific value
+
+        Returns:
+            None
+
+        Doc Author:
+            Trelent
+        """
         self._current_frame = frame
         self._video_handler.seek(frame)
 
@@ -1343,14 +1366,13 @@ class Video_Editor(DVD_Archiver_Base):
                 "300s": int(self._frame_rate * 300),
             }
             self._step_value = step_values[value.data]
-            print(f"DBG {self._step_value=} {value=}")
 
     def _video_file_system_maker(self) -> int:
         """
         Create the necessary folders for video processing, and checks if the input file exists.
 
         Returns:
-            int : 1 OK, -1 error occured
+            int : 1 OK, -1 error occurred
 
 
         Side effects:
@@ -1358,8 +1380,6 @@ class Video_Editor(DVD_Archiver_Base):
 
         """
         file_handler = file_utils.File()
-
-        print(f"DBG {self._output_folder=} {self._edit_folder=}")
 
         if not file_handler.path_exists(self._output_folder):
             file_handler.make_dir(self._output_folder)
@@ -1439,6 +1459,15 @@ class Video_Editor(DVD_Archiver_Base):
 
     def layout(self) -> qtg.VBoxContainer:
         def assemble_video_cutter_container() -> qtg.VBoxContainer:
+            """
+            The function assembles the video cutter container.
+
+            Args:
+
+            Returns:
+                qtg.VBoxContainer : A vboxcontainer housing the video cutter
+
+            """
             step_unit_list = [
                 qtg.Combo_Item(
                     display="Frame", data="frame", icon=None, user_data=None
@@ -1466,22 +1495,22 @@ class Video_Editor(DVD_Archiver_Base):
             )
 
             self._menu_frame = qtg.LineEdit(
-                        tag="menu_frame",
-                        width=6,
-                        height=1,
-                        char_length=6,
-                        callback=self.event_handler,
-                        editable=False,
-                        buddy_control=qtg.Button(
-                            tag="clear_menu_frame",
-                            height=1,
-                            width=1,
-                            callback=self.event_handler,
-                            icon=file_utils.App_Path("x.svg"),
-                            tooltip="Clear The DVD Menu Button Image",
-                        ),
-                    )
-            
+                tag="menu_frame",
+                width=6,
+                height=1,
+                char_length=6,
+                callback=self.event_handler,
+                editable=False,
+                buddy_control=qtg.Button(
+                    tag="clear_menu_frame",
+                    height=1,
+                    width=1,
+                    callback=self.event_handler,
+                    icon=file_utils.App_Path("x.svg"),
+                    tooltip="Clear The DVD Menu Button Image",
+                ),
+            )
+
             self._frame_display = qtg.LCD(
                 tag="frame_display",
                 label="Frame",
@@ -1563,7 +1592,7 @@ class Video_Editor(DVD_Archiver_Base):
                         height=1,
                         width=2,
                     ),
-                    self._menu_frame,                                        
+                    self._menu_frame,
                 )
             )
 
@@ -1592,7 +1621,7 @@ class Video_Editor(DVD_Archiver_Base):
         def assemble_edit_list_container() -> qtg.VBoxContainer:
             """
             Create a VBoxContainer containing the editing list.
-            TODO : Pull into its own class
+
             Returns:
                 qtg.FormContainer: A form container that houses the edit list.
             """
