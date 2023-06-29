@@ -19,7 +19,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from time import sleep
+import pprint
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
@@ -35,21 +35,23 @@ import sqldb
 import sys_consts
 from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
-from configuration_classes import DVD_Menu_Settings, File_Def, Video_Data
+from configuration_classes import (DVD_Archiver_Base, DVD_Menu_Settings,
+                                   File_Def, Get_DVD_Build_Folder, Video_Data)
 from dvd import DVD, DVD_Config
 from dvdarch_popups import Menu_Page_Title_Popup
+from video_cutter import Video_Editor
 from video_file_grid import Video_File_Grid
 
 # fmt: on
 
 
-class DVD_Archiver:
+class DVD_Archiver(DVD_Archiver_Base):
     """
     Class for archiving DVDs.
 
     """
 
-    def __init__(self, background_task_manager: Task_Manager) -> None:
+    def __init__(self, program_name) -> None:
         """
         Sets up the instance of the class, and initializes all its attributes.
 
@@ -58,30 +60,27 @@ class DVD_Archiver:
 
 
         """
+        super().__init__()
+
         self._DVD_Arch_App = qtg.QtPyApp(
             display_name=sys_consts.PROGRAM_NAME,
             callback=self.event_handler,
-            height=600,
+            height=900,
             icon=file_utils.App_Path("gitlogo.jpg"),
-            width=800,
+            width=1200,
         )
 
         self._startup = True
         self._shutdown = False
+        self._control_tab: qtg.Tab | None = None
 
         self._data_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
-        self._background_task_manager = Task_Manager()
-        self._background_task_manager.start()
-
-        self._file_control = Video_File_Grid(
-            background_task_manager=self._background_task_manager
-        )
+        self._file_control = Video_File_Grid(parent=self)
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
 
         # A problem in the next 3 lines can shut down startup as database initialization failed
         if self._db_settings.error_code == -1:
-            self._background_task_manager.stop()
             raise RuntimeError(
                 f"Failed To Start {sys_consts.PROGRAM_NAME} -"
                 f" {self._db_settings.error_message}"
@@ -99,6 +98,7 @@ class DVD_Archiver:
         self._default_font = sys_consts.DEFAULT_FONT
 
         self._dvd = DVD()  # Needs DB config to be completed before calling this
+        self._video_editor: Video_Editor | None = None
 
     def db_init(self) -> sqldb.SQLDB:
         """
@@ -207,7 +207,7 @@ class DVD_Archiver:
             case qtg.Sys_Events.APPINIT:
                 pass
             case qtg.Sys_Events.APPEXIT | qtg.Sys_Events.APPCLOSED:
-                if not self._shutdown:
+                if not self._shutdown:  # Prevent getting called twice
                     self._shutdown = True
                     if (
                         popups.PopYesNo(
@@ -219,22 +219,11 @@ class DVD_Archiver:
                         ).show()
                         == "yes"
                     ):
-                        if self._background_task_manager.list_running_tasks():
-                            if (
-                                popups.PopYesNo(
-                                    title="Background Tasks Running...",
-                                    message="Kill Background Tasks And Exit?",
-                                ).show()
-                                == "yes"
-                            ):
-                                self._background_task_manager.stop()
-                                return 1
-                            else:
-                                self._shutdown = False
-                                return -1
-
-                        self._background_task_manager.stop()
-                        return 1
+                        if self._video_editor.shutdown() == 1:
+                            return 1
+                        else:
+                            self._shutdown = False
+                            return -1
                     else:
                         self._shutdown = False
                         return -1
@@ -251,6 +240,26 @@ class DVD_Archiver:
                         self._DVD_Arch_App.app_exit()
                     case "make_dvd":
                         self._make_dvd(event)
+                    case "video_editor":  # Signal from file_grid
+                        dvd_folder = Get_DVD_Build_Folder()
+
+                        if dvd_folder.strip() != "":
+                            video_data: list[Video_Data] = event.value
+                            self._video_editor.set_source(
+                                video_file_input=video_data, output_folder=dvd_folder
+                            )
+                            self._control_tab.select_tab(tag_name="video_editor_tab")
+                            self._control_tab.enable_set(
+                                tag="video_editor_tab", enable=True
+                            )
+
+            case qtg.Sys_Events.CHANGED:
+                match event.tag:
+                    case "control_tab":
+                        if self._video_editor.video_file_input:
+                            self._file_control.process_edited_video_files(
+                                video_file_input=self._video_editor.video_file_input
+                            )
 
     def _archive_folder_select(self, event) -> None:
         """Select an archive folder and updates the settings in the database with the selected folder.
@@ -528,6 +537,18 @@ class DVD_Archiver:
                 return -1, message
         return 1, ""
 
+    def _processed_files_handler(self, video_file_input: list[Video_Data]):
+        assert isinstance(video_file_input, list), f"{video_file_input=}. Must be list"
+        assert all(
+            isinstance(video_file, Video_Data) for video_file in video_file_input
+        ), f"{video_file_input=}. Must be list of Video_Data"
+
+        # pprint.pprint(video_file_input)
+
+        self._file_control.process_edited_video_files(video_file_input=video_file_input)
+        self._control_tab.select_tab(tag_name="control_tab")
+        self._control_tab.enable_set(tag="video_editor_tab", enable=False)
+
     def layout(self) -> qtg.VBoxContainer:
         """Returns the Black DVD Archiver application ui layout
 
@@ -642,18 +663,32 @@ class DVD_Archiver:
         main_control_container = qtg.VBoxContainer(
             tag="control_buttons",
             align=qtg.Align.TOPLEFT,
-            width=60,  # text="DVD Options"
+            width=60,  # text="DVD Options"            
         ).add_row(
             dvd_properties,
             qtg.Spacer(),
             self._file_control.layout(),
         )
 
-        buttons_container = qtg.HBoxContainer(margin_right=9).add_row(
+        self._video_editor = Video_Editor(
+            processed_files_callback=self._processed_files_handler
+        )
+        self._control_tab = qtg.Tab(height=47, width=142, callback=self.event_handler)
+        self._control_tab.page_add(
+            tag="control_tab", title="Files", control=main_control_container
+        )
+        self._control_tab.page_add(
+            tag="video_editor_tab",
+            title="Video Editor",
+            control=self._video_editor.layout(),
+            enabled=False,
+        )
+
+        buttons_container = qtg.HBoxContainer(margin_right=0).add_row(
             qtg.Button(
                 tag="make_dvd", text="Make DVD", callback=self.event_handler, width=13
             ),
-            qtg.Spacer(width=98),
+            qtg.Spacer(width=117),
             qtg.Button(
                 tag="exit_app", text="Exit", callback=self.event_handler, width=9
             ),
@@ -662,7 +697,7 @@ class DVD_Archiver:
         screen_container = qtg.VBoxContainer(
             tag="main",
             align=qtg.Align.RIGHT,  # width=80
-        ).add_row(main_control_container, buttons_container)
+        ).add_row(self._control_tab, buttons_container)
 
         return screen_container
 

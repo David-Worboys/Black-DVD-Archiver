@@ -31,25 +31,28 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
-from background_task_manager import Task_Manager
-from configuration_classes import Video_Data
+from configuration_classes import (DVD_Archiver_Base, Get_DVD_Build_Folder,
+                                   Video_Data)
 from dvd_menu_configuration import DVD_Menu_Config_Popup
-from video_cutter import Video_Cutter_Popup
 from video_file_picker import Video_File_Picker_Popup
 
 # fmt: on
 
 
-class Video_File_Grid:
+class Video_File_Grid(DVD_Archiver_Base):
     """This class implements the file handling of the Black DVD Archiver ui"""
 
-    def __init__(self, background_task_manager: Task_Manager) -> None:
+    def __init__(self, parent: DVD_Archiver_Base) -> None:
         """Initializes the instance for use"""
         assert isinstance(
-            background_task_manager, Task_Manager
-        ), f"{background_task_manager=}. Must be an instance of Task_Manager"
+            parent, DVD_Archiver_Base
+        ), f"{parent=}. Must be an instance of DVD_Archiver_Base"
 
-        self._background_task_manager = background_task_manager
+        super().__init__()
+
+        self._file_grid: qtg.Grid | None = None
+
+        self._parent = parent
         file_handler = file_utils.File()
 
         self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
@@ -66,25 +69,6 @@ class Video_File_Grid:
             self._db_path, sys_consts.VIDEO_GRID_DB, "db"
         )
 
-    @property
-    def _get_dvd_build_folder(self) -> str:
-        """Gets the DVD build folder
-
-        Returns:
-            str: The DVD build folder
-        """
-        dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
-
-        if dvd_folder is None or dvd_folder.strip() == "":
-            popups.PopError(
-                title="DVD Build Folder Error...",
-                message=(
-                    "A DVD Build Folder Must Be Entered Before Making A Video Edit!"
-                ),
-            ).show()
-            return ""
-        return dvd_folder
-
     def grid_events(self, event: qtg.Action) -> None:
         """Process Grid Events
         Args:
@@ -100,6 +84,40 @@ class Video_File_Grid:
             elif event.value.row >= 0 and event.value.col >= 0:
                 self._set_project_standard_duration(event)
 
+    def process_edited_video_files(self, video_file_input: list[Video_Data]) -> None:
+        """
+        Called in DVD Archiver
+        """
+        assert isinstance(video_file_input, list), f"{video_file_input=}. Must be list"
+        assert all(
+            isinstance(video_file, Video_Data) for video_file in video_file_input
+        ), f"{video_file_input=}. Must be list of Video_Data"
+
+        if (
+            len(video_file_input) == 1
+        ):  # Original, only user entered file title text might have changed
+            self._processed_trimmed(
+                self._file_grid,
+                video_file_input[0].vd_id,
+                video_file_input[0].video_path,
+                video_file_input[0].video_file_settings.button_title,
+            )
+        elif len(video_file_input) == 2:  # Original & one edited file (cut/assemble)
+            self._processed_trimmed(
+                self._file_grid,
+                video_file_input[0].vd_id,
+                video_file_input[1].video_path,
+                video_file_input[0].video_file_settings.button_title,
+            )
+        elif len(video_file_input) > 2:  # Original and multiple edited files
+            # TODO Make user configurable perhaps
+            self._delete_file_from_grid(self._file_grid, video_file_input[0].vd_id)
+
+            # Insert Assembled Children  Files
+            self._insert_files_into_grid(
+                [video_file_data for video_file_data in video_file_input[1:]],
+            )
+
     def _edit_video(self, event: qtg.Action) -> None:
         """
         Edits a video file.
@@ -111,7 +129,7 @@ class Video_File_Grid:
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        dvd_folder = self._get_dvd_build_folder
+        dvd_folder = Get_DVD_Build_Folder()
 
         if not dvd_folder:
             return None
@@ -130,13 +148,26 @@ class Video_File_Grid:
         )
         video_file_input: list[Video_Data] = [user_data]
 
-        Video_Cutter_Popup(
-            title="Video File Cutter/Settings",
-            video_file_input=video_file_input,  # list :  pass by reference, so that contents can be modified
-            output_folder=dvd_folder,
-            excluded_word_list=self.common_words,
-            background_task_manager=self._background_task_manager,
-        ).show()
+        self._aspect_ratio = video_file_input[0].encoding_info.video_ar
+        self._frame_width = video_file_input[0].encoding_info.video_width
+        self._frame_height = video_file_input[0].encoding_info.video_height
+        self._frame_rate = video_file_input[0].encoding_info.video_frame_rate
+        self._frame_count = video_file_input[0].encoding_info.video_frame_count
+        count = 0
+        # self._video_player.set_source(video_file_input[0].video_file)
+        event.tag = "video_editor"
+        event.value = video_file_input
+        self._parent.event_handler(event)  # Processed in DVD Archiver!
+        return None
+        while count < 1:
+            Video_Cutter_Popup(
+                title="Video File Cutter/Settings",
+                video_file_input=video_file_input,  # list :  pass by reference, so that contents can be modified
+                output_folder=dvd_folder,
+                excluded_word_list=self.common_words,
+                background_task_manager=self._background_task_manager,
+            ).show()
+            count += 1
 
         if (
             len(video_file_input) == 1
@@ -160,7 +191,6 @@ class Video_File_Grid:
 
             # Insert Assembled Children  Files
             self._insert_files_into_grid(
-                event,
                 [video_file_data for video_file_data in video_file_input[1:]],
             )
 
@@ -303,18 +333,9 @@ class Video_File_Grid:
                     case "move_video_file_up":
                         self._move_video_file(event=event, up=True)
                     case "select_files":
-                        folder = self._db_settings.setting_get(
-                            sys_consts.DVD_BUILD_FOLDER
-                        )
+                        dvd_folder = Get_DVD_Build_Folder()
 
-                        if folder is None or folder.strip() == "":
-                            popups.PopError(
-                                title="DVD Build Folder Error...",
-                                message=(
-                                    "A DVD Build Folder Must Be Entered Before Video"
-                                    " Folders Are Selected!"
-                                ),
-                            ).show()
+                        if dvd_folder is None or dvd_folder.strip() == "":
                             return None
 
                         self.load_video_input_files(event)
@@ -350,7 +371,7 @@ class Video_File_Grid:
         )
 
         file_handler = file_utils.File()
-        dvd_folder = self._get_dvd_build_folder
+        dvd_folder = Get_DVD_Build_Folder()
 
         if not dvd_folder:
             return None
@@ -966,7 +987,7 @@ class Video_File_Grid:
             )
 
             with qtg.sys_cursor(qtg.Cursor.hourglass):
-                rejected = self._insert_files_into_grid(event, video_file_list)
+                rejected = self._insert_files_into_grid(video_file_list)
 
             if file_grid.row_count > 0:
                 # First file sets project encoding standard - Project files in toto Can be PAL or NTSC not both
@@ -1010,21 +1031,16 @@ class Video_File_Grid:
 
     def _insert_files_into_grid(
         self,
-        event: qtg.Action,
         selected_files: list[Video_Data],
     ) -> str:
         """
         Inserts files into the file grid widget.
 
         Args:
-            event (qrg.Action) : Triggering event
             selected_files (list[Video_Data]): list of video file data
         Returns:
             str: A string containing information about any rejected files.
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
         assert isinstance(
             selected_files, list
         ), f"{selected_files=}.  Must be a list of Video_Data objects"
@@ -1032,21 +1048,15 @@ class Video_File_Grid:
             isinstance(item, Video_Data) for item in selected_files
         ), f"{selected_files=}.  Must be a list of Video_Data objects"
 
-        file_handler: file_utils.File
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
-        )
-
         rejected = ""
-        rows_loaded = file_grid.row_count
+        rows_loaded = self._file_grid.row_count
         row_index = 0
 
         for file_video_data in selected_files:
             # Check if file already loaded in grid
-            for check_row_index in range(file_grid.row_count):
-                grid_video_data: Video_Data = file_grid.userdata_get(
-                    row=check_row_index, col=file_grid.colindex_get("video_file")
+            for check_row_index in range(self._file_grid.row_count):
+                grid_video_data: Video_Data = self._file_grid.userdata_get(
+                    row=check_row_index, col=self._file_grid.colindex_get("video_file")
                 )
 
                 if grid_video_data.video_path == file_video_data.video_path:
@@ -1081,15 +1091,15 @@ class Video_File_Grid:
                 ).split(".")[0]
 
                 self._populate_grid_row(
-                    file_grid=file_grid,
+                    file_grid=self._file_grid,
                     row_index=rows_loaded + row_index,
                     video_user_data=file_video_data,
                     duration=duration,
                 )
 
-                file_grid.row_widget_set(
+                self._file_grid.row_widget_set(
                     row=rows_loaded + row_index,
-                    col=file_grid.colindex_get("settings"),
+                    col=self._file_grid.colindex_get("settings"),
                     widget=toolbox,
                 )
 
@@ -1385,7 +1395,7 @@ class Video_File_Grid:
             qtg.Col_Def(
                 label="Video File",
                 tag="video_file",
-                width=64,
+                width=70,
                 editable=False,
                 checkable=True,
             ),
@@ -1426,7 +1436,15 @@ class Video_File_Grid:
             ),
         )
         file_control_container = qtg.VBoxContainer(
-            tag="video_file_controls", align=qtg.Align.TOPLEFT, margin_right=20
+            tag="video_file_controls", align=qtg.Align.TOPLEFT, margin_right=0
+        )
+
+        self._file_grid = qtg.Grid(
+            tag="video_input_files",
+            noselection=True,
+            height=18,
+            col_def=file_col_def,
+            callback=self.grid_events,
         )
 
         file_control_container.add_row(
@@ -1436,20 +1454,14 @@ class Video_File_Grid:
                 callback=self.event_handler,
                 width=11,
             ),
-            qtg.Grid(
-                tag="video_input_files",
-                noselection=True,
-                height=10,
-                col_def=file_col_def,
-                callback=self.grid_events,
-            ),
+            self._file_grid,
         )
 
         control_container = qtg.VBoxContainer(
             tag="control_container",
             text="DVD Input Files",
             align=qtg.Align.TOPRIGHT,
-            margin_left=9,
+            margin_left=9,            
         ).add_row(file_control_container, button_container)
 
         return control_container

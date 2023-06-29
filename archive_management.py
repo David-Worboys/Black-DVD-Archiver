@@ -370,7 +370,6 @@ class Archive_Manager:
                     edit_cuts = ()
                     break
                 edit_cuts.append(tuple(edit_point))
-
         return tuple(edit_cuts)
 
     def write_edit_cuts(

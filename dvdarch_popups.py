@@ -87,7 +87,24 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                     case "button_title_grid":
                         if hasattr(event.value, "grid"):
                             self._current_button_grid: qtg.Grid = event.value.grid
+                    case "move_menu_up":
+                        menu_grid: qtg.Grid = event.widget_get(
+                            container_tag="menu_page_controls", tag="menu_titles"
+                        )
 
+                        new_row = menu_grid.move_row_up(menu_grid.selected_row)
+
+                        if new_row >= 0:
+                            menu_grid.select_row(new_row)
+                    case "move_menu_down":
+                        menu_grid: qtg.Grid = event.widget_get(
+                            container_tag="menu_page_controls", tag="menu_titles"
+                        )
+
+                        new_row = menu_grid.move_row_down(menu_grid.selected_row)
+
+                        if new_row >= 0:
+                            menu_grid.select_row(new_row)
                     case "move_button_title_down":
                         if self._current_button_grid is not None:
                             self._move_button_title(
@@ -427,8 +444,25 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         control_container.add_row(
             menu_page_control_container,
-            qtg.Command_Button_Container(
-                ok_callback=self.event_handler, cancel_callback=self.event_handler
+            qtg.HBoxContainer(tag="menu_move", margin_right=5).add_row(
+                qtg.Button(
+                    icon=file_utils.App_Path("arrow-up.svg"),
+                    tag="move_menu_up",
+                    callback=self.event_handler,
+                    tooltip="Move This Menu Up!",
+                    width=2,
+                ),
+                qtg.Button(
+                    icon=file_utils.App_Path("arrow-down.svg"),
+                    tag="move_menu_down",
+                    callback=self.event_handler,
+                    tooltip="Move This Menu Down!",
+                    width=2,
+                ),
+                qtg.Spacer(width=45),
+                qtg.Command_Button_Container(
+                    ok_callback=self.event_handler, cancel_callback=self.event_handler
+                ),
             ),
         )
 

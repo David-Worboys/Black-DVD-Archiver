@@ -741,6 +741,114 @@ def overlay_text(
     return execute_check_output(commands=command)
 
 
+def Transcode_H26x(
+    input_file: str,
+    output_folder: str,
+    frame_rate: float,
+    width: int,
+    height: int,
+    interlaced: bool = True,
+    bottom_field_first: bool = True,
+    h265: bool = False,
+    high_quality = True
+) -> tuple[int, str]:
+    """Converts an input video to H.264/5 at supplied resolution and frame rate.
+    The video is transcoded to a file in the output folder.
+
+    Args:
+        input_file (str): The path to the input video file.
+        output_folder (str): The path to the output folder.
+        frame_rate (float): The frame rate to use for the output video.
+        width (int) : The width of the video
+        height (int) : The height of the cideo
+        interlaced (bool, optional): Whether to use interlaced video. Defaults to True.
+        bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
+        h265 (bool, optional): Whether to use H.265. Defaults to False.
+        high_quality (bool, optional): Use a high quality encode. Defaults to True.
+    
+    Returns:
+        tuple[int, str]:
+            arg 1: 1 if ok, -1 if error
+            arg 2: error message if error else ""
+    """
+    assert (
+        isinstance(input_file, str) and input_file.strip() != ""
+    ), f"{input_file=}. Must be a non-empty str"
+
+    assert (
+        isinstance(output_folder, str) and output_folder.strip() != ""
+    ), f"{output_folder=}. Must be a non-empty str"
+
+    file_handler = file_utils.File()
+
+    if not file_handler.path_exists(output_folder):
+        return -1, f"{output_folder} Does not exist"
+
+    if not file_handler.path_writeable(output_folder):
+        return -1, f"{output_folder} Cannot Be Written To"
+
+    if not file_handler.file_exists(input_file):
+        return -1, f"File Does Not Exist {input_file}"
+
+    _, input_file_name, input_file_extn = file_handler.split_file_path(input_file)
+
+    output_file = file_handler.file_join(output_folder, f"{input_file_name}_edit.mp4")
+
+    # Construct the FFmpeg command    
+    if h265:
+        encoder = "libx265"
+    else:
+        encoder = "libx264"
+
+    if high_quality:
+        quality_preset = "slow"
+    else:
+        quality_preset = "superfast"
+
+    video_filter = [
+        "-vf",
+        f"scale={width}x{height}",
+    ]
+
+    if interlaced:
+        video_filter = video_filter + [
+            f"fieldorder={'bff' if bottom_field_first else 'tff' }",
+            "-flags:v:0",  # video flags for the first video stream
+            "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
+            "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
+            "1",  # alternate scan value is 1
+        ]
+
+    command = [
+        sys_consts.FFMPG,
+        "-i",
+        input_file,        
+        *video_filter,
+        "-r",
+        str(frame_rate),
+        "-c:v",
+        encoder,
+        "-crf",
+        "18",
+        "-preset",
+        quality_preset,
+        "-c:a",
+        "pcm_s16le",
+        "-threads",
+        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        "-y",
+        output_file,
+    ]
+
+    if not file_handler.file_exists(output_file):
+        result, message = execute_check_output(commands=command, debug=False)
+
+        if result == -1:
+            return -1, message
+
+    return 1, output_file
+
+
 def write_text_on_file(
     input_file: str, text: str, x: int, y: int, font: str, pointsize: int, color: str
 ) -> tuple[int, str]:
