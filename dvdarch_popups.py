@@ -358,6 +358,8 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             tag="menu_titles",
         )
 
+        deactivate_switch: qtg.Switch = event.widget_get(container_tag="menu_move" , tag="deactivate_filters")
+
         menu_title_col_index = menu_title_grid.colindex_get("menu_title")
         video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
         result = ""
@@ -377,11 +379,17 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             for row in range(row_grid.row_count):
                 button_title = row_grid.value_get(row=row, col=0)
                 video_data = row_grid.userdata_get(row=row, col=0)
+
                 if (
                     video_data.video_file_settings.button_title.strip()
                     != button_title.strip()
                 ):
                     video_data.video_file_settings.button_title = button_title
+
+                video_data.video_file_settings.deactivate_filters = False
+                if deactivate_switch.value_get():
+                    video_data.video_file_settings.deactivate_filters = True
+
                 menu_items.append(video_data)
 
             self.menu_layout.append((menu_title, menu_items.copy()))
@@ -445,21 +453,25 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         control_container.add_row(
             menu_page_control_container,
             qtg.HBoxContainer(tag="menu_move", margin_right=5).add_row(
-                qtg.Button(
-                    icon=file_utils.App_Path("arrow-up.svg"),
-                    tag="move_menu_up",
-                    callback=self.event_handler,
-                    tooltip="Move This Menu Up!",
-                    width=2,
+                qtg.HBoxContainer().add_row(
+                    qtg.Button(
+                        icon=file_utils.App_Path("arrow-up.svg"),
+                        tag="move_menu_up",
+                        callback=self.event_handler,
+                        tooltip="Move This Menu Up!",
+                        width=2,
+                    ),
+                    qtg.Button(
+                        icon=file_utils.App_Path("arrow-down.svg"),
+                        tag="move_menu_down",
+                        callback=self.event_handler,
+                        tooltip="Move This Menu Down!",
+                        width=2,
+                    ),
+                    qtg.Spacer(width=2),
+                    qtg.Switch(tag="deactivate_filters",buddy_control=qtg.Label(tag="switch_label",text="Deactivate Filters",width=20 )),
+                    qtg.Spacer(width=13),
                 ),
-                qtg.Button(
-                    icon=file_utils.App_Path("arrow-down.svg"),
-                    tag="move_menu_down",
-                    callback=self.event_handler,
-                    tooltip="Move This Menu Down!",
-                    width=2,
-                ),
-                qtg.Spacer(width=45),
                 qtg.Command_Button_Container(
                     ok_callback=self.event_handler, cancel_callback=self.event_handler
                 ),

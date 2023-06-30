@@ -680,9 +680,6 @@ class DVD:
             - arg2: error message or "" if ok
         """
         file_handler = file_utils.File()
-        video_filters = []
-        video_width = 0
-        video_height = 0
 
         # Black Video Choices
         average_bit_rate = sys_consts.AVERAGE_BITRATE
@@ -734,7 +731,6 @@ class DVD:
 
             if video_file.video_file_settings.filters_off:
                 video_filter_options = [
-                    "-vf",  # set video filters,
                     f" {black_box_filter}",  # video filters applied
                 ]
             else:
@@ -757,7 +753,7 @@ class DVD:
 
                 video_filter_options.append(black_box_filter)
 
-                video_filters = ["-vf", ",".join(video_filter_options)]
+            video_filters = ["-vf", ",".join(video_filter_options)]
 
             video_width = video_file.encoding_info.video_width
             video_height = video_file.encoding_info.video_height

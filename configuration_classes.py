@@ -834,6 +834,7 @@ class Encoding_Details:
 class Video_File_Settings:
     """Class to hold video file settings for each file comprising the DVD menu buttons"""
 
+    _deactivate_filters: bool = False
     _normalise: bool = True
     _denoise: bool = True
     _white_balance: bool = True
@@ -845,6 +846,10 @@ class Video_File_Settings:
 
     def __post_init__(self) -> None:
         """Post init to check the file settings are valid"""
+
+        assert isinstance(
+            self._deactivate_filters, bool
+        ), f"{self._deactivate_filters=}. Must be a bool"
         assert isinstance(self._normalise, bool), f"{self._normalise=}. Must be a bool"
         assert isinstance(self._denoise, bool), f"{self._denoise=}. Must be a bool"
         assert isinstance(
@@ -867,6 +872,32 @@ class Video_File_Settings:
         ), f"{self._menu_group=}. Must be int >= 0 or == -1"
 
     @property
+    def deactivate_filters(self) -> bool:
+        """
+        The deactivate_filters method overrides  the individual filter settings.
+
+        Args:
+
+        Returns:
+            bool : True if deactivating all filters, otherwise False
+
+        """
+        return self._deactivate_filters
+
+    @deactivate_filters.setter
+    def deactivate_filters(self, value: bool) -> None:
+        """
+        The deactivate_filters method overrides  the individual filter settings..
+
+        Args:
+            value (bool): True to deactivate all filters via override
+
+        """
+        assert isinstance(value, bool), f"{value=}. Must be a bool"
+
+        self._deactivate_filters = value
+
+    @property
     def filters_off(self) -> bool:
         """
         The filters_off method returns True if all the filter settings are off.
@@ -877,16 +908,19 @@ class Video_File_Settings:
             bool : True if all the filter settings are off otherwise False
 
         """
-        return not any(
-            value
-            for value in [
-                self._normalise,
-                self._denoise,
-                self._white_balance,
-                self._sharpen,
-                self._auto_bright,
-            ]
-        )
+        if self.deactivate_filters:
+            return True
+        else:
+            return not any(
+                value
+                for value in [
+                    self._normalise,
+                    self._denoise,
+                    self._white_balance,
+                    self._sharpen,
+                    self._auto_bright,
+                ]
+            )
 
     @property
     def normalise(self) -> bool:

@@ -1,5 +1,5 @@
 """
-    DVD archiver specic utility functions.
+    DVD archiver specific utility functions.
 
     Copyright (C) 2022  David Worboys (-:alumnus Moyhu Primary School et al.:-)
 

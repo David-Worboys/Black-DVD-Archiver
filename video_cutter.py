@@ -269,6 +269,7 @@ class Video_Editor(DVD_Archiver_Base):
             self.processed_files_callback(self._video_file_input)
 
         self._edit_list_grid.clear()
+        self._menu_frame.value_set("")
 
         self._video_file_input = video_file_input
 
