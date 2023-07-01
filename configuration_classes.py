@@ -835,11 +835,12 @@ class Video_File_Settings:
     """Class to hold video file settings for each file comprising the DVD menu buttons"""
 
     _deactivate_filters: bool = False
-    _normalise: bool = True
-    _denoise: bool = True
-    _white_balance: bool = True
-    _sharpen: bool = True
-    _auto_bright: bool = True
+
+    _normalise: bool = False
+    _denoise: bool = False
+    _white_balance: bool = False
+    _sharpen: bool = False
+    _auto_bright: bool = False
     _button_title: str = ""
     _menu_button_frame: int = -1
     _menu_group: int = -1

@@ -358,7 +358,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             tag="menu_titles",
         )
 
-        deactivate_switch: qtg.Switch = event.widget_get(container_tag="menu_move" , tag="deactivate_filters")
+        deactivate_switch: qtg.Switch = event.widget_get(
+            container_tag="menu_move", tag="deactivate_filters"
+        )
 
         menu_title_col_index = menu_title_grid.colindex_get("menu_title")
         video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
@@ -469,7 +471,12 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                         width=2,
                     ),
                     qtg.Spacer(width=2),
-                    qtg.Switch(tag="deactivate_filters",buddy_control=qtg.Label(tag="switch_label",text="Deactivate Filters",width=20 )),
+                    qtg.Switch(
+                        tag="deactivate_filters",
+                        buddy_control=qtg.Label(
+                            tag="switch_label", text="Deactivate Filters", width=20
+                        ),
+                    ),
                     qtg.Spacer(width=13),
                 ),
                 qtg.Command_Button_Container(

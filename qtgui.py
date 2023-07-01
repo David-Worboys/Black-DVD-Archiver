@@ -29,6 +29,7 @@ import math
 import os
 import pathlib
 import platform
+import pprint
 import random
 import re
 import string
@@ -6704,9 +6705,26 @@ class Checkbox(_qtpyBase_Control):
             raise RuntimeError(f"{self._widget=}. Not set")
 
         assert isinstance(value, bool), f"{value=}. Must be bool"
+        import inspect
 
         self._widget: qtW.QCheckBox
-        self._widget.setChecked(value)
+        self._widget.setCheckState(
+            qtC.Qt.CheckState.Checked if value else qtC.Qt.CheckState.Unchecked
+        )
+
+    def value_set(self, value: bool = True):
+        """Toggles the checkbox on or off.
+
+        Args:
+            value (bool): True checkbox is checked, False checkbox is unchecked. Defaults to True
+        """
+
+        if self._widget is None:
+            raise RuntimeError(f"{self._widget=}. Not set")
+
+        assert isinstance(value, bool), f"{value=}. Must be bool"
+
+        self.button_toggle(value)
 
     @property
     def label_get(self) -> str:

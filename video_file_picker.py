@@ -242,6 +242,28 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                 )
 
                 video_settings = Video_File_Settings()
+
+                if self._db_settings.setting_exist("vf_normalise"):
+                    video_settings.normalise = self._db_settings.setting_get(
+                        "vf_normalise"
+                    )
+
+                if self._db_settings.setting_exist("vf_denoise"):
+                    video_settings.denoise = self._db_settings.setting_get("vf_denoise")
+
+                if self._db_settings.setting_exist("vf_white_balance"):
+                    video_settings.white_balance = self._db_settings.setting_get(
+                        "vf_white_balance"
+                    )
+
+                if self._db_settings.setting_exist("vf_sharpen"):
+                    video_settings.sharpen = self._db_settings.setting_get("vf_sharpen")
+
+                if self._db_settings.setting_exist("vf_auto_levels"):
+                    video_settings.auto_bright = self._db_settings.setting_get(
+                        "vf_auto_levels"
+                    )
+
                 video_settings.button_title = file_handler.extract_title(file_name)
 
                 self.video_file_list.append(

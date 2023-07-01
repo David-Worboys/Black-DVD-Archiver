@@ -263,15 +263,10 @@ class Video_File_Grid(DVD_Archiver_Base):
         assert isinstance(
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
-
+        # print(f"DBG {event.event=} {event.container_tag=} {event.tag=} {event.value=} ")
         match event.event:
             case qtg.Sys_Events.APPPOSTINIT:
-                self._load_grid(event)
-
-                # Hot wire to show title names instead of file names #TODO:  make this user settable
-                event.event = qtg.Sys_Events.CLICKED
-                event.tag = "toggle_file_button_names"
-                self.event_handler(event)
+                self.postinit_handler(event)
             case qtg.Sys_Events.APPCLOSED:
                 self._save_grid(event)
             case qtg.Sys_Events.CLICKED:
@@ -287,6 +282,16 @@ class Video_File_Grid(DVD_Archiver_Base):
                         )
 
                         self._set_project_standard_duration(event)
+                    case "normalise":
+                        self._db_settings.setting_set("vf_normalise", event.value)
+                    case "denoise":
+                        self._db_settings.setting_set("vf_denoise", event.value)
+                    case "white_balance":
+                        self._db_settings.setting_set("vf_white_balance", event.value)
+                    case "sharpen":
+                        self._db_settings.setting_set("vf_sharpen", event.value)
+                    case "auto_levels":
+                        self._db_settings.setting_set("vf_auto_levels", event.value)
                     case "dvd_menu_configuration":
                         DVD_Menu_Config_Popup(title="DVD Menu Configuration").show()
                     case "group_files":
@@ -315,6 +320,91 @@ class Video_File_Grid(DVD_Archiver_Base):
                         self._toggle_file_button_names(event)
                     case "ungroup_files":
                         self._ungroup_files(event)
+
+    def postinit_handler(self, event: qtg.Action):
+        """
+        The postinit_handler method is called after the GUI has been created.
+        It is used to set default values for widgets
+
+        Args:
+            event (qtg.Action) : The triggering event
+
+        Returns:
+            None
+
+        """
+
+        self._load_grid(event)
+
+        if self._db_settings.setting_exist("vf_normalise"):
+            event.value_set(
+                container_tag="default_video_filters",
+                tag="normalise",
+                value=self._db_settings.setting_get("vf_normalise"),
+            )
+        else:
+            event.value_set(
+                container_tag="default_video_filters",
+                tag="normalise",
+                value=False,
+            )
+
+        if self._db_settings.setting_exist("vf_denoise"):
+            event.value_set(
+                container_tag="default_video_filters",
+                tag="denoise",
+                value=self._db_settings.setting_get("vf_denoise"),
+            )
+        else:
+            event.value_set(
+                container_tag="default_video_filters",
+                tag="denoise",
+                value=False,
+            )
+
+        if self._db_settings.setting_exist("vf_white_balance"):
+            event.value_set(
+                container_tag="default_video_filters",
+                tag="white_balance",
+                value=self._db_settings.setting_get("vf_white_balance"),
+            )
+        else:
+            event.value_set(
+                container_tag="default_video_filters",
+                tag="white_balance",
+                value=False,
+            )
+
+        if self._db_settings.setting_exist("vf_sharpen"):
+            event.value_set(
+                container_tag="default_video_filters",
+                tag="sharpen",
+                value=self._db_settings.setting_get("vf_sharpen"),
+            )
+        else:
+            event.value_set(
+                container_tag="default_video_filters",
+                tag="sharpen",
+                value=False,
+            )
+
+        if self._db_settings.setting_exist("vf_auto_levels"):
+            event.value_set(
+                container_tag="default_video_filters",
+                tag="auto_levels",
+                value=self._db_settings.setting_get("vf_auto_levels"),
+            )
+        else:
+            event.value_set(
+                container_tag="default_video_filters",
+                tag="auto_levels",
+                value=False,
+            )
+
+        # Hot wire to show title names instead of file names #TODO:  make this user settable
+        event.event = qtg.Sys_Events.CLICKED
+        event.tag = "toggle_file_button_names"
+        self.event_handler(event)
 
     def _join_files(self, event: qtg.Action) -> None:
         """
@@ -1269,8 +1359,49 @@ class Video_File_Grid(DVD_Archiver_Base):
         """
 
         button_container = qtg.HBoxContainer(
-            tag="control_buttons", align=qtg.Align.RIGHT, margin_right=0
+            tag="control_buttons", align=qtg.Align.BOTTOMRIGHT, margin_right=0
         ).add_row(
+            qtg.HBoxContainer(
+                text="Default Video Filters", tag="default_video_filters"
+            ).add_row(
+                qtg.Checkbox(
+                    tag="normalise",
+                    text="Normalise",
+                    checked=False,
+                    tooltip="Bring Out Shadow Details",
+                    callback=self.event_handler,
+                ),
+                qtg.Checkbox(
+                    tag="denoise",
+                    text="Denoise",
+                    checked=False,
+                    tooltip="Lightly Reduce Video Noise",
+                    callback=self.event_handler,
+                ),
+                qtg.Checkbox(
+                    tag="white_balance",
+                    text="White Balance",
+                    checked=False,
+                    tooltip="Fix White Balance Problems",
+                    width=16,
+                    callback=self.event_handler,
+                ),
+                qtg.Checkbox(
+                    tag="sharpen",
+                    text="Sharpen",
+                    checked=False,
+                    tooltip="Lightly Sharpen Video",
+                    callback=self.event_handler,
+                ),
+                qtg.Checkbox(
+                    tag="auto_levels",
+                    text="Auto Levels",
+                    checked=False,
+                    tooltip="Improve Exposure",
+                    callback=self.event_handler,
+                ),
+            ),
+            qtg.Spacer(width=4),
             qtg.Button(
                 icon=file_utils.App_Path("grid-2.svg"),
                 tag="dvd_menu_configuration",

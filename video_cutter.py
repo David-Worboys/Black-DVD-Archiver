@@ -44,6 +44,9 @@ from dvdarch_popups import File_Renamer_Popup
 
 @dataclasses.dataclass
 class Video_Editor(DVD_Archiver_Base):
+    """Implements a basic video editor"""
+
+    # Public instance variables
     processed_files_callback: Callable
     display_height: int = 576  # // 2
     display_width: int = 720  # // 2
@@ -332,12 +335,20 @@ class Video_Editor(DVD_Archiver_Base):
             ).value_get()
         )
 
-        self._video_file_input[0].video_file_settings.normalise = (
+        self._video_file_input[0].video_file_settings.denoise = (
             self._video_filter_container.widget_get(
                 container_tag="video_filters",
                 tag="denoise",
             ).value_get()
         )
+
+        self._video_file_input[0].video_file_settings.white_balance = (
+            self._video_filter_container.widget_get(
+                container_tag="video_filters",
+                tag="white_balance",
+            ).value_get()
+        )
+
         self._video_file_input[0].video_file_settings.auto_bright = (
             self._video_filter_container.widget_get(
                 container_tag="video_filters",
@@ -378,14 +389,22 @@ class Video_Editor(DVD_Archiver_Base):
             container_tag="video_filters",
             tag="normalise",
         ).value_set(self._video_file_input[0].video_file_settings.normalise)
+
         self._video_filter_container.widget_get(
             container_tag="video_filters",
             tag="denoise",
-        ).value_set(self._video_file_input[0].video_file_settings.normalise)
+        ).value_set(self._video_file_input[0].video_file_settings.denoise)
+
+        self._video_filter_container.widget_get(
+            container_tag="video_filters",
+            tag="white_balance",
+        ).value_set(self._video_file_input[0].video_file_settings.white_balance)
+
         self._video_filter_container.widget_get(
             container_tag="video_filters",
             tag="auto_levels",
         ).value_set(self._video_file_input[0].video_file_settings.auto_bright)
+
         self._video_filter_container.widget_get(
             container_tag="video_filters",
             tag="sharpen",
