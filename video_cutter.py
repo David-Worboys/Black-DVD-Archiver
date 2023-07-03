@@ -215,11 +215,7 @@ class Video_Editor(DVD_Archiver_Base):
                 match event.tag:
                     case "step_unit":
                         self._step_unit(event)
-            case qtg.Sys_Events.EDITCHANGED:
-                match event.tag:
-                    case "video_slider":
-                        pass
-                        # self._seek(event.value)
+
             case qtg.Sys_Events.MOVED:
                 match event.tag:
                     case "video_slider":
@@ -237,8 +233,9 @@ class Video_Editor(DVD_Archiver_Base):
 
             case qtg.Sys_Events.TRIGGERED:
                 match event.tag:
-                    case "video_sliderx":
-                        self._seek(event.value)
+                    case "video_slider":
+                        pass
+                        # self._seek(event.value)
 
     def is_available(self) -> bool:
         """Checks if the media player is supported on the platform
@@ -558,6 +555,27 @@ class Video_Editor(DVD_Archiver_Base):
                             ) = file_handler.split_file_path(video_file_path)
 
                             video_file_settings = Video_File_Settings()
+
+                            if self._db_settings.setting_exist("vf_denoise"):
+                                video_file_settings.denoise = (
+                                    self._db_settings.setting_get("vf_denoise")
+                                )
+
+                            if self._db_settings.setting_exist("vf_white_balance"):
+                                video_file_settings.white_balance = (
+                                    self._db_settings.setting_get("vf_white_balance")
+                                )
+
+                            if self._db_settings.setting_exist("vf_sharpen"):
+                                video_file_settings.sharpen = (
+                                    self._db_settings.setting_get("vf_sharpen")
+                                )
+
+                            if self._db_settings.setting_exist("vf_auto_levels"):
+                                video_file_settings.auto_bright = (
+                                    self._db_settings.setting_get("vf_auto_levels")
+                                )
+
                             video_file_settings.button_title = (
                                 file_handler.extract_title(video_file)
                             )

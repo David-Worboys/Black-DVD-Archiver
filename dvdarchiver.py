@@ -389,9 +389,6 @@ class DVD_Archiver(DVD_Archiver_Base):
         ):
             return None
 
-        # video_data = [file.user_data for file in checked_items]
-        # self._file_control._insert_files_into_grid(event, video_data)
-
         video_file_defs = []
         menu_labels = []
         menu_title = []
@@ -544,7 +541,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         ), f"{video_file_input=}. Must be list of Video_Data"
 
         # Note when changing tabpages I call process_edited_video_files and that makes this call
-        # redundant - worse it would fire twice!. TODO Consider This Unintended Conseqence!
+        # redundant - worse it would fire twice!. TODO Consider This Unintended Consequence!
         # self._file_control.process_edited_video_files(video_file_input=video_file_input)
         self._control_tab.select_tab(tag_name="control_tab")
         self._control_tab.enable_set(tag="video_editor_tab", enable=False)

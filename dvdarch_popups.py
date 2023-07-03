@@ -687,11 +687,7 @@ class File_Renamer_Popup(qtg.PopContainer):
             ):
                 result = self._rename_files(event)
 
-                if result == 1:
-                    popups.PopMessage(
-                        title="Rename Files...", message="Files Renamed Successfully"
-                    ).show()
-                    self._package_files(event)
+                self._package_files(event)
 
                 return result
         else:
@@ -732,8 +728,11 @@ class File_Renamer_Popup(qtg.PopContainer):
                     f"{sys_consts.SDELIM}{file_name!r}{sys_consts.SDELIM} is not a"
                     " valid file name! Please reenter."
                 )
-                popups.PopError(title="Invalid File Name...", message=error_msg).show()
+                popups.PopError(
+                    title="Invalid File Name...", message=error_msg, width=80
+                ).show()
                 file_grid.select_row(row_index, col_index)
+
                 return -1
 
             old_file_path, old_file_name, extension = file_handler.split_file_path(

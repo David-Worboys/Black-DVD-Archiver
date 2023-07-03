@@ -689,12 +689,16 @@ class DVD:
         # Black filter Choices for now TODO Allow some user configuration
         debug = False
         normalise_video_filter = (  # Try to improve exposure of video
-            "normalize=blackpt=black:whitept=white:smoothing=11:independence=1"
+            "normalize=blackpt=black:whitept=white:smoothing=11:independence=0.5"
         )
 
         video_denoise_filter = "nlmeans=1.0:7:5:3:3"  # Light but fairly fast denoise
         # video_denoise_filter = "nlmeans=7.0:7:5:0:9"  # Light but fairly fast denoise
         # video_denoise_filter ="owdenoise"
+        # video_denoise_filter ="vaguedenoiser"
+        # video_denoise_filter ="atadenoise"
+        # video_denoise_filter="hqdn3d=2.0:3.0:3.0:4.5"
+
         color_correct_filter = "colorcorrect=analyze='median'"  # Fixes white balance
         usharp_filter = "unsharp=luma_amount=0.2"  # Gentle sharpening of luma channel
 
@@ -707,12 +711,14 @@ class DVD:
         ]
         black_box_filter = ",".join(filter_commands)
 
-        # Tries to dering and lighten dark videos somewhat
-        auto_bright = "pp=dr/al"
-
         for video_file in self.dvd_setup.input_videos:
             _, file_name, _ = file_handler.split_file_path(video_file.file_path)
             vob_file = file_handler.file_join(self._vob_folder, file_name, "vob")
+
+            # Tries to dering and lighten dark videos somewhat
+            auto_bright = (
+                "pp=dr/al" if video_file.video_file_settings.auto_bright else "pp=dr"
+            )
 
             if (
                 video_file.encoding_info.video_height <= 0
@@ -734,22 +740,19 @@ class DVD:
                     f" {black_box_filter}",  # video filters applied
                 ]
             else:
-                video_filter_options = []
+                video_filter_options = [auto_bright]
 
                 if video_file.video_file_settings.normalise:
                     video_filter_options.append(normalise_video_filter)
 
-                if video_file.video_file_settings.denoise:
-                    video_filter_options.append(video_denoise_filter)
-
                 if video_file.video_file_settings.white_balance:
                     video_filter_options.append(color_correct_filter)
 
+                if video_file.video_file_settings.denoise:
+                    video_filter_options.append(video_denoise_filter)
+
                 if video_file.video_file_settings.sharpen:
                     video_filter_options.append(usharp_filter)
-
-                if video_file.video_file_settings.auto_bright:
-                    video_filter_options.append(auto_bright)
 
                 video_filter_options.append(black_box_filter)
 
