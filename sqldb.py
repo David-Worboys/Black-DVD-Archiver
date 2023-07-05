@@ -157,7 +157,6 @@ class ColDef:
     cascaded_update: bool = True  # FK updates cascade to children
     cascade_delete: bool = True  # FK deletes cascade to children
     index: bool = False
-    _sql_type: SQL = dataclasses.field(default_factory=SQL)
 
     def __post_init__(self):
         assert (
@@ -202,8 +201,6 @@ class ColDef:
             else:
                 self.data_type = SQL.DECIMAL
 
-        self._sql_type = self.data_type
-
     @property
     def type(self) -> SQL:
         """Returns the type of the column
@@ -211,7 +208,7 @@ class ColDef:
         Returns:
             SQL: The type of the column.
         """
-        return self._sql_type
+        return self.data_type
 
 
 class App_Settings:
