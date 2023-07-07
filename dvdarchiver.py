@@ -98,7 +98,9 @@ class DVD_Archiver(DVD_Archiver_Base):
         self._default_font = sys_consts.DEFAULT_FONT
 
         self._dvd = DVD()  # Needs DB config to be completed before calling this
+        self._project_label: qtg.Label | None = None
         self._video_editor: Video_Editor | None = None
+        self._working_file_label: qtg.Label | None = None
 
     def db_init(self) -> sqldb.SQLDB:
         """
@@ -242,6 +244,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                         self._make_dvd(event)
                     case "video_editor":  # Signal from file_grid
                         dvd_folder = Get_DVD_Build_Folder()
+                        file_handler = file_utils.File()
 
                         if dvd_folder.strip() != "":
                             video_data: list[Video_Data] = event.value
@@ -253,6 +256,26 @@ class DVD_Archiver(DVD_Archiver_Base):
                                 tag="video_editor_tab", enable=True
                             )
 
+                            _, file_name, extn = file_handler.split_file_path(
+                                video_data[0].video_path
+                            )
+
+                            self._working_file_label.value_set(f"{file_name}{extn}")
+                            self._working_file_label.tooltip_set(
+                                video_data[0].video_path
+                            )
+
+            case qtg.Sys_Events.CUSTOM:
+                match event.tag:
+                    case "project_changed":
+                        self._control_tab.select_tab(tag_name="control_tab")
+                        self._control_tab.enable_set(
+                            tag="video_editor_tab", enable=False
+                        )
+                        self._working_file_label.value_set("")
+                        self._working_file_label.tooltip_set("")
+                        self._project_label.value_set(event.value)
+
             case qtg.Sys_Events.CHANGED:
                 match event.tag:
                     case "control_tab":
@@ -260,6 +283,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                             self._file_control.process_edited_video_files(
                                 video_file_input=self._video_editor.video_file_input
                             )
+        return None
 
     def _archive_folder_select(self, event) -> None:
         """Select an archive folder and updates the settings in the database with the selected folder.
@@ -545,6 +569,8 @@ class DVD_Archiver(DVD_Archiver_Base):
         # self._file_control.process_edited_video_files(video_file_input=video_file_input)
         self._control_tab.select_tab(tag_name="control_tab")
         self._control_tab.enable_set(tag="video_editor_tab", enable=False)
+        self._working_file_label.value_set("")
+        self._working_file_label.tooltip_set("")
 
     def layout(self) -> qtg.VBoxContainer:
         """Returns the Black DVD Archiver application ui layout
@@ -562,15 +588,6 @@ class DVD_Archiver(DVD_Archiver_Base):
         if dvd_build_folder is None or dvd_build_folder.strip() == "":
             dvd_build_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
             self._db_settings.setting_set(sys_consts.DVD_BUILD_FOLDER, dvd_build_folder)
-
-        color_list = [
-            qtg.Combo_Item(display=color, data=color, icon=None, user_data=color)
-            for color in dvdarch_utils.get_color_names()
-        ]
-        font_list = [
-            qtg.Combo_Item(display=font[0], data=font[1], icon=None, user_data=font)
-            for font in dvdarch_utils.get_fonts()
-        ]
 
         info_panel = qtg.HBoxContainer().add_row(
             qtg.Label(
@@ -670,7 +687,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         self._video_editor = Video_Editor(
             processed_files_callback=self._processed_files_handler
         )
-        self._control_tab = qtg.Tab(height=47, width=142, callback=self.event_handler)
+        self._control_tab = qtg.Tab(height=47, width=143, callback=self.event_handler)
         self._control_tab.page_add(
             tag="control_tab", title="Files", control=main_control_container
         )
@@ -681,11 +698,39 @@ class DVD_Archiver(DVD_Archiver_Base):
             enabled=False,
         )
 
-        buttons_container = qtg.HBoxContainer(margin_right=0).add_row(
+        self._working_file_label = qtg.Label(
+            tag="working_file",
+            label="Selected File:",
+            width=40,
+            frame=qtg.Widget_Frame(
+                frame_style=qtg.Frame_Style.PANEL,
+                frame=qtg.Frame.SUNKEN,
+                line_width=2,
+            ),
+        )
+
+        self._project_label = qtg.Label(
+            tag="current_project",
+            label="Project:",
+            width=40,
+            frame=qtg.Widget_Frame(
+                frame_style=qtg.Frame_Style.PANEL,
+                frame=qtg.Frame.SUNKEN,
+                line_width=2,
+            ),
+        )
+
+        buttons_container = qtg.HBoxContainer(
+            tag="main_controls", margin_right=0
+        ).add_row(
             qtg.Button(
                 tag="make_dvd", text="Make DVD", callback=self.event_handler, width=13
             ),
-            qtg.Spacer(width=117),
+            qtg.Spacer(width=3),
+            qtg.Spacer(width=1),
+            self._working_file_label,
+            self._project_label,
+            qtg.Spacer(width=3),
             qtg.Button(
                 tag="exit_app", text="Exit", callback=self.event_handler, width=9
             ),

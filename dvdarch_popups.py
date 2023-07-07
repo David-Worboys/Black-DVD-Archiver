@@ -378,9 +378,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 ),
             )
             menu_items = []
-            for row in range(row_grid.row_count):
-                button_title = row_grid.value_get(row=row, col=0)
-                video_data = row_grid.userdata_get(row=row, col=0)
+            for row_grid_row in range(row_grid.row_count):
+                button_title = row_grid.value_get(row=row_grid_row, col=0)
+                video_data = row_grid.userdata_get(row=row_grid_row, col=0)
 
                 if (
                     video_data.video_file_settings.button_title.strip()

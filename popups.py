@@ -894,7 +894,9 @@ class PopTextGet(PopContainer):
         # self.container.add_row(Spacer())
         self.container.add_row(
             Command_Button_Container(
-                ok_callback=self.event_handler, cancel_callback=self.event_handler
+                ok_callback=self.event_handler,
+                cancel_callback=self.event_handler,
+                margin_right=9,
             )
         )
 

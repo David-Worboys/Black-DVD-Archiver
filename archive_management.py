@@ -66,7 +66,7 @@ class Archive_Manager:
         """Makes the archive folder structure
 
         Returns:
-            str : An error message if the folder structure caould not be created
+            str : An error message if the folder structure could not be created
         """
         file_handler = file_utils.File()
         self._error_code = 1

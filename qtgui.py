@@ -360,6 +360,7 @@ class Sys_Events(IntEnum):
     WINDOWCLOSED = 38  #: The window has been closed
     WINDOWOPEN = 39  #: The window has been opened
     WINDOWPOSTOPEN = 40  #: Triggered after the window has been opened
+    CUSTOM = 41  # Where the user wants to hotwire an event for their own use
 
 
 # Tell Black to leave this block alone
@@ -3085,9 +3086,7 @@ class _qtpyBase_Control(_qtpyBase):
             bg_color (str): The background color of the tooltip. Defaults to white.
             border (str): The border style of the tooltip. Defaults to "1px solid #000000".
         """
-        assert (
-            isinstance(tooltip, str) and tooltip.strip() != ""
-        ), f"{tooltip=} must be a non-empty str"
+        assert isinstance(tooltip, str), f"{tooltip=} must be str"
         assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
         assert isinstance(txt_color, str), f"{txt_color=} must be a string"
         assert isinstance(bg_color, str), f"{bg_color=} must be a string"
@@ -7044,13 +7043,27 @@ class ComboBox(_qtpyBase_Control):
         return max_len
 
     @property
+    def count_items(self) -> int:
+        """Returns the number of items in the combo box
+
+        Returns:
+            int: The number of items in the combobox
+        """
+        if self._widget is None:
+            raise RuntimeError(f"{self._widget=}. Not set")
+
+        self._widget: qtW.QComboBox
+
+        return self._widget.count()
+
+    @property
     def get_items(self) -> list[Combo_Data]:
         """Returns all the items in the combo_box
 
         :return:
 
         Returns:
-            List[COMBO_DATA]: List of items in the combo box
+            list[COMBO_DATA]: List of items in the combo box
         """
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
@@ -7297,16 +7310,22 @@ class ComboBox(_qtpyBase_Control):
 
         self._widget.removeItem(index)
 
-    def value_set(self, value: Union[str, Combo_Data]) -> None:  # noqa LISKOV != good
+    def value_set(
+        self, value: Union[str, Combo_Data], insert_alpha: bool = True
+    ) -> None:  # noqa LISKOV != good
         """Sets a value in the dropdown and scrolls to that value. if COMBO_DATA index is -1 then data and display
         values must match for scroll to happen
 
         value (Union[str,COMBO_DATA]): COMBO_DATA - selected text or int - selected index
+        insert_alpha (bool): Insert alphabetically
         """
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
 
         self._widget: qtW.QComboBox
+
+        if insert_alpha:
+            self._widget.setInsertPolicy(qtW.QComboBox.InsertAlphabetically)
 
         assert isinstance(
             value, (str, Combo_Data)

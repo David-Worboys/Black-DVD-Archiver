@@ -33,7 +33,9 @@ import sys_consts
 import utils
 from configuration_classes import (DVD_Archiver_Base, Get_DVD_Build_Folder,
                                    Video_Data)
+
 from dvd_menu_configuration import DVD_Menu_Config_Popup
+from project_settings_popup import Project_Settings_Popup
 from video_file_picker import Video_File_Picker_Popup
 
 # fmt: on
@@ -42,11 +44,13 @@ from video_file_picker import Video_File_Picker_Popup
 class Video_File_Grid(DVD_Archiver_Base):
     """This class implements the file handling of the Black DVD Archiver ui"""
 
-    def __init__(self, parent: DVD_Archiver_Base) -> None:
+    def __init__(self, parent: DVD_Archiver_Base, project_name="") -> None:
         """Initializes the instance for use"""
         assert isinstance(
             parent, DVD_Archiver_Base
         ), f"{parent=}. Must be an instance of DVD_Archiver_Base"
+
+        assert isinstance(project_name, str), f"{project_name=}. Must be str"
 
         super().__init__()
 
@@ -55,6 +59,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         self._parent = parent
         file_handler = file_utils.File()
 
+        self.project_name = project_name
         self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
         self.common_words = []
         self.project_video_standard = ""  # PAL or NTSC
@@ -68,6 +73,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         self._grid_db = file_handler.file_join(
             self._db_path, sys_consts.VIDEO_GRID_DB, "db"
         )
+        self._shutdown = False
 
     def grid_events(self, event: qtg.Action) -> None:
         """Process Grid Events
@@ -263,11 +269,41 @@ class Video_File_Grid(DVD_Archiver_Base):
         assert isinstance(
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
-        # print(f"DBG {event.event=} {event.container_tag=} {event.tag=} {event.value=} ")
+        
         match event.event:
+            case qtg.Sys_Events.APPINIT:
+                if self._db_settings.setting_exist("latest_project"):
+                    self.project_name = self._db_settings.setting_get("latest_project")
+
             case qtg.Sys_Events.APPPOSTINIT:
                 self.postinit_handler(event)
-            case qtg.Sys_Events.APPCLOSED:
+
+                event.event = qtg.Sys_Events.CUSTOM
+                event.container_tag = ""
+                event.tag = "project_changed"
+                event.value = self.project_name
+                self._parent.event_handler(event=event)
+
+            case qtg.Sys_Events.APPEXIT | qtg.Sys_Events.APPCLOSED:
+                if not self._shutdown:  # Prevent getting called twice
+                    self._shutdown = True
+
+                    if self.project_name.strip() == "":
+                        project_name = popups.PopTextGet(
+                            title="Enter Project Name",
+                            label="Project Name:",
+                            label_above=False,
+                        ).show()
+                        if project_name.strip():
+                            self._db_settings.setting_set(
+                                "latest_project", project_name
+                            )
+
+                    else:  # Project might be changed in file grid
+                        self._db_settings.setting_set(
+                            "latest_project", self.project_name
+                        )
+
                 self._save_grid(event)
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
@@ -302,6 +338,9 @@ class Video_File_Grid(DVD_Archiver_Base):
                         self._move_video_file(event=event, up=False)
                     case "move_video_file_up":
                         self._move_video_file(event=event, up=True)
+                    case "project_config":
+                        self._project_config(event)
+
                     case "select_files":
                         dvd_folder = Get_DVD_Build_Folder()
 
@@ -320,6 +359,72 @@ class Video_File_Grid(DVD_Archiver_Base):
                         self._toggle_file_button_names(event)
                     case "ungroup_files":
                         self._ungroup_files(event)
+
+    def _project_config(self, event: qtg.Action) -> None:
+        """Handles  project config processing
+        Args:
+            event (qtg.Action): The triggering event
+        """
+
+        assert isinstance(
+            event, qtg.Action
+        ), f"{event=}. Must be an instance of qtg.Action"
+
+        file_handler = file_utils.File()
+        dir_path, _, extn = file_handler.split_file_path(self._grid_db)
+        project_name = Project_Settings_Popup(
+            title="Project Settings",
+            current_project=self.project_name,
+            project_path=dir_path,
+            extn=f"{extn}.dir",  # Shelf files add a  ".dir" to the end
+            ignored_project=self._grid_db,
+        ).show()
+
+        if project_name.strip() and project_name != self.project_name:
+            file_grid: qtg.Grid = event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            )
+            self._save_grid(event)
+
+            self.project_name = project_name
+
+            if file_handler.file_exists(
+                directory_path=dir_path,
+                file_name=utils.Text_To_File_Name(self.project_name),
+                file_extension=f"{extn}.dir",
+            ):  # Existing Project                
+                file_grid.clear()
+                self._load_grid(event)
+            else:  # New Project
+                if (
+                    popups.PopYesNo(
+                        title="New Project...",
+                        message="Clear The Current File List?",
+                    ).show()
+                    == "yes"
+                ):
+                    file_grid.clear()
+                                    
+                self._save_grid(event)
+
+            self._db_settings.setting_set("latest_project", self.project_name)
+
+            event.event = qtg.Sys_Events.CUSTOM
+            event.container_tag = ""
+            event.tag = "project_changed"
+            event.value = self.project_name
+            self._parent.event_handler(event=event)
+        else:
+            if  self._db_settings.setting_exist("latest_project"):                
+                self._project_name = self._db_settings.setting_get("latest_project")
+
+                event.event = qtg.Sys_Events.CUSTOM
+                event.container_tag = ""
+                event.tag = "project_changed"
+                event.value = self.project_name
+                self._parent.event_handler(event=event)
+
 
     def postinit_handler(self, event: qtg.Action):
         """
@@ -742,18 +847,29 @@ class Video_File_Grid(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
+        file_handler = file_utils.File()
+
+        if self.project_name:
+            dir_path, _, extn = file_handler.split_file_path(self._grid_db)            
+            project_file_name = file_handler.file_join(
+                dir_path=dir_path,
+                file_name=utils.Text_To_File_Name(self.project_name),
+                ext=extn,
+            )
+        else:
+            project_file_name = self._grid_db
+        
         file_grid: qtg.Grid = event.widget_get(
             container_tag="video_file_controls",
             tag="video_input_files",
         )
 
-        file_handler = file_utils.File()
         removed_files = []
 
         try:
             with qtg.sys_cursor(qtg.Cursor.hourglass):
                 with shelve.open(
-                    self._grid_db
+                    project_file_name
                 ) as db:  # TODO should this be stored in the app db?
                     db_data = db.get("video_grid")
 
@@ -813,11 +929,23 @@ class Video_File_Grid(DVD_Archiver_Base):
         assert isinstance(
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
+        
+        if self.project_name:
+            file_handler = file_utils.File()
+
+            dir_path, _, extn = file_handler.split_file_path(self._grid_db)
+            project_file_name = file_handler.file_join(
+                dir_path=dir_path,
+                file_name=utils.Text_To_File_Name(self.project_name),
+                ext=extn,
+            )
+        else:
+            project_file_name = self._grid_db
 
         try:
             with qtg.sys_cursor(qtg.Cursor.hourglass):
                 with shelve.open(
-                    self._grid_db
+                    project_file_name
                 ) as db:  # TODO should this be stored in the app db?
                     row_data = []
                     file_grid: qtg.Grid = event.widget_get(
@@ -1126,7 +1254,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                         rejected += (
                             "File Error"
                             f" {sys_consts.SDELIM}{file_video_data.video_path} :"
-                            f" {sys_consts.SDELIM} {file_video_data.encoding_info.error} \n"
+                            f"  {file_video_data.encoding_info.error}{sys_consts.SDELIM} \n"
                         )
                         continue
 
@@ -1180,7 +1308,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                 tag="grid_button",
                 height=1,
                 width=1,
-                # tune_vsize=-5,
                 callback=self.grid_events,
                 user_data=video_user_data,
                 icon=file_utils.App_Path("wrench.svg"),
@@ -1383,7 +1510,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                     text="White Balance",
                     checked=False,
                     tooltip="Fix White Balance Problems",
-                    width=16,
+                    width=15,
                     callback=self.event_handler,
                 ),
                 qtg.Checkbox(
@@ -1401,7 +1528,15 @@ class Video_File_Grid(DVD_Archiver_Base):
                     callback=self.event_handler,
                 ),
             ),
-            qtg.Spacer(width=4),
+            qtg.Spacer(width=1),
+            qtg.Button(
+                icon=file_utils.App_Path("briefcase.svg"),
+                tag="project_config",
+                callback=self.event_handler,
+                tooltip="Project Settings",
+                width=2,
+            ),
+            # qtg.Spacer(width=1),
             qtg.Button(
                 icon=file_utils.App_Path("grid-2.svg"),
                 tag="dvd_menu_configuration",

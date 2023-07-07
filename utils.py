@@ -1565,6 +1565,39 @@ def soundex(text_string: str, census_type: int = 2) -> str:
     return soundex[:4]
 
 
+def Text_To_File_Name(text: str) -> str:
+    """
+    This function takes a string and returns a cleaned version of the string that is safe to use as a file name.
+
+    Args:
+        text(str): The text string to be transformed into a file name
+
+    Returns:
+        A cleaned up version of a string that can be used as a file name
+
+    """
+    assert (
+        isinstance(text, str) and text.strip() != ""
+    ), f"{text=} must be a non-empty string"
+
+    # Remove any characters that are not allowed in file names
+    cleaned_text = re.sub(r'[<>:"/\\|?*]', "", text)
+
+    # Remove leading/trailing whitespaces and periods
+    cleaned_text = cleaned_text.strip().strip(".")
+
+    # Replace spaces with underscores
+    cleaned_text = cleaned_text.replace(" ", "_")
+
+    # Truncate the filename to a maximum length (depends on the OS but 255 is safe)
+    max_filename_length = 255
+
+    if max_filename_length and len(cleaned_text) > int(max_filename_length):
+        cleaned_text = cleaned_text[: int(max_filename_length)]
+
+    return cleaned_text
+
+
 """ Regex for email check TODO put in function
 re.fullmatch(regex, email):
 (?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=^_`{|}~-]+)*
