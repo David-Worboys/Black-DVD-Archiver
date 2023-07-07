@@ -37,7 +37,7 @@ from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
 from configuration_classes import (DVD_Archiver_Base, Video_Data,
                                    Video_File_Settings)
-from dvdarch_popups import File_Renamer_Popup
+from file_renamer_popup import File_Renamer_Popup
 
 # fmt: on
 

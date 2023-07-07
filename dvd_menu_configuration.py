@@ -1,4 +1,6 @@
-"""This module implements a DVD menu configuration form.
+"""
+    Implements a popup dialog that allows a user to configure the text and 
+    colours of the text on a DVD menu.
 
     Copyright (C) 2023  David Worboys (-:alumnus Moyhu Primary School et al.:-)
 

@@ -38,7 +38,7 @@ from background_task_manager import Task_Manager
 from configuration_classes import (DVD_Archiver_Base, DVD_Menu_Settings,
                                    File_Def, Get_DVD_Build_Folder, Video_Data)
 from dvd import DVD, DVD_Config
-from dvdarch_popups import Menu_Page_Title_Popup
+from menu_page_title_popup import Menu_Page_Title_Popup
 from video_cutter import Video_Editor
 from video_file_grid import Video_File_Grid
 

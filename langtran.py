@@ -69,12 +69,7 @@ class Lang_Tran(metaclass=Singleton):
 
         self._error_code = error_status.code
         self._error_msg = error_status.message
-        x = sqldb.ColDef(
-            name="id",
-            description="pk_id",
-            data_type="INTEGER",
-            primary_key=True,
-        )
+
         if self._error_code == 1 and not self.DB.table_exists(self._db_file):
             lang_tran_def = (
                 sqldb.ColDef(

@@ -33,7 +33,6 @@ import sys_consts
 import utils
 from configuration_classes import (DVD_Archiver_Base, Get_DVD_Build_Folder,
                                    Video_Data)
-
 from dvd_menu_configuration import DVD_Menu_Config_Popup
 from project_settings_popup import Project_Settings_Popup
 from video_file_picker import Video_File_Picker_Popup
@@ -269,7 +268,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         assert isinstance(
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
-        
+
         match event.event:
             case qtg.Sys_Events.APPINIT:
                 if self._db_settings.setting_exist("latest_project"):
@@ -393,7 +392,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 directory_path=dir_path,
                 file_name=utils.Text_To_File_Name(self.project_name),
                 file_extension=f"{extn}.dir",
-            ):  # Existing Project                
+            ):  # Existing Project
                 file_grid.clear()
                 self._load_grid(event)
             else:  # New Project
@@ -405,7 +404,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                     == "yes"
                 ):
                     file_grid.clear()
-                                    
+
                 self._save_grid(event)
 
             self._db_settings.setting_set("latest_project", self.project_name)
@@ -416,7 +415,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             event.value = self.project_name
             self._parent.event_handler(event=event)
         else:
-            if  self._db_settings.setting_exist("latest_project"):                
+            if self._db_settings.setting_exist("latest_project"):
                 self._project_name = self._db_settings.setting_get("latest_project")
 
                 event.event = qtg.Sys_Events.CUSTOM
@@ -424,7 +423,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                 event.tag = "project_changed"
                 event.value = self.project_name
                 self._parent.event_handler(event=event)
-
 
     def postinit_handler(self, event: qtg.Action):
         """
@@ -850,7 +848,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         file_handler = file_utils.File()
 
         if self.project_name:
-            dir_path, _, extn = file_handler.split_file_path(self._grid_db)            
+            dir_path, _, extn = file_handler.split_file_path(self._grid_db)
             project_file_name = file_handler.file_join(
                 dir_path=dir_path,
                 file_name=utils.Text_To_File_Name(self.project_name),
@@ -858,7 +856,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             )
         else:
             project_file_name = self._grid_db
-        
+
         file_grid: qtg.Grid = event.widget_get(
             container_tag="video_file_controls",
             tag="video_input_files",
@@ -929,7 +927,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         assert isinstance(
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
-        
+
         if self.project_name:
             file_handler = file_utils.File()
 

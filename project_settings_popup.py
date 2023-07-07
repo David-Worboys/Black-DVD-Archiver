@@ -1,5 +1,6 @@
 """
-    A popup dialog that allows the user to control project settings - create/select/detete a project
+    Implements a popup dialog that allows the user to control project settings 
+    - create/select/detete a project
 
     Copyright (C) 2023  David Worboys (-:alumnus Moyhu Primary School et al.:-)
 
