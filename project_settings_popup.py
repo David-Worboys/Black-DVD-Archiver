@@ -18,10 +18,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import dataclasses
-
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+import dataclasses
+
 import file_utils
 import popups
 import qtgui as qtg
@@ -66,6 +66,7 @@ class Project_Settings_Popup(qtg.PopContainer):
 
     def event_handler(self, event: qtg.Action) -> None:
         """Handles  form events
+
         Args:
             event (qtg.Action): The triggering event
         """
@@ -76,7 +77,9 @@ class Project_Settings_Popup(qtg.PopContainer):
                 project_combo: qtg.ComboBox = event.widget_get(
                     container_tag="project_controls", tag="existing_projects"
                 )
-                project_combo.select_text(self.current_project, partial_match=True)
+
+                if self.current_project:
+                    project_combo.select_text(self.current_project, partial_match=True)
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "delete_project":
@@ -131,7 +134,8 @@ class Project_Settings_Popup(qtg.PopContainer):
                 )
 
     def _delete_project(self, event: qtg.Action) -> None:
-        """Deletes a project by removing the corrospong python shelf files
+        """Deletes a project by removing the corrosponding python shelf files
+
         Args:
             event (qtg.Action): Triggering event
         """
@@ -142,6 +146,8 @@ class Project_Settings_Popup(qtg.PopContainer):
         project: str = event.value_get(
             container_tag="project_controls", tag="current_project"
         )
+        project_file = Text_To_File_Name(project)
+
         project_combo: qtg.ComboBox = event.widget_get(
             container_tag="project_controls",
             tag="existing_projects",
@@ -153,10 +159,10 @@ class Project_Settings_Popup(qtg.PopContainer):
             dir_path, _, _ = file_handler.split_file_path(self.ignored_project)
 
             project_path = file_handler.file_join(
-                dir_path, f"{project}.{db_extn}", extn
+                dir_path, f"{project_file}.{db_extn}", extn
             )
 
-            if file_handler.file_exists(dir_path, f"{project}.{db_extn}", extn):
+            if file_handler.file_exists(dir_path, f"{project_file}.{db_extn}", extn):
                 if extn == "dir":
                     if (
                         popups.PopYesNo(
@@ -196,11 +202,11 @@ class Project_Settings_Popup(qtg.PopContainer):
                     container_tag="project_controls", tag="current_project"
                 )
 
-                if self._db_settings.setting_exist("latest_project"):
-                    if project_combo.count_items > 0:
-                        self._db_settings.setting_set("latest_project", project)
-                    else:
-                        self._db_settings.setting_set("latest_project", "")
+            if self._db_settings.setting_exist("latest_project"):
+                if project_combo.count_items > 0:
+                    self._db_settings.setting_set("latest_project", project)
+                else:
+                    self._db_settings.setting_set("latest_project", "")
 
     def _process_ok(self, event: qtg.Action) -> int:
         """

@@ -19,7 +19,6 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import pprint
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
@@ -27,7 +26,6 @@ from typing import cast
 
 import platformdirs
 
-import dvdarch_utils
 import file_utils
 import popups
 import qtgui as qtg

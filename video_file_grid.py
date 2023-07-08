@@ -369,6 +369,11 @@ class Video_File_Grid(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
+        file_grid: qtg.Grid = event.widget_get(
+            container_tag="video_file_controls",
+            tag="video_input_files",
+        )
+
         file_handler = file_utils.File()
         dir_path, _, extn = file_handler.split_file_path(self._grid_db)
         project_name = Project_Settings_Popup(
@@ -380,10 +385,6 @@ class Video_File_Grid(DVD_Archiver_Base):
         ).show()
 
         if project_name.strip() and project_name != self.project_name:
-            file_grid: qtg.Grid = event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            )
             self._save_grid(event)
 
             self.project_name = project_name
@@ -416,7 +417,10 @@ class Video_File_Grid(DVD_Archiver_Base):
             self._parent.event_handler(event=event)
         else:
             if self._db_settings.setting_exist("latest_project"):
-                self._project_name = self._db_settings.setting_get("latest_project")
+                self.project_name = self._db_settings.setting_get("latest_project")
+
+                if not self.project_name:
+                    file_grid.clear()
 
                 event.event = qtg.Sys_Events.CUSTOM
                 event.container_tag = ""
