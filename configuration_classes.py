@@ -38,9 +38,7 @@ def Get_DVD_Build_Folder() -> str:
     file_handler = file_utils.File()
     db = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
     dvd_folder = db.setting_get(sys_consts.DVD_BUILD_FOLDER)
-
-    print(f"DBG {dvd_folder=}")
-
+    
     if dvd_folder is None or dvd_folder.strip() == "":
         popups.PopError(
             title="DVD Build Folder Error...",
