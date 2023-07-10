@@ -9577,7 +9577,7 @@ class Grid(_qtpyBase_Control):
                     if self.tag != item.tag:
                         self.parent_app.widget_del(
                             window_id=window_id,
-                            container_tag=item.container_tag,
+                            container_tag=item.tag,
                             tag=item.tag,
                         )
 
