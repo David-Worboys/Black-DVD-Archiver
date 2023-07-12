@@ -908,10 +908,8 @@ class SQLDB:
                 except:
                     self._error_message(
                         "DB_Error",
-                        (
-                            f"Database File <{str(dbfile_instance.resolve())}> Not"
-                            " Found or Could Not Be created "
-                        ),
+                        f"Database File <{str(dbfile_instance.resolve())}> Not"
+                        " Found or Could Not Be created ",
                     )
 
                 try:
