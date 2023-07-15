@@ -9567,8 +9567,6 @@ class Grid(_qtpyBase_Control):
         for col_num in range(col_count):
             widgets.append(self.row_widget_get(row, col_num))
 
-        self._widget.removeRow(row)
-
         window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         for widget in widgets:
@@ -9580,6 +9578,8 @@ class Grid(_qtpyBase_Control):
                             container_tag=item.tag,
                             tag=item.tag,
                         )
+                        
+        self._widget.removeRow(row)                
 
     def row_widget_tag_delete(
         self, widget_row: int, tag: str = "", container_tag: str = ""
