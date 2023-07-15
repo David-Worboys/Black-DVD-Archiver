@@ -9578,8 +9578,8 @@ class Grid(_qtpyBase_Control):
                             container_tag=item.tag,
                             tag=item.tag,
                         )
-                        
-        self._widget.removeRow(row)                
+
+        self._widget.removeRow(row)
 
     def row_widget_tag_delete(
         self, widget_row: int, tag: str = "", container_tag: str = ""
