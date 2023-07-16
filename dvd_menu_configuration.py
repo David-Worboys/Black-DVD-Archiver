@@ -17,7 +17,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import copy
+
+# Tell Black to leave this block alone (realm of isort)
+# fmt: off
 import dataclasses
 
 import dvdarch_utils
@@ -27,10 +29,6 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from configuration_classes import DVD_Menu_Settings
-
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
-
 
 # fmt: on
 
