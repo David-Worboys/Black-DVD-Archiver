@@ -585,7 +585,7 @@ class Video_Editor(DVD_Archiver_Base):
                                     video_folder=video_path,
                                     video_file=video_file,
                                     video_extension=video_extension,
-                                    encoding_info=dvdarch_utils.get_file_encoding_info(
+                                    encoding_info=dvdarch_utils.Get_File_Encoding_Info(
                                         video_file_path
                                     ),
                                     video_file_settings=video_file_settings,
@@ -627,7 +627,7 @@ class Video_Editor(DVD_Archiver_Base):
                             message=f"<{video_files_string}>",
                         ).show()
                     else:
-                        result, message = dvdarch_utils.concatenate_videos(
+                        result, message = dvdarch_utils.Concatenate_Videos(
                             temp_files=video_files_string.split(","),
                             output_file=assembled_file,
                             delete_temp_files=True,
@@ -652,7 +652,7 @@ class Video_Editor(DVD_Archiver_Base):
                                 video_folder=assembled_path,
                                 video_file=assembled_filename,
                                 video_extension=assembled_extension,
-                                encoding_info=dvdarch_utils.get_file_encoding_info(
+                                encoding_info=dvdarch_utils.Get_File_Encoding_Info(
                                     video_files_string
                                 ),
                                 video_file_settings=self._video_file_input[
@@ -822,7 +822,7 @@ class Video_Editor(DVD_Archiver_Base):
 
         out_path, out_file, out_extn = file_handler.split_file_path(output_file)
 
-        result, message = dvdarch_utils.get_codec(input_file)
+        result, message = dvdarch_utils.Get_Codec(input_file)
 
         if result == -1:
             return -1, message
@@ -877,14 +877,14 @@ class Video_Editor(DVD_Archiver_Base):
             end_time = end_frame / self._frame_rate
 
             # Calculate the nearest key frames before and after the cut
-            result, before_key_frame = dvdarch_utils.get_nearest_key_frame(
+            result, before_key_frame = dvdarch_utils.Get_Nearest_Key_Frame(
                 input_file, start_time, "prev"
             )
 
             if result == -1:
                 return -1, "Failed To Get Before Key Frame"
 
-            result, after_key_frame = dvdarch_utils.get_nearest_key_frame(
+            result, after_key_frame = dvdarch_utils.Get_Nearest_Key_Frame(
                 input_file, end_time, "next"
             )
 
@@ -955,7 +955,7 @@ class Video_Editor(DVD_Archiver_Base):
         self._progress_bar.reset()
 
         if cut_out:  # Concat temp file for final file and remove the temp files
-            result, message = dvdarch_utils.concatenate_videos(
+            result, message = dvdarch_utils.Concatenate_Videos(
                 temp_files=temp_files, output_file=output_file, delete_temp_files=False
             )
 
@@ -1043,7 +1043,7 @@ class Video_Editor(DVD_Archiver_Base):
                             video_folder=trimmed_path,
                             video_file=trimmed_filename,
                             video_extension=trimmed_extension,
-                            encoding_info=dvdarch_utils.get_file_encoding_info(
+                            encoding_info=dvdarch_utils.Get_File_Encoding_Info(
                                 trimmed_file
                             ),
                             video_file_settings=self._video_file_input[

@@ -120,7 +120,7 @@ class dvd_dims:
     display_height: int = -1
 
 
-def concatenate_videos(
+def Concatenate_Videos(
     temp_files: list[str],
     output_file: str,
     audio_codec: str = "",
@@ -183,7 +183,7 @@ def concatenate_videos(
         ]
 
     # Concatenate the video files using ffmpeg
-    result, message = execute_check_output(
+    result, message = Execute_Check_Output(
         commands=[
             sys_consts.FFMPG,
             "-f",
@@ -225,7 +225,7 @@ def concatenate_videos(
     return 1, ""
 
 
-def create_dvd_iso(input_dir: str, output_file: str) -> tuple[int, str]:
+def Create_DVD_Iso(input_dir: str, output_file: str) -> tuple[int, str]:
     """
     Create a DVD-Video compliant ISO image file from a directory containing VIDEO_TS and AUDIO_TS directories.
 
@@ -261,10 +261,10 @@ def create_dvd_iso(input_dir: str, output_file: str) -> tuple[int, str]:
         "VIDEO_TS=" + input_dir,
     ]
 
-    return execute_check_output(command)
+    return Execute_Check_Output(command)
 
 
-def get_space_available(path: str) -> tuple[int, str]:
+def Get_Space_Available(path: str) -> tuple[int, str]:
     """Returns the amount of available disk space in bytes for the specified file system path.
 
     Args:
@@ -285,7 +285,7 @@ def get_space_available(path: str) -> tuple[int, str]:
         return -1, str(e)
 
 
-def get_color_names() -> list:
+def Get_Color_Names() -> list:
     """Return a list of color names in the colors dictionary.
 
     Returns:
@@ -294,7 +294,7 @@ def get_color_names() -> list:
     return sorted(list(colors.keys()), key=lambda x: x[0].upper())
 
 
-def get_hex_color(color: str) -> str:
+def Get_Hex_Color(color: str) -> str:
     """This function returns the hexadecimal value for a given color name.
 
     Args:
@@ -305,8 +305,8 @@ def get_hex_color(color: str) -> str:
 
     """
     assert (
-        isinstance(color, str) and color.strip() != "" and color in get_color_names()
-    ), f"{color=}. Must be string  in {', '.join(get_color_names())} "
+        isinstance(color, str) and color.strip() != "" and color in Get_Color_Names()
+    ), f"{color=}. Must be string  in {', '.join(Get_Color_Names())} "
 
     color = color.lower()
 
@@ -318,7 +318,7 @@ def get_hex_color(color: str) -> str:
     return hex_value
 
 
-def get_colored_rectangle_example(width: int, height: int, color: str) -> bytes:
+def Get_Colored_Rectangle_Example(width: int, height: int, color: str) -> bytes:
     """Generates a PNG image of a colored rectangle.
 
     Args:
@@ -337,7 +337,7 @@ def get_colored_rectangle_example(width: int, height: int, color: str) -> bytes:
     ), f"{height}. Must be a positive integer."
     assert (
         isinstance(color, str) and color in colors
-    ), f"{color=} must be a string in {', '.join(get_color_names())}"
+    ), f"{color=} must be a string in {', '.join(Get_Color_Names())}"
 
     size = f"{width}x{height}"
     command = ["convert", "-size", size, f"xc:{color}", "png:-"]
@@ -348,7 +348,7 @@ def get_colored_rectangle_example(width: int, height: int, color: str) -> bytes:
         return b""
 
 
-def get_font_example(
+def Get_Font_Example(
     font_file: str,
     pointsize: int = -1,
     text: str = "Example Text",
@@ -385,10 +385,10 @@ def get_font_example(
     )
     assert (
         isinstance(text_color, str) and text_color in colors
-    ), f"{text_color=} must be a string in {', '.join(get_color_names())}"
+    ), f"{text_color=} must be a string in {', '.join(Get_Color_Names())}"
     assert (
         isinstance(background_color, str) and background_color in colors
-    ), f"{background_color=} must be a string in {', '.join(get_color_names())}"
+    ), f"{background_color=} must be a string in {', '.join(Get_Color_Names())}"
     assert (
         isinstance(width, int) and width == -1 or width > 0
     ), f"{width=}. Must be int > 0 or -1 to autocalc"
@@ -405,7 +405,7 @@ def get_font_example(
             # Find the optimal font size to fit the text within the bounding box
             # Determine the initial bounds for the binary search
             low, high = 1, 200
-            text_width, text_height = get_text_dims(
+            text_width, text_height = Get_Text_Dims(
                 text=text, font=font_file, pointsize=10
             )
 
@@ -417,7 +417,7 @@ def get_font_example(
             while low <= high:
                 mid = (low + high) // 2
 
-                text_width, text_height = get_text_dims(
+                text_width, text_height = Get_Text_Dims(
                     text=text, font=font_file, pointsize=mid
                 )
 
@@ -427,7 +427,7 @@ def get_font_example(
                     pointsize = mid
                     low = mid + 1
 
-        result, background_hex = make_opaque(color=background_color, opacity=opacity)
+        result, background_hex = Make_Opaque(color=background_color, opacity=opacity)
 
         if result == -1:
             return -1, b""
@@ -456,7 +456,7 @@ def get_font_example(
         return -1, b""
 
 
-def get_fonts() -> list[tuple[str, str]]:
+def Get_Fonts() -> list[tuple[str, str]]:
     """Returns a list of built-in fonts
 
     Returns:
@@ -499,7 +499,7 @@ def get_fonts() -> list[tuple[str, str]]:
     return sorted(font_list, key=lambda x: x[0].upper())
 
 
-def make_opaque(color: str, opacity: float) -> tuple[int, str]:
+def Make_Opaque(color: str, opacity: float) -> tuple[int, str]:
     """Makes a hex color value partially opaque.
 
     Args:
@@ -516,10 +516,10 @@ def make_opaque(color: str, opacity: float) -> tuple[int, str]:
     """
     assert (
         isinstance(color, str) and color in colors
-    ), f"{color=} must be a string in {', '.join(get_color_names())}"
+    ), f"{color=} must be a string in {', '.join(Get_Color_Names())}"
     assert 0.0 <= opacity <= 1.0, "Opacity must be between 0.0 and 1.0"
 
-    hex_color = get_hex_color(color)
+    hex_color = Get_Hex_Color(color)
 
     if hex_color == "":
         return -1, f"Invalid System Color {color}"
@@ -529,7 +529,7 @@ def make_opaque(color: str, opacity: float) -> tuple[int, str]:
     return 1, hex_color + opacity_hex
 
 
-def create_transparent_file(width: int, height: int, out_file: str, border_color=""):
+def Create_Transparent_File(width: int, height: int, out_file: str, border_color=""):
     """Creates a transparent file of a given width and height.
     If a border color is provided a rectangle of that color is drawn
     around the edge of the file
@@ -573,10 +573,10 @@ def create_transparent_file(width: int, height: int, out_file: str, border_color
             out_file,
         ]
 
-    return execute_check_output(commands=command)
+    return Execute_Check_Output(commands=command)
 
 
-def overlay_file(
+def Overlay_File(
     in_file: str, overlay_file: str, out_file: str, x: int, y: int
 ) -> tuple[int, str]:
     """Places the overlay_file on the input file at a given x,y co-ord
@@ -604,10 +604,10 @@ def overlay_file(
         out_file,
     ]
 
-    return execute_check_output(commands=command)
+    return Execute_Check_Output(commands=command)
 
 
-def overlay_text(
+def Overlay_Text(
     in_file: str,
     text: str,
     text_font: str,
@@ -683,29 +683,29 @@ def overlay_text(
         justification.lower()
     ]
 
-    background_color_hex = get_hex_color(background_color)
+    background_color_hex = Get_Hex_Color(background_color)
 
     if background_color_hex == "":
         return -1, f"Unknown color {background_color}"
 
-    result, text_hex = make_opaque(color=text_color, opacity=1)
+    result, text_hex = Make_Opaque(color=text_color, opacity=1)
 
     if result == -1:
         return -1, f"Invalid System Color {text_color}"
 
-    result, background_hex = make_opaque(color=background_color, opacity=opacity)
+    result, background_hex = Make_Opaque(color=background_color, opacity=opacity)
 
     if result == -1:
         return -1, f"Invalid System Color {text_color}"
 
-    text_width, text_height = get_text_dims(
+    text_width, text_height = Get_Text_Dims(
         text=text, font=text_font, pointsize=text_pointsize
     )
 
     if text_width == -1:
         return -1, "Could Not Get Text Width"
 
-    image_width, message = get_image_width(in_file)
+    image_width, message = Get_Image_Width(in_file)
 
     if image_width == -1:
         return -1, message
@@ -738,7 +738,7 @@ def overlay_text(
         out_file,
     ]
 
-    return execute_check_output(commands=command)
+    return Execute_Check_Output(commands=command)
 
 
 def Transcode_H26x(
@@ -841,7 +841,7 @@ def Transcode_H26x(
     ]
 
     if not file_handler.file_exists(output_file):
-        result, message = execute_check_output(commands=command, debug=False)
+        result, message = Execute_Check_Output(commands=command, debug=False)
 
         if result == -1:
             return -1, message
@@ -849,7 +849,7 @@ def Transcode_H26x(
     return 1, output_file
 
 
-def write_text_on_file(
+def Write_Text_On_File(
     input_file: str, text: str, x: int, y: int, font: str, pointsize: int, color: str
 ) -> tuple[int, str]:
     """Writes text on a file
@@ -903,10 +903,10 @@ def write_text_on_file(
         input_file,
     ]
 
-    return execute_check_output(commands=command)
+    return Execute_Check_Output(commands=command)
 
 
-def get_text_dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
+def Get_Text_Dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
     """Gets the text dimensions in pixels
 
     Args:
@@ -926,7 +926,7 @@ def get_text_dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
     ), f"{pointsize=}. Must be int > 0"
 
     # Run the ImageMagick command to measure the text
-    result, message = execute_check_output(
+    result, message = Execute_Check_Output(
         [
             sys_consts.CONVERT,
             "-background",
@@ -955,7 +955,7 @@ def get_text_dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
     return width, height
 
 
-def get_codec(input_file: str) -> tuple[int, str]:
+def Get_Codec(input_file: str) -> tuple[int, str]:
     """
     Get the codec name of the video file using FFprobe.
 
@@ -985,7 +985,7 @@ def get_codec(input_file: str) -> tuple[int, str]:
         input_file,
     ]
 
-    result, output = execute_check_output(commands)
+    result, output = Execute_Check_Output(commands)
 
     if result == -1:
         return -1, "Failed To Get Codec Name!"
@@ -993,7 +993,7 @@ def get_codec(input_file: str) -> tuple[int, str]:
     return 1, output.strip()
 
 
-def stream_optimise(output_file: str) -> tuple[int, str]:
+def Stream_Optimise(output_file: str) -> tuple[int, str]:
     """Optimizes a video file for streaming.
 
     Args:
@@ -1020,7 +1020,7 @@ def stream_optimise(output_file: str) -> tuple[int, str]:
     ]
 
     # Run the FFmpeg command
-    result, message = execute_check_output(command)
+    result, message = Execute_Check_Output(command)
 
     if result == -1:
         return -1, message
@@ -1028,7 +1028,7 @@ def stream_optimise(output_file: str) -> tuple[int, str]:
     return 1, ""
 
 
-def get_nearest_key_frame(
+def Get_Nearest_Key_Frame(
     input_file: str, time: float, direction: str
 ) -> tuple[int, Optional[float]]:
     """
@@ -1073,7 +1073,7 @@ def get_nearest_key_frame(
         input_file,
     ]
 
-    result, output = execute_check_output(commands, debug=False)
+    result, output = Execute_Check_Output(commands, debug=False)
 
     if result == -1:
         return -1, None
@@ -1103,7 +1103,7 @@ def get_nearest_key_frame(
             return -1, None
 
 
-def execute_check_output(
+def Execute_Check_Output(
     commands: list[str],
     env: dict | None = None,
     execute_as_string: bool = False,
@@ -1179,7 +1179,7 @@ def execute_check_output(
     return 1, output
 
 
-def get_dvd_dims(aspect_ratio: str, dvd_format: str) -> dvd_dims:
+def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> dvd_dims:
     """Returns the DVD image dimensions. The hard coded values are  mandated by the dvd_format and the
     aspect ratio and must not be changed.  PAL is 720 x 576 and NTSC is 720 x 480 and is always stored
     that way on a DVD. But the display aspect ratio can be flagged on a DVD (PAL is 1024 x 576 and NTSC is
@@ -1235,7 +1235,7 @@ def get_dvd_dims(aspect_ratio: str, dvd_format: str) -> dvd_dims:
             )
 
 
-def get_image_width(image_file: str) -> tuple[int, str]:
+def Get_Image_Width(image_file: str) -> tuple[int, str]:
     """Returns the width of an image file in pixels.
 
     Args:
@@ -1254,7 +1254,7 @@ def get_image_width(image_file: str) -> tuple[int, str]:
 
     commands = [sys_consts.IDENTIFY, "-format", "%w", image_file]
 
-    result, message = execute_check_output(commands=commands)
+    result, message = Execute_Check_Output(commands=commands)
 
     if result == -1:
         return -1, message
@@ -1262,7 +1262,7 @@ def get_image_width(image_file: str) -> tuple[int, str]:
     return int(message.strip()), ""
 
 
-def get_image_height(image_file: str) -> tuple[int, str]:
+def Get_Image_Height(image_file: str) -> tuple[int, str]:
     """Returns the height of an image file in pixels.
 
     Args:
@@ -1281,7 +1281,7 @@ def get_image_height(image_file: str) -> tuple[int, str]:
 
     commands = [sys_consts.IDENTIFY, "-format", "%h", image_file]
 
-    result, message = execute_check_output(commands=commands)
+    result, message = Execute_Check_Output(commands=commands)
 
     if result == -1:
         return -1, message
@@ -1289,7 +1289,7 @@ def get_image_height(image_file: str) -> tuple[int, str]:
     return int(message.strip()), ""
 
 
-def get_image_size(image_file: str) -> tuple[int, int, str]:
+def Get_Image_Size(image_file: str) -> tuple[int, int, str]:
     """Returns the width and height of an image file in pixels.
 
     Args:
@@ -1309,7 +1309,7 @@ def get_image_size(image_file: str) -> tuple[int, int, str]:
 
     commands = [sys_consts.IDENTIFY, "-format", "%w %h", image_file]
 
-    result, message = execute_check_output(commands=commands)
+    result, message = Execute_Check_Output(commands=commands)
 
     if result == -1:
         return -1, -1, message
@@ -1319,7 +1319,7 @@ def get_image_size(image_file: str) -> tuple[int, int, str]:
     return int(width), int(height), ""
 
 
-def generate_menu_image_from_file(
+def Generate_Menu_Image_From_File(
     video_file: str, frame_number: int, out_folder: str, button_height: int = 500
 ) -> tuple[int, str]:
     """Generate the image at the specified frame number from the video file.
@@ -1382,7 +1382,7 @@ def generate_menu_image_from_file(
         image_file,
     ]
 
-    result, message = execute_check_output(commands=commands)
+    result, message = Execute_Check_Output(commands=commands)
 
     if result == -1:
         return result, message
@@ -1390,7 +1390,7 @@ def generate_menu_image_from_file(
     return 1, image_file
 
 
-def get_file_encoding_info(video_file: str) -> Encoding_Details:
+def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
     """Returns the pertinent file encoding information as required for DVD creation
 
     Args:
@@ -1401,7 +1401,7 @@ def get_file_encoding_info(video_file: str) -> Encoding_Details:
 
     """
 
-    def find_keys(node: list[str] | dict, key_value: str) -> Generator:
+    def _find_keys(node: list[str] | dict, key_value: str) -> Generator:
         """Find an XML key based on a key value
 
         Args:
@@ -1413,13 +1413,13 @@ def get_file_encoding_info(video_file: str) -> Encoding_Details:
         """
         if isinstance(node, list):
             for i in node:
-                for x in find_keys(i, key_value):
+                for x in _find_keys(i, key_value):
                     yield x
         elif isinstance(node, dict):
             if key_value in node:
                 yield node[key_value]
             for j in node.values():
-                for x in find_keys(j, key_value):
+                for x in _find_keys(j, key_value):
                     yield x
 
     assert (
@@ -1447,7 +1447,7 @@ def get_file_encoding_info(video_file: str) -> Encoding_Details:
             print("=========== Video Info Debug ===========")
 
         video_details: dict[str, list[str, int, str]]
-        track_info = list(find_keys(video_info, "track"))
+        track_info = list(_find_keys(video_info, "track"))
 
         for tracks in track_info:
             for track_dict in tracks:
@@ -1523,7 +1523,7 @@ def get_file_encoding_info(video_file: str) -> Encoding_Details:
     return video_file_details  # video_details
 
 
-def resize_image(
+def Resize_Image(
     width: int,
     height: int,
     input_file: str,
@@ -1569,7 +1569,7 @@ def resize_image(
         cmd += ["-colors", colors]
 
     if remap:
-        result, colors = execute_check_output(
+        result, colors = Execute_Check_Output(
             [
                 sys_consts.CONVERT,
                 input_file,
@@ -1583,7 +1583,7 @@ def resize_image(
 
         cmd += ["-remap", colors]
 
-    result, _ = execute_check_output(commands=cmd + [out_file])
+    result, _ = Execute_Check_Output(commands=cmd + [out_file])
 
     if result == -1:
         return -1, "Could Not Resize Image"

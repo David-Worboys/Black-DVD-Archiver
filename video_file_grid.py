@@ -32,7 +32,7 @@ import sqldb
 import sys_consts
 import utils
 from configuration_classes import (DVD_Archiver_Base, Get_DVD_Build_Folder,
-                                   Video_Data)
+                                   Get_Shelved_DVD_Menu_Layout, Video_Data)
 from dvd_menu_configuration import DVD_Menu_Config_Popup
 from project_settings_popup import Project_Settings_Popup
 from video_file_picker import Video_File_Picker_Popup
@@ -218,7 +218,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             )
 
             if user_data and vd_id == user_data.vd_id:
-                encoding_info = dvdarch_utils.get_file_encoding_info(trimmed_file)
+                encoding_info = dvdarch_utils.Get_File_Encoding_Info(trimmed_file)
                 if encoding_info.error:  # Error Occurred
                     popups.PopError(
                         title="Encoding Read Error...",
@@ -589,7 +589,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
             if concatenating_files and output_file:
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
-                    result, message = dvdarch_utils.concatenate_videos(
+                    result, message = dvdarch_utils.Concatenate_Videos(
                         temp_files=concatenating_files, output_file=output_file
                     )
 
@@ -922,6 +922,59 @@ class Video_File_Grid(DVD_Archiver_Base):
         except Exception as e:
             popups.PopError(title="File Grid Load Error...", message=str(e)).show()
 
+            return None
+
+        with qtg.sys_cursor(qtg.Cursor.hourglass):
+            project_file_name = file_handler.file_join(
+                dir_path=self._db_path,
+                file_name=utils.Text_To_File_Name(self.project_name),
+                ext="dvdmenu",
+            )
+
+            dvd_menu_layout, error_message = Get_Shelved_DVD_Menu_Layout(
+                project_file_name
+            )
+
+        if error_message:
+            popups.PopError(
+                title="DVD Menu Grid Load Error...",
+                message=f"{sys_consts.SDELIM}{str(error_message)}{sys_consts.SDELIM}",
+            ).show()
+            return None
+
+        col_index = file_grid.colindex_get("video_file")
+        missing_files = []
+
+        for row_index, menu_item in enumerate(dvd_menu_layout):
+            for menu_page in menu_item[1]:
+                for video_data in menu_page:
+                    for row_index in range(file_grid.row_count):
+                        user_data: Video_Data = file_grid.userdata_get(
+                            row=row_index, col=col_index
+                        )
+
+                        if user_data.video_path == video_data.video_path:
+                            file_grid.checkitemrow_set(True, row_index, col_index)
+                            break
+                    else:  # No match found, missing file
+                        missing_files.append(video_data.video_path)
+
+        if missing_files:
+            missing_file_list = "\n".join(missing_files)
+            popups.PopMessage(
+                title="Missing DVD Menu Files...",
+                message=(
+                    "The following DVD Menu source files are missing from the"
+                    " project:\n"
+                    f"{sys_consts.SDELIM}{missing_file_list}{sys_consts.SDELIM}"
+                ),
+                width=80,
+            ).show()
+
+        self._set_project_standard_duration(event)
+
+        return None
+
     def _save_grid(self, event: qtg.Action) -> None:
         """Saves the grid to the database
 
@@ -1210,7 +1263,9 @@ class Video_File_Grid(DVD_Archiver_Base):
 
             if rejected != "":
                 popups.PopMessage(
-                    title="These Files Are Not Permitted...", message=rejected
+                    title="These Files Are Not Permitted...",
+                    message=f"The Files Below Failed Acceptability Checks:\n{rejected}",
+                    width=80,
                 ).show()
         return None
 
@@ -1249,7 +1304,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             else:  # File not in grid already
                 if file_video_data.encoding_info.video_tracks <= 0:
                     file_video_data.encoding_info = (
-                        dvdarch_utils.get_file_encoding_info(file_video_data.video_path)
+                        dvdarch_utils.Get_File_Encoding_Info(file_video_data.video_path)
                     )
 
                     if file_video_data.encoding_info.error:  # Error Occurred
@@ -1434,7 +1489,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         self.dvd_percent_used = 0
 
         if file_grid.row_count > 0:
-            for row_index, checked_item in enumerate(file_grid.checkitems_get):
+            for checked_item in file_grid.checkitems_get:
                 checked_item: qtg.Grid_Item
                 video_data: Video_Data = checked_item.user_data
 

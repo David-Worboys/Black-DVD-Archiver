@@ -274,15 +274,18 @@ class Project_Settings_Popup(qtg.PopContainer):
         combo_items = []
 
         for item in file_list.files:
-            if item.rstrip(self.extn).rstrip(".") not in self.ignored_project:
-                combo_items.append(
-                    qtg.Combo_Item(
-                        display=item.replace("_", " ").rstrip(self.extn).rstrip("."),
-                        data=item,
-                        icon=None,
-                        user_data=None,
+            if "dvdmenu" not in item:
+                if item.rstrip(self.extn).rstrip(".") not in self.ignored_project:
+                    combo_items.append(
+                        qtg.Combo_Item(
+                            display=item.replace("_", " ")
+                            .rstrip(self.extn)
+                            .rstrip("."),
+                            data=item,
+                            icon=None,
+                            user_data=None,
+                        )
                     )
-                )
 
         project_control_container.add_row(
             qtg.VBoxContainer(text="Select Project", align=qtg.Align.TOPRIGHT).add_row(

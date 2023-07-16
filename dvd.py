@@ -174,7 +174,7 @@ class DVD_Config:
             self._menu_font = value
             return
         else:
-            for font in dvdarch_utils.get_fonts():
+            for font in dvdarch_utils.Get_Fonts():
                 if font[0] == value:
                     self._menu_font = font[1]
                     return
@@ -234,7 +234,7 @@ class DVD_Config:
             self._button_font = value
             return
         else:
-            for font in dvdarch_utils.get_fonts():
+            for font in dvdarch_utils.Get_Fonts():
                 if font[0] == value:
                     self._button_font = font[1]
                     return
@@ -309,7 +309,7 @@ class DVD_Config:
             self._timestamp_font = value
             return
         else:
-            for font in dvdarch_utils.get_fonts():
+            for font in dvdarch_utils.Get_Fonts():
                 if font[0] == value:
                     self._timestamp_font = font[1]
                     return
@@ -868,7 +868,7 @@ class DVD:
                 ]
             )
 
-            result, message = dvdarch_utils.execute_check_output(commands=command)
+            result, message = dvdarch_utils.Execute_Check_Output(commands=command)
 
             if result == -1:
                 return -1, message
@@ -889,7 +889,7 @@ class DVD:
         buttons_per_page = self.dvd_setup.menu_buttons_per_page
         buttons_across = self.dvd_setup.menu_buttons_across
 
-        dvd_dims = dvdarch_utils.get_dvd_dims(
+        dvd_dims = dvdarch_utils.Get_DVD_Dims(
             self.dvd_setup.menu_aspect_ratio, self.dvd_setup.video_standard
         )
         if dvd_dims.display_height == -1:
@@ -916,13 +916,13 @@ class DVD:
         if result == -1:
             return result, message
 
-        canvas_height, message = dvdarch_utils.get_image_height(
+        canvas_height, message = dvdarch_utils.Get_Image_Height(
             self._background_canvas_file
         )
         if canvas_height == -1:
             return -1, message
 
-        canvas_width, message = dvdarch_utils.get_image_width(
+        canvas_width, message = dvdarch_utils.Get_Image_Width(
             self._background_canvas_file
         )
         if canvas_width == -1:
@@ -1028,7 +1028,7 @@ class DVD:
 
             menu_text = self.dvd_setup.menu_labels[video_index]
 
-            result, message = dvdarch_utils.overlay_text(
+            result, message = dvdarch_utils.Overlay_Text(
                 in_file=menu_button_file,
                 out_file=menu_button_text_file,
                 text=menu_text,
@@ -1320,13 +1320,13 @@ class DVD:
             self._background_canvas_file,
         ]
 
-        result, message = dvdarch_utils.execute_check_output(commands=commands)
+        result, message = dvdarch_utils.Execute_Check_Output(commands=commands)
 
         if result == -1:
             return -1, message
 
         if self.dvd_setup.timestamp_font and self.dvd_setup.timestamp:
-            _, timestamp_height = dvdarch_utils.get_text_dims(
+            _, timestamp_height = dvdarch_utils.Get_Text_Dims(
                 text=self.dvd_setup.timestamp,
                 font=self.dvd_setup.timestamp_font,
                 pointsize=self.dvd_setup.timestamp_font_point_size,
@@ -1335,7 +1335,7 @@ class DVD:
             if timestamp_height == -1:
                 return -1, "Failed to get timestamp height"
 
-            result, message = dvdarch_utils.write_text_on_file(
+            result, message = dvdarch_utils.Write_Text_On_File(
                 input_file=self._background_canvas_file,
                 text=self.dvd_setup.timestamp,
                 x=self._dvd_timestamp_x_offset,
@@ -1349,7 +1349,7 @@ class DVD:
                 return -1, message
 
         if self.dvd_setup.timestamp_font and self.dvd_setup.serial_number:
-            serial_num_width, serial_num_height = dvdarch_utils.get_text_dims(
+            serial_num_width, serial_num_height = dvdarch_utils.Get_Text_Dims(
                 text=self.dvd_setup.serial_number,
                 font=self.dvd_setup.timestamp_font,
                 pointsize=self.dvd_setup.timestamp_font_point_size,
@@ -1358,7 +1358,7 @@ class DVD:
             if serial_num_height == -1:
                 return -1, "Failed to get serial number height"
 
-            result, message = dvdarch_utils.write_text_on_file(
+            result, message = dvdarch_utils.Write_Text_On_File(
                 input_file=self._background_canvas_file,
                 text=self.dvd_setup.serial_number,
                 x=width - serial_num_width - self._dvd_timestamp_x_offset,
@@ -1376,7 +1376,7 @@ class DVD:
                 f" {sys_consts.AUTHOR} {sys_consts.COPYRIGHT_YEAR()}"
             )
 
-            progname_width, progname_height = dvdarch_utils.get_text_dims(
+            progname_width, progname_height = dvdarch_utils.Get_Text_Dims(
                 text=calling_card,
                 font=self.dvd_setup.timestamp_font,
                 pointsize=self.dvd_setup.timestamp_font_point_size,
@@ -1385,7 +1385,7 @@ class DVD:
             if progname_height == -1:
                 return -1, "Failed to get calling card height"
 
-            result, message = dvdarch_utils.write_text_on_file(
+            result, message = dvdarch_utils.Write_Text_On_File(
                 input_file=self._background_canvas_file,
                 text=calling_card,
                 x=width // 2 - progname_width // 2,
@@ -1470,7 +1470,7 @@ class DVD:
                 canvas_images_file,
             ]
 
-            result, message = dvdarch_utils.execute_check_output(commands=command)
+            result, message = dvdarch_utils.Execute_Check_Output(commands=command)
 
             if result == -1:
                 return -1, message, "", "", ""
@@ -1526,7 +1526,7 @@ class DVD:
                 canvas_highlight_file,
                 canvas_select_file,
             ):
-                result, message = dvdarch_utils.create_transparent_file(
+                result, message = dvdarch_utils.Create_Transparent_File(
                     width=width,
                     height=height,
                     out_file=file,
@@ -1590,7 +1590,7 @@ class DVD:
                 out_file = file[0]
                 border_color = file[1]
 
-                result, message = dvdarch_utils.create_transparent_file(
+                result, message = dvdarch_utils.Create_Transparent_File(
                     width=width,
                     height=height,
                     out_file=out_file,
@@ -1631,7 +1631,7 @@ class DVD:
                 overlaid_file = file_tuple[0]
                 overlay_file = file_tuple[1]
 
-                result, message = dvdarch_utils.overlay_file(
+                result, message = dvdarch_utils.Overlay_File(
                     in_file=overlaid_file,
                     overlay_file=overlay_file,
                     out_file=overlaid_file,
@@ -1738,7 +1738,7 @@ class DVD:
             pointer_file_extn,
         )
 
-        pointer_width, pointer_height, message = dvdarch_utils.get_image_size(
+        pointer_width, pointer_height, message = dvdarch_utils.Get_Image_Size(
             left_pointer_icon_path
         )  # Assume left and right are the same size
 
@@ -1751,7 +1751,7 @@ class DVD:
             back_ground_file_extn,
         ) = file_handler.split_file_path(self._background_canvas_file)
 
-        canvas_width, canvas_height, message = dvdarch_utils.get_image_size(
+        canvas_width, canvas_height, message = dvdarch_utils.Get_Image_Size(
             self._background_canvas_file
         )
 
@@ -1860,7 +1860,7 @@ class DVD:
                 button_text_file,
             ) = cell_coord.get_mask_filenames()
 
-            width, height, message = dvdarch_utils.get_image_size(button_text_file)
+            width, height, message = dvdarch_utils.Get_Image_Size(button_text_file)
 
             if width == -1 and height == -1:
                 return -1, message
@@ -1903,7 +1903,7 @@ class DVD:
                     canvas_images_file,
                 ]
 
-                result, message = dvdarch_utils.execute_check_output(commands=command)
+                result, message = dvdarch_utils.Execute_Check_Output(commands=command)
 
                 if result == -1:
                     return -1, message
@@ -1914,7 +1914,7 @@ class DVD:
                     menu_title = ""
 
                 if menu_title.strip() != "":
-                    result, message = dvdarch_utils.overlay_text(
+                    result, message = dvdarch_utils.Overlay_Text(
                         in_file=canvas_images_file,
                         text=menu_title,
                         text_font=self.dvd_setup.menu_font,
@@ -2069,7 +2069,7 @@ class DVD:
 
         """
         for index, input_video in enumerate(self.dvd_setup.input_videos):
-            result, message = dvdarch_utils.resize_image(
+            result, message = dvdarch_utils.Resize_Image(
                 input_file=input_video.menu_image_file_path,
                 out_file=input_video.menu_image_file_path,
                 width=cell_coords[index].width,
@@ -2115,7 +2115,7 @@ class DVD:
             (
                 result,
                 image_file,
-            ) = dvdarch_utils.generate_menu_image_from_file(
+            ) = dvdarch_utils.Generate_Menu_Image_From_File(
                 video_file=video_file.file_path,
                 frame_number=menu_image_frame,
                 out_folder=self._menu_image_folder,
@@ -2301,7 +2301,7 @@ class DVD:
                     ac3_file,
                 ]
 
-                result, message = dvdarch_utils.execute_check_output(commands=commands)
+                result, message = dvdarch_utils.Execute_Check_Output(commands=commands)
 
                 if result == -1:
                     return -1, message
@@ -2353,7 +2353,7 @@ class DVD:
                     ac3_file,
                 ]
 
-                result, message = dvdarch_utils.execute_check_output(commands=commands)
+                result, message = dvdarch_utils.Execute_Check_Output(commands=commands)
 
                 if result == -1:
                     return -1, message
@@ -2556,7 +2556,7 @@ class DVD:
         if result.returncode == 0:
             iso_folder = file_handler.file_join(self._iso_out_folder, "dvd_iso")
 
-            return dvdarch_utils.create_dvd_iso(self._dvd_out_folder, iso_folder)
+            return dvdarch_utils.Create_DVD_Iso(self._dvd_out_folder, iso_folder)
 
         else:
             return -1, result.stderr.strip()

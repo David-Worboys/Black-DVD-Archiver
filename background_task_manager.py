@@ -26,7 +26,7 @@ import signal
 import threading
 from typing import Callable, Optional
 
-from dvdarch_utils import execute_check_output
+from dvdarch_utils import Execute_Check_Output
 
 # fmt: on
 
@@ -127,7 +127,7 @@ class Task_Manager:
             loop = asyncio.get_event_loop()
             executor = concurrent.futures.ThreadPoolExecutor()
             status, output = await loop.run_in_executor(
-                executor, execute_check_output, task.command
+                executor, Execute_Check_Output, task.command
             )
 
             if not task.crashed:

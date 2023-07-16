@@ -22,8 +22,6 @@
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
-from typing import cast
-
 import platformdirs
 
 import file_utils
@@ -32,11 +30,11 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from archive_management import Archive_Manager
-from background_task_manager import Task_Manager
 from configuration_classes import (DVD_Archiver_Base, DVD_Menu_Settings,
                                    File_Def, Get_DVD_Build_Folder, Video_Data)
 from dvd import DVD, DVD_Config
 from menu_page_title_popup import Menu_Page_Title_Popup
+from utils import Text_To_File_Name
 from video_cutter import Video_Editor
 from video_file_grid import Video_File_Grid
 
@@ -366,6 +364,8 @@ class DVD_Archiver(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event} is not an instance of qtg.Action"
 
+        file_handler = file_utils.File()
+
         if (
             self._file_control.dvd_percent_used + sys_consts.PERCENT_SAFTEY_BUFFER
             >= 100
@@ -390,9 +390,16 @@ class DVD_Archiver(DVD_Archiver_Base):
             tag="video_input_files",
         )
 
-        checked_items = file_grid.checkitems_get
+        checked_items: tuple[qtg.Grid_Item] = file_grid.checkitems_get
 
-        if not checked_items:
+        if (
+            not file_handler.file_exists(
+                directory_path=platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
+                file_name=Text_To_File_Name(self._file_control.project_name),
+                file_extension="dvdmenu.dir",
+            )
+            and not checked_items
+        ):
             popups.PopMessage(
                 title="No Video Files Selected...",
                 message="Please Select Video Files For The DVD!",
@@ -406,6 +413,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 title="DVD Menu Title",
                 video_data_list=menu_video_data,  # Pass by reference
                 menu_layout=menu_layout,  # Pass by reference
+                project_name=self._file_control.project_name,
             ).show()
             == "cancel"
         ):
@@ -422,7 +430,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 video_data_items: list[Video_Data] = menu_item[1]
 
                 for video_data in video_data_items:
-                    video_data = cast(Video_Data, video_data)
+                    video_data: Video_Data
 
                     file_def = File_Def()
                     file_def.path = video_data.video_folder
@@ -506,7 +514,10 @@ class DVD_Archiver(DVD_Archiver_Base):
         if result == -1:
             popups.PopError(
                 title="DVD Build Error...",
-                message=f"Failed To Create A DVD!!\n{message}",
+                message=(
+                    "Failed To Create A"
+                    f" DVD!!\n{sys_consts.SDELIM}{message}{sys_consts.SDELIM}"
+                ),
             ).show()
 
     def archive_dvd_files(self, video_file_defs: list[File_Def]) -> tuple[int, str]:

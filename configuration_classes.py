@@ -19,6 +19,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
+import shelve
 
 import file_utils
 import popups
@@ -50,6 +51,55 @@ def Get_DVD_Build_Folder() -> str:
         dvd_folder, f"{sys_consts.PROGRAM_NAME} Video Editor"
     )
     return dvd_folder
+
+
+def Get_Shelved_DVD_Menu_Layout(
+    project_file_name: str,
+) -> tuple[list[tuple[str, list[list["Video_Data"]]]], str]:
+    """Gets the DVD menu layout from the shelved project file.
+
+    Args:
+        project_file_name (str): The name of the shelved project file.
+
+    Returns:
+        tuple[list[tuple[str, list[list["Video_Data"]]]],str]:
+            The DVD menu layout and no error message if no issue.
+            Empty DVD menu layout and error message if there is an issue
+    """
+    assert (
+        isinstance(project_file_name, str) and project_file_name.strip() != ""
+    ), f"{project_file_name=}. Must be a non-empty str"
+
+    dvd_menu_layout: list[tuple[str, list[Video_Data]]] = []
+
+    try:
+        with shelve.open(project_file_name) as db:
+            db_data = db.get("dvd_menu_grid")
+            menu_pages: list[list[Video_Data]] = []
+
+            if db_data:
+                for grid_row in db_data:
+                    menu_title = ""
+
+                    for col_index, grid_col_item in enumerate(grid_row):
+                        grid_value: str = grid_col_item[0]
+                        grid_user_data = grid_col_item[1]
+                        if menu_title.strip() == "" and grid_value.strip() != "":
+                            menu_title = grid_value
+
+                        if col_index == 1:  # 2nd Col houses button menu titles
+                            menu_page: list[Video_Data] = []
+                            for row_grid_item in grid_col_item[2]:
+                                row_grid_item_value = row_grid_item[0]
+                                row_grid_item_user_data: Video_Data = row_grid_item[1]
+                                menu_page.append(row_grid_item_user_data)
+
+                            menu_pages.append(menu_page)
+                    dvd_menu_layout.append((menu_title, menu_pages))
+    except Exception as e:
+        return [], str(e)
+
+    return dvd_menu_layout, ""
 
 
 @dataclasses.dataclass

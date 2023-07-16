@@ -231,7 +231,7 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
                 font_path=font_combo.value_get().data
             )
 
-            pointsize, png_bytes = dvdarch_utils.get_font_example(
+            pointsize, png_bytes = dvdarch_utils.Get_Font_Example(
                 font_file=font_combo.value_get().data,
                 # pointsize=font_size.value_get(),
                 text=example_text,
@@ -372,12 +372,12 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
 
         color_list = [
             qtg.Combo_Item(display=color, data=color, icon=None, user_data=color)
-            for color in dvdarch_utils.get_color_names()
+            for color in dvdarch_utils.Get_Color_Names()
         ]
 
         font_list = [
             qtg.Combo_Item(display=font[0], data=font[1], icon=None, user_data=font)
-            for font in dvdarch_utils.get_fonts()
+            for font in dvdarch_utils.Get_Fonts()
         ]
 
         dvd_menu_properties = qtg.VBoxContainer(
