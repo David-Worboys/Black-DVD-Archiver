@@ -29,7 +29,6 @@ import math
 import os
 import pathlib
 import platform
-import pprint
 import random
 import re
 import string
@@ -8746,6 +8745,8 @@ class Grid(_qtpyBase_Control):
     noselection: bool = False
     header_sort: bool = True
 
+    _changed: bool = False
+
     @dataclasses.dataclass(slots=True)
     class _Item_Data:
         """Used to store the data for a single item in a grid"""
@@ -9057,6 +9058,36 @@ class Grid(_qtpyBase_Control):
         else:
             return 1
 
+    @property
+    def changed(self) -> bool:
+        """Returns True if the grid has been changed, False otherwise.
+
+        Returns:
+            bool: True if the grid has been changed, False otherwise.
+        """
+        if not self._changed:
+            for row in range(self._widget.rowCount()):
+                for col in range(self._widget.columnCount()):
+                    if self.valueorig_get(row, col) is None:
+                        continue
+
+                    if self.value_get(row, col) != self.valueorig_get(row, col):
+                        self._changed = True
+                        return self._changed
+
+        return self._changed
+
+    @changed.setter
+    def changed(self, value: bool):
+        """Sets the changed property.
+
+        Args:
+            value (bool): True if the grid has been changed, False otherwise.
+        """
+        assert isinstance(value, bool), f"{value=}. Must be of type bool"
+
+        self._changed = value
+
     def checkitemrow_get(self, row: int, col: int) -> Grid_Item | tuple:
         """Returns ans named tuple of (row_index, tag, current_value, and user_data) from the row and column specified
         if the item is checked or an empty tuple if not checked.
@@ -9171,6 +9202,7 @@ class Grid(_qtpyBase_Control):
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
 
+        self._changed = False
         self._widget.setRowCount(0)
 
     @property
@@ -9541,6 +9573,7 @@ class Grid(_qtpyBase_Control):
                     self._widget.editItem(item)
 
         self.select_row(row)
+        self._changed = True
 
         return row
 
@@ -9579,6 +9612,7 @@ class Grid(_qtpyBase_Control):
                             tag=item.tag,
                         )
 
+        self._changed = True
         self._widget.removeRow(row)
 
     def row_widget_tag_delete(
@@ -9613,6 +9647,7 @@ class Grid(_qtpyBase_Control):
                     and widget.tag == row_tag
                 ):
                     self.row_delete(row)
+                    self._changed = True
                     return 1
         return -1
 
@@ -9630,6 +9665,8 @@ class Grid(_qtpyBase_Control):
             raise RuntimeError(f"{self._widget=}. Not set")
 
         assert isinstance(row, int) and row > 0, f"{row=} must be an int > 0"
+
+        self._changed = True
 
         if row > self._widget.rowCount():
             row = self.row_append
@@ -10072,6 +10109,8 @@ class Grid(_qtpyBase_Control):
         if self._widget is None:
             raise RuntimeError(f"{self._widget=} not set")
 
+        self._changed = True
+
         # Append a new row if the specified row is out of range
         if row >= self._widget.rowCount():
             row_index = self.row_append
@@ -10299,10 +10338,6 @@ class Grid(_qtpyBase_Control):
         )
 
         item.setData(qtC.Qt.UserRole, item_data)
-
-        model = self._widget.model()
-
-        size = self.pixel_char_size(char_height=1, char_width=1)
 
         assert widget.width > 0 and widget.height > 0, (
             "Dev Error"
