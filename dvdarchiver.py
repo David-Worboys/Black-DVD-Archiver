@@ -30,8 +30,8 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from archive_management import Archive_Manager
-from configuration_classes import (DVD_Archiver_Base, DVD_Menu_Settings,
-                                   File_Def, Get_DVD_Build_Folder, Video_Data)
+from configuration_settings import (DVD_Archiver_Base, DVD_Menu_Settings,
+                                    File_Def, Get_DVD_Build_Folder, Video_Data)
 from dvd import DVD, DVD_Config
 from menu_page_title_popup import Menu_Page_Title_Popup
 from utils import Text_To_File_Name

@@ -25,8 +25,8 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
-from configuration_classes import (Encoding_Details, Video_Data,
-                                   Video_File_Settings)
+from configuration_settings import (Encoding_Details, Video_Data,
+                                    Video_File_Settings)
 from utils import Get_Unique_Int
 
 # fmt: on

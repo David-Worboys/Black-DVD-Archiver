@@ -31,8 +31,8 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
-from configuration_classes import (DVD_Archiver_Base, Get_DVD_Build_Folder,
-                                   Get_Shelved_DVD_Menu_Layout, Video_Data)
+from configuration_settings import (DVD_Archiver_Base, Get_DVD_Build_Folder,
+                                    Get_Shelved_DVD_Menu_Layout, Video_Data)
 from dvd_menu_configuration import DVD_Menu_Config_Popup
 from project_settings_popup import Project_Settings_Popup
 from video_file_picker import Video_File_Picker_Popup
@@ -930,16 +930,17 @@ class Video_File_Grid(DVD_Archiver_Base):
                 file_name=utils.Text_To_File_Name(self.project_name),
                 ext="dvdmenu",
             )
-
+            
             dvd_menu_layout, error_message = Get_Shelved_DVD_Menu_Layout(
                 project_file_name
             )
-
+            
         if error_message:
             popups.PopError(
                 title="DVD Menu Grid Load Error...",
                 message=f"{sys_consts.SDELIM}{str(error_message)}{sys_consts.SDELIM}",
             ).show()
+
             return None
 
         col_index = file_grid.colindex_get("video_file")

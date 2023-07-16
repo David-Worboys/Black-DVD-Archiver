@@ -31,8 +31,8 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
-from configuration_classes import (DVD_Menu_Settings,
-                                   Get_Shelved_DVD_Menu_Layout, Video_Data)
+from configuration_settings import (DVD_Menu_Settings,
+                                    Get_Shelved_DVD_Menu_Layout, Video_Data)
 from utils import Text_To_File_Name
 
 # fmt: on
