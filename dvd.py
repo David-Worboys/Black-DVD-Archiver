@@ -34,7 +34,7 @@ import dvdarch_utils
 import file_utils
 import sqldb
 import sys_consts
-from configuration_settings import File_Def
+from sys_config import File_Def
 
 # fmt: on
 

@@ -28,7 +28,7 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
-from configuration_settings import DVD_Menu_Settings
+from sys_config import DVD_Menu_Settings
 
 # fmt: on
 

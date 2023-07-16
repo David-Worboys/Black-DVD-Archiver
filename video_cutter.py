@@ -35,9 +35,8 @@ import sys_consts
 import utils
 from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
-from configuration_settings import (DVD_Archiver_Base, Video_Data,
-                                    Video_File_Settings)
 from file_renamer_popup import File_Renamer_Popup
+from sys_config import DVD_Archiver_Base, Video_Data, Video_File_Settings
 
 # fmt: on
 

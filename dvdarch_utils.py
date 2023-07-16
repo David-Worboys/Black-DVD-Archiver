@@ -35,7 +35,7 @@ import xmltodict
 import file_utils
 import sys_consts
 import utils
-from configuration_settings import Encoding_Details
+from sys_config import Encoding_Details
 
 # fmt: on
 

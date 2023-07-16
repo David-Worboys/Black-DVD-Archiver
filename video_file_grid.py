@@ -31,10 +31,10 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 import utils
-from configuration_settings import (DVD_Archiver_Base, Get_DVD_Build_Folder,
-                                    Get_Shelved_DVD_Menu_Layout, Video_Data)
 from dvd_menu_configuration import DVD_Menu_Config_Popup
 from project_settings_popup import Project_Settings_Popup
+from sys_config import (DVD_Archiver_Base, Get_DVD_Build_Folder,
+                        Get_Shelved_DVD_Menu_Layout, Video_Data)
 from video_file_picker import Video_File_Picker_Popup
 
 # fmt: on
@@ -404,7 +404,15 @@ class Video_File_Grid(DVD_Archiver_Base):
                     ).show()
                     == "yes"
                 ):
-                    file_grid.clear()
+                    if (
+                        popups.PopYesNo(
+                            title="File List Is About To Be Wiped...",
+                            message="File List Contents Will Be Lost! Continue?",
+                            icon=qtg.Sys_Icon.messagewarning.get(),
+                        ).show()
+                        == "yes"
+                    ):
+                        file_grid.clear()
 
                 self._save_grid(event)
 
@@ -924,55 +932,58 @@ class Video_File_Grid(DVD_Archiver_Base):
 
             return None
 
-        with qtg.sys_cursor(qtg.Cursor.hourglass):
-            project_file_name = file_handler.file_join(
-                dir_path=self._db_path,
-                file_name=utils.Text_To_File_Name(self.project_name),
-                ext="dvdmenu",
-            )
-            
-            dvd_menu_layout, error_message = Get_Shelved_DVD_Menu_Layout(
-                project_file_name
-            )
-            
-        if error_message:
-            popups.PopError(
-                title="DVD Menu Grid Load Error...",
-                message=f"{sys_consts.SDELIM}{str(error_message)}{sys_consts.SDELIM}",
-            ).show()
+        if self.project_name.strip():
+            with qtg.sys_cursor(qtg.Cursor.hourglass):
+                project_file_name = file_handler.file_join(
+                    dir_path=self._db_path,
+                    file_name=utils.Text_To_File_Name(self.project_name),
+                    ext="dvdmenu",
+                )
 
-            return None
+                dvd_menu_layout, error_message = Get_Shelved_DVD_Menu_Layout(
+                    project_file_name
+                )
 
-        col_index = file_grid.colindex_get("video_file")
-        missing_files = []
+            if error_message:
+                popups.PopError(
+                    title="DVD Menu Grid Load Error...",
+                    message=(
+                        f"{sys_consts.SDELIM}{str(error_message)}{sys_consts.SDELIM}"
+                    ),
+                ).show()
 
-        for row_index, menu_item in enumerate(dvd_menu_layout):
-            for menu_page in menu_item[1]:
-                for video_data in menu_page:
-                    for row_index in range(file_grid.row_count):
-                        user_data: Video_Data = file_grid.userdata_get(
-                            row=row_index, col=col_index
-                        )
+                return None
 
-                        if user_data.video_path == video_data.video_path:
-                            file_grid.checkitemrow_set(True, row_index, col_index)
-                            break
-                    else:  # No match found, missing file
-                        missing_files.append(video_data.video_path)
+            col_index = file_grid.colindex_get("video_file")
+            missing_files = []
 
-        if missing_files:
-            missing_file_list = "\n".join(missing_files)
-            popups.PopMessage(
-                title="Missing DVD Menu Files...",
-                message=(
-                    "The following DVD Menu source files are missing from the"
-                    " project:\n"
-                    f"{sys_consts.SDELIM}{missing_file_list}{sys_consts.SDELIM}"
-                ),
-                width=80,
-            ).show()
+            for row_index, menu_item in enumerate(dvd_menu_layout):
+                for menu_page in menu_item[1]:
+                    for video_data in menu_page:
+                        for row_index in range(file_grid.row_count):
+                            user_data: Video_Data = file_grid.userdata_get(
+                                row=row_index, col=col_index
+                            )
 
-        self._set_project_standard_duration(event)
+                            if user_data.video_path == video_data.video_path:
+                                file_grid.checkitemrow_set(True, row_index, col_index)
+                                break
+                        else:  # No match found, missing file
+                            missing_files.append(video_data.video_path)
+
+            if missing_files:
+                missing_file_list = "\n".join(missing_files)
+                popups.PopMessage(
+                    title="Missing DVD Menu Files...",
+                    message=(
+                        "The following DVD Menu source files are missing from the"
+                        " project:\n"
+                        f"{sys_consts.SDELIM}{missing_file_list}{sys_consts.SDELIM}"
+                    ),
+                    width=80,
+                ).show()
+
+            self._set_project_standard_duration(event)
 
         return None
 

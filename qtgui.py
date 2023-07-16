@@ -6364,7 +6364,7 @@ class PopContainer(_qtpyBase_Control):
     title: str = ""
     container: Optional[_Container] = None
     dialog: _Dialog = None
-    parent_app: QtPyApp = None  # Changed to public 2023/03/05 because of a very occasional focus_out erroe
+    parent_app: QtPyApp = None  # Changed to public 2023/03/05 because of a very occasional focus_out error
 
     # private instance variables
     _allow_close: bool = False
@@ -10947,7 +10947,7 @@ class Image(_qtpyBase_Control):
         super().__post_init__()
 
         assert isinstance(
-            self.image, (type(None), str, qtG.QPixmap)
+            self.image, (type(None), str, qtG.QIcon, qtG.QPixmap)
         ), f"{self.image=}. Must Be None. str (file_path/file_name) or QPixmap"
 
         assert (
@@ -11515,7 +11515,7 @@ class Image(_qtpyBase_Control):
             raise RuntimeError(f"{self._widget=}. Not set")
 
         assert isinstance(
-            image, (str, qtG.QPixmap, bytes)
+            image, (str, qtG.QIcon, qtG.QPixmap, bytes)
         ), f"{image=}. Must Be str (file_path/file_name) or QPixmap"
         assert isinstance(height, int) and (
             height > 0 or height == -1

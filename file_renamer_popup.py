@@ -26,7 +26,7 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
-from configuration_settings import Video_Data
+from sys_config import Video_Data
 
 # fmt: on
 
