@@ -21,7 +21,6 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
-import shelve
 from typing import Optional
 
 import platformdirs
@@ -32,7 +31,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from sys_config import (DVD_Menu_Settings, Get_Shelved_DVD_Menu_Layout,
-                        Video_Data)
+                        Set_Shelved_DVD_Layout, Video_Data)
 from utils import Text_To_File_Name
 
 # fmt: on
@@ -105,30 +104,24 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                         menu_grid: qtg.Grid = event.widget_get(
                             container_tag="menu_page_controls", tag="menu_titles"
                         )
+                        self._move_grid_row(menu_grid, True)
 
-                        new_row = menu_grid.move_row_up(menu_grid.selected_row)
-
-                        if new_row >= 0:
-                            menu_grid.select_row(new_row)
                     case "move_menu_down":
                         menu_grid: qtg.Grid = event.widget_get(
                             container_tag="menu_page_controls", tag="menu_titles"
                         )
+                        self._move_grid_row(menu_grid, False)
 
-                        new_row = menu_grid.move_row_down(menu_grid.selected_row)
-
-                        if new_row >= 0:
-                            menu_grid.select_row(new_row)
                     case "move_button_title_down":
                         if self._current_button_grid is not None:
-                            self._move_button_title(
-                                button_title_grid=self._current_button_grid,
+                            self._move_grid_row(
+                                source_grid=self._current_button_grid,
                                 up=False,
                             )
                     case "move_button_title_up":
                         if self._current_button_grid is not None:
-                            self._move_button_title(
-                                button_title_grid=self._current_button_grid,
+                            self._move_grid_row(
+                                source_grid=self._current_button_grid,
                                 up=True,
                             )
                     case "save_layout":
@@ -188,11 +181,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 menu_title_grid.value_set(
                     row=row_index,
                     col=0,
-                    value=(
-                        menu_item[0]
-                        if menu_item[0].strip() or row_index > 0
-                        else self.project_name
-                    ),
+                    value=menu_item[0],
                     user_data=None,
                 )
 
@@ -208,11 +197,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 menu_title_grid.value_set(
                     row=row_index,
                     col=0,
-                    value=(
-                        menu_item[0]
-                        if menu_item[0].strip() or row_index > 0
-                        else self.project_name
-                    ),
+                    value=menu_item[0],
                     user_data=None,
                 )
                 menu_pages: list[list[Video_Data]] = menu_item[1]
@@ -228,6 +213,25 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             temp_non_group = []
 
             for temp_video_item in temp_video_list:
+                # Check if in saved DVD menu layout and ignore if so
+                used = False
+                for grouped_item in grouped_video_items:
+                    if temp_video_item.video_path == grouped_item.video_path:
+                        used = True
+                        break
+
+                if used:
+                    continue
+
+                for non_grouped_item in non_grouped_video_items:
+                    if temp_video_item.video_path == non_grouped_item.video_path:
+                        used = True
+                        break
+
+                if used:
+                    continue
+
+                # Sort out the groupings of the files that are not in the saved DVD layout
                 if temp_video_item.video_file_settings.menu_group >= 0:
                     is_grouped = False
                     for group_video_item in grouped_video_items:
@@ -295,6 +299,21 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             self._insert_video_title_control(
                 menu_title_grid=menu_title_grid, menu_pages=menu_pages
             )
+
+        # Default 1st page title to project name
+        if menu_title_grid.row_count > 0:
+            menu_titles_col_index = menu_title_grid.colindex_get("menu_title")
+
+            if (
+                menu_title_grid.value_get(row=0, col=menu_titles_col_index).strip()
+                == ""
+            ):
+                menu_title_grid.value_set(
+                    row=0,
+                    col=menu_titles_col_index,
+                    value=self.project_name,
+                    user_data=None,
+                )
 
         menu_title_grid.changed = False
 
@@ -417,19 +436,11 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             list[tuple[str, list[list[Video_Data]]]]: The DVD menu page Video_Data definitions loaded from the database file
         """
 
-        file_handler = file_utils.File()
-
-        project_file_name = file_handler.file_join(
-            dir_path=self._db_path,
-            file_name=Text_To_File_Name(self.project_name),
-            ext="dvdmenu",
-        )
-
         dvd_menu_layout: list[tuple[str, list[Video_Data]]] = []
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             dvd_menu_layout, error_message = Get_Shelved_DVD_Menu_Layout(
-                project_file_name
+                self.project_name
             )
 
         if error_message:
@@ -440,20 +451,20 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         return dvd_menu_layout
 
-    def _move_button_title(self, button_title_grid: qtg.Grid, up: bool) -> None:
+    def _move_grid_row(self, source_grid: qtg.Grid, up: bool) -> None:
         """
         Move the selected button title up or down in the button title grid on a given row.
 
         Args:
-            button_title_grid (qtg.Grid): The button title grid on a given row
+            source_grid (qtg.Grid): The grid with the row to move up or down depending on up
             up (bool): True to move the edit point up, False to move it down.
         """
         assert isinstance(up, bool), f"{up=}. Must be bool"
 
         checked_items: tuple[qtg.Grid_Item] = (
-            button_title_grid.checkitems_get
+            source_grid.checkitems_get
             if up
-            else tuple(reversed(button_title_grid.checkitems_get))
+            else tuple(reversed(source_grid.checkitems_get))
         )
 
         assert all(
@@ -468,6 +479,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             return None
 
         checked_indices: list[int] = [item.row_index for item in checked_items]
+
         index_range: list[int] = (
             list(range(min(checked_indices), max(checked_indices) + 1))
             if up
@@ -478,8 +490,8 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             len(checked_indices) > 1 and checked_indices != index_range
         ):  # Contiguous block check failed
             popups.PopMessage(
-                title="Selected Button Titles Not Contiguous...",
-                message="Selected Button Titles Must Be A Contiguous Block!",
+                title="Selected Rows Not Contiguous...",
+                message="Selected Rows Must Be A Contiguous Block!",
             ).show()
             return None
 
@@ -488,23 +500,23 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 if checked_item.row_index == 0:
                     break
             else:
-                if checked_item.row_index == button_title_grid.row_count - 1:
+                if checked_item.row_index == source_grid.row_count - 1:
                     break
 
-            button_title_grid.checkitemrow_set(False, checked_item.row_index, 0)
-            button_title_grid.select_row(checked_item.row_index)
+            source_grid.checkitemrow_set(False, checked_item.row_index, 0)
+            source_grid.select_row(checked_item.row_index)
 
             if up:
-                new_row = button_title_grid.move_row_up(checked_item.row_index)
+                new_row = source_grid.move_row_up(checked_item.row_index)
             else:
-                new_row = button_title_grid.move_row_down(checked_item.row_index)
+                new_row = source_grid.move_row_down(checked_item.row_index)
 
             if new_row >= 0:
-                button_title_grid.checkitemrow_set(True, new_row, 0)
-                button_title_grid.select_col(new_row, 0)
+                source_grid.checkitemrow_set(True, new_row, 0)
+                source_grid.select_col(new_row, 0)
             else:
-                button_title_grid.checkitemrow_set(True, checked_item.row_index, 0)
-                button_title_grid.select_col(checked_item.row_index, 0)
+                source_grid.checkitemrow_set(True, checked_item.row_index, 0)
+                source_grid.select_col(checked_item.row_index, 0)
 
     def _process_cancel(self, event: qtg.Action) -> int:
         """
@@ -712,63 +724,54 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
 
-        file_handler = file_utils.File()
-        project_file_name = file_handler.file_join(
-            dir_path=self._db_path,
-            file_name=Text_To_File_Name(self.project_name),
-            ext="dvdmenu",
-        )
+        with qtg.sys_cursor(qtg.Cursor.hourglass):
+            row_data: list[tuple[str, list[Video_Data]]] = []
 
-        try:
-            with qtg.sys_cursor(qtg.Cursor.hourglass):
-                with shelve.open(project_file_name) as db:
-                    row_data = []
+            for row in range(menu_title_grid.row_count):
+                grid_col_values = []
+                row_grid_data = []
 
-                    for row in range(menu_title_grid.row_count):
-                        grid_col_values = []
+                for col in range(menu_title_grid.col_count):
+                    grid_value = menu_title_grid.value_get(row=row, col=col)
+                    grid_user_data = menu_title_grid.userdata_get(row=row, col=col)
+
+                    if col == video_titles_col_index:
+                        row_grid: qtg.Grid = menu_title_grid.row_widget_get(
+                            row=row,
+                            col=video_titles_col_index,
+                            container_tag="control_box",
+                            tag="row_grid",
+                        )
+
                         row_grid_data = []
-                        for col in range(menu_title_grid.col_count):
-                            grid_value = menu_title_grid.value_get(row=row, col=col)
-                            grid_user_data = menu_title_grid.userdata_get(
-                                row=row, col=col
-                            )
 
-                            if col == video_titles_col_index:
-                                row_grid: qtg.Grid = menu_title_grid.row_widget_get(
-                                    row=row,
-                                    col=video_titles_col_index,
-                                    container_tag="control_box",
-                                    tag="row_grid",
+                        for row_grid_row in range(row_grid.row_count):
+                            for row_grid_col in range(row_grid.col_count):
+                                row_grid_value = row_grid.value_get(
+                                    row=row_grid_row, col=row_grid_col
+                                )
+                                row_grid_user_data = row_grid.userdata_get(
+                                    row=row_grid_row, col=row_grid_col
                                 )
 
-                                row_grid_data = []
+                                row_grid_data.append(
+                                    (row_grid_value, row_grid_user_data)
+                                )
 
-                                for row_grid_row in range(row_grid.row_count):
-                                    for row_grid_col in range(row_grid.col_count):
-                                        row_grid_value = row_grid.value_get(
-                                            row=row_grid_row, col=row_grid_col
-                                        )
-                                        row_grid_user_data = row_grid.userdata_get(
-                                            row=row_grid_row, col=row_grid_col
-                                        )
+                    grid_col_values.append((grid_value, grid_user_data, row_grid_data))
 
-                                        row_grid_data.append(
-                                            (row_grid_value, row_grid_user_data)
-                                        )
+                row_data.append(grid_col_values)
 
-                            grid_col_values.append(
-                                (grid_value, grid_user_data, row_grid_data)
-                            )
+            result = Set_Shelved_DVD_Layout(
+                project_name=self.project_name, dvd_menu_layout=row_data
+            )
 
-                        row_data.append(grid_col_values)
-
-                    db["dvd_menu_grid"] = row_data
-        except Exception as e:
-            popups.PopError(
-                title="DVD Menu Grid Save Error...",
-                message=f"{sys_consts.SDELIM}{str(e)}{sys_consts.SDELIM}",
-            ).show()
-            return -1
+            if result:
+                popups.PopError(
+                    title="DVD Menu Grid Save Error...",
+                    message=f"{sys_consts.SDELIM}{result}{sys_consts.SDELIM}",
+                ).show()
+                return -1
         return 1
 
     def layout(self) -> qtg.VBoxContainer:

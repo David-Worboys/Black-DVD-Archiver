@@ -21,11 +21,14 @@
 import dataclasses
 import shelve
 
+import platformdirs
+
 import file_utils
 import popups
 import sqldb
 import sys_consts
 from qtgui import Action
+from utils import Text_To_File_Name
 
 # fmt: on
 
@@ -54,12 +57,12 @@ def Get_DVD_Build_Folder() -> str:
 
 
 def Get_Shelved_DVD_Menu_Layout(
-    project_file_name: str,
+    project_name: str,
 ) -> tuple[list[tuple[str, list[list["Video_Data"]]]], str]:
     """Gets the DVD menu layout from the shelved project file.
 
     Args:
-        project_file_name (str): The name of the shelved project file.
+        project_name (str): The name of the shelved project file.
 
     Returns:
         tuple[list[tuple[str, list[list["Video_Data"]]]],str]:
@@ -67,8 +70,17 @@ def Get_Shelved_DVD_Menu_Layout(
             Empty DVD menu layout and error message if there is an issue
     """
     assert (
-        isinstance(project_file_name, str) and project_file_name.strip() != ""
-    ), f"{project_file_name=}. Must be a non-empty str"
+        isinstance(project_name, str) and project_name.strip() != ""
+    ), f"{project_name=}. Must be a non-empty str"
+
+    db_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
+
+    file_handler = file_utils.File()
+    project_file_name = file_handler.file_join(
+        dir_path=db_path,
+        file_name=Text_To_File_Name(project_name),
+        ext="dvdmenu",
+    )
 
     dvd_menu_layout: list[tuple[str, list[Video_Data]]] = []
 
@@ -84,6 +96,8 @@ def Get_Shelved_DVD_Menu_Layout(
                     for col_index, grid_col_item in enumerate(grid_row):
                         grid_value: str = grid_col_item[0]
                         grid_user_data = grid_col_item[1]
+                        menu_pages = []
+
                         if menu_title.strip() == "" and grid_value.strip() != "":
                             menu_title = grid_value
 
@@ -100,6 +114,41 @@ def Get_Shelved_DVD_Menu_Layout(
         return [], str(e)
 
     return dvd_menu_layout, ""
+
+
+def Set_Shelved_DVD_Layout(
+    project_name: str, dvd_menu_layout: list[tuple[str, list[list["Video_Data"]]]]
+) -> str:
+    """Saves the DVD menu layout to the shelved project file.
+
+    Args:
+        project_name (str): The name of the shelved project.
+        dvd_menu_layout (list[tuple[str, list[list[Video_Data]]]]): The DVD menu layout to save.
+
+    Returns:
+        str: Empty string if successful, or an error message if there is an issue.
+    """
+    assert (
+        isinstance(project_name, str) and project_name.strip() != ""
+    ), f"{project_name=}. Must be a non-empty str"
+    assert isinstance(dvd_menu_layout, list), f"{dvd_menu_layout=}. Must be a list"
+
+    db_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
+
+    file_handler = file_utils.File()
+    project_file_name = file_handler.file_join(
+        dir_path=db_path,
+        file_name=Text_To_File_Name(project_name),
+        ext="dvdmenu",
+    )
+
+    try:
+        with shelve.open(project_file_name) as db:
+            db["dvd_menu_grid"] = dvd_menu_layout
+    except Exception as e:
+        return str(e)
+
+    return ""
 
 
 @dataclasses.dataclass

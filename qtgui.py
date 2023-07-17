@@ -9462,6 +9462,7 @@ class Grid(_qtpyBase_Control):
 
             self._widget.removeRow(move_row + 1)
             self._widget.setCurrentCell(new_row, column)
+            self._changed = True
 
             return new_row
 
@@ -9495,6 +9496,7 @@ class Grid(_qtpyBase_Control):
 
             self._widget.removeRow(move_row)
             self._widget.setCurrentCell(new_row, column)
+            self._changed = True
 
             return move_row + 1
 

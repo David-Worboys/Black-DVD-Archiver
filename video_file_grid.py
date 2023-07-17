@@ -934,14 +934,8 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         if self.project_name.strip():
             with qtg.sys_cursor(qtg.Cursor.hourglass):
-                project_file_name = file_handler.file_join(
-                    dir_path=self._db_path,
-                    file_name=utils.Text_To_File_Name(self.project_name),
-                    ext="dvdmenu",
-                )
-
                 dvd_menu_layout, error_message = Get_Shelved_DVD_Menu_Layout(
-                    project_file_name
+                    self.project_name
                 )
 
             if error_message:
@@ -958,6 +952,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             missing_files = []
 
             for row_index, menu_item in enumerate(dvd_menu_layout):
+                print(f"DBG YYY {menu_item=}")
                 for menu_page in menu_item[1]:
                     for video_data in menu_page:
                         for row_index in range(file_grid.row_count):
