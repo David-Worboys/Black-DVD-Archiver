@@ -1264,6 +1264,7 @@ class Video_Data:
     video_extension: str
     encoding_info: Encoding_Details
     video_file_settings: Video_File_Settings
+    dvd_page: int = -1
     vd_id: int = -1
 
     def __post_init__(self) -> None:
@@ -1285,6 +1286,10 @@ class Video_Data:
         assert isinstance(
             self.video_file_settings, Video_File_Settings
         ), f"{self.video_file_settings=}. Must be an instance of Video_Filter_Settings"
+
+        assert (
+            isinstance(self.dvd_page, int) and self.dvd_page == -1 or self.dvd_page >= 0
+        ), f"{self.dvd_page=}. Must be an int == -1 or >= 0"
 
         assert (
             isinstance(self.vd_id, int) and self.vd_id == -1 or self.vd_id >= 0
@@ -1322,6 +1327,7 @@ class File_Def:
     _video_file_settings: Video_File_Settings = dataclasses.field(
         default_factory=Video_File_Settings
     )
+    _dvd_page: int = -1
 
     @property
     def path(self) -> str:
@@ -1483,3 +1489,23 @@ class File_Def:
         ), f"{value=}. Must be an instance Video_Filter_Settings"
 
         self._video_file_settings = value
+
+    @property
+    def dvd_page(self) -> int:
+        """
+        The dvd_page method is used to get the DVD page number.
+
+        Returns:
+            int : DVD page number or -1 if not set
+        """
+        return self._dvd_page
+
+    @dvd_page.setter
+    def dvd_page(self, value: int) -> None:
+        """
+        The dvd_page method is used to set the DVD page number.
+        """
+        assert (
+            isinstance(value, int) and value == -1 or value >= 0
+        ), f"{value=}. Must be an int == -1 or >= 0"
+        self._dvd_page = value

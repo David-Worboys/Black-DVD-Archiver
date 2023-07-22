@@ -419,9 +419,9 @@ class DVD_Archiver(DVD_Archiver_Base):
         ):
             return None
 
-        video_file_defs = []
-        menu_labels = []
-        menu_title = []
+        video_file_defs: list[File_Def] = []
+        menu_labels: list[str] = []
+        menu_title: list[str] = []
         dvd_menu_settings = DVD_Menu_Settings()
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
@@ -439,6 +439,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     )
                     file_def.encoding_info = video_data.encoding_info
                     file_def.video_file_settings = video_data.video_file_settings
+                    file_def.dvd_page = video_data.dvd_page
 
                     if video_data.video_file_settings.button_title.strip() == "":
                         menu_labels.append(video_data.video_file)
@@ -472,8 +473,6 @@ class DVD_Archiver(DVD_Archiver_Base):
                     dvd_config.serial_number = dvd_serial_number
 
                 dvd_config.input_videos = video_file_defs
-
-                dvd_config.menu_labels = menu_labels
 
                 dvd_config.menu_title = menu_title
                 dvd_config.menu_background_color = (

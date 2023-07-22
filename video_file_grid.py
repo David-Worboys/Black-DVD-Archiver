@@ -951,7 +951,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             col_index = file_grid.colindex_get("video_file")
             missing_files = []
 
-            for row_index, menu_item in enumerate(dvd_menu_layout):                
+            for row_index, menu_item in enumerate(dvd_menu_layout):
                 for menu_page in menu_item[1]:
                     for video_data in menu_page:
                         for row_index in range(file_grid.row_count):

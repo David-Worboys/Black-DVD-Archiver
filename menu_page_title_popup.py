@@ -613,6 +613,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             for row_grid_row in range(row_grid.row_count):
                 button_title: str = row_grid.value_get(row=row_grid_row, col=0)
                 video_data: Video_Data = row_grid.userdata_get(row=row_grid_row, col=0)
+                video_data.dvd_page = row
 
                 if (
                     video_data.video_file_settings.button_title.strip()

@@ -46,7 +46,6 @@ class DVD_Config:
     _input_videos: list[File_Def] | tuple[File_Def] = dataclasses.field(
         default_factory=tuple
     )
-    _menu_labels: list[str] | tuple[str] = dataclasses.field(default_factory=tuple)
     _menu_title: list[str] | tuple[str] = dataclasses.field(default_factory=tuple)
     _menu_background_color: str = "wheat"
     _menu_font_color: str = "gold"
@@ -105,23 +104,6 @@ class DVD_Config:
             ), f"{video_file.path=}. Must be a valid file path"
 
         self._input_videos = value
-
-    @property
-    def menu_labels(self) -> list[str] | tuple[str]:
-        return self._menu_labels
-
-    @menu_labels.setter
-    def menu_labels(self, value: list[str] | tuple[str]) -> None:
-        assert isinstance(
-            value, (list, tuple)
-        ), f"{value=}. Must be a list | tuple of str"
-
-        assert all(
-            isinstance(menu_label, str) and menu_label.strip() != ""
-            for menu_label in value
-        ), f"{value=} must be list | tuple of non-empty strings."
-
-        self._menu_labels = value
 
     @property
     def menu_background_color(self) -> str:
@@ -508,10 +490,6 @@ class DVD:
         assert (
             len(self.dvd_setup.input_videos) > 0
         ), "Must have at least one input video"
-        assert len(self.dvd_setup.menu_labels) > 0, "Must have at least one menu label"
-        assert len(self.dvd_setup.input_videos) == len(
-            self.dvd_setup.menu_labels
-        ), "Input videos and menu_labels must be the same length"
 
         error_no, error_message = self._build_working_folders()
 
@@ -895,17 +873,29 @@ class DVD:
         if dvd_dims.display_height == -1:
             return -1, "Failed To Get DVD Dimensions"
 
-        cell_coords, message = self._calc_layout(
-            num_buttons=len(self.dvd_setup.input_videos),
-            buttons_per_page=buttons_per_page,
-            buttons_across=buttons_across,
-            button_aspect_ratio=4 / 3,
-            dvd_dims=dvd_dims,
-            border_top=10,
-            border_bottom=10 + timestamp_height,
-            border_left=10,  # + timestamp_height,
-            border_right=10,  # + timestamp_height,
-        )
+        if all(file_def.dvd_page >= 0 for file_def in self.dvd_setup.input_videos):
+            cell_coords, message = self._dvd_page_calc_layout(
+                buttons_per_page=buttons_per_page,
+                buttons_across=buttons_across,
+                button_aspect_ratio=4 / 3,
+                dvd_dims=dvd_dims,
+                border_top=10,
+                border_bottom=10 + timestamp_height,
+                border_left=10,  # + timestamp_height,
+                border_right=10,  # + timestamp_height,
+            )
+        else:  # Auto calc layout
+            cell_coords, message = self._auto_calc_layout(
+                num_buttons=len(self.dvd_setup.input_videos),
+                buttons_per_page=buttons_per_page,
+                buttons_across=buttons_across,
+                button_aspect_ratio=4 / 3,
+                dvd_dims=dvd_dims,
+                border_top=10,
+                border_bottom=10 + timestamp_height,
+                border_left=10,  # + timestamp_height,
+                border_right=10,  # + timestamp_height,
+            )
 
         if not cell_coords:
             return -1, message
@@ -933,7 +923,9 @@ class DVD:
         if result == -1:
             return -1, message
 
-        result, message = self._create_labels(buttons_per_page=buttons_per_page)
+        result, message = self._create_labels(
+            cell_coords=cell_coords, buttons_per_page=buttons_per_page
+        )
 
         if result == -1:
             return -1, message
@@ -972,14 +964,16 @@ class DVD:
         if result == -1:
             return -1, message
 
-        result, message = self._create_dvd_image(buttons_per_page=buttons_per_page)
+        result, message = self._create_dvd_image(cell_coords=cell_coords)
 
         if result == -1:
             return -1, message
 
         return 1, ""
 
-    def _create_labels(self, buttons_per_page: int) -> tuple[int, str]:
+    def _create_labels(
+        self, cell_coords: list[_Cell_Coords], buttons_per_page: int
+    ) -> tuple[int, str]:
         """
         Create images for each label to be placed on the button images.
         Args:
@@ -1011,22 +1005,23 @@ class DVD:
 
         file_handler = file_utils.File()
 
-        for video_index, input_video in enumerate(self.dvd_setup.input_videos):
-            page = math.floor(video_index / buttons_per_page)
+        for cell_cord in cell_coords:
             path_name, file_name, file_extn = file_handler.split_file_path(
-                input_video.menu_image_file_path
+                cell_cord.video_file.menu_image_file_path
             )
 
             # Setup required files
             menu_button_file = file_handler.file_join(path_name, file_name, file_extn)
             menu_button_text_file = file_handler.file_join(
-                path_name, f"{file_name}_text_{page}", file_extn
+                path_name, f"{file_name}_text_{cell_cord.page}", file_extn
             )
 
             if not file_handler.file_exists(menu_button_file):
                 return -1, f"Video File Does Not Exist : {menu_button_file}"
 
-            menu_text = self.dvd_setup.menu_labels[video_index]
+            cell_cord.video_file.video_file_settings.button_title
+
+            menu_text = cell_cord.video_file.video_file_settings.button_title
 
             result, message = dvdarch_utils.Overlay_Text(
                 in_file=menu_button_file,
@@ -1046,7 +1041,74 @@ class DVD:
 
         return 1, ""
 
-    def _calc_layout(
+    def _build_page_grid(
+        self,
+        num_buttons: int,
+        num_pages: int,
+        buttons_per_page: int,
+        buttons_across: int,
+    ) -> tuple[list[list], int, int]:
+        """Builds a page grid.  Empty cells are represented by -1, Non-empty cells are represented by 1.
+
+        Args:
+            num_buttons (int): Total number of buttons in the dvd menu.
+            num_pages (int): Total number of pages in the dvd menu.
+            buttons_per_page (int): Number of buttons on a single page.
+            buttons_across (int): Number of buttons across a single page.
+
+        Returns:
+            tuple[list[list], int, int]:
+            - arg 1: A list of page grids.
+            - arg 2: Number of rows in the page grid.
+            - arg 3: Number of columns in the page grid.
+        """
+        assert (
+            isinstance(num_buttons, int) and num_buttons > 0
+        ), f"{num_buttons=}. Must be int > 0"
+        assert (
+            isinstance(buttons_per_page, int) and buttons_per_page > 0
+        ), f"{buttons_per_page=}. Must be int > 0"
+        assert (
+            isinstance(buttons_across, int) and buttons_across > 0
+        ), f"{buttons_across=}. Must be int > 0"
+
+        pages = []
+        button_count = 0
+        num_rows = 0
+        num_cols = 0
+
+        if buttons_per_page == 1:
+            buttons_down = 1
+        else:
+            buttons_down = math.ceil(buttons_per_page / buttons_across)
+
+        for _ in range(num_pages):
+            page_grid = [
+                [-1 for _ in range(buttons_across)] for _ in range(buttons_down)
+            ]
+
+            button_num = 0
+            for row_index in range(buttons_down):
+                for col_index in range(buttons_across):
+                    if button_num > buttons_per_page - 1:
+                        break
+                    elif button_count < num_buttons:
+                        page_grid[row_index][col_index] = 1
+                        button_count += 1
+                    else:
+                        break
+
+                    button_num += 1
+
+                if button_num > buttons_per_page - 1 or button_count == num_buttons:
+                    break
+
+            pages.append(page_grid)
+            num_rows = max(num_rows, len(page_grid))
+            num_cols = max(num_cols, len(page_grid[0]))
+        return pages, num_rows, num_cols
+
+    def _auto_calc_layout(
         self,
         num_buttons: int,
         buttons_per_page: int,
@@ -1100,73 +1162,6 @@ class DVD:
             isinstance(border_right, int) and border_right >= 0
         ), f"{border_right=}. Must be int >= than zero"
 
-        # ===== Helper
-        def _build_page_grid(
-            num_buttons: int,
-            buttons_per_page: int,
-            buttons_across: int,
-        ) -> tuple[list[list], int, int]:
-            """Builds a page grid.  Empty cells are represented by -1, Non-empty cells are represented by 1.
-
-            Args:
-                num_buttons (int): Total number of buttons in the dvd menu.
-                buttons_per_page (int): Number of buttons on a single page.
-                buttons_across (int): Number of buttons across a single page.
-
-            Returns:
-                tuple[list[list], int, int]:
-                - arg 1: A list of page grids.
-                - arg 2: Number of rows in the page grid.
-                - arg 3: Number of columns in the page grid.
-            """
-            assert (
-                isinstance(num_buttons, int) and num_buttons > 0
-            ), f"{num_buttons=}. Must be int > 0"
-            assert (
-                isinstance(buttons_per_page, int) and buttons_per_page > 0
-            ), f"{buttons_per_page=}. Must be int > 0"
-            assert (
-                isinstance(buttons_across, int) and buttons_across > 0
-            ), f"{buttons_across=}. Must be int > 0"
-
-            pages = []
-            button_count = 0
-            num_rows = 0
-            num_cols = 0
-
-            if buttons_per_page == 1:
-                buttons_down = 1
-            else:
-                buttons_down = math.ceil(buttons_per_page / buttons_across)
-
-            for _ in range(num_pages):
-                page_grid = [
-                    [-1 for _ in range(buttons_across)] for _ in range(buttons_down)
-                ]
-
-                button_num = 0
-                for row_index in range(buttons_down):
-                    for col_index in range(buttons_across):
-                        if button_num > buttons_per_page - 1:
-                            break
-                        elif button_count < num_buttons:
-                            page_grid[row_index][col_index] = 1
-                            button_count += 1
-                        else:
-                            break
-
-                        button_num += 1
-
-                    if button_num > buttons_per_page - 1 or button_count == num_buttons:
-                        break
-
-                pages.append(page_grid)
-                num_rows = max(num_rows, len(page_grid))
-                num_cols = max(num_cols, len(page_grid[0]))
-            return pages, num_rows, num_cols
-
-        # ===== Main
-
         # TODO Make these values configurable
         header_pad = 10  # Feel good thing
         button_padding = 20  # Min value that works with spumux
@@ -1189,8 +1184,9 @@ class DVD:
 
         num_pages = math.ceil(num_buttons / buttons_per_page)
 
-        pages, num_rows, num_cols = _build_page_grid(
+        pages, num_rows, num_cols = self._build_page_grid(
             num_buttons=num_buttons,
+            num_pages=num_pages,
             buttons_per_page=buttons_per_page,
             buttons_across=buttons_across,
         )
@@ -1241,7 +1237,7 @@ class DVD:
                 f"Too Many Buttons Down: {total_height=}  >  {canvas_height=}",
             )
 
-            # Calculate the y offset
+        # Calculate the y offset
         y_offset = ((canvas_height - total_height) // 2) + border_top + header_pad
 
         cell_cords = []
@@ -1295,6 +1291,195 @@ class DVD:
                     )
                     file_index += 1
                     col_index += 1
+
+        return cell_cords, ""
+
+    def _dvd_page_calc_layout(
+        self,
+        buttons_per_page: int,
+        buttons_across,
+        button_aspect_ratio: float,
+        dvd_dims: dvdarch_utils.dvd_dims,
+        border_top: int = 0,
+        border_left: int = 0,
+        border_bottom: int = 15,
+        border_right: int = 0,
+    ) -> tuple[list[_Cell_Coords], str]:
+        """
+        Generates a layout of rectangles with fixed size borders on each edge,
+        arranged to fit according to assigned dvd pages.
+
+        Args:
+            buttons_per_page (int): The number of buttons on the DVD menu page
+            buttons_across (int): The number of buttons across the DVD menu (buttons down is calculated).
+            button_aspect_ratio (float): The aspect ratio of the button rectangles (height/width).
+            dvd_dims (dvdarch_utils.dvd_dims): The DVD dimensions
+            border_top (int): The width of the border at the top edge of the canvas.
+            border_left (int): The width of the border at the left edge of the canvas.
+            border_bottom (int): The width of the border at the bottom edge of the canvas.
+            border_right (int): The width of the border at the right edge of the canvas.
+        Returns:
+            tuple[list[_Cell_Coords], str]:
+            - arg 1: A list of _Cell_Coords objects representing the layout of the rectangles within the canvas.
+            - arg 2 : An error message if there is an error.
+
+        """
+        # TODO Make these values configurable
+        header_pad = 10  # Feel good thing
+        button_padding = 20  # Min value that works with spumux
+
+        # This keeps spumux happy
+        if border_right < SPUMUX_BUFFER:
+            border_right = SPUMUX_BUFFER
+
+        if border_left < SPUMUX_BUFFER:
+            border_left = SPUMUX_BUFFER
+
+        if not self.dvd_setup.menu_title:  # Header pad is only for titles
+            header_pad = 0
+
+        # Compute the canvas size and ratio
+        canvas_width = dvd_dims.display_width - (border_left + border_right)
+        canvas_height = dvd_dims.display_height - (
+            border_top + border_bottom + header_pad
+        )
+
+        num_pages = (
+            self.dvd_setup.input_videos[-1].dvd_page + 1
+        )  # dvd_page is zero based
+
+        if buttons_per_page == 1:
+            buttons_down = 1
+        else:
+            buttons_down = math.ceil(buttons_per_page / buttons_across)
+
+        max_button_height = canvas_height // max(
+            buttons_down, 4
+        )  # Do not change as spumux very sensitive to this
+
+        ## Compute the maximum width of each rectangle based on the number of columns across all pages
+        rect_width_max = (
+            (canvas_width // buttons_across)
+            - (buttons_across * button_padding)
+            - (border_left + border_right)
+        )
+
+        # Compute the dimensions of each rectangle and the padding between them
+        rect_width = rect_width_max
+        rect_height = int(min(canvas_height / buttons_down, max_button_height))
+        rect_aspect_ratio = rect_width / rect_height
+
+        if rect_aspect_ratio > button_aspect_ratio:
+            rect_width = int(rect_height * button_aspect_ratio)
+        else:
+            rect_height = int(rect_width / button_aspect_ratio)
+
+        # Compute the vertical padding between the rectangles
+        if buttons_down > 1:
+            rect_padding = (canvas_height - rect_height * buttons_down) / (
+                buttons_down - 1
+            )
+        else:
+            rect_padding = canvas_height - rect_height * buttons_down
+
+        # We do not want the padding to be too big or small, so we max it at
+        # twice the horizontal spacing between the rectangles and min it at button_padding.
+        if rect_padding < button_padding or rect_padding > 2 * button_padding:
+            rect_padding = 2 * button_padding
+
+        dvd_menu_pages = []
+        num_non_empty_rows = 0
+        for page_index in range(num_pages):
+            page_file_defs = [
+                file_def
+                for file_def in sorted(
+                    self.dvd_setup.input_videos, key=lambda item: item.dvd_page
+                )
+                if file_def.dvd_page == page_index
+            ]
+
+            dvd_page = []
+
+            for row_index in range(buttons_down):
+                row = []
+                for col_index in range(buttons_across):
+                    if row_index * buttons_across + col_index >= len(page_file_defs):
+                        break
+
+                    row.append(page_file_defs[row_index * buttons_across + col_index])
+
+                if row_index > num_non_empty_rows:
+                    num_non_empty_rows = row_index
+
+                dvd_page.append(row)
+
+            dvd_menu_pages.append(dvd_page)
+
+        cell_cords = []
+        file_index = 0
+
+        for page_index, page in enumerate(dvd_menu_pages):
+            # Num of rows could vary per page so need to calc for each page
+            num_non_empty_rows = len([item for item in page if item])
+
+            # Calculate the total height of the grid
+            total_height = (
+                num_non_empty_rows * rect_height
+                + (num_non_empty_rows - 1) * rect_padding
+            )
+
+            # Calculate the y offset
+            y_offset = ((canvas_height - total_height) // 2) + border_top + header_pad
+
+            for row_index, row in enumerate(page):
+                row_col_count = len(row)
+
+                total_width = (row_col_count * rect_width) + (
+                    button_padding * (row_col_count - 1)
+                )
+
+                if total_width > canvas_width:
+                    return (
+                        [],
+                        f"Too Many Buttons Across: {total_width=}  >  {canvas_width=}",
+                    )
+
+                x_offset = (canvas_width - total_width) // 2 + border_right
+
+                col_index = 0
+                for col_value in row:
+                    if col_value == -1:  # Ignore not on grid
+                        continue
+
+                    x = int(x_offset + col_index * (rect_width + button_padding))
+                    y = int(y_offset + row_index * (rect_height + rect_padding))
+
+                    if file_index > len(self.dvd_setup.input_videos) - 1:
+                        return (
+                            [],
+                            (
+                                "File index out of range 0 -"
+                                f" {len(self.dvd_setup.input_videos) - 1}"
+                            ),
+                        )
+
+                    cell_cords.append(
+                        _Cell_Coords(
+                            x0=x,
+                            y0=y,
+                            x1=x + rect_width,
+                            y1=y + rect_height,
+                            width=rect_width
+                            - button_padding,  # Provide space between buttons
+                            height=rect_height
+                            - button_padding,  # Provide space between buttons
+                            page=page_index,
+                            video_file=self.dvd_setup.input_videos[file_index],
+                        )
+                    )
+                    file_index += 1
+                    col_index += 1
+
         return cell_cords, ""
 
     def _create_canvas_image(self, width: int, height: int) -> tuple[int, str]:
@@ -1748,7 +1933,7 @@ class DVD:
         (
             background_path_name,
             background_file_name,
-            back_ground_file_extn,
+            _,
         ) = file_handler.split_file_path(self._background_canvas_file)
 
         canvas_width, canvas_height, message = dvdarch_utils.Get_Image_Size(
@@ -1758,7 +1943,7 @@ class DVD:
         if canvas_width == -1 and canvas_height == -1:
             return -1, message
 
-        max_page_no = 0
+        max_page_no = cell_coords[-1].page + 1  # Zero based
         prev_page = -1
 
         left_x = SPUMUX_BUFFER
@@ -1766,58 +1951,16 @@ class DVD:
         right_x = canvas_width - (pointer_width + SPUMUX_BUFFER)
         right_y = canvas_height - (pointer_height + SPUMUX_BUFFER)
 
-        for coords in cell_coords:
-            if coords.page != prev_page:
-                prev_page = coords.page
-                max_page_no += 1
-
         # ----- Write out spumux files # TODO Enhance with button name/pos/action, split out to another method then
-        prev_page = cell_coords[0].page
-        (
-            result,
-            canvas_overlay_file,
-            canvas_highlight_file,
-            canvas_select_file,
-            canvas_images_file,
-        ) = _get_canvas_overlay_files(
-            background_path_name=background_path_name,
-            background_file_name=background_file_name,
-            page_no=0,
-        )
-
-        if result == -1:
-            return (
-                -1,
-                canvas_overlay_file,
-            )  # Holds error message if result is -1
-
-        result, message = _write_spumux_xml(
-            page=0,
-            prev_page=-1,
-            canvas_highlight_file=canvas_highlight_file,
-            canvas_select_file=canvas_select_file,
-            background_path_name=background_path_name,
-        )
-
-        if result == -1:
-            return -1, message
+        prev_page = -1
 
         for cell_index, cell_coord in enumerate(cell_coords):
             if (
-                prev_page != cell_coord.page or cell_index == len(cell_coords) - 1
+                prev_page != cell_coord.page
+                or cell_index == 0
+                or cell_index == len(cell_coords) - 1
             ):  # Page break
                 prev_page = cell_coord.page
-
-                result, message = _write_spumux_xml(
-                    page=cell_coord.page,
-                    prev_page=-prev_page,
-                    canvas_highlight_file=canvas_highlight_file,
-                    canvas_select_file=canvas_select_file,
-                    background_path_name=background_path_name,
-                )
-
-                if result == -1:
-                    return -1, message
 
                 (
                     result,
@@ -1836,6 +1979,17 @@ class DVD:
                         -1,
                         canvas_overlay_file,
                     )  # Holds error message if result is -1
+
+                result, message = _write_spumux_xml(
+                    page=cell_coord.page,
+                    prev_page=-prev_page,
+                    canvas_highlight_file=canvas_highlight_file,
+                    canvas_select_file=canvas_select_file,
+                    background_path_name=background_path_name,
+                )
+
+                if result == -1:
+                    return -1, message
 
         else:
             result, message = _write_spumux_xml(
@@ -1869,10 +2023,7 @@ class DVD:
             y_padding = math.floor((cell_coord.height - height) / 2)
 
             button_x = cell_coord.x0 + x_padding
-            button_y = (
-                cell_coord.y0
-                + y_padding  # - (pointer_height) if max_page_no > 1 else 0
-            )
+            button_y = cell_coord.y0 + y_padding
 
             if (
                 prev_page != cell_coord.page or cell_index > len(cell_coords) - 1
@@ -2056,7 +2207,9 @@ class DVD:
 
         return 1, ""
 
-    def _resize_menu_button_images(self, cell_coords: list[_Cell_Coords]):
+    def _resize_menu_button_images(
+        self, cell_coords: list[_Cell_Coords]
+    ) -> tuple[int, str]:
         """Resize the menu buttons to fit on the grid layout
 
         Args:
@@ -2068,12 +2221,15 @@ class DVD:
             - arg2: error message or "" if ok
 
         """
-        for index, input_video in enumerate(self.dvd_setup.input_videos):
+        for cell_coord in cell_coords:
+            if cell_coord.video_file.menu_image_file_path == "":
+                continue
+
             result, message = dvdarch_utils.Resize_Image(
-                input_file=input_video.menu_image_file_path,
-                out_file=input_video.menu_image_file_path,
-                width=cell_coords[index].width,
-                height=cell_coords[index].height,
+                input_file=cell_coord.video_file.menu_image_file_path,
+                out_file=cell_coord.video_file.menu_image_file_path,
+                width=cell_coord.width,
+                height=cell_coord.height,
                 ignore_aspect=True,
             )
 
@@ -2427,18 +2583,21 @@ class DVD:
 
         return 1, ""
 
-    def _create_dvd_image(self, buttons_per_page: int) -> tuple[int, str]:
+    def _create_dvd_image(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
         """Creates the DVD Folder/File structure via the dvdauthor application
 
         Args:
-                buttons_per_page (int): The maximum number of buttons to display per page.
+            cell_coords (list[_Cell_Coords]): The calculated grid layout
 
         Returns:
             tuple[int, str]: arg 1 : 1 Ok, -1 Fail, arg 2 : "" if Ok otherwise Error Message
         """
-        assert (
-            isinstance(buttons_per_page, int) and buttons_per_page > 0
-        ), f"{buttons_per_page=}. Must be int > 0"
+        assert isinstance(
+            cell_coords, list
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert all(
+            isinstance(item, _Cell_Coords) for item in cell_coords
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
 
         file_handler = file_utils.File()
         path_name, file_name, _ = file_handler.split_file_path(
@@ -2460,25 +2619,25 @@ class DVD:
             }
         }
 
-        page_max = math.ceil(len(self.dvd_setup.input_videos) / buttons_per_page)
+        page_max = cell_coords[-1].page + 1  # zero based
         page_count = 0
         button_count = 1
-        buttons_per_page = min(len(self.dvd_setup.input_videos), buttons_per_page)
         pgc = {"button": [], "vob": {"@pause": "inf"}}
         pgcs = []
         button_index = 0
         arrow_index = 0
 
-        # Build menu pass
-        for menu_index, input_video in enumerate(self.dvd_setup.input_videos):
+        # # Build menu pass
+        for menu_index, coord in enumerate(cell_coords):
             button_index += 1
             # TODO Specifically use buttons indicies rather than relying on the auro feature of spumux
             # pgc["button"].append({"@name":f"btn-{button_index}","#text":f"jump title {menu_index + 1};"})
             pgc["button"].append(f"jump title {menu_index + 1};")
 
             if (
-                button_count == buttons_per_page
-                or menu_index == len(self.dvd_setup.input_videos) - 1
+                button_count
+                == len([item for item in cell_coords if item.page == coord.page])
+                or menu_index == len(cell_coords) - 1
             ):
                 page_count += 1
 
@@ -2513,8 +2672,8 @@ class DVD:
         }
 
         # Build titleset pass
-        for input_video in self.dvd_setup.input_videos:
-            _, video_name, _ = file_handler.split_file_path(input_video.file_path)
+        for coord in cell_coords:
+            _, video_name, _ = file_handler.split_file_path(coord.video_file.file_name)
             vob_file = file_handler.file_join(self._vob_folder, video_name, "vob")
 
             pgc = {"vob": {"@file": vob_file}}
