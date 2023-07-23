@@ -22,7 +22,6 @@
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
-from calendar import c
 import platformdirs
 
 import file_utils
@@ -33,7 +32,7 @@ import sys_consts
 from archive_management import Archive_Manager
 from dvd import DVD, DVD_Config
 from menu_page_title_popup import Menu_Page_Title_Popup
-from sys_config import (DVD_Archiver_Base, DVD_Menu_Settings, File_Def,
+from sys_config import (DVD_Archiver_Base, DVD_Menu_Settings,
                         Get_DVD_Build_Folder, Video_Data)
 from utils import Text_To_File_Name
 from video_cutter import Video_Editor
@@ -420,7 +419,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         ):
             return None
 
-        video_file_defs: list[File_Def] = []
+        video_files: list[Video_Data] = []
         menu_labels: list[str] = []
         menu_title: list[str] = []
         dvd_menu_settings = DVD_Menu_Settings()
@@ -431,33 +430,22 @@ class DVD_Archiver(DVD_Archiver_Base):
                 menu_title.append(menu_item[0])
                 video_data_items: list[Video_Data] = menu_item[1]
 
-                for video_data in video_data_items:
+                for video_item in video_data_items:
                     self._file_control.check_file(
-                        file_grid=file_grid, vd_id=video_data.vd_id, checked=True
+                        file_grid=file_grid, vd_id=video_item.vd_id, checked=True
                     )
+                    video_files.append(video_item)
 
-                    video_data: Video_Data
-                    file_def = File_Def()
-                    file_def.path = video_data.video_folder
-                    file_def.file_name = (
-                        f"{video_data.video_file}{video_data.video_extension}"
-                    )
-                    file_def.encoding_info = video_data.encoding_info
-                    file_def.video_file_settings = video_data.video_file_settings
-                    file_def.dvd_page = video_data.dvd_page
-
-                    if video_data.video_file_settings.button_title.strip() == "":
-                        menu_labels.append(video_data.video_file)
+                    if video_item.video_file_settings.button_title.strip() == "":
+                        menu_labels.append(video_item.video_file)
                     else:
-                        menu_labels.append(video_data.video_file_settings.button_title)
-
-                    video_file_defs.append(file_def)
+                        menu_labels.append(video_item.video_file_settings.button_title)
 
         result = -1
         message = ""
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
-            if video_file_defs:
+            if video_files:
                 dvd_config = DVD_Config()
 
                 # TODO: Move this to the GUI, currently the following is guaranteed as set in DB when created
@@ -477,7 +465,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     )
                     dvd_config.serial_number = dvd_serial_number
 
-                dvd_config.input_videos = video_file_defs
+                dvd_config.input_videos = video_files
 
                 dvd_config.menu_title = menu_title
                 dvd_config.menu_background_color = (
@@ -513,7 +501,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 result, message = self._dvd.build()
 
                 if result == 1:
-                    result, message = self.archive_dvd_files(video_file_defs)
+                    result, message = self.archive_dvd_files(video_files)
 
         if result == -1:
             popups.PopError(
@@ -524,12 +512,12 @@ class DVD_Archiver(DVD_Archiver_Base):
                 ),
             ).show()
 
-    def archive_dvd_files(self, video_file_defs: list[File_Def]) -> tuple[int, str]:
+    def archive_dvd_files(self, video_files: list[Video_Data]) -> tuple[int, str]:
         """
         Archives the specified video files into a DVD image and saves the ISO image to the specified folder.
 
         Args:
-            video_file_defs: A list of `File_Def` objects representing the video files to be archived.
+            video_files (list[Video_Data]): A list of `Video_Data` objects representing the video files to be archived.
 
         Returns:
             tuple[int, str]:
@@ -538,24 +526,21 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         """
         assert isinstance(
-            video_file_defs, list
-        ), f"{video_file_defs} must be a list of File_Def instances"
+            video_files, list
+        ), f"{video_files} must be a list of File_Def instances"
         assert all(
-            isinstance(fd, File_Def) for fd in video_file_defs
-        ), f"All elements in {video_file_defs} must be instances of File_Def"
+            isinstance(fd, Video_Data) for fd in video_files
+        ), f"All elements in {video_files} must be instances of File_Def"
 
-        file_handler = file_utils.File()
         dvd_image_folder = self._dvd.dvd_image_folder
         iso_folder = self._dvd.iso_folder
         archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
 
         source_files = []
-        for file_def in video_file_defs:
-            file_def: File_Def
+        for video_file in video_files:
+            video_file: Video_Data
 
-            source_files.append(
-                file_handler.file_join(file_def.path, file_def.file_name)
-            )
+            source_files.append(video_file.video_path)
 
         if source_files:
             archive_manager = Archive_Manager(archive_folder=archive_folder)

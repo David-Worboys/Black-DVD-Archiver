@@ -32,6 +32,7 @@ import sqldb
 import sys_consts
 from sys_config import (DVD_Menu_Settings, Get_Shelved_DVD_Menu_Layout,
                         Set_Shelved_DVD_Layout, Video_Data)
+
 # fmt: on
 
 

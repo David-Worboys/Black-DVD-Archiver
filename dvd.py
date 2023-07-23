@@ -34,7 +34,7 @@ import dvdarch_utils
 import file_utils
 import sqldb
 import sys_consts
-from sys_config import File_Def
+from sys_config import Video_Data
 
 # fmt: on
 
@@ -43,7 +43,7 @@ SPUMUX_BUFFER: Final[int] = 43
 
 @dataclasses.dataclass
 class DVD_Config:
-    _input_videos: list[File_Def] | tuple[File_Def] = dataclasses.field(
+    _input_videos: list[Video_Data] | tuple[Video_Data] = dataclasses.field(
         default_factory=tuple
     )
     _menu_title: list[str] | tuple[str] = dataclasses.field(default_factory=tuple)
@@ -85,23 +85,23 @@ class DVD_Config:
         locale.setlocale(locale.LC_TIME, current_locale)
 
     @property
-    def input_videos(self) -> list[File_Def] | tuple[File_Def]:
+    def input_videos(self) -> list[Video_Data] | tuple[Video_Data]:
         return self._input_videos
 
     @input_videos.setter
-    def input_videos(self, value: list[File_Def] | tuple[File_Def]) -> None:
+    def input_videos(self, value: list[Video_Data] | tuple[Video_Data]) -> None:
         assert isinstance(
             value, (list, tuple)
         ), f"{value=}. Must be a list | tuple of File_Def"
 
         for video_file in value:
             assert isinstance(
-                video_file, File_Def
+                video_file, Video_Data
             ), f"{video_file=}. Must be a File_Def"
 
             assert file_utils.File().path_exists(
-                video_file.path
-            ), f"{video_file.path=}. Must be a valid file path"
+                video_file.video_folder
+            ), f"{video_file.video_folder=}. Must be a valid file folder"
 
         self._input_videos = value
 
@@ -357,7 +357,7 @@ class _Cell_Coords:
     width: int = 0
     height: int = 0
     page: int = 0
-    video_file: File_Def = dataclasses.field(default_factory=File_Def)
+    video_file: Video_Data = dataclasses.field(default_factory=Video_Data)
 
     def get_mask_filenames(self, alternate_file_path: str = "") -> tuple[str, ...]:
         """Generate the file names for overlay, highlight, select, and text masks.
@@ -690,8 +690,9 @@ class DVD:
         black_box_filter = ",".join(filter_commands)
 
         for video_file in self.dvd_setup.input_videos:
-            _, file_name, _ = file_handler.split_file_path(video_file.file_path)
-            vob_file = file_handler.file_join(self._vob_folder, file_name, "vob")
+            vob_file = file_handler.file_join(
+                self._vob_folder, video_file.video_file, "vob"
+            )
 
             # Tries to dering and lighten dark videos somewhat
             auto_bright = (
@@ -704,7 +705,7 @@ class DVD:
             ):
                 return (
                     -1,
-                    f"{video_file.file_path=}. Does Not Specify Height and/or Width",
+                    f"{video_file.video_path=}. Does Not Specify Height and/or Width",
                 )
 
             if not video_file.encoding_info.video_ar:
@@ -793,7 +794,7 @@ class DVD:
                     "-threads",  # set number of threads to use
                     f"{psutil.cpu_count(logical=False) - 1}",  # To be responsive use 1 core less than is in the system
                     "-i",  # input flag
-                    video_file.file_path,  # path to video file
+                    video_file.video_path,  # path to video file
                 ]
                 + interlaced_flags
                 + [
@@ -2244,7 +2245,7 @@ class DVD:
         """
         for video_file in self.dvd_setup.input_videos:
             if video_file.encoding_info.video_frame_count <= 0:
-                return -1, f"No video frame count found for {video_file.file_path}"
+                return -1, f"No video frame count found for {video_file.video_path}"
 
             if (
                 video_file.video_file_settings.menu_button_frame == -1
@@ -2268,7 +2269,7 @@ class DVD:
                 result,
                 image_file,
             ) = dvdarch_utils.Generate_Menu_Image_From_File(
-                video_file=video_file.file_path,
+                video_file=video_file.video_path,
                 frame_number=menu_image_frame,
                 out_folder=self._menu_image_folder,
             )
@@ -2669,8 +2670,9 @@ class DVD:
 
         # Build titleset pass
         for coord in cell_coords:
-            _, video_name, _ = file_handler.split_file_path(coord.video_file.file_name)
-            vob_file = file_handler.file_join(self._vob_folder, video_name, "vob")
+            vob_file = file_handler.file_join(
+                self._vob_folder, coord.video_file.video_file, "vob"
+            )
 
             pgc = {"vob": {"@file": vob_file}}
 

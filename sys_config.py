@@ -1259,6 +1259,7 @@ class Video_Data:
         vd_id (int): The id of the video data. Defaults to -1.
     """
 
+    # Public instance variables
     video_folder: str
     video_file: str
     video_extension: str
@@ -1266,6 +1267,9 @@ class Video_Data:
     video_file_settings: Video_File_Settings
     dvd_page: int = -1
     vd_id: int = -1
+
+    # Private instance variables
+    _menu_image_file_path: str = ""
 
     def __post_init__(self) -> None:
         """
@@ -1311,115 +1315,6 @@ class Video_Data:
 
         return video_path
 
-
-@dataclasses.dataclass
-class File_Def:
-    """
-    Class to hold video file related information
-    """
-
-    _path: str = ""
-    _file_name: str = ""
-    _menu_image_file_path: str = ""
-    _encoding_info: Encoding_Details = dataclasses.field(
-        default_factory=Encoding_Details
-    )
-    _video_file_settings: Video_File_Settings = dataclasses.field(
-        default_factory=Video_File_Settings
-    )
-    _dvd_page: int = -1
-
-    @property
-    def path(self) -> str:
-        """
-        The path method is used to get the path to the file.
-
-        Returns:
-            str: The path to the file
-        """
-        assert (
-            isinstance(self._path, str) and self._path.strip() != ""
-        ), f"{self._path=} must be str"
-
-        return self._path
-
-    @path.setter
-    def path(self, value: str) -> None:
-        """
-        The path method is used to set the path to the file.
-
-        Args:
-            value: (str): Check if the value is a string and that it's not empty
-
-        """
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a file path"
-
-        self._path = value
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a file path"
-
-        assert file_utils.File().path_exists(value), f"{value=}. Path does not exist"
-
-        self._path = value
-
-    @property
-    def file_name(self) -> str:
-        """
-        The file_name method is used to get the file name.
-
-        Returns:
-            str: The file name
-        """
-        assert (
-            isinstance(self._file_name, str) and self._file_name.strip() != ""
-        ), f"{self._file_name=} must be str"
-
-        return self._file_name
-
-    @file_name.setter
-    def file_name(self, value: str) -> None:
-        """
-        The file_name method is used to set the file name.
-
-        Args:
-            value: (str): The file name
-
-        """
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a file name"
-
-        self._file_name = value
-
-    @property
-    def encoding_info(self) -> Encoding_Details:
-        """
-        The file_info method is used to get the video file information.
-
-        Returns:
-            Video_Details: The file information
-        """
-
-        return self._encoding_info
-
-    @encoding_info.setter
-    def encoding_info(self, value: Encoding_Details) -> None:
-        """
-        The file_info method is used to set the video file information.
-
-        Args:
-            value: (Video_Details): The file information
-
-        """
-        assert isinstance(
-            value, Encoding_Details
-        ), f"{value=}. Must be a dict of file properties"
-
-        self._encoding_info = value
-
     @property
     def menu_image_file_path(self) -> str:
         """
@@ -1450,62 +1345,3 @@ class File_Def:
         assert file_utils.File().file_exists(value), f"{value=}. Path does not exist"
 
         self._menu_image_file_path = value
-
-    @property
-    def file_path(self) -> str:
-        """
-        The file_path method is used to get the full path to the file.
-
-        Returns:
-            str: The full path to the file
-        """
-        return file_utils.File().file_join(self.path, self.file_name)
-
-    @property
-    def video_file_settings(self) -> Video_File_Settings:
-        """
-        The video_file_settings method is used to get the video file settings.
-
-        Returns:
-            Video_File_Settings: The video file settings
-        """
-        assert isinstance(
-            self._video_file_settings, Video_File_Settings
-        ), f"{self._video_file_settings=}. Must be an instance of Video_Filter_Settings"
-
-        return self._video_file_settings
-
-    @video_file_settings.setter
-    def video_file_settings(self, value: Video_File_Settings) -> None:
-        """
-        The video_file_settings method is used to set the video file settings.
-
-        Args:
-            value: (Video_File_Settings): The video file settings instance
-
-        """
-        assert isinstance(
-            value, Video_File_Settings
-        ), f"{value=}. Must be an instance Video_Filter_Settings"
-
-        self._video_file_settings = value
-
-    @property
-    def dvd_page(self) -> int:
-        """
-        The dvd_page method is used to get the DVD page number.
-
-        Returns:
-            int : DVD page number or -1 if not set
-        """
-        return self._dvd_page
-
-    @dvd_page.setter
-    def dvd_page(self, value: int) -> None:
-        """
-        The dvd_page method is used to set the DVD page number.
-        """
-        assert (
-            isinstance(value, int) and value == -1 or value >= 0
-        ), f"{value=}. Must be an int == -1 or >= 0"
-        self._dvd_page = value
