@@ -436,10 +436,10 @@ class DVD_Archiver(DVD_Archiver_Base):
                     )
                     video_files.append(video_item)
 
-                    if video_item.video_file_settings.button_title.strip() == "":
-                        menu_labels.append(video_item.video_file)
-                    else:
+                    if video_item.video_file_settings.button_title.strip():
                         menu_labels.append(video_item.video_file_settings.button_title)
+                    else:
+                        menu_labels.append(video_item.video_file)
 
         result = -1
         message = ""
@@ -501,7 +501,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 result, message = self._dvd.build()
 
                 if result == 1:
-                    result, message = self.archive_dvd_files(video_files)
+                    result, message = self.archive_dvd_files(menu_layout)
 
         if result == -1:
             popups.PopError(
@@ -512,12 +512,15 @@ class DVD_Archiver(DVD_Archiver_Base):
                 ),
             ).show()
 
-    def archive_dvd_files(self, video_files: list[Video_Data]) -> tuple[int, str]:
+    def archive_dvd_files(
+        self, menu_layout: list[tuple[str, list[Video_Data]]]
+    ) -> tuple[int, str]:
         """
         Archives the specified video files into a DVD image and saves the ISO image to the specified folder.
 
         Args:
-            video_files (list[Video_Data]): A list of `Video_Data` objects representing the video files to be archived.
+            menu_layout (list[tuple[str, list[Video_Data]]]): A list of tuples (menu title,Video_Data)
+            representing the video files to be archived.
 
         Returns:
             tuple[int, str]:
@@ -526,30 +529,31 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         """
         assert isinstance(
-            video_files, list
-        ), f"{video_files} must be a list of File_Def instances"
-        assert all(
-            isinstance(fd, Video_Data) for fd in video_files
-        ), f"All elements in {video_files} must be instances of File_Def"
+            menu_layout, list
+        ), f"{menu_layout=} must be a list of tuples of str,Video_Data"
+
+        for menu in menu_layout:
+            assert isinstance(menu[0], str), f"{menu[0]=} must be a str"
+            assert isinstance(menu[1], list), f"{menu[1]=} must be a list"
+            assert all(
+                isinstance(fd, Video_Data) for fd in menu[1]
+            ), f"All elements in {menu[1]=} must be Video_Data"
 
         dvd_image_folder = self._dvd.dvd_image_folder
         iso_folder = self._dvd.iso_folder
         archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
 
-        source_files = []
-        for video_file in video_files:
-            video_file: Video_Data
-
-            source_files.append(video_file.video_path)
-
-        if source_files:
+        if menu_layout:
             archive_manager = Archive_Manager(archive_folder=archive_folder)
 
             result, message = archive_manager.archive_dvd_build(
-                dvd_name=self._dvd.dvd_setup.serial_number,
+                dvd_name=(
+                    f"{self._dvd.dvd_setup.serial_number} -"
+                    f" {self._file_control.project_name}"
+                ),
                 dvd_folder=dvd_image_folder,
                 iso_folder=iso_folder,
-                source_video_files=source_files,
+                menu_layout=menu_layout,
             )
 
             if result == -1:

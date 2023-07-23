@@ -236,8 +236,8 @@ class File:
         if os.path.isdir(source):
             return -1, f"Source path is a directory: {source}"
 
-        if os.path.isfile(destination_path):
-            return -1, f"Destination path is a file: {destination_path}"
+        # if os.path.isfile(destination_path):
+        #    return -1, f"Destination path is a file: {destination_path}"
 
         if not os.path.exists(os.path.dirname(destination_path)):
             return (

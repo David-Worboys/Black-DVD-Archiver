@@ -22,9 +22,12 @@
 import dataclasses
 import json
 from datetime import datetime
+from xml.dom.minidom import Text
 
 import file_utils
 import sys_consts
+from sys_config import Video_Data
+from utils import Text_To_File_Name
 
 # fmt: on
 
@@ -101,7 +104,7 @@ class Archive_Manager:
         dvd_name: str,
         dvd_folder: str,
         iso_folder: str,
-        source_video_files: list[str],
+        menu_layout: list[tuple[str, list[Video_Data]]],
         overwrite_existing: bool = True,
     ) -> tuple[int, str]:
         """
@@ -111,7 +114,7 @@ class Archive_Manager:
             dvd_name (str): The name of the DVD.
             iso_folder (str) : The file path of the folder where the ISO build was created.
             dvd_folder (str): The file path of the folder where the DVD build was created.
-            source_video_files (list[str]): A list of file paths for the source video files to be included in the DVD.
+            menu_layout (list[tuple[str, list[Video_Data]]]): A list of tuples (menu title,Video_Data) represeting thd DVD folder/file names
             overwrite_existing (bool): Whether to overwrite existing DVD backup folder
 
         Returns:
@@ -126,16 +129,22 @@ class Archive_Manager:
         assert (
             isinstance(iso_folder, str) and iso_folder.strip() != ""
         ), f"{iso_folder=}. Must be a non-empty str"
-        assert (
-            isinstance(source_video_files, list) and source_video_files != []
-        ), f"{source_video_files=}. Must be a non-empty list of str"
-        assert all(
-            isinstance(file_path, str) for file_path in source_video_files
-        ), "source_video_files list must only contain strings"
+        assert isinstance(
+            menu_layout, list
+        ), f"{menu_layout=} must be a list of tuples of str,Video_Data"
+
+        for menu in menu_layout:
+            assert isinstance(menu[0], str), f"{menu[0]=} must be a str"
+            assert isinstance(menu[1], list), f"{menu[1]=} must be a list"
+            assert all(
+                isinstance(fd, Video_Data) for fd in menu[1]
+            ), f"All elements in {menu[1]=} must be Video_Data"
 
         self._error_code = 1
 
         file_handler = file_utils.File()
+
+        dvd_name = Text_To_File_Name(dvd_name)
 
         backup_path = file_handler.file_join(self.archive_folder, dvd_name)
 
@@ -223,11 +232,44 @@ class Archive_Manager:
                     self._error_code = -1
                     return -1, f"Failed To Create Backup Folder : {backup_item_folder}"
 
-                for source_file in source_video_files:
-                    result, message = file_handler.copy_file(
-                        source_file, backup_item_folder
-                    )
+                for menu in menu_layout:
+                    menu_title = menu[0]
 
+                    if menu_title.strip():
+                        menu_dir = file_handler.file_join(
+                            dir_path=backup_item_folder,
+                            file_name=Text_To_File_Name(menu_title),
+                        )
+                    else:
+                        menu_dir = backup_item_folder
+
+                    if not file_handler.path_exists(menu_dir):
+                        if file_handler.make_dir(menu_dir) == -1:
+                            self._error_code = -1
+                            return -1, f"Failed To Create Backup Folder : {menu_dir}"
+
+                    for menu_video_data in menu[1]:
+                        backup_file_name = (
+                            Text_To_File_Name(
+                                menu_video_data.video_file_settings.button_title
+                            )
+                            if menu_video_data.video_file_settings.button_title.strip()
+                            else menu_video_data.video_file
+                        )
+
+                        backup_path = file_handler.file_join(
+                            dir_path=menu_dir,
+                            file_name=backup_file_name,
+                            ext=menu_video_data.video_extension,
+                        )
+
+                        result, message = file_handler.copy_file(
+                            menu_video_data.video_path, backup_path
+                        )
+
+                        if result == -1:
+                            self._error_code = -1
+                            return -1, message
         return 1, ""
 
     def delete_edit_cuts(self, file_path: str) -> tuple[int, str]:
