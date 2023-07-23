@@ -22,7 +22,6 @@
 import dataclasses
 import json
 from datetime import datetime
-from xml.dom.minidom import Text
 
 import file_utils
 import sys_consts
@@ -94,7 +93,10 @@ class Archive_Manager:
                         " Not Delete Folder!"
                     )
             except (FileNotFoundError, PermissionError, IOError) as e:
-                self._error_message = f"Failed To Write {readme_file} {e} "
+                self._error_message = (
+                    "Failed To Write"
+                    f" {sys_consts.SDELIM}{readme_file} {e}{sys_consts.SDELIM} "
+                )
                 self._error_code = 1
 
         return ""
@@ -114,7 +116,7 @@ class Archive_Manager:
             dvd_name (str): The name of the DVD.
             iso_folder (str) : The file path of the folder where the ISO build was created.
             dvd_folder (str): The file path of the folder where the DVD build was created.
-            menu_layout (list[tuple[str, list[Video_Data]]]): A list of tuples (menu title,Video_Data) represeting thd DVD folder/file names
+            menu_layout (list[tuple[str, list[Video_Data]]]): A list of tuples (menu title,Video_Data) representing thd DVD folder/file names
             overwrite_existing (bool): Whether to overwrite existing DVD backup folder
 
         Returns:
@@ -137,7 +139,7 @@ class Archive_Manager:
             assert isinstance(menu[0], str), f"{menu[0]=} must be a str"
             assert isinstance(menu[1], list), f"{menu[1]=} must be a list"
             assert all(
-                isinstance(fd, Video_Data) for fd in menu[1]
+                isinstance(video_item, Video_Data) for video_item in menu[1]
             ), f"All elements in {menu[1]=} must be Video_Data"
 
         self._error_code = 1
@@ -190,47 +192,52 @@ class Archive_Manager:
             return -1, self._error_message
 
         if file_handler.path_exists(backup_path):
-            result, message = file_handler.remove_dir_contents(backup_path)
+            self._error_code, message = file_handler.remove_dir_contents(backup_path)
 
-            if result == -1:
+            if self._error_code == -1:
                 self._error_message = str(message).replace(
                     backup_path,
-                    f"{sys_consts.SDELIM}{sys_consts.SDELIM}{sys_consts.SDELIM}",
+                    f"{sys_consts.SDELIM}{backup_path}{sys_consts.SDELIM}",
                 )
-                self._error_code = -1
                 return -1, self._error_message
 
         if file_handler.make_dir(dvd_name) == -1:
             self._error_code = -1
-            return (
-                -1,
-                (
-                    "Failed To Create Backup Folder :"
-                    f" {sys_consts.SDELIM}{dvd_name}{sys_consts.SDELIM}"
-                ),
+            self._error_message = (
+                "Failed To Create Backup Folder :"
+                f" {sys_consts.SDELIM}{dvd_name}{sys_consts.SDELIM}"
             )
+            return -1, self._error_message
 
         for folder in self._backup_folders:
             backup_item_folder = file_handler.file_join(backup_path, folder)
 
             if folder == DVD_IMAGE:
-                result, message = file_handler.copy_dir(
+                self._error_code, self._error_message = file_handler.copy_dir(
                     src_folder=dvd_folder, dest_folder=backup_item_folder
                 )
 
-                if result == -1:
-                    self._error_code = -1
-                    return -1, message
+                if self._error_code == -1:
+                    return -1, self._error_message
+
             elif folder == ISO_IMAGE:
-                result, message = file_handler.copy_dir(
+                self._error_code, self._error_message = file_handler.copy_dir(
                     src_folder=iso_folder, dest_folder=backup_item_folder
                 )
+                if self._error_code == -1:
+                    return -1, self._error_message
             elif folder == MISC:
                 pass
             elif folder == VIDEO_SOURCE:
                 if file_handler.make_dir(backup_item_folder) == -1:
                     self._error_code = -1
-                    return -1, f"Failed To Create Backup Folder : {backup_item_folder}"
+                    return (
+                        -1,
+                        (
+                            "Failed To Create Backup Folder :"
+                            f" {sys_consts.SDELIM}{backup_item_folder}{sys_consts.SDELIM}"
+                        ),
+                    )
 
                 for menu in menu_layout:
                     menu_title = menu[0]
@@ -246,7 +253,13 @@ class Archive_Manager:
                     if not file_handler.path_exists(menu_dir):
                         if file_handler.make_dir(menu_dir) == -1:
                             self._error_code = -1
-                            return -1, f"Failed To Create Backup Folder : {menu_dir}"
+                            return (
+                                -1,
+                                (
+                                    "Failed To Create Backup Folder"
+                                    f" :{sys_consts.SDELIM}{menu_dir}{sys_consts.SDELIM}"
+                                ),
+                            )
 
                     for menu_video_data in menu[1]:
                         backup_file_name = (
@@ -263,12 +276,11 @@ class Archive_Manager:
                             ext=menu_video_data.video_extension,
                         )
 
-                        result, message = file_handler.copy_file(
+                        self._error_code, self._error_message = file_handler.copy_file(
                             menu_video_data.video_path, backup_path
                         )
 
-                        if result == -1:
-                            self._error_code = -1
+                        if self._error_code == -1:
                             return -1, message
         return 1, ""
 
@@ -293,17 +305,25 @@ class Archive_Manager:
         )
 
         if not file_handler.path_exists(self.archive_folder):
-            self._error_message = f"{self.archive_folder} does not exist"
+            self._error_message = (
+                f"{sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM} does not"
+                " exist"
+            )
             self._error_code = -1
             return self._error_code, self._error_message
 
         if not file_handler.path_writeable(self.archive_folder):
-            self._error_message = f"{self.archive_folder} is not writable"
+            self._error_message = (
+                f"{sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM} is not"
+                " writable"
+            )
             self._error_code = -1
             return self._error_code, self._error_message
 
         if not file_handler.file_exists(json_cuts_file):
-            self._error_message = f"{json_cuts_file} does not exist"
+            self._error_message = (
+                f"{sys_consts.SDELIM}{json_cuts_file}{sys_consts.SDELIM} does not exist"
+            )
             self._error_code = 1  # May not be an actual error
             return self._error_code, self._error_message
 
@@ -316,7 +336,10 @@ class Archive_Manager:
             IOError,
             json.decoder.JSONDecodeError,
         ) as e:
-            self._error_message = f"Can not read {json_cuts_file}. {e}"
+            self._error_message = (
+                f"Can not read {sys_consts.SDELIM}{json_cuts_file}."
+                f" {e}{sys_consts.SDELIM}"
+            )
             self._error_code = -1
             return self._error_code, self._error_message
 
@@ -333,7 +356,10 @@ class Archive_Manager:
                 IOError,
                 json.decoder.JSONDecodeError,
             ) as e:
-                self._error_message = f"Unable to write to JSON file: {e}"
+                self._error_message = (
+                    "Unable to write to JSON file:"
+                    f" {sys_consts.SDELIM}{e}{sys_consts.SDELIM}"
+                )
                 self._error_code = -1
 
                 return self._error_code, self._error_message
@@ -366,17 +392,25 @@ class Archive_Manager:
         )
 
         if not file_handler.path_exists(self.archive_folder):
-            self._error_message = f"{self.archive_folder} does not exist"
+            self._error_message = (
+                f"{sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM} does not"
+                " exist"
+            )
             self._error_code = -1
             return ()
 
         if not file_handler.path_writeable(self.archive_folder):
-            self._error_message = f"{self.archive_folder} is not writable"
+            self._error_message = (
+                f"{sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM} is not"
+                " writable"
+            )
             self._error_code = -1
             return ()
 
         if not file_handler.file_exists(json_cuts_file):
-            self._error_message = f"{json_cuts_file} does not exist"
+            self._error_message = (
+                f"{sys_consts.SDELIM}{json_cuts_file}{sys_consts.SDELIM} does not exist"
+            )
             self._error_code = 1  # May not be an actual error
             return ()
 
@@ -390,7 +424,10 @@ class Archive_Manager:
             IOError,
             json.decoder.JSONDecodeError,
         ) as e:
-            self._error_message = f"Can not read {json_cuts_file}. {e}"
+            self._error_message = (
+                f"Can not read {sys_consts.SDELIM}{json_cuts_file}."
+                f" {e}{sys_consts.SDELIM}"
+            )
             self._error_code = -1
             return ()
 
@@ -408,7 +445,10 @@ class Archive_Manager:
                     or not isinstance(edit_point[1], int)
                     or not isinstance(edit_point[2], str)
                 ):
-                    self._error_message = f"Invalid JSON format for {file_path}"
+                    self._error_message = (
+                        "Invalid JSON format for"
+                        f" {sys_consts.SDELIM}{file_path}{sys_consts.SDELIM}"
+                    )
                     edit_cuts = ()
                     break
                 edit_cuts.append(tuple(edit_point))
@@ -451,12 +491,18 @@ class Archive_Manager:
         )
 
         if not file_handler.path_exists(self.archive_folder):
-            self._error_message = f"{self.archive_folder} Does Not Exist"
+            self._error_message = (
+                f"{sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM} Does Not"
+                " Exist"
+            )
             self._error_code = -1
             return self._error_code, self._error_message
 
         if not file_handler.path_writeable(self.archive_folder):
-            self._error_message = f"{self.archive_folder} Is Not Writable"
+            self._error_message = (
+                f"{sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM} Is Not"
+                " Writable"
+            )
             self._error_code = -1
             return self._error_code, self._error_message
 
@@ -491,7 +537,10 @@ class Archive_Manager:
             IOError,
             json.decoder.JSONDecodeError,
         ) as e:
-            self._error_message = f"Unable to write to JSON file: {e}"
+            self._error_message = (
+                "Unable to write to JSON file:"
+                f" {sys_consts.SDELIM}{e}{sys_consts.SDELIM}"
+            )
             self._error_code = -1
 
         return self._error_code, self._error_message
