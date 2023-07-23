@@ -22,6 +22,7 @@
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+from calendar import c
 import platformdirs
 
 import file_utils
@@ -425,13 +426,17 @@ class DVD_Archiver(DVD_Archiver_Base):
         dvd_menu_settings = DVD_Menu_Settings()
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
+            file_grid.checkitems_all(checked=False, col_tag="video_file")
             for menu_item in menu_layout:
                 menu_title.append(menu_item[0])
                 video_data_items: list[Video_Data] = menu_item[1]
 
                 for video_data in video_data_items:
-                    video_data: Video_Data
+                    self._file_control.check_file(
+                        file_grid=file_grid, vd_id=video_data.vd_id, checked=True
+                    )
 
+                    video_data: Video_Data
                     file_def = File_Def()
                     file_def.path = video_data.video_folder
                     file_def.file_name = (

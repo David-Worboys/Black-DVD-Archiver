@@ -923,9 +923,7 @@ class DVD:
         if result == -1:
             return -1, message
 
-        result, message = self._create_labels(
-            cell_coords=cell_coords, buttons_per_page=buttons_per_page
-        )
+        result, message = self._create_labels(cell_coords=cell_coords)
 
         if result == -1:
             return -1, message
@@ -971,13 +969,11 @@ class DVD:
 
         return 1, ""
 
-    def _create_labels(
-        self, cell_coords: list[_Cell_Coords], buttons_per_page: int
-    ) -> tuple[int, str]:
+    def _create_labels(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
         """
         Create images for each label to be placed on the button images.
         Args:
-            buttons_per_page (int): The number of buttons on the DVD menu page
+            cell_coords (list[_Cell_Coords]): The list of cell coordinates.
 
         Returns:
             tuple[int,str]:

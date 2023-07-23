@@ -165,6 +165,25 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         return None
 
+    def check_file(self, file_grid: qtg.Grid, vd_id: int, checked: bool) -> None:
+        """Checks the file (identified by vd_id) in the file grid.
+        Args:
+            file_grid (qtg.Grid): An instance of the `Grid` class.
+            vd_id (int): The Video_Data ID of the source file that is to be checked.
+            checked (bool): True Chacked, False Unchecked
+        """
+        assert isinstance(file_grid, qtg.Grid), f"{file_grid}. Must be a Grid instance"
+        assert isinstance(vd_id, int), f"{vd_id=}. Must be an int"
+        assert isinstance(checked, bool), f"{checked=}. Must be a bool"
+
+        col_index = file_grid.colindex_get("video_file")
+
+        for row in range(file_grid.row_count):
+            user_data: Video_Data = file_grid.userdata_get(row=row, col=col_index)
+
+            if user_data and user_data.vd_id == vd_id:
+                file_grid.checkitemrow_set(row=row, col=col_index, checked=checked)
+
     def _delete_file_from_grid(
         self,
         file_grid: qtg.Grid,
