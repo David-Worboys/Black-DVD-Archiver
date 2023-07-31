@@ -30,7 +30,7 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
-from sys_config import (DVD_Menu_Settings, Get_Shelved_DVD_Menu_Layout,
+from sys_config import (DVD_Menu_Settings, Get_Shelved_DVD_Layout,
                         Set_Shelved_DVD_Layout, Video_Data)
 
 # fmt: on
@@ -48,7 +48,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
     menu_layout: list[tuple[str, list[Video_Data]]] = dataclasses.field(
         default_factory=list
     )  # Pass by reference
-    project_name: str = ""
+    dvd_layout_name: str = ""
 
     # Private instance variable
     _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
@@ -65,7 +65,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         assert all(
             isinstance(video_data, Video_Data) for video_data in self.video_data_list
         ), "All elements must be Video_Data instances"
-        assert isinstance(self.project_name, str), f"{self.project_name=}. Must be str"
+        assert isinstance(
+            self.dvd_layout_name, str
+        ), f"{self.dvd_layout_name=}. Must be str"
 
         super().__post_init__()  # This statement must be last
 
@@ -176,6 +178,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         )
 
         if dvd_menu_layout and not temp_video_list:  # Build from shelf stored menu list
+            menu_pages: list[list[Video_Data]] = []
+            videos: list[Video_Data] = []
+
             for row_index, menu_item in enumerate(dvd_menu_layout):
                 menu_title_grid.value_set(
                     row=row_index,
@@ -184,8 +189,17 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                     user_data=None,
                 )
 
+                for video_item in menu_item[1]:
+                    for video in video_item:
+                        if len(videos) >= buttons_per_page:  # Should not happen!
+                            menu_pages.append(videos)
+                            videos = []
+
+                        videos.append(video)
+                menu_pages.append(videos)
+
             self._insert_video_title_control(
-                menu_title_grid=menu_title_grid, menu_pages=menu_item[1]
+                menu_title_grid=menu_title_grid, menu_pages=menu_pages
             )
 
         elif temp_video_list:  # got to try and match files
@@ -286,7 +300,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             videos: list[Video_Data] = []
 
             for video in non_grouped_video_items:
-                if len(videos) >= buttons_per_page:
+                if len(videos) >= buttons_per_page:  # Should not happen!
                     menu_pages.append(videos)
                     videos = []
 
@@ -300,34 +314,40 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             )
 
         # Default 1st page title to project name
-        if menu_title_grid.row_count > 0:
-            menu_titles_col_index = menu_title_grid.colindex_get("menu_title")
-
-            if (
-                menu_title_grid.value_get(row=0, col=menu_titles_col_index).strip()
-                == ""
-            ):
-                menu_title_grid.value_set(
-                    row=0,
-                    col=menu_titles_col_index,
-                    value=self.project_name,
-                    user_data=None,
-                )
+        # if menu_title_grid.row_count > 0:
+        #      menu_titles_col_index = menu_title_grid.colindex_get("menu_title")
+        #
+        #      if (
+        #          menu_title_grid.value_get(row=0, col=menu_titles_col_index).strip()
+        #          == ""
+        #      ):
+        #          menu_title_grid.value_set(
+        #              row=0,
+        #              col=menu_titles_col_index,
+        #              value=self.dvd_layout_name,
+        #              user_data=None,
+        #          )
 
         menu_title_grid.changed = False
 
         return None
 
     def _insert_video_title_control(
-        self, menu_title_grid: qtg.Grid, menu_pages: list[list[Video_Data]]
+        self,
+        menu_title_grid: qtg.Grid,
+        menu_pages: list[list[Video_Data]],
     ) -> None:
         """Inserts a video title control box into the main menu grid
 
         Args:
             menu_title_grid (qtg.Grid): The main menu grid that holds menu pages
             menu_pages (list[list[Video_Data]]): The menu pages that populate a video title control box
-
         """
+        assert isinstance(
+            menu_title_grid, qtg.Grid
+        ), f"{menu_title_grid=}. Must be an instance of qtg.Grid"
+        assert isinstance(menu_pages, list), f"{menu_pages=}. Must be a list"
+
         file_handler = file_utils.File()
         buttons_per_page: int = DVD_Menu_Settings().buttons_per_page
         video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
@@ -432,14 +452,13 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             event (qtg.Action): The event that triggered the load of the DVD menu
 
         Returns:
-            list[tuple[str, list[list[Video_Data]]]]: The DVD menu page Video_Data definitions loaded from the database file
+            list[tuple[str, list[list[Video_Data]]]]: The DVD menu page Video_Data definitions loaded from the database
+            file
         """
 
-        dvd_menu_layout: list[tuple[str, list[Video_Data]]] = []
-
         with qtg.sys_cursor(qtg.Cursor.hourglass):
-            dvd_menu_layout, error_message = Get_Shelved_DVD_Menu_Layout(
-                self.project_name
+            dvd_menu_layout, error_message = Get_Shelved_DVD_Layout(
+                self.dvd_layout_name
             )
 
         if error_message:
@@ -535,14 +554,14 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         if not changed:
             for row in range(menu_title_grid.row_count):
-                row_grid: qtg.Grid = menu_title_grid.row_widget_get(
+                row_grid: qtg.Grid | None = menu_title_grid.row_widget_get(
                     row=row,
                     col=video_titles_col_index,
                     container_tag="control_box",
                     tag="row_grid",
                 )
 
-                if row_grid.changed:
+                if row_grid is not None and row_grid.changed:
                     changed = True
                     break
 
@@ -601,7 +620,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         for row in range(menu_title_grid.row_count):
             menu_title = menu_title_grid.value_get(row=row, col=menu_title_col_index)
 
-            row_grid: qtg.Grid = menu_title_grid.row_widget_get(
+            row_grid: qtg.Grid | None = menu_title_grid.row_widget_get(
                 row=row,
                 col=video_titles_col_index,
                 container_tag="control_box",
@@ -643,7 +662,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         """
         assert isinstance(
             event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Actoin"
+        ), f"{event=}. Must be an instance of qtg.Action"
 
         menu_title_grid: qtg.Grid = event.widget_get(
             container_tag="menu_page_controls",
@@ -725,7 +744,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
-            row_data: list[tuple[str, list[Video_Data]]] = []
+            row_data: list[tuple[str, list[list[Video_Data]]]] = []
 
             for row in range(menu_title_grid.row_count):
                 grid_col_values = []
@@ -736,7 +755,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                     grid_user_data = menu_title_grid.userdata_get(row=row, col=col)
 
                     if col == video_titles_col_index:
-                        row_grid: qtg.Grid = menu_title_grid.row_widget_get(
+                        row_grid: qtg.Grid | None = menu_title_grid.row_widget_get(
                             row=row,
                             col=video_titles_col_index,
                             container_tag="control_box",
@@ -763,7 +782,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 row_data.append(grid_col_values)
 
             result = Set_Shelved_DVD_Layout(
-                project_name=self.project_name, dvd_menu_layout=row_data
+                dvd_layout_name=self.dvd_layout_name, dvd_menu_layout=row_data
             )
 
             if result:

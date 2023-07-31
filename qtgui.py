@@ -3871,7 +3871,7 @@ class QtPyApp(_qtpyBase):
 
     def widget_get(
         self, window_id: int, container_tag: str, tag: str
-    ) -> _qtpyBase_Control:
+    ) -> _qtpyBase_Control | None:
         """Returns a widget from the widget registry
 
         Args:
@@ -3880,7 +3880,7 @@ class QtPyApp(_qtpyBase):
             tag (str): The tag name of the widget you want to get.
 
         Returns:
-            _qtpyBase_Control: The widget you are looking for.
+            _qtpyBase_Control: The widget you are looking for or None if not found.
         """
 
         if self._widget_registry.widget_exist(
@@ -3919,7 +3919,7 @@ class Action(_qtpyBase):
         ), f"{self.window_id=}. Must be int > 0"
         assert isinstance(
             self.parent_app, QtPyApp
-        ), f"{self.parent_app=}. Must ba an instance of QtPyApp"
+        ), f"{self.parent_app=}. Must be an instance of QtPyApp"
         assert isinstance(
             self.container_tag, (str)
         ), f"{self.container_tag=}. Must be a str"
@@ -8199,7 +8199,7 @@ class FolderView(_qtpyBase_Control):
         def headerData(
             self,
             section: int,
-            orientation: Union[qtC.Qt.Horizontal, qtC.Qt.Vertical],
+            orientation: qtC.Qt.Horizontal | qtC.Qt.Vertical,
             role: qtC.Qt.ItemDataRole,
         ):
             """
@@ -9201,6 +9201,9 @@ class Grid(_qtpyBase_Control):
 
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
+
+        for row in reversed(range(self._widget.rowCount())):
+            self.row_delete(row)
 
         self._changed = False
         self._widget.setRowCount(0)
@@ -10349,7 +10352,6 @@ class Grid(_qtpyBase_Control):
 
         size_hint = widget.guiwidget_get.sizeHint()
 
-        # rowcol_widget.setFixedSize(size_hint)
         self._widget.setRowHeight(row_index, size_hint.height())
         self._widget.setColumnWidth(col_index, size_hint.width())
         self._widget.setCellWidget(row_index, col_index, rowcol_widget)
@@ -15160,8 +15162,9 @@ class Video_Player(qtC.QObject):
         Seeks to a position
 
         Args:
-            position (int): THe position in milliseconds to move to
+            frame (int): The frame to seek to
         """
+
         time_offset = int((1000 / self._frame_rate) * frame)
 
         if (

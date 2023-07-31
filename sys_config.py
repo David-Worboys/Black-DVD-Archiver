@@ -56,33 +56,81 @@ def Get_DVD_Build_Folder() -> str:
     return dvd_folder
 
 
-def Get_Shelved_DVD_Menu_Layout(
-    project_name: str,
-) -> tuple[list[tuple[str, list[list["Video_Data"]]]], str]:
-    """Gets the DVD menu layout from the shelved project file.
+def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str]]:
+    """Get a list of project names and a list of dvd layout names associated with the project name
 
     Args:
-        project_name (str): The name of the shelved project file.
+        project_name (str): The project name
 
     Returns:
-        tuple[list[tuple[str, list[list["Video_Data"]]]],str]:
-            The DVD menu layout and no error message if no issue.
-            Empty DVD menu layout and error message if there is an issue
+        tuple[list[str],list[str]] : A tuple of a list of all project names and a tuple of a list of DVD layouts for the
+        project name
+
+
     """
     assert (
         isinstance(project_name, str) and project_name.strip() != ""
     ), f"{project_name=}. Must be a non-empty str"
+
+    project_name = Text_To_File_Name(project_name)
+
+    file_handler = file_utils.File()
+
+    layout_items = []
+    project_items = []
+
+    file_list: file_utils.File_Result = file_handler.filelist(
+        path=platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
+        extensions=sys_consts.SHELVE_FILE_EXTNS,
+    )
+
+    for item in file_list.files:
+        if item.count(".") == 2:
+            project, type, extn = item.split(".")
+
+            if extn == "dir" and type == "project_files":
+                project_items.append(project.replace("_", " "))
+        elif item.count(".") == 3:
+            project, layout_name, type, extn = item.split(".")
+
+            if extn == "dir" and project == project_name and type == "dvdmenu":
+                layout_items.append(layout_name.replace("_", " "))
+
+    if not project_items:
+        project_items.append(project_name)
+    if not layout_items:
+        layout_items.append(sys_consts.DEFAULT_DVD_LAYOUT_NAME)
+
+    return project_items, layout_items
+
+
+def Get_Shelved_DVD_Layout(
+    dvd_layout_name: str,
+) -> tuple[list[tuple[str, list[list["Video_Data"]]]], str]:
+    """Gets the DVD menu layout from the shelved project file.
+
+    Args:
+        dvd_layout_name (str): The name of the shelved project file.
+
+    Returns:
+        tuple[list[tuple[str, list["Video_Data"]]],str]:
+            The DVD menu layout and no error message if no issue.
+            Empty DVD menu layout and error message if there is an issue
+    """
+    assert (
+        isinstance(dvd_layout_name, str) and dvd_layout_name.strip() != ""
+    ), f"{dvd_layout_name=}. Must be a non-empty str"
 
     db_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
     file_handler = file_utils.File()
     project_file_name = file_handler.file_join(
         dir_path=db_path,
-        file_name=Text_To_File_Name(project_name),
+        file_name=Text_To_File_Name(dvd_layout_name),
         ext="dvdmenu",
     )
 
-    dvd_menu_layout: list[tuple[str, list[Video_Data]]] = []
+    dvd_menu_layout: list[tuple[str, list[list[Video_Data]]]] = []
 
     try:
         with shelve.open(project_file_name) as db:
@@ -96,7 +144,7 @@ def Get_Shelved_DVD_Menu_Layout(
                     for col_index, grid_col_item in enumerate(grid_row):
                         grid_value: str = grid_col_item[0]
                         grid_user_data = grid_col_item[1]
-                        menu_pages = []
+                        menu_pages: list[list[Video_Data]] = []
 
                         if menu_title.strip() == "" and grid_value.strip() != "":
                             menu_title = grid_value
@@ -117,20 +165,20 @@ def Get_Shelved_DVD_Menu_Layout(
 
 
 def Set_Shelved_DVD_Layout(
-    project_name: str, dvd_menu_layout: list[tuple[str, list[list["Video_Data"]]]]
+    dvd_layout_name: str, dvd_menu_layout: list[tuple[str, list[list["Video_Data"]]]]
 ) -> str:
     """Saves the DVD menu layout to the shelved project file.
 
     Args:
-        project_name (str): The name of the shelved project.
+        dvd_layout_name (str): The name of the shelved project.
         dvd_menu_layout (list[tuple[str, list[list[Video_Data]]]]): The DVD menu layout to save.
 
     Returns:
         str: Empty string if successful, or an error message if there is an issue.
     """
     assert (
-        isinstance(project_name, str) and project_name.strip() != ""
-    ), f"{project_name=}. Must be a non-empty str"
+        isinstance(dvd_layout_name, str) and dvd_layout_name.strip() != ""
+    ), f"{dvd_layout_name=}. Must be a non-empty str"
     assert isinstance(dvd_menu_layout, list), f"{dvd_menu_layout=}. Must be a list"
 
     db_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
@@ -138,7 +186,7 @@ def Set_Shelved_DVD_Layout(
     file_handler = file_utils.File()
     project_file_name = file_handler.file_join(
         dir_path=db_path,
-        file_name=Text_To_File_Name(project_name),
+        file_name=Text_To_File_Name(dvd_layout_name),
         ext="dvdmenu",
     )
 

@@ -32,9 +32,7 @@ import sqldb
 import sys_consts
 import utils
 from dvd_menu_configuration import DVD_Menu_Config_Popup
-from project_settings_popup import Project_Settings_Popup
-from sys_config import (DVD_Archiver_Base, Get_DVD_Build_Folder,
-                        Get_Shelved_DVD_Menu_Layout, Video_Data)
+from sys_config import DVD_Archiver_Base, Get_DVD_Build_Folder, Video_Data
 from video_file_picker import Video_File_Picker_Popup
 
 # fmt: on
@@ -58,7 +56,11 @@ class Video_File_Grid(DVD_Archiver_Base):
         self._parent = parent
         file_handler = file_utils.File()
 
-        self.project_name = project_name
+        if not project_name.strip():
+            self.project_name = sys_consts.DEFAULT_PROJECT_NAME
+        else:
+            self.project_name = project_name
+
         self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
         self.common_words = []
         self.project_video_standard = ""  # PAL or NTSC
@@ -70,7 +72,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         self._db_path = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
         self._grid_db = file_handler.file_join(
-            self._db_path, sys_consts.VIDEO_GRID_DB, "db"
+            self._db_path, sys_consts.DEFAULT_PROJECT_NAME, "project_files"
         )
         self._shutdown = False
 
@@ -87,7 +89,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             if event.tag.startswith("grid_button"):
                 self._edit_video(event)
             elif event.value.row >= 0 and event.value.col >= 0:
-                self._set_project_standard_duration(event)
+                self.set_project_standard_duration(event)
 
     def process_edited_video_files(self, video_file_input: list[Video_Data]) -> None:
         """
@@ -292,6 +294,8 @@ class Video_File_Grid(DVD_Archiver_Base):
             case qtg.Sys_Events.APPINIT:
                 if self._db_settings.setting_exist("latest_project"):
                     self.project_name = self._db_settings.setting_get("latest_project")
+                else:
+                    self.project_name = sys_consts.DEFAULT_PROJECT_NAME
 
             case qtg.Sys_Events.APPPOSTINIT:
                 self.postinit_handler(event)
@@ -306,7 +310,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 if not self._shutdown:  # Prevent getting called twice
                     self._shutdown = True
 
-                    if self.project_name.strip() == "":
+                    if not self.project_name.strip():
                         project_name = popups.PopTextGet(
                             title="Enter Project Name",
                             label="Project Name:",
@@ -317,11 +321,10 @@ class Video_File_Grid(DVD_Archiver_Base):
                                 "latest_project", project_name
                             )
 
-                    else:  # Project might be changed in file grid
+                    else:  # Project might be changed
                         self._db_settings.setting_set(
                             "latest_project", self.project_name
                         )
-
                 self._save_grid(event)
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
@@ -335,7 +338,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                             checked=event.value, col_tag="video_file"
                         )
 
-                        self._set_project_standard_duration(event)
+                        self.set_project_standard_duration(event)
                     case "normalise":
                         self._db_settings.setting_set("vf_normalise", event.value)
                     case "denoise":
@@ -356,8 +359,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                         self._move_video_file(event=event, up=False)
                     case "move_video_file_up":
                         self._move_video_file(event=event, up=True)
-                    case "project_config":
-                        self._project_config(event)
 
                     case "select_files":
                         dvd_folder = Get_DVD_Build_Folder()
@@ -378,11 +379,12 @@ class Video_File_Grid(DVD_Archiver_Base):
                     case "ungroup_files":
                         self._ungroup_files(event)
 
-    def _project_config(self, event: qtg.Action) -> None:
-        """Handles  project config processing
-        Args:
-            event (qtg.Action): The triggering event
-        """
+    def project_changed(
+        self, event: qtg.Action, project_name: str, save_existing: bool
+    ):
+        assert (
+            isinstance(project_name, str) and project_name.strip() != ""
+        ), f"{project_name=}. Must be non-empty str"
 
         assert isinstance(
             event, qtg.Action
@@ -395,65 +397,31 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         file_handler = file_utils.File()
         dir_path, _, extn = file_handler.split_file_path(self._grid_db)
-        project_name = Project_Settings_Popup(
-            title="Project Settings",
-            current_project=self.project_name,
-            project_path=dir_path,
-            extn=f"{extn}.dir",  # Shelf files add a  ".dir" to the end
-            ignored_project=self._grid_db,
-        ).show()
 
-        if project_name.strip() and project_name != self.project_name:
+        if save_existing and file_grid.changed:
             self._save_grid(event)
 
-            self.project_name = project_name
+        self.project_name = project_name
 
-            if file_handler.file_exists(
-                directory_path=dir_path,
-                file_name=utils.Text_To_File_Name(self.project_name),
-                file_extension=f"{extn}.dir",
-            ):  # Existing Project
-                file_grid.clear()
-                self._load_grid(event)
-            else:  # New Project
-                if (
-                    popups.PopYesNo(
-                        title="New Project...",
-                        message="Clear The Current File List?",
-                    ).show()
-                    == "yes"
-                ):
-                    if (
-                        popups.PopYesNo(
-                            title="File List Is About To Be Wiped...",
-                            message="File List Contents Will Be Lost! Continue?",
-                            icon=qtg.Sys_Icon.messagewarning.get(),
-                        ).show()
-                        == "yes"
-                    ):
-                        file_grid.clear()
-
-                self._save_grid(event)
-
-            self._db_settings.setting_set("latest_project", self.project_name)
-
-            event.event = qtg.Sys_Events.CUSTOM
-            event.container_tag = ""
-            event.tag = "project_changed"
-            event.value = self.project_name
-            self._parent.event_handler(event=event)
+        if file_handler.file_exists(
+            directory_path=dir_path,
+            file_name=utils.Text_To_File_Name(self.project_name),
+            file_extension=f"{extn}.dir",
+        ):  # Existing Project
+            file_grid.clear()
+            self._load_grid(event)
         else:
-            if self._db_settings.setting_exist("latest_project"):
-                self.project_name = self._db_settings.setting_get("latest_project")
+            file_grid.clear()
 
-                if not self.project_name:
-                    file_grid.clear()
+        self._save_grid(event)
 
-                event.event = qtg.Sys_Events.CUSTOM
-                event.container_tag = ""
-                event.tag = "project_changed"
-                event.value = self.project_name
-                self._parent.event_handler(event=event)
+        self._db_settings.setting_set("latest_project", self.project_name)
+
+        event.event = qtg.Sys_Events.CUSTOM
+        event.container_tag = ""
+        event.tag = "project_changed"
+        event.value = self.project_name
+        self._parent.event_handler(event=event)
 
     def postinit_handler(self, event: qtg.Action):
         """
@@ -703,7 +671,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 item: qtg.Grid_Item
                 file_grid.row_delete(item.row_index)
 
-        self._set_project_standard_duration(event)
+        self.set_project_standard_duration(event)
 
         if event.value_get(container_tag="video_file_controls", tag="bulk_select"):
             event.value_set(
@@ -933,7 +901,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                                         widget=toolbox,
                                     )
                 file_grid.row_scroll_to(0)
-                self._set_project_standard_duration(event)
+                self.set_project_standard_duration(event)
 
                 if removed_files:
                     removed_file_list = "\n".join(removed_files)
@@ -948,55 +916,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                     ).show()
         except Exception as e:
             popups.PopError(title="File Grid Load Error...", message=str(e)).show()
-
-            return None
-
-        if self.project_name.strip():
-            with qtg.sys_cursor(qtg.Cursor.hourglass):
-                dvd_menu_layout, error_message = Get_Shelved_DVD_Menu_Layout(
-                    self.project_name
-                )
-
-            if error_message:
-                popups.PopError(
-                    title="DVD Menu Grid Load Error...",
-                    message=(
-                        f"{sys_consts.SDELIM}{str(error_message)}{sys_consts.SDELIM}"
-                    ),
-                ).show()
-
-                return None
-
-            col_index = file_grid.colindex_get("video_file")
-            missing_files = []
-
-            for row_index, menu_item in enumerate(dvd_menu_layout):
-                for menu_page in menu_item[1]:
-                    for video_data in menu_page:
-                        for row_index in range(file_grid.row_count):
-                            user_data: Video_Data = file_grid.userdata_get(
-                                row=row_index, col=col_index
-                            )
-
-                            if user_data.video_path == video_data.video_path:
-                                file_grid.checkitemrow_set(True, row_index, col_index)
-                                break
-                        else:  # No match found, missing file
-                            missing_files.append(video_data.video_path)
-
-            if missing_files:
-                missing_file_list = "\n".join(missing_files)
-                popups.PopMessage(
-                    title="Missing DVD Menu Files...",
-                    message=(
-                        "The following DVD Menu source files are missing from the"
-                        " project:\n"
-                        f"{sys_consts.SDELIM}{missing_file_list}{sys_consts.SDELIM}"
-                    ),
-                    width=80,
-                ).show()
-
-            self._set_project_standard_duration(event)
 
         return None
 
@@ -1043,6 +962,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                         row_data.append(col_value)
 
                     db["video_grid"] = row_data
+
         except Exception as e:
             popups.PopError(title="File Grid Save Error...", message=str(e)).show()
 
@@ -1284,7 +1204,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 # Keep a list of words common to all file names
                 self.common_words = utils.Find_Common_Words(loaded_files)
             self._toggle_file_button_names(event)
-            self._set_project_standard_duration(event)
+            self.set_project_standard_duration(event)
 
             if rejected != "":
                 popups.PopMessage(
@@ -1492,7 +1412,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             user_data=video_user_data,
         )
 
-    def _set_project_standard_duration(self, event: qtg.Action) -> None:
+    def set_project_standard_duration(self, event: qtg.Action) -> None:
         """
         Sets the duration and video standard for the current project based on the selected
         input video files.
@@ -1612,14 +1532,6 @@ class Video_File_Grid(DVD_Archiver_Base):
             ),
             qtg.Spacer(width=1),
             qtg.Button(
-                icon=file_utils.App_Path("briefcase.svg"),
-                tag="project_config",
-                callback=self.event_handler,
-                tooltip="Project Settings",
-                width=2,
-            ),
-            # qtg.Spacer(width=1),
-            qtg.Button(
                 icon=file_utils.App_Path("grid-2.svg"),
                 tag="dvd_menu_configuration",
                 callback=self.event_handler,
@@ -1641,6 +1553,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 tooltip="Ungroup Selected Video Files",
                 width=2,
             ),
+            qtg.Spacer(width=2),
             qtg.Button(
                 icon=file_utils.App_Path("film.svg"),
                 tag="join_files",

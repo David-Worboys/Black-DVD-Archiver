@@ -28,7 +28,6 @@ import re
 import shutil
 import sys
 
-import dateparser
 import titlecase
 
 
@@ -507,7 +506,7 @@ class File:
         try:
             path = pathlib.Path(file_path)
 
-            if path.is_dir():
+            if path.is_dir() or path.is_file():
                 return True
 
             return False
@@ -668,11 +667,31 @@ class File:
         assert (
             isinstance(file_path, str) and file_path.strip() != ""
         ), f"{file_path=} must be a non-empty string."
+        assert (
+            isinstance(file_path, str) and file_path.strip() != ""
+        ), f"{file_path=} must be a non-empty string."
+
         try:
-            os.remove(file_path)
-            return 1
+            path = pathlib.Path(file_path)
+
+            if path.exists():
+                path.unlink()
+                if not path.exists():
+                    return 1  # File was successfully removed.
+                else:
+                    return -1  # File still exists after unlinking.
+            else:
+                return -1  # File does not exist.
+        except FileNotFoundError:
+            return -1  # File does not exist at the given path.
+        except PermissionError:
+            return -1  # Permission error occurred during removal.
+        except OSError as e:
+            return -1  # Other OS-related error occurred during removal.
         except Exception as e:
-            return -1
+            return (
+                -1
+            )  # Catching any other unexpected exception for logging and debugging.
 
     def write_list_to_txt_file(
         self, str_list: list[str], text_file: str

@@ -53,7 +53,9 @@ class Video_Editor(DVD_Archiver_Base):
     # Private instance variables
     _aspect_ratio: str = sys_consts.AR43
     _archive_manager: Archive_Manager | None = None
-    _background_task_manager = Task_Manager()
+    _background_task_manager: Task_Manager = dataclasses.field(
+        default_factory=Task_Manager
+    )
     _current_frame: int = -1
     _display_height: int = -1
     _display_width: int = -1
@@ -72,6 +74,7 @@ class Video_Editor(DVD_Archiver_Base):
     _menu_frame: qtg.LineEdit | None = None
     _menu_title: qtg.LineEdit | None = None
     _progress_bar: qtg.ProgressBar | None = None
+    _source_file_label: qtg.Label | None = None
     _video_editor: qtg.HBoxContainer | None = None
     _video_filter_container: qtg.HBoxContainer | None = None
     _sliding: bool = False
@@ -300,6 +303,12 @@ class Video_Editor(DVD_Archiver_Base):
             self._video_handler.set_source(
                 self._video_file_input[0].video_path, self._frame_rate
             )
+        self._source_file_label.value_set(
+            f"{self._video_file_input[0].video_file}{self._video_file_input[0].video_extension}"
+        )
+        self._source_file_label.tooltip_set(
+            f"{sys_consts.SDELIM}{self._video_file_input[0].video_path}{sys_consts.SDELIM}"
+        )
 
     @property
     def video_file_input(self) -> list[Video_Data]:
@@ -1636,13 +1645,26 @@ class Video_Editor(DVD_Archiver_Base):
             self._video_slider = qtg.Slider(
                 tag="video_slider",
                 width=self.display_width,
-                height=40,
+                height=15,
                 callback=self.event_handler,
                 range_max=1,
                 range_min=0,
                 pixel_unit=True,
                 single_step=1,
             )
+
+            self._source_file_label = qtg.Label(
+                tag="source_file",
+                label="Source:",
+                width=80,
+                frame=qtg.Widget_Frame(
+                    frame_style=qtg.Frame_Style.PANEL,
+                    frame=qtg.Frame.SUNKEN,
+                    line_width=2,
+                ),
+                translate=False,
+            )
+
             video_cutter_container = qtg.VBoxContainer(
                 tag="video_cutter",
                 text="Video Cutter",
@@ -1651,6 +1673,7 @@ class Video_Editor(DVD_Archiver_Base):
                 self._video_display,
                 self._video_slider,
                 video_button_container,
+                self._source_file_label,
             )
 
             return video_cutter_container
@@ -1762,7 +1785,7 @@ class Video_Editor(DVD_Archiver_Base):
 
             return edit_list_container
 
-        # ===== Maint
+        # ===== Main
         self._video_filter_container = qtg.HBoxContainer(
             text="Video Filters", tag="video_filters"
         ).add_row(

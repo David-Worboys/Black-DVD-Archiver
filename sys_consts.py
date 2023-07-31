@@ -31,7 +31,7 @@ executable_folder = file_utils.App_Path()
 file_sep = file_utils.File().ossep
 
 PROGRAM_NAME: Final[str] = "Black DVD Archiver"
-PROGRAM_VERSION: Final[str] = "0.8.5"
+PROGRAM_VERSION: Final[str] = "0.8.9"
 AUTHOR: Final[str] = "David Worboys"
 LICENCE: Final[str] = "GNU V3 GPL"
 
@@ -69,6 +69,7 @@ AVERAGE_BITRATE: Final[int] = 5500  # kilobits/sec
 SINGLE_SIDED_DVD_SIZE: Final[int] = 40258730  # kb ~ 4.7GB DVD5
 DOUBLE_SIDED_DVD_SIZE: Final[int] = 72453177  # kb ~ 8.5GB DVD9
 
+SHELVE_FILE_EXTNS = ("dir", "dat", "bak")
 # fmt: off
 VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp", 
                     "3g2", "mj2","mkv","mpg","mpeg","ts", "m2ts", "mts","qt",
@@ -97,7 +98,8 @@ PRODUCT_LINE: Final[str] = "product_line"
 # Database Setting Keys
 ARCHIVE_FOLDER: Final[str] = "archive_folder"
 DVD_BUILD_FOLDER: Final[str] = "dvd_build_folder"
-VIDEO_GRID_DB: Final[str] = "video_grid"
+DEFAULT_PROJECT_NAME: Final[str] = "Default"
+DEFAULT_DVD_LAYOUT_NAME: Final[str] = "DVD 1"
 EDIT_FOLDER: Final[str] = "edits"
 TRANSCODE_FOLDER: Final[str] = "transcodes"
 
