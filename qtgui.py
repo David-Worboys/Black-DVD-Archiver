@@ -6130,6 +6130,21 @@ class Button(_qtpyBase_Control):
 
         return widget
 
+    def text_set(self, button_text: str, translate: bool = True):
+        """Set the text on the button
+
+        Args:
+            button_text (str): The text to be placed on the button
+            translate (bool): Translate the text
+        """
+
+        if self._widget is None:
+            raise RuntimeError(f"{self._widget=}. Not set")
+
+        self._widget: qtW.QPushButton
+
+        self._widget.setText(self.trans_str(button_text) if translate else button_text)
+
 
 @dataclasses.dataclass
 class FormContainer(_Container):
@@ -6703,7 +6718,6 @@ class Checkbox(_qtpyBase_Control):
             raise RuntimeError(f"{self._widget=}. Not set")
 
         assert isinstance(value, bool), f"{value=}. Must be bool"
-        import inspect
 
         self._widget: qtW.QCheckBox
         self._widget.setCheckState(
@@ -15187,8 +15201,6 @@ class Video_Player(qtC.QObject):
     def stop(self):
         """Stops the video"""
         self._media_player.stop()
-        self._media_player.setVideoSink(None)
-        self._media_player.setAudioOutput(None)
 
     def set_source(self, input_file: str, frame_rate: float) -> None:
         """Sets the source of the media player

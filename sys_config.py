@@ -143,7 +143,7 @@ def Get_Shelved_DVD_Layout(
 
                     for col_index, grid_col_item in enumerate(grid_row):
                         grid_value: str = grid_col_item[0]
-                        grid_user_data = grid_col_item[1]
+                        # grid_user_data = grid_col_item[1]
                         menu_pages: list[list[Video_Data]] = []
 
                         if menu_title.strip() == "" and grid_value.strip() != "":
@@ -152,7 +152,7 @@ def Get_Shelved_DVD_Layout(
                         if col_index == 1:  # 2nd Col houses button menu titles
                             menu_page: list[Video_Data] = []
                             for row_grid_item in grid_col_item[2]:
-                                row_grid_item_value = row_grid_item[0]
+                                # row_grid_item_value = row_grid_item[0]
                                 row_grid_item_user_data: Video_Data = row_grid_item[1]
                                 menu_page.append(row_grid_item_user_data)
 

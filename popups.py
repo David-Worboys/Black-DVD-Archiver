@@ -924,7 +924,7 @@ class PopYesNo(PopMessage):
 
     def __post_init__(self):
         """Constructor for the PopYesNo dialogue that checks arguments and sets instance variables."""
-        if self.icon == None:
+        if self.icon is None:
             self.icon: Union[qtG.QIcon, qtG.QPixmap, str, None] = (
                 Sys_Icon.messagequestion.get(iconformat=False)
             )

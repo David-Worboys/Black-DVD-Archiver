@@ -82,6 +82,12 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         match event.event:
             case qtg.Sys_Events.WINDOWPOSTOPEN:
+                ok_button: qtg.Button = event.widget_get(
+                    container_tag="command_buttons", tag="ok"
+                )
+                ok_button.text_set("Make A DVD")
+                ok_button.icon_set(file_utils.App_Path("compact-disc.svg"))
+
                 self._post_open_handler(event)
 
             case qtg.Sys_Events.CLICKED:
@@ -179,9 +185,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         if dvd_menu_layout and not temp_video_list:  # Build from shelf stored menu list
             menu_pages: list[list[Video_Data]] = []
-            videos: list[Video_Data] = []
 
             for row_index, menu_item in enumerate(dvd_menu_layout):
+                videos: list[Video_Data] = []
                 menu_title_grid.value_set(
                     row=row_index,
                     col=0,
@@ -194,13 +200,15 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                         if len(videos) >= buttons_per_page:  # Should not happen!
                             menu_pages.append(videos)
                             videos = []
-
+                            break
                         videos.append(video)
                 menu_pages.append(videos)
 
             self._insert_video_title_control(
                 menu_title_grid=menu_title_grid, menu_pages=menu_pages
             )
+
+            menu_title_grid.changed = False
 
         elif temp_video_list:  # got to try and match files
             grouped_video_items: list[Video_Data] = []
@@ -263,7 +271,6 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                             == non_group_video_item.video_path
                         ):
                             is_non_grouped = True
-                            # break
 
                     if not is_non_grouped:
                         temp_non_group.append(temp_video_item)
@@ -313,22 +320,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 menu_title_grid=menu_title_grid, menu_pages=menu_pages
             )
 
-        # Default 1st page title to project name
-        # if menu_title_grid.row_count > 0:
-        #      menu_titles_col_index = menu_title_grid.colindex_get("menu_title")
-        #
-        #      if (
-        #          menu_title_grid.value_get(row=0, col=menu_titles_col_index).strip()
-        #          == ""
-        #      ):
-        #          menu_title_grid.value_set(
-        #              row=0,
-        #              col=menu_titles_col_index,
-        #              value=self.dvd_layout_name,
-        #              user_data=None,
-        #          )
-
-        menu_title_grid.changed = False
+            menu_title_grid.changed = True
 
         return None
 
@@ -380,7 +372,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 ).add_row(
                     qtg.Button(
                         icon=file_utils.App_Path("arrow-up.svg"),
-                        tag=f"move_button_title_up",
+                        tag="move_button_title_up",
                         callback=self.event_handler,
                         tooltip="Move Selected Button Title Up",
                         width=2,
@@ -569,11 +561,11 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             if (
                 popups.PopYesNo(
                     title="Discard Changes..",
-                    message="Discard Changes & Stop DVD Build?",
+                    message="Discard Changes & Stop The DVD Build?",
                 ).show()
-                == "ok"
+                == "no"
             ):
-                return 1
+                return -1
         return 1
 
     def _process_ok(self, event: qtg.Action) -> int:
@@ -601,8 +593,17 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         menu_title_col_index = menu_title_grid.colindex_get("menu_title")
         video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
 
+        if (
+            popups.PopYesNo(
+                title="Generate DVD..",
+                message="Stop Generating The DVD And Archive?",
+            ).show()
+            == "yes"
+        ):
+            return -1
+
         for row_index, menu_item in enumerate(self.menu_layout):
-            if menu_item[0].strip() == "":
+            if not menu_item[0].strip():
                 if (
                     popups.PopYesNo(
                         title="Menu Page Title Not Entered..",
@@ -744,7 +745,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
-            row_data: list[tuple[str, list[list[Video_Data]]]] = []
+            row_data: list[tuple[str, list[list[Video_Data]]]] | list = []
 
             for row in range(menu_title_grid.row_count):
                 grid_col_values = []
@@ -869,17 +870,19 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                     qtg.Switch(
                         tag="deactivate_filters",
                         buddy_control=qtg.Label(
-                            tag="switch_label", text="Deactivate Filters", width=20
+                            tag="switch_label", text="Deactivate Filters", width=17
                         ),
                         tooltip=(
                             "Switch Video Filters Off - Good For Testing Because It"
                             " Increases Speed"
                         ),
                     ),
-                    qtg.Spacer(width=4),
+                    qtg.Spacer(width=1),
                 ),
                 qtg.Command_Button_Container(
-                    ok_callback=self.event_handler, cancel_callback=self.event_handler
+                    ok_callback=self.event_handler,
+                    cancel_callback=self.event_handler,
+                    button_width=13,
                 ),
             ),
         )

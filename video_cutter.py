@@ -53,9 +53,10 @@ class Video_Editor(DVD_Archiver_Base):
     # Private instance variables
     _aspect_ratio: str = sys_consts.AR43
     _archive_manager: Archive_Manager | None = None
-    _background_task_manager: Task_Manager = dataclasses.field(
-        default_factory=Task_Manager
-    )
+    # _background_task_manager: Task_Manager = dataclasses.field(
+    #    default_factory=Task_Manager
+    # )
+    _background_task_manager: Task_Manager | None = None
     _current_frame: int = -1
     _display_height: int = -1
     _display_width: int = -1
@@ -102,6 +103,7 @@ class Video_Editor(DVD_Archiver_Base):
             display_width=self.display_width, display_height=self.display_height
         )
 
+        self._background_task_manager = Task_Manager()
         self._background_task_manager.start()
 
         self._video_handler.frame_changed_handler.connect(self._frame_handler)
@@ -367,6 +369,10 @@ class Video_Editor(DVD_Archiver_Base):
                 tag="sharpen",
             ).value_get()
         )
+
+    def video_pause(self):
+        """Pause video playback"""
+        self._video_handler.pause()
 
     def _set_dvd_settings(self):
         """Writes DVD settings into the appropriate values of self.video_file_input"""

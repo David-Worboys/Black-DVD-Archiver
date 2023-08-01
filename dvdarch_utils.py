@@ -1446,7 +1446,6 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
             pprint.pprint(video_info)
             print("=========== Video Info Debug ===========")
 
-        video_details: dict[str, list[str, int, str]]
         track_info = list(_find_keys(video_info, "track"))
 
         for tracks in track_info:
@@ -1520,7 +1519,7 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         pprint.pprint(video_file_details)
         print("=========== video_details Debug ===========")
 
-    return video_file_details  # video_details
+    return video_file_details
 
 
 def Resize_Image(

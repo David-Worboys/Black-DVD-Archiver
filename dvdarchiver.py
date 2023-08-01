@@ -226,6 +226,19 @@ class DVD_Archiver(DVD_Archiver_Base):
                         return -1
             case qtg.Sys_Events.APPPOSTINIT:
                 pass  # Consumed in video_file_grid caught in custom/project_changed below
+            case qtg.Sys_Events.CHANGED:  # Tab changed!
+                match event.tag:
+                    case "control_tab":
+                        self._video_editor.video_pause()
+
+                        if self._video_editor.video_file_input:
+                            self._file_control.process_edited_video_files(
+                                video_file_input=self._video_editor.video_file_input
+                            )
+
+                        self._tab_enable_handler(event=event, enable=True)
+                    case "video_editor_tab":
+                        self._tab_enable_handler(event=event, enable=False)
 
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
@@ -279,65 +292,112 @@ class DVD_Archiver(DVD_Archiver_Base):
 
                         self._startup = False
 
-            case qtg.Sys_Events.CHANGED:
-                match event.tag:
-                    case "control_tab":
-                        if self._video_editor.video_file_input:
-                            self._file_control.process_edited_video_files(
-                                video_file_input=self._video_editor.video_file_input
-                            )
             case qtg.Sys_Events.INDEXCHANGED:
                 match event.tag:
                     case "existing_projects":
-                        new_project: qtg.Combo_Item = event.value
-
-                        if (
-                            not self._startup
-                            and new_project.display.strip()
-                            and self._file_control.project_name.strip()
-                            != new_project.display.strip()
-                        ):
-                            self._file_control.project_changed(
-                                event, new_project.display, self._save_existing_project
-                            )
-                            if event.widget_exist(
-                                container_tag="main_controls", tag="existing_projects"
-                            ) and event.widget_exist(
-                                container_tag="main_controls", tag="existing_layouts"
-                            ):
-                                project_combo: qtg.ComboBox = event.widget_get(
-                                    container_tag="main_controls",
-                                    tag="existing_projects",
-                                )
-                                layout_combo: qtg.ComboBox = event.widget_get(
-                                    container_tag="main_controls",
-                                    tag="existing_layouts",
-                                )
-
-                                layout_combo.clear()
-
-                                project_combo.select_text(
-                                    self._file_control.project_name, partial_match=False
-                                )
-
-                                _, layout_items = Get_Project_Layout_Names(
-                                    self._file_control.project_name
-                                )
-
-                                layout_combo_items = [
-                                    qtg.Combo_Data(
-                                        index=-1,
-                                        display=item.replace("_", " "),
-                                        data=item.replace("_", " "),
-                                        user_data=None,
-                                    )
-                                    for item in layout_items
-                                ]
-
-                                for item in layout_combo_items:
-                                    layout_combo.value_set(item)
+                        self._project_combo_change(event)
 
         return None
+
+    def _tab_enable_handler(self, event: qtg.Action, enable: bool):
+        """Enables or disables the tab dependent controls
+
+        Args:
+            event (qtg.Action): The triggering event
+            enable (bool): True - enables tab sensitive controls, False - disables tab sensitive controls
+        """
+        if event.widget_exist(
+            container_tag="main_controls", tag="existing_projects"
+        ):  # Buttons are buddies so must exist
+            project_combo: qtg.ComboBox = event.widget_get(
+                container_tag="main_controls", tag="existing_projects"
+            )
+
+            delete_button: qtg.Button = event.widget_get(
+                container_tag="main_controls", tag="delete_project"
+            )
+
+            new_button: qtg.Button = event.widget_get(
+                container_tag="main_controls", tag="new_project"
+            )
+
+            delete_button.enable_set(enable)
+            new_button.enable_set(enable)
+
+            project_combo.enable_set(enable)
+
+        if event.widget_exist(container_tag="main_controls", tag="existing_layouts"):
+            dvd_layout_combo: qtg.ComboBox = event.widget_get(
+                container_tag="main_controls", tag="existing_layouts"
+            )
+            delete_button: qtg.Button = event.widget_get(
+                container_tag="main_controls", tag="delete_dvd_layout"
+            )
+
+            new_button: qtg.Button = event.widget_get(
+                container_tag="main_controls", tag="new_dvd_layout"
+            )
+            make_button: qtg.Button = event.widget_get(
+                container_tag="main_controls", tag="make_dvd"
+            )
+
+            make_button.enable_set(enable)
+            delete_button.enable_set(enable)
+            new_button.enable_set(enable)
+
+            dvd_layout_combo.enable_set(enable)
+
+    def _project_combo_change(self, event: qtg.Action):
+        """Handles the change of a project combo item
+
+        Args:
+            event (qtg.Action): Triggering event (INDEXCHANGED in this case)
+        """
+        new_project: qtg.Combo_Item = event.value
+        if (
+            not self._startup
+            and new_project.display.strip()
+            and self._file_control.project_name.strip() != new_project.display.strip()
+        ):
+            self._file_control.project_changed(
+                event, new_project.display, self._save_existing_project
+            )
+            if event.widget_exist(
+                container_tag="main_controls", tag="existing_projects"
+            ) and event.widget_exist(
+                container_tag="main_controls", tag="existing_layouts"
+            ):
+                project_combo: qtg.ComboBox = event.widget_get(
+                    container_tag="main_controls",
+                    tag="existing_projects",
+                )
+                layout_combo: qtg.ComboBox = event.widget_get(
+                    container_tag="main_controls",
+                    tag="existing_layouts",
+                )
+
+                layout_combo.clear()
+
+                project_combo.select_text(
+                    self._file_control.project_name, partial_match=False
+                )
+
+                _, layout_items = Get_Project_Layout_Names(
+                    self._file_control.project_name
+                )
+
+                layout_combo_items = [
+                    qtg.Combo_Data(
+                        index=-1,
+                        display=item.replace("_", " "),
+                        data=item.replace("_", " "),
+                        user_data=None,
+                    )
+                    for item in layout_items
+                ]
+
+                for item in layout_combo_items:
+                    layout_combo.value_set(item)
 
     def _archive_folder_select(self, event) -> None:
         """Select an archive folder and updates the settings in the database with the selected folder.
@@ -453,7 +513,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
 
         folder = popups.PopFolderGet(
-            title=f"Select A DVD Build Folder....",
+            title="Select A DVD Build Folder....",
             root_dir=folder,
             create_folder=True,
             folder_edit=False,
@@ -522,7 +582,10 @@ class DVD_Archiver(DVD_Archiver_Base):
         menu_layout: list[tuple[str, list[Video_Data]]] = []
         if (
             Menu_Page_Title_Popup(
-                title="DVD Menu Title",
+                title=(
+                    "DVD Layout -"
+                    f" {sys_consts.SDELIM}{dvd_layout_combo.value_get().display}{sys_consts.SDELIM}"
+                ),
                 video_data_list=menu_video_data,  # Pass by reference
                 menu_layout=menu_layout,  # Pass by reference
                 dvd_layout_name=dvd_layout_name,
@@ -987,7 +1050,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     height=1,
                     width=1,
                     icon=qtg.Sys_Icon.dir.get(),
-                    tooltip=f"Select The  DVD Archive Folder",
+                    tooltip="Select The  DVD Archive Folder",
                 ),
             ),
             qtg.LineEdit(
@@ -1004,7 +1067,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     height=1,
                     width=1,
                     icon=qtg.Sys_Icon.dir.get(),
-                    tooltip=f"Select The  DVD Build Folder",
+                    tooltip="Select The  DVD Build Folder",
                 ),
             ),
         )
@@ -1036,12 +1099,22 @@ class DVD_Archiver(DVD_Archiver_Base):
         buttons_container = qtg.HBoxContainer(
             tag="main_controls", margin_right=0
         ).add_row(
+            qtg.Button(
+                tag="make_dvd",
+                text="Make A DVD",
+                callback=self.event_handler,
+                tooltip="Make A DVD",
+                width=13,
+                height=2,
+                icon=file_utils.App_Path("compact-disc.svg"),
+            ),
+            qtg.Spacer(width=4),
             qtg.Label(
                 text="Project:",
                 buddy_control=qtg.HBoxContainer().add_row(
                     qtg.ComboBox(
                         tag="existing_projects",
-                        width=40,
+                        width=38,
                         items=project_combo_items,
                         translate=False,
                         display_na=False,
@@ -1065,7 +1138,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     ),
                 ),
             ),
-            qtg.Spacer(width=2),
+            qtg.Spacer(width=3),
             qtg.Label(
                 text="DVD Layout:",
                 buddy_control=qtg.HBoxContainer().add_row(
@@ -1093,21 +1166,11 @@ class DVD_Archiver(DVD_Archiver_Base):
                         width=2,
                         height=1,
                     ),
-                    qtg.Spacer(width=6),
-                    qtg.Button(
-                        tag="make_dvd",
-                        text="Make DVD",
-                        callback=self.event_handler,
-                        tooltip="Make A DVD",
-                        width=12,
-                        height=2,
-                        icon=file_utils.App_Path("compact-disc.svg"),
-                    ),
                 ),
             ),
-            qtg.Spacer(width=2),
+            qtg.Spacer(width=1),
             qtg.Button(
-                tag="exit_app", text="Exit", callback=self.event_handler, width=9
+                tag="exit_app", text="Exit", callback=self.event_handler, width=13
             ),
         )
 
@@ -1127,6 +1190,6 @@ if __name__ == "__main__":
     # import faulthandler
 
     # faulthandler.enable()
-    # faulthandler.dump_traceback_later(timeout=180, repeat=True)
+    # faulthandler.dump_traceback_later(timeout=360, repeat=True)
 
     DVD_Archiver(sys_consts.PROGRAM_NAME).run()

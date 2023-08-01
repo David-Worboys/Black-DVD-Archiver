@@ -172,7 +172,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         Args:
             file_grid (qtg.Grid): An instance of the `Grid` class.
             vd_id (int): The Video_Data ID of the source file that is to be checked.
-            checked (bool): True Chacked, False Unchecked
+            checked (bool): True Checked, False Unchecked
         """
         assert isinstance(file_grid, qtg.Grid), f"{file_grid}. Must be a Grid instance"
         assert isinstance(vd_id, int), f"{vd_id=}. Must be an int"
