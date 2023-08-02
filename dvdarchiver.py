@@ -1108,13 +1108,13 @@ class DVD_Archiver(DVD_Archiver_Base):
                 height=2,
                 icon=file_utils.App_Path("compact-disc.svg"),
             ),
-            qtg.Spacer(width=4),
+            qtg.Spacer(width=1),
             qtg.Label(
                 text="Project:",
                 buddy_control=qtg.HBoxContainer().add_row(
                     qtg.ComboBox(
                         tag="existing_projects",
-                        width=38,
+                        width=30,
                         items=project_combo_items,
                         translate=False,
                         display_na=False,
@@ -1144,7 +1144,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 buddy_control=qtg.HBoxContainer().add_row(
                     qtg.ComboBox(
                         tag="existing_layouts",
-                        width=20,
+                        width=30,
                         items=layout_combo_items,
                         translate=False,
                         display_na=False,

@@ -1836,6 +1836,7 @@ class Video_Editor(DVD_Archiver_Base):
             tag="menu_title",
             char_length=40,
             width=40,
+            translate=False,
         )
 
         dvd_settings = qtg.HBoxContainer().add_row(

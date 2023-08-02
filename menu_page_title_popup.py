@@ -596,9 +596,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         if (
             popups.PopYesNo(
                 title="Generate DVD..",
-                message="Stop Generating The DVD And Archive?",
+                message="Generate And Archive The DVD?",
             ).show()
-            == "yes"
+            == "no"
         ):
             return -1
 
@@ -767,12 +767,22 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
                         for row_grid_row in range(row_grid.row_count):
                             for row_grid_col in range(row_grid.col_count):
+                                
                                 row_grid_value = row_grid.value_get(
                                     row=row_grid_row, col=row_grid_col
                                 )
-                                row_grid_user_data = row_grid.userdata_get(
+
+                                row_grid_user_data: Video_Data = row_grid.userdata_get(
                                     row=row_grid_row, col=row_grid_col
                                 )
+
+                                if (
+                                    row_grid_user_data.video_file_settings.button_title.strip()
+                                    != row_grid_value.strip()
+                                ):
+                                    row_grid_user_data.video_file_settings.button_title = (
+                                        row_grid_value
+                                    )
 
                                 row_grid_data.append(
                                     (row_grid_value, row_grid_user_data)
