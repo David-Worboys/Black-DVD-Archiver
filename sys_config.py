@@ -1,5 +1,5 @@
 """
-    Contains classes and function that are used to store and retrieve configuration data.
+    Contains classes and functions that are used to store and retrieve configuration data.
 
     Copyright (C) 2023  David Worboys (-:alumnus Moyhu Primary School et al.:-)
 

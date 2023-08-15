@@ -324,51 +324,51 @@ class Video_Editor(DVD_Archiver_Base):
 
     def _get_dvd_settings(self):
         """Populates DVD settings with values sourced from self.video_file_input"""
+        if self._video_file_input:
+            if self._menu_title.modified:
+                self._video_file_input[0].video_file_settings.button_title = (
+                    self._menu_title.value_get()
+                )
 
-        if self._menu_title.modified:
-            self._video_file_input[0].video_file_settings.button_title = (
-                self._menu_title.value_get()
+            if self._menu_frame.modified:
+                self._video_file_input[0].video_file_settings.menu_button_frame = int(
+                    self._menu_frame.value_get()
+                )
+
+            self._video_file_input[0].video_file_settings.normalise = (
+                self._video_filter_container.widget_get(
+                    container_tag="video_filters",
+                    tag="normalise",
+                ).value_get()
             )
 
-        if self._menu_frame.modified:
-            self._video_file_input[0].video_file_settings.menu_button_frame = int(
-                self._menu_frame.value_get()
+            self._video_file_input[0].video_file_settings.denoise = (
+                self._video_filter_container.widget_get(
+                    container_tag="video_filters",
+                    tag="denoise",
+                ).value_get()
             )
 
-        self._video_file_input[0].video_file_settings.normalise = (
-            self._video_filter_container.widget_get(
-                container_tag="video_filters",
-                tag="normalise",
-            ).value_get()
-        )
+            self._video_file_input[0].video_file_settings.white_balance = (
+                self._video_filter_container.widget_get(
+                    container_tag="video_filters",
+                    tag="white_balance",
+                ).value_get()
+            )
 
-        self._video_file_input[0].video_file_settings.denoise = (
-            self._video_filter_container.widget_get(
-                container_tag="video_filters",
-                tag="denoise",
-            ).value_get()
-        )
+            self._video_file_input[0].video_file_settings.auto_bright = (
+                self._video_filter_container.widget_get(
+                    container_tag="video_filters",
+                    tag="auto_levels",
+                ).value_get()
+            )
 
-        self._video_file_input[0].video_file_settings.white_balance = (
-            self._video_filter_container.widget_get(
-                container_tag="video_filters",
-                tag="white_balance",
-            ).value_get()
-        )
-
-        self._video_file_input[0].video_file_settings.auto_bright = (
-            self._video_filter_container.widget_get(
-                container_tag="video_filters",
-                tag="auto_levels",
-            ).value_get()
-        )
-
-        self._video_file_input[0].video_file_settings.sharpen = (
-            self._video_filter_container.widget_get(
-                container_tag="video_filters",
-                tag="sharpen",
-            ).value_get()
-        )
+            self._video_file_input[0].video_file_settings.sharpen = (
+                self._video_filter_container.widget_get(
+                    container_tag="video_filters",
+                    tag="sharpen",
+                ).value_get()
+            )
 
     def video_pause(self):
         """Pause video playback"""
@@ -1211,7 +1211,9 @@ class Video_Editor(DVD_Archiver_Base):
         Args:
             frame (qtG.QPixmap): THe video frame to be displayed
         """
-        self._video_display.guiwidget_get.setPixmap(frame)
+        self._video_display.guiwidget_get.setPixmap(
+            frame.scaledToWidth(self.display_width)
+        )
 
     def _position_changed(self, frame: int) -> None:
         """

@@ -412,7 +412,7 @@ class DVD:
     """Does the grunt work needed to automatically turn video files into a
     DVD Folder/File structure with an auto generated menu"""
 
-    _BACKGROUND_CANVAS_FILE: str = "background_canvas.png"
+    _BACKGROUND_CANVAS_FILE: Final[str] = "background_canvas.png"
 
     # Database
     _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
@@ -1016,8 +1016,6 @@ class DVD:
             if not file_handler.file_exists(menu_button_file):
                 return -1, f"Video File Does Not Exist : {menu_button_file}"
 
-            cell_cord.video_file.video_file_settings.button_title
-
             menu_text = cell_cord.video_file.video_file_settings.button_title
 
             result, message = dvdarch_utils.Overlay_Text(
@@ -1192,7 +1190,7 @@ class DVD:
             num_rows, 4
         )  # Do not change as spumux very sensitive to this
 
-        ## Compute the maximum width of each rectangle based on the number of columns across all pages
+        # Compute the maximum width of each rectangle based on the number of columns across all pages
         rect_width_max = (
             (canvas_width // num_cols)
             - (num_cols * button_padding)
@@ -1354,7 +1352,7 @@ class DVD:
             buttons_down, 4
         )  # Do not change as spumux very sensitive to this
 
-        ## Compute the maximum width of each rectangle based on the number of columns across all pages
+        # Compute the maximum width of each rectangle based on the number of columns across all pages
         rect_width_max = (
             (canvas_width // buttons_across)
             - (buttons_across * button_padding)
@@ -2624,10 +2622,10 @@ class DVD:
         button_index = 0
         arrow_index = 0
 
-        # # Build menu pass
+        # Build menu pass
         for menu_index, coord in enumerate(cell_coords):
             button_index += 1
-            # TODO Specifically use buttons indicies rather than relying on the auro feature of spumux
+            # TODO Specifically use buttons indices rather than relying on the auto feature of spumux
             # pgc["button"].append({"@name":f"btn-{button_index}","#text":f"jump title {menu_index + 1};"})
             pgc["button"].append(f"jump title {menu_index + 1};")
 

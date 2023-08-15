@@ -11770,6 +11770,9 @@ class Label(_qtpyBase_Control):
         if self._widget is None:
             raise RuntimeError(f"{self._widget=}. Not set")
 
+        self._widget: qtW.QLabel
+        self._widget.setOpenExternalLinks(True)
+
         return widget
 
     def value_get(self) -> str:

@@ -465,21 +465,23 @@ def Get_Fonts() -> list[tuple[str, str]]:
 
     """
     font_list = []
+    font_dirs = []
 
     # Directories to search for font files
-    font_dirs = [
-        "/usr/share/fonts/",
-        "/usr/local/share/fonts/",
-        os.path.expanduser("~/.fonts/"),
-        "/Library/Fonts/",
-        ".",
-        os.path.expanduser("~/Library/Fonts/"),
-    ]
+    if platform.system() == "Linux":
+        font_dirs = [
+            "/usr/share/fonts/",
+            "/usr/local/share/fonts/",
+            os.path.expanduser("~/.fonts/"),
+            "/Library/Fonts/",
+            ".",
+            os.path.expanduser("~/Library/Fonts/"),
+        ]
 
-    # Windows font directory
-    windows_font_dir = os.getenv("WINDIR")
-    if windows_font_dir is not None:
-        font_dirs.append(windows_font_dir + "\\Fonts\\")
+    if platform.system() == "Windows":
+        windows_font_dir = os.getenv("WINDIR")
+        if windows_font_dir is not None:
+            font_dirs.append(windows_font_dir + "\\Fonts\\")
 
     # Add Mac font directory if the platform is Mac
     if platform.system() == "Darwin":
@@ -529,7 +531,9 @@ def Make_Opaque(color: str, opacity: float) -> tuple[int, str]:
     return 1, hex_color + opacity_hex
 
 
-def Create_Transparent_File(width: int, height: int, out_file: str, border_color=""):
+def Create_Transparent_File(
+    width: int, height: int, out_file: str, border_color=""
+) -> tuple[int, str]:
     """Creates a transparent file of a given width and height.
     If a border color is provided a rectangle of that color is drawn
     around the edge of the file
@@ -760,7 +764,7 @@ def Transcode_H26x(
         output_folder (str): The path to the output folder.
         frame_rate (float): The frame rate to use for the output video.
         width (int) : The width of the video
-        height (int) : The height of the cideo
+        height (int) : The height of the video
         interlaced (bool, optional): Whether to use interlaced video. Defaults to True.
         bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
         h265 (bool, optional): Whether to use H.265. Defaults to False.
@@ -965,7 +969,7 @@ def Get_Codec(input_file: str) -> tuple[int, str]:
     Returns:
         tuple[int, str]:
         - arg 1: Status code. Returns 1 if the codec name was obtained successfully, -1 otherwise.
-        - arg 2: Codec name if obtained successfully, otherwisr error message
+        - arg 2: Codec name if obtained successfully, otherwise error message
 
     """
     assert (
@@ -1348,13 +1352,7 @@ def Generate_Menu_Image_From_File(
 
     file_handler = file_utils.File()
 
-    video_file_path, video_file_name = file_handler.split_head_tail(video_file)
-
-    if "." in video_file_name:
-        extn = video_file_name.split(".")[-1]
-        video_file_name = ".".join(video_file_name.split(".")[0:-1])
-    else:
-        extn = ""
+    video_file_path, video_file_name, extn = file_handler.split_file_path(video_file)
 
     if (
         not file_handler.file_exists(video_file_path, video_file_name, extn)
@@ -1577,7 +1575,7 @@ def Resize_Image(
             ]
         )
 
-        if result == -1:  # colurs contains the eror message in this case
+        if result == -1:  # colors contains the error message in this case
             return result, colors
 
         cmd += ["-remap", colors]

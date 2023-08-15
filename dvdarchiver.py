@@ -795,7 +795,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 message=(
                     "Delete Project"
                     f" {sys_consts.SDELIM}{self._file_control.project_name}{sys_consts.SDELIM}?"
-                    " \nWarning All Project Data Except Source Video Files Will Be"
+                    " \n Warning All Project Data Except Source Video Files Will Be"
                     " Lost!"
                 ),
             ).show()
@@ -1095,6 +1095,32 @@ class DVD_Archiver(DVD_Archiver_Base):
             control=self._video_editor.layout(),
             enabled=False,
         )
+        about_text = (
+            '<h2 style="text-align: center;"><strong><span style="color: #3366ff;">'
+            f" The {sys_consts.PROGRAM_NAME} -"
+            f' {sys_consts.PROGRAM_VERSION}</span></strong></h2><p style="text-align:'
+            ' center;font-size: 15px;">&#169;'
+            f" {sys_consts.COPYRIGHT_YEAR()} {sys_consts.AUTHOR}</p><p"
+            ' style="text-align: center;"> <br/><img'
+            f' src={file_utils.App_Path("logo.jpg")} width="400"  /></p><p'
+            ' style="text-align: center;"> < a  href="https://www.moyhups.vic.edu.au/"'
+            " > 20th Century Alumnus: Moyhu Primary School Et Al. < /a ></p>  </p> <p "
+            f' style="text-align: center;">License: {sys_consts.LICENCE}</p>'
+        )
+        self._control_tab.page_add(
+            tag="about_tab",
+            title="About",
+            control=qtg.VBoxContainer().add_row(
+                qtg.Label(
+                    width=135,
+                    height=32,
+                    editable=False,
+                    text=about_text,
+                    translate=False,
+                )
+            ),
+            enabled=True,
+        )
 
         buttons_container = qtg.HBoxContainer(
             tag="main_controls", margin_right=0
@@ -1187,9 +1213,4 @@ class DVD_Archiver(DVD_Archiver_Base):
 
 
 if __name__ == "__main__":
-    # import faulthandler
-
-    # faulthandler.enable()
-    # faulthandler.dump_traceback_later(timeout=360, repeat=True)
-
     DVD_Archiver(sys_consts.PROGRAM_NAME).run()

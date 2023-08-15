@@ -116,7 +116,8 @@ class Archive_Manager:
             dvd_name (str): The name of the DVD.
             iso_folder (str) : The file path of the folder where the ISO build was created.
             dvd_folder (str): The file path of the folder where the DVD build was created.
-            menu_layout (list[tuple[str, list[Video_Data]]]): A list of tuples (menu title,Video_Data) representing thd DVD folder/file names
+            menu_layout (list[tuple[str, list[Video_Data]]]): A list of tuples (menu title,Video_Data) representing the
+            DVD folder/file names
             overwrite_existing (bool): Whether to overwrite existing DVD backup folder
 
         Returns:
@@ -281,7 +282,7 @@ class Archive_Manager:
                         )
 
                         if self._error_code == -1:
-                            return -1, message
+                            return -1, self._error_message
         return 1, ""
 
     def delete_edit_cuts(self, file_path: str) -> tuple[int, str]:

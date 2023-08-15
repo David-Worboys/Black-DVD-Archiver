@@ -767,7 +767,6 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
                         for row_grid_row in range(row_grid.row_count):
                             for row_grid_col in range(row_grid.col_count):
-                                
                                 row_grid_value = row_grid.value_get(
                                     row=row_grid_row, col=row_grid_col
                                 )
