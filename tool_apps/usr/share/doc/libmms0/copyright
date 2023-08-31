@@ -1,0 +1,64 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: libMMS
+Upstream-Contact:
+ Maciej Katafiasz (Mathrick) <mathrick@users.sourceforge.net>
+ Søren Hansen (shawarma) <sh@warma.dk>
+Source: http://sourceforge.net/projects/libmms/
+
+Files: *
+Copyright:
+ 2000-2004 the xine project
+ 2004-2012,2014 the libmms project
+License: LGPL-2+
+
+Files: src/bswap.h
+Copyright:
+ 2004 Maciej Katafiasz
+License: LGPL-2+
+
+Files:
+ src/mms-common.h
+ src/mmsx.*
+Copyright:
+ 2007,2010 Hans de Goede
+License: LGPL-2+
+
+Files: src/mms-common-funcs.h
+Copyright:
+ 2000-2003 the xine project
+ 2011 Hans de Goede
+License: LGPL-2+
+
+Files: src/uri.*
+Copyright:
+ 2000-2003 David Helder
+ 2000-2003 David Bolcsfoldi
+ 2000-20003 Eric Williams
+License: LGPL-2+
+
+Files: debian/*
+Copyright:
+ 2005 Søren Hansen (shawarma) <sh@warma.dk>
+ 2005-2007 Loic Minier <lool@dooz.org>
+ 2007-2008 Arthur Loiret <arthur.loiret@gmail.com>
+ 2010-2011 Fabian Greffrath <fabian+debian@greffrath.com>
+ 2014-2015 Sebastian Ramacher <sramacher@debian.org>
+License: LGPL-2+
+
+License: LGPL-2+
+ This package is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2 of the License, or (at your option) any later version.
+ .
+ This package is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public
+ License along with this package; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in `/usr/share/common-licenses/LGPL-2'.
