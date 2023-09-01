@@ -76,19 +76,22 @@ VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp",
                     "wmv", "asf","flv","f4v","ogg","ogv","rm", "rmvb","divx","mxf",
                     "dv","mts")
 # fmt: on
+tool_app_folder: Final[str] = (
+    f"{executable_folder}{file_sep}tool_apps{file_sep}usr{file_sep}bin{file_sep}"
+)
 
-COMPOSITE: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}composite"
-CONVERT: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}magick"
-DVDAUTHOR: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}dvdauthor"
-FFMPG: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}ffmpeg"
-FFPROBE: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}ffprobe"
-IDENTIFY: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}identify"
-MEDIAINFO: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}mediainfo"
-MPEG2ENC: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}mpeg2enc"
-MPLEX: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}mplex"
-PPMTOY4M: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}ppmtoy4m"
-SPUMUX: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}spumux"
-XORRISO: Final[str] = f"{executable_folder}{file_sep}tools{file_sep}xorriso"
+COMPOSITE: Final[str] = f"{tool_app_folder}composite"
+CONVERT: Final[str] = f"{tool_app_folder}magick"
+DVDAUTHOR: Final[str] = f"{tool_app_folder}dvdauthor"
+FFMPG: Final[str] = f"{tool_app_folder}ffmpeg"
+FFPROBE: Final[str] = f"{tool_app_folder}ffprobe"
+IDENTIFY: Final[str] = f"{tool_app_folder}identify"
+MEDIAINFO: Final[str] = f"{tool_app_folder}mediainfo"
+MPEG2ENC: Final[str] = f"{tool_app_folder}mpeg2enc"
+MPLEX: Final[str] = f"{tool_app_folder}mplex"
+PPMTOY4M: Final[str] = f"{tool_app_folder}ppmtoy4m"
+SPUMUX: Final[str] = f"{tool_app_folder}spumux"
+XORRISO: Final[str] = f"{tool_app_folder}xorriso"
 
 ICON_PATH: Final[str] = f"{executable_folder}{file_sep}icons"
 

@@ -425,7 +425,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             self._db_settings.setting_set(sys_consts.ARCHIVE_FOLDER, folder)
 
             event.value_set(
-                container_tag="archive_properties",
+                container_tag="dvd_properties",
                 tag="archive_path",
                 value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
             )

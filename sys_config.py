@@ -405,8 +405,8 @@ class DVD_Menu_Settings:
             str : The font used for button text
 
         """
-        if not self._db_settings.setting_exist("menu_font"):
-            self._db_settings.setting_set("menu_font", sys_consts.DEFAULT_FONT)
+        if not self._db_settings.setting_exist("button_font"):
+            self._db_settings.setting_set("button_font", sys_consts.DEFAULT_FONT)
         return self._db_settings.setting_get("button_font")
 
     @button_font.setter

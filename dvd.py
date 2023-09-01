@@ -152,16 +152,32 @@ class DVD_Config:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a non-empty string"
 
-        if file_utils.File().file_exists(value):
+        file_handler = file_utils.File()
+
+        if file_handler.file_exists(value):
             self._menu_font = value
+
             return
         else:
             for font in dvdarch_utils.Get_Fonts():
                 if font[0] == value:
                     self._menu_font = font[1]
+
                     return
 
-        raise RuntimeError(f"{value=}. Font not found")
+        if file_handler.file_exists(
+            file_utils.App_Path(
+                f"IBM-Plex-Mono{file_handler.ossep}{sys_consts.DEFAULT_FONT}"
+            )
+        ):
+            self._menu_font = file_utils.App_Path(
+                f"IBM-Plex-Mono{file_handler.ossep}{sys_consts.DEFAULT_FONT}"
+            )
+
+            return
+
+        # At this point something is really wrong
+        raise RuntimeError(f"{value=}. Menu Font not found")
 
     @property
     def button_background_color(self) -> str:
@@ -211,8 +227,9 @@ class DVD_Config:
         assert (
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a non-empty string"
+        file_handler = file_utils.File()
 
-        if file_utils.File().file_exists(value):
+        if file_handler.file_exists(value):
             self._button_font = value
             return
         else:
@@ -220,8 +237,19 @@ class DVD_Config:
                 if font[0] == value:
                     self._button_font = font[1]
                     return
+        if file_handler.file_exists(
+            file_utils.App_Path(
+                f"IBM-Plex-Mono{file_handler.ossep}{sys_consts.DEFAULT_FONT}"
+            )
+        ):
+            self._menu_font = file_utils.App_Path(
+                f"IBM-Plex-Mono{file_handler.ossep}{sys_consts.DEFAULT_FONT}"
+            )
 
-        raise RuntimeError(f"{value=}. Font not found")
+            return
+
+        # At this point something is really wrong
+        raise RuntimeError(f"{value=}. Button Font not found")
 
     @property
     def menu_font_color(self) -> str:
@@ -287,7 +315,9 @@ class DVD_Config:
             isinstance(value, str) and value.strip() != ""
         ), f"{value=}. Must be a non-empty string"
 
-        if file_utils.File().path_exists(value):
+        file_handler = file_utils.File()
+
+        if file_handler.path_exists(value):
             self._timestamp_font = value
             return
         else:
@@ -296,7 +326,20 @@ class DVD_Config:
                     self._timestamp_font = font[1]
                     return
 
-        raise RuntimeError(f"{value=}. Font not found")
+        if file_handler.file_exists(
+            file_utils.App_Path(
+                f"IBM-Plex-Mono{file_handler.ossep}{sys_consts.DEFAULT_FONT}"
+            )
+        ):
+            self._menu_font = file_utils.App_Path(
+                f"IBM-Plex-Mono{file_handler.ossep}{sys_consts.DEFAULT_FONT}"
+            )
+
+            return
+
+        # At this point something is really wrong
+
+        raise RuntimeError(f"{value=}. Timestamp Font not found")
 
     @property
     def timestamp_font_point_size(self) -> int:

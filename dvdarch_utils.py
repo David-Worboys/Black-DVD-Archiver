@@ -205,7 +205,7 @@ def Concatenate_Videos(
             "-threads",
             str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
             "-y",
-        ],
+        ]
     )
 
     if result == -1:
@@ -453,6 +453,7 @@ def Get_Font_Example(
         return pointsize, subprocess.check_output(command, stderr=subprocess.DEVNULL)
 
     except subprocess.CalledProcessError as e:
+        print(f"DBG Render Error {e=}")
         return -1, b""
 
 
@@ -931,7 +932,7 @@ def Get_Text_Dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
 
     # Run the ImageMagick command to measure the text
     result, message = Execute_Check_Output(
-        [
+        commands=[
             sys_consts.CONVERT,
             "-background",
             "none",
@@ -945,7 +946,8 @@ def Get_Text_Dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
             "-format",
             "%[fx:w]x%[fx:h]",
             "info:",
-        ]
+        ],
+        debug=False,
     )
 
     if result == -1:
@@ -1163,7 +1165,8 @@ def Execute_Check_Output(
                 commands if not execute_as_string else " ".join(commands),
                 universal_newlines=True,
                 shell=shell,
-                stderr=subprocess.STDOUT,
+                # stderr=subprocess.STDOUT,
+                stderr=subprocess.DEVNULL,
                 env=env,
             )
     except (subprocess.CalledProcessError, FileNotFoundError) as call_error:
@@ -1434,7 +1437,8 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         mi = subprocess.check_output(
             [sys_consts.MEDIAINFO, fmt, video_file],
             universal_newlines=True,
-            stderr=subprocess.STDOUT,
+            # stderr=subprocess.STDOUT,
+            stderr=subprocess.DEVNULL,
         ).strip()
 
         video_info = xmltodict.parse(mi)
