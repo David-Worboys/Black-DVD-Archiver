@@ -19,7 +19,13 @@ Can the author be persuaded to be more flexible and add additional features? Pos
 * A Simple Video Editor
 * Limited Video Filters With Fixed Settings
 * DVD's Have A Simplified Menu Structure
-* Saves The Input Files In A User Selected Archive Folder. This Can Be On A NAS And Accessed By A Media Player.
+* Saves The Input/Ouput Files In A User-Selected Archive Folder. 
+  * This Can Be Placed On A NAS And Accessed By A Media Player.
+  * An ISO image of the DVD is produced so that DVD burning software can produce the physical DVD. 
+    * Brasero is a good choice, choose the "Burn Image" option (https://wiki.gnome.org/Apps/Brasero) 
+  * Example Archive Folder Structure
+   ![](./userguide_images/archive_file_structure.png)
+  
 
 ## Why Archive To DVD?
 In short, because DVD's are offline, they last, and they are easy to share.
