@@ -1,4 +1,5 @@
 # The Black DVD Archiver - βeta 1.0 Release
+### Author: David Worboys 2023-09-01
 The Black DVD Archiver is an application that will place user selected video files on a DVD and the source files in an 
 archive location specified by the user. 
 
