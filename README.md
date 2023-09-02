@@ -3,9 +3,9 @@ The Black DVD Archiver is an application that will place user selected video fil
 archive location specified by the user. 
 
 ## Why Black? 
-Henry Ford is reputed to have said "...You can have any colour you like as long as it is black..." likewise you can have 
+Henry Ford is reputed to have said "...You can have any colour you like as long as it is black..." likewise, you can have 
 any DVD/Video settings you want in The Black DVD Archiver as long as they are the settings the author chose.
-
+ 
 These settings are optimised at getting VHS, Beta and 8mm analogue video onto a DVD at the best possible quality that 
 allows 2 hours to fit on a 4.7 GB disk.
 
@@ -28,19 +28,26 @@ SD cards, USB and Solid State Drives are not long term storage solutions because
 cells as an electric charge that slowly leaks away.  
 
 Similarly, Hard Disk Drives are not reliable because they are 
-electromechanical devices with components that degrade over time even sitting on a shelf.  In fact do not bet on more 
-than 10 years from either and I have seen both go bad in a lot less than that.
+electromechanical devices with components that degrade over time even sitting on a shelf.  In fact, do not bet on more 
+than 10 years from either, and I have seen both go bad in a lot less than that.
 
-Storing data in the cloud is betting on a companies' longevity and continued support. It also depends on people passing 
-on their login details after they die.
+Offline magnetic tape storage can be long-lasting, if stored correctly, but requires specialised cassettes and drives. 
+These maye be hard to source for individuals in decades to come.
+
+Storing data in the cloud is betting on a companies' longevity, security, backup policies and continued support. It also 
+depends on people passing on their login details after they die.
+
+As a final note, archiving important material should be an in depth approach that utilises some of the above methods to 
+avoid long term data loss, taking into account the deficiencies of each method. Offline optical disks (DVD/Blu-ray) are
+the last best line of defence and the longest lasting and most accessible for individuals, particularly if neglected.
 
 **Archiving for individuals** means a descendant can be digging through a hot dusty attic in say 50 years or a century 
 and finding media that has retained data. 
 
-Because DVD's are ubiquitous and held in official archives it is highly likely a means can be found to play them or 
+Because DVD's are ubiquitous and held in official archives, it is highly likely a means can be found to play them or 
 transfer their contents to future media for playback and sharing.
 
-Successful consumer media playback and recording formats have very long lives and because people collect them there is 
+Successful consumer media playback and recording formats have very long lives, and because people collect them there is 
 an incentive to find a way to play them back. Records, Cassettes, VHS, CD,  DVD and Blu-ray are all testaments to this.
 
 Case in point VHS tapes, I have some now  over 40 years old and I can still play them. 
@@ -76,7 +83,7 @@ The Black DVD Archiver is a Linux program licensed under the terms of the GNU Ge
 ## The Main Window
 ![](./userguide_images/main_screen.png)
 
-When the "black-dvd-archiver" has started the user will see the main window above.
+When the "black-dvd-archiver" has started, the user will see the main window above.
 
 ### The DVD Properties Panel
 ![](./userguide_images/dvd_properties.png)
@@ -91,21 +98,21 @@ panel
    * Fixed and set to 5.5 Mb/s. This allows 2 hours of video on a DVD in high quality
  * _DVD_Used_ - The percent of the DVD used by the selected files.
    * Only 99% is available this allows 1% to cover for any time overruns.
-     * Added benefit of providing a small buffer on the outer edge of the DVD to protect from edge damage 
+     * The added benefit of providing a small buffer on the outer edge of the DVD is to protect the DVD from edge damage 
  * _Archive Folder_ - This is set by the user
    * The Archive Folder is where the DVD image, ISO image (used to burn a DVD) and 
    DVD source files are stored.
    * The Archive Folder is best placed on a NAS (Network Attached Storage) device 
    where a media-player can access it.
    * The DVD file folder is composed of a unique code and the project name: e.g DVD-HV-000209-6_Userguide_Example
-     * DVD - Is self explanatory
+     * DVD - Is self-explanatory
      * HV - Home Video
      * 000209 - Sequential Folder Number
      * 6 - Check sum
      * Userguide_Example - The Project Name 
  * _DVD Build Folder_ - This is set by the user
    * The folder in which all the assets required to build a DVD are marshalled
-   * Will be overwritten on the next DVD build
+   * It will be overwritten on the next DVD build
    * The relevant files will be copied from here to the _Archive Folder_ when a DVD build is complete
  
 ### DVD Input Files Panel
@@ -123,11 +130,11 @@ Displays the list of video files selected to comprise a DVD project
 * _Duration_ - Displays the video file duration in hourse, minutes, seconds
 
 ![](./userguide_images/dvd_input_files_panel_b.png)
-At the botton of the video file grid is the _Default Video Filters_ and control buttons.
+At the bottom of the video file grid is the _Default Video Filters_ and control buttons.
 
 #### Video File Filters
 * _Default Video Filters_ - These are the video filters applied by default to the project files.
-In general it is best not to filter unless absolutely  required as it takes time and can impact image 
+In general, it is best not to filter unless absolutely  required as it takes time and can impact image 
 quality. The settings chosen for these filters are aimed at having the minimal impact on video  quality
 
   * _Normalise_ - Attempts to bring out the shadow details
