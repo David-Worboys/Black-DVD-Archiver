@@ -23,9 +23,9 @@ Can the author be persuaded to be more flexible and add additional features? Pos
   * This Can Be Placed On A NAS And Accessed By A Media Player.
   * An ISO image of the DVD is produced so that DVD burning software can produce the physical DVD. 
     * Brasero is a good choice, choose the "Burn Image" option (https://wiki.gnome.org/Apps/Brasero) 
-  * Example Archive Folder Structure
-   ![](./userguide_images/archive_file_structure.png)
   
+  _Example Archive Folder Structure_
+   ![](./userguide_images/archive_file_structure.png)
 
 ## Why Archive To DVD?
 In short, because DVD's are offline, they last, and they are easy to share.
