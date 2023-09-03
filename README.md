@@ -39,14 +39,17 @@ electromechanical devices with components that degrade over time even sitting on
 than 10 years from either, and I have seen both go bad in a lot less than that.
 
 Offline magnetic tape storage can be long-lasting, if stored correctly, but requires specialised cassettes and drives. 
-These maye be hard to source for individuals in decades to come.
+The drives to read these cassettes maybe be especially hard to source for individuals in decades to come as they are 
+niche products.
 
 Storing data in the cloud is betting on a companies' longevity, security, backup policies and continued support. It also 
-depends on people passing on their login details after they die.
+depends on people passing on their login details after they die and making arrangements to pay for the service indefinitely.
 
-As a final note, archiving important material should be an in depth approach that utilises some of the above methods to 
-avoid long term data loss, taking into account the deficiencies of each method. Offline optical disks (DVD/Blu-ray) are
-the last best line of defence and the longest lasting and most accessible for individuals, particularly if neglected.
+_Archiving important material should take an in depth planned approach that utilises some (or all) of the above methods  
+to avoid long term data loss, taking into account the deficiencies of each backup method._ 
+
+_Offline optical disks (DVD/Blu-ray) are
+the last best line of defence and the longest lasting and most accessible for individuals, particularly if neglected._
 
 **Archiving for individuals** means a descendant can be digging through a hot dusty attic in say 50 years or a century 
 and finding media that has retained data. 
@@ -85,6 +88,9 @@ The Black DVD Archiver is a Linux program licensed under the terms of the GNU Ge
 
 ## Installation
 * Download the "black-dvd-archiver" (insert link) to your Programs folder.
+* Right click on the "black-dvd-archiver" file and select "Properties". This will open the window below, select 
+"Permissions" and tick "Allow executing file as program" and then "Close" 
+ ![](./userguide_images/allow_executing_as_a_program.png)
 * Double-click on the "black-dvd-archiver". It will take a few seconds to start.
 
 ## The Main Window
