@@ -87,7 +87,7 @@ The Black DVD Archiver is a Linux program licensed under the terms of the GNU Ge
 * 50+ GB of free disk space
 
 ## Installation
-* Download the "black-dvd-archiver" [()](https://github.com/David-Worboys/Black-DVD-Archiver/releases/tag/%CE%B21.0.0) to your Programs folder.
+* Download the "black-dvd-archiver" [(Release)](https://github.com/David-Worboys/Black-DVD-Archiver/releases/tag/%CE%B21.0.0) to your Programs folder.
 * Right click on the "black-dvd-archiver" file and select "Properties". This will open the window below, select 
 "Permissions" and tick "Allow executing file as program" and then "Close" 
  ![](./userguide_images/allow_executing_as_a_program.png)
