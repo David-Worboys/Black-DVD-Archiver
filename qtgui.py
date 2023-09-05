@@ -59,7 +59,7 @@ from utils import Coords, Is_Complied, amper_length, country_date_formatmask
 
 # fmt: on
 
-g_application = None
+g_application: Union["QtPyApp", None] = None
 
 # Constants
 DEFAULT_FONT_SIZE = 10
@@ -2879,7 +2879,11 @@ class _qtpyBase_Control(_qtpyBase):
         colour = Colors(self)
 
         if widget_font.font_name == "":
-            widget_font.font_name = app_font.font_name
+            widget_font.font_name = (
+                g_application.app_font.family()
+                if app_font.font_name == ""
+                else app_font.font_name
+            )  # Catches case where app_font is not set, this might be a bug.
 
         if widget_font.size < 0:
             widget_font.size = app_font.size
