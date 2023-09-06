@@ -45,11 +45,11 @@ niche products.
 Storing data in the cloud is betting on a companies' longevity, security, backup policies and continued support. It also 
 depends on people passing on their login details after they die and making arrangements to pay for the service indefinitely.
 
-_Archiving important material should take an in depth planned approach that utilises some (or all) of the above methods  
-to avoid long term data loss, taking into account the deficiencies of each backup method._ 
+_Archiving important material should take an in depth planned approach that utilises some (or all) of the above methods to 
+avoid long term data loss, taking into account the deficiencies of each backup method._ 
 
-_Offline optical disks (DVD/Blu-ray) are
-the last best line of defence and the longest lasting and most accessible for individuals, particularly if neglected._
+**_Offline optical disks (DVD/Blu-ray) are
+the last best line of defence and the longest lasting and most accessible for individuals, particularly if neglected._**
 
 **Archiving for individuals** means a descendant can be digging through a hot dusty attic in say 50 years or a century 
 and finding media that has retained data. 
@@ -65,6 +65,18 @@ Case in point VHS tapes, I have some now  over 40 years old and I can still play
 **Quality** DVD-R's/Blu-ray's burned correctly are the only media that an individual can rely on for long-term archiving 
 today. I have some DVD-R's on a shelf behind me that are over 20 years old and test just fine.  I have CD-R that are 
 over 25 years old and they test fine.  
+
+For the longest data storage Ritek M-Disc is the way to go: https://www.ritek.com/business-detail/index/1/id/1/title/M-DISC 
+
+Verbatim archival grade DVD-R's are also a good choice: https://www.verbatim.com/prod/optical-media/dvd/archival-grade-gold-dvd-r/ultralife-archival-grade-gold-dvd-r/
+
+The best approach would be burn copies to both and store in separate locations. 
+
+**Never use Blu-ray LTH disks for archival storage as they will not last as long as the original Blu-ray disks**
+https://www.verbatim.com/subcat/optical-media/m-disc/
+
+![](./userguide_images/media_longevity.png)
+Source: https://ia801503.us.archive.org/7/items/nist-ir-8387/NIST.IR.8387.pdf
 
 ## Points To Note
 * PAL Specs - 720 W * 576 H, Aspect Ratio 4:3, 25 frames a second interlaced (50 fields a second)
@@ -87,7 +99,7 @@ The Black DVD Archiver is a Linux program licensed under the terms of the GNU Ge
 * 50+ GB of free disk space
 
 ## Installation
-* Download the "black-dvd-archiver" (insert link) to your Programs folder.
+* Download the "black-dvd-archiver" (https://github.com/David-Worboys/Black-DVD-Archiver/releases/tag/%CE%B21.0.0) to your Programs folder.
 * Right click on the "black-dvd-archiver" file and select "Properties". This will open the window below, select 
 "Permissions" and tick "Allow executing file as program" and then "Close" 
  ![](./userguide_images/allow_executing_as_a_program.png)
