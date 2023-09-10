@@ -1,5 +1,5 @@
 """ 
-    This modile implements various common popup message boxes. 
+    This module implements various common popup message boxes.
 
     Split from qtgui.py
 
@@ -23,21 +23,29 @@
 import dataclasses
 import os
 import pathlib
+import shelve
 import types
 from dataclasses import field
 from typing import Callable, Optional, Union
 
 import fs
+import platformdirs
+import translators
 from pathvalidate import ValidationError, validate_filepath
 from PySide6 import QtCore as qtC
 from PySide6 import QtGui as qtG
 
+import file_utils
+import sqldb
 from file_utils import App_Path
-from qtgui import (Action, Align, Button, Command_Button_Container, FolderView,
-                   Font, Frame, Frame_Style, GridContainer, HBoxContainer,
-                   Image, Label, LineEdit, PopContainer, RadioButton, Spacer,
-                   Sys_Events, Sys_Icon, TextEdit, VBoxContainer, Widget_Frame)
-from sys_consts import SDELIM
+from qtgui import (Action, Align, Button, Col_Def, Combo_Data, Combo_Item,
+                   ComboBox, Command_Button_Container, Cursor, FolderView,
+                   Font, Frame, Frame_Style, Grid, Grid_Col_Value,
+                   GridContainer, HBoxContainer, Image, Label, LineEdit,
+                   PopContainer, RadioButton, Spacer, Sys_Events, Sys_Icon,
+                   TextEdit, VBoxContainer, Widget_Frame, sys_cursor)
+from sys_consts import PROGRAM_NAME, SDELIM
+from utils import Countries, Text_To_File_Name
 
 # fmt: on
 
@@ -981,3 +989,645 @@ class PopWarn(PopYesNo):
                 self.buttons = (Button(text="&Ok", tag="ok"),)
 
         super().__post_init__()
+
+
+@dataclasses.dataclass
+class Langtran_Popup(PopContainer):
+    """Allow users to provide translations - should be in langtran.py but got circular import error"""
+
+    tag: str = "langtran_popup"
+
+    # Private instance variable
+    _db_settings: sqldb.App_Settings | None = None
+    _db_file: str = "lang_tran"
+    _path = platformdirs.user_data_dir(appname=PROGRAM_NAME)
+
+    def __post_init__(self) -> None:
+        """Sets-up the form"""
+
+        self.container = self.layout()
+        self._db_settings = sqldb.App_Settings(PROGRAM_NAME)
+        self.DB = sqldb.SQLDB(
+            appname=PROGRAM_NAME,
+            dbpath=self._path,
+            dbfile=self._db_file,
+            suffix=".db",
+            dbpassword="",
+        )
+
+        error_status = self.DB.get_error_status()
+
+        self._error_code = error_status.code
+        self._error_msg = error_status.message
+
+        super().__post_init__()  # This statement must be last
+
+    def _get_language_code(self, event: Action) -> str:
+        """Gets the language code from the country combo-box
+
+        Args:
+            event (Action): Triggering event
+
+        Returns:
+            str: The country code in 2 char  ISO language code
+        """
+        assert isinstance(event, Action), f"{event=}. Must be Action"
+
+        combo_value: Combo_Data = event.value_get(
+            container_tag="langtran_controls", tag="countries"
+        )
+
+        return combo_value.data
+
+    def event_handler(self, event: Action) -> None:
+        """Handles  form events
+        Args:
+            event (qtg.Action): The triggering event
+        """
+        assert isinstance(event, Action), f"{event=}. Must be Action"
+
+        match event.event:
+            case Sys_Events.WINDOWPOSTOPEN:
+                self._windows_open_handler(event)
+
+            case Sys_Events.CLICKED:
+                match event.tag:
+                    case "auto_trans":
+                        self._auto_translate(event)
+                    case "export":
+                        self._export_handler(event)
+                    case "import":
+                        self._import_handler(event)
+                    case "ok":
+                        if self._process_ok(event) == 1:
+                            self.set_result(event.tag)
+                            super().close()
+                    case "save":
+                        self._save_handler(event)
+
+            case Sys_Events.CLEAR_TYPING_BUFFER:
+                if isinstance(event.value, Grid_Col_Value):
+                    grid_col_value: Grid_Col_Value = event.value
+
+                    grid_col_value.grid = self
+
+                    phrase: str = grid_col_value.value
+                    row = grid_col_value.row
+                    col = grid_col_value.col
+                    user_data = grid_col_value.user_data
+
+                    phrase_grid: Grid = event.widget_get(
+                        container_tag="langtran_controls",
+                        tag="phrase_grid",
+                    )
+
+                    phrase_grid.value_set(
+                        value=phrase, row=row, col=col, user_data=user_data
+                    )
+                    phrase_grid.changed = True
+
+            case Sys_Events.INDEXCHANGED:
+                match event.tag:
+                    case "countries":
+                        self._country_combo_handler(event)
+
+    def _import_handler(self, event: Action):
+        """Imports into the phrase grid the user seleced language translation file located in the users document folder
+
+        Args:
+            event (Action): Triggering event
+        """
+        assert isinstance(event, Action), f"{event=}. Must be Action"
+
+        db_path: str = platformdirs.user_documents_dir()
+        file_handler = file_utils.File()
+
+        phrase_grid: Grid = event.widget_get(
+            container_tag="langtran_controls",
+            tag="phrase_grid",
+        )
+        country_combo: ComboBox = event.widget_get(
+            container_tag="langtran_controls",
+            tag="countries",
+        )
+
+        langtran_files = file_handler.filelist(db_path, ("dat",))
+
+        langtran_dict = {}
+        langtran_names = []
+
+        for file in langtran_files.files:
+            _, name, _ = file_handler.split_file_path(file)
+
+            langtran_dict[name] = file_handler.file_join(db_path, name)
+            langtran_names.append(name)
+
+        result = PopOptions(
+            title="Choose Language File...",
+            message="Please Choose Language File",
+            options=langtran_names,
+        ).show()
+
+        if result in langtran_dict:
+            file = langtran_dict[result]
+            country = result.replace("_", " ").split(".langtran")[0]
+            result = country_combo.select_text(
+                select_text=country,
+                case_sensitive=False,
+                partial_match=False,
+            )
+
+            phrase_grid.clear()
+
+            try:
+                with shelve.open(file) as db:
+                    db_data = db.get("lang_tran")
+
+                    for row_index, grid_row in enumerate(db_data):
+                        for col_index, grid_col_item in enumerate(grid_row):
+                            grid_item_value = grid_col_item[0]
+                            grid_item_user_data = grid_col_item[1]
+
+                            phrase_grid.value_set(
+                                row=row_index,
+                                col=col_index,
+                                value=grid_item_value,
+                                user_data=grid_item_user_data,
+                            )
+
+            except Exception as e:
+                PopError(
+                    title="Failed To Import...",
+                    message=(
+                        f"Failed To Import {SDELIM}{file} -"
+                        f" {e if e is not None else ''}{SDELIM}"
+                    ),
+                ).show()
+                return None
+
+    def _export_handler(self, event: Action) -> None:
+        """Exports the phrase grid as a language translation file to the users document folder
+
+        Args:
+            event (Action): Triggering event
+        """
+        assert isinstance(event, Action), f"{event=}. Must be Action"
+
+        db_path: str = platformdirs.user_documents_dir()
+        file_handler = file_utils.File()
+
+        phrase_grid: Grid = event.widget_get(
+            container_tag="langtran_controls",
+            tag="phrase_grid",
+        )
+        country_combo: ComboBox = event.widget_get(
+            container_tag="langtran_controls",
+            tag="countries",
+        )
+
+        country_data: Combo_Data = country_combo.value_get()
+
+        project_file_name = file_handler.file_join(
+            dir_path=db_path,
+            file_name=Text_To_File_Name(country_data.display),
+            ext="langtran",
+        )
+
+        row_data = []
+
+        for row in range(phrase_grid.row_count):
+            grid_col_values = []
+
+            for col in range(phrase_grid.col_count):
+                grid_value = phrase_grid.value_get(row=row, col=col)
+                grid_user_data = phrase_grid.userdata_get(row=row, col=col)
+
+                grid_col_values.append((grid_value, grid_user_data))
+
+            row_data.append(grid_col_values)
+
+        try:
+            with shelve.open(project_file_name) as db:
+                db["lang_tran"] = row_data
+
+        except Exception as e:
+            PopError(
+                title="Failed To Export...",
+                message=f"Failed to export {SDELIM}{project_file_name} - {e}{SDELIM}",
+            ).show()
+            return None
+
+        PopMessage(
+            title="Exported...",
+            message=f"Exported {SDELIM}{project_file_name}{SDELIM}",
+        ).show()
+        return None
+
+    def _country_combo_handler(self, event: Action):
+        """Handles the change of country in the country combo box
+
+        Args:
+            event (Action): Triggering event
+        """
+
+        if event.widget_exist(
+            container_tag="langtran_controls",
+            tag="phrase_grid",
+        ):
+            trans_table = self._get_trans_table(event)
+
+            phrase_grid: Grid = event.widget_get(
+                container_tag="langtran_controls",
+                tag="phrase_grid",
+            )
+
+            for row_index in range(phrase_grid.row_count):
+                result_row = phrase_grid.userdata_get(row=row_index, col=0)
+                base_lang_id = result_row[0]
+                base_phrase = result_row[1]
+
+                if (
+                    base_lang_id in trans_table
+                ):  # Populate with translated phrases if available
+                    phrase_grid.value_set(
+                        value=trans_table[base_lang_id][1],
+                        row=row_index,
+                        col=1,
+                        user_data=trans_table[base_lang_id],
+                    )
+                else:
+                    phrase_grid.value_set(
+                        value="",
+                        row=row_index,
+                        col=1,
+                        user_data=(),
+                    )
+
+            phrase_grid.changed = False
+
+    def _windows_open_handler(self, event: Action) -> None:
+        """Performs the tasks needed when the window opnes
+
+        Args:
+            event (Action): Triggering event
+        """
+        trans_table: dict = {}
+        phrase_grid: Grid = event.widget_get(
+            container_tag="langtran_controls",
+            tag="phrase_grid",
+        )
+
+        # Default country combo to the country specified in the application selected country
+        if self._db_settings.setting_exist(
+            setting_name="app_country",
+        ):
+            app_country = self._db_settings.setting_get(
+                setting_name="app_country",
+            )
+
+            if app_country:
+                country_combo: ComboBox = event.widget_get(
+                    container_tag="langtran_controls",
+                    tag="countries",
+                )
+
+                result = country_combo.select_text(
+                    select_text=app_country,
+                    case_sensitive=False,
+                    partial_match=False,
+                )
+
+        trans_table = self._get_trans_table(event)
+
+        # Populate the phrase table with base phrases and, if any, translated phrases from the app selected country
+        trans_sql = (
+            f"{sqldb.SQL.SELECT} id, word {sqldb.SQL.FROM} lang_tran"
+            f" {sqldb.SQL.WHERE} language_code {sqldb.SQL.IS_NULL}"
+        )
+
+        result = self.DB.sql_execute(trans_sql, debug=False)
+        error = self.DB.get_error_status()
+
+        if error.code == 1 and result:  # Have base words
+            for row_index, result_row in enumerate(result):
+                base_lang_id = result_row[0]
+                base_phrase = result_row[1]
+
+                phrase_grid.value_set(
+                    value=base_phrase,
+                    row=row_index,
+                    col=0,
+                    user_data=result_row,
+                )
+
+                if base_lang_id in trans_table:
+                    phrase_grid.value_set(
+                        value=trans_table[base_lang_id][1],
+                        row=row_index,
+                        col=1,
+                        user_data=trans_table[base_lang_id],
+                    )
+        phrase_grid.changed = False
+
+    def _get_trans_table(self, event) -> dict[str, tuple[str, str]]:
+        """Get a dict loaded with translations, if any, for the current language in the combobox
+
+        Args:
+            event (Action): The triggering event
+
+        Returns:
+            dict[str,tuple[str,str]]: A dict loaded with translations, if any, for the current language
+                - key is base_lag_id tuple is (trans_lang_id, translated_phrase)
+        """
+        trans_table = {}
+
+        trans_sql = (
+            f"{sqldb.SQL.SELECT} base_lang_id, id, word"
+            f" {sqldb.SQL.FROM} lang_tran"
+            f" {sqldb.SQL.WHERE} language_code ="
+            f" '{self._get_language_code(event)}'"
+        )
+        result = self.DB.sql_execute(trans_sql, debug=False)
+        error = self.DB.get_error_status()
+
+        if error.code == 1 and result:  # Have translated words for language
+            for row_index, result_row in enumerate(result):
+                base_lang_id = result_row[0]
+                trans_id = result_row[1]
+                trans_phrase = result_row[2]
+
+                trans_table[base_lang_id] = (trans_id, trans_phrase)
+
+        return trans_table
+
+    def _auto_translate(self, event: Action):
+        """Attempts to automatically translate the base phrases
+
+        Args:
+            event (Action): The triggering event
+
+        Returns:
+
+        """
+        assert isinstance(event, Action), f"{event=}. Must be Action"
+
+        if (
+            PopYesNo(
+                title="Access The Internet...",
+                message="Auto-Translation Will Use The Internet!  Continue?",
+            ).show()
+            == "yes"
+        ):
+            phrase_grid: Grid = event.widget_get(
+                container_tag="langtran_controls",
+                tag="phrase_grid",
+            )
+            language_code = self._get_language_code(event).lower()
+
+            with sys_cursor(Cursor.hourglass):
+                try:
+                    if language_code not in translators.get_languages():
+                        PopError(
+                            title="Language Is Not Supported...",
+                            message=(
+                                "MS Bing Does Not Support  Translating That Language!"
+                            ),
+                        ).show()
+                        return None
+
+                    for row in range(phrase_grid.row_count):
+                        base_phrase = phrase_grid.value_get(row=row, col=0)
+                        trans_text = translators.translate_text(
+                            query_text=base_phrase,
+                            to_language=language_code,
+                        )
+
+                        if trans_text:
+                            phrase_grid.value_set(
+                                value=trans_text,
+                                row=row,
+                                col=1,
+                                user_data=None,
+                            )
+                except Exception as e:
+                    PopError(
+                        title="Language Translation Failed...",
+                        message=f"Language Translation Failed!{SDELIM}\n {e} {SDELIM}",
+                    ).show()
+
+    def _save_handler(self, event: Action) -> int:
+        """Saves the translated text to the database
+
+        Args:
+            event (Action): The triggering event
+
+        Returns:
+            int : 1 Saved Ok, -1 Save Failed
+
+        """
+        assert isinstance(event, Action), f"{event=}. Must be Action"
+
+        phrase_grid: Grid = event.widget_get(
+            container_tag="langtran_controls",
+            tag="phrase_grid",
+        )
+        language_code = self._get_language_code(event).lower()
+
+        with sys_cursor(Cursor.hourglass):
+            for row in range(phrase_grid.row_count):
+                base_phrase = phrase_grid.value_get(row=row, col=0)
+                trans_phrase = phrase_grid.value_get(row=row, col=1)
+
+                if trans_phrase.strip():
+                    trans_sql = (
+                        f"{sqldb.SQL.SELECT} id, word"
+                        f" {sqldb.SQL.FROM} lang_tran"
+                        f" {sqldb.SQL.WHERE} word = '{base_phrase}'"
+                        f" {sqldb.SQL.AND} language_code"
+                        f" {sqldb.SQL.IS_NULL}"
+                    )
+
+                    result = self.DB.sql_execute(trans_sql, debug=False)
+                    error = self.DB.get_error_status()
+
+                    if error.code == 1 and result:  # Have a base word
+                        base_lang_id = result[0][0]
+
+                        trans_sql = (
+                            f"{sqldb.SQL.SELECT} id, word"
+                            f" {sqldb.SQL.FROM} lang_tran"
+                            f" {sqldb.SQL.WHERE} base_lang_id ="
+                            f" '{base_lang_id}'"
+                            f" {sqldb.SQL.AND} language_code ="
+                            f" '{language_code}'"
+                        )
+
+                        result = self.DB.sql_execute(trans_sql, debug=False)
+                        error = self.DB.get_error_status()
+
+                        if error.code == 1:
+                            trans_phrase = trans_phrase.replace("'", "''")
+                            if result:  # Have a translated phrase (update)
+                                trans_sql = (
+                                    f"{sqldb.SQL.UPDATE} lang_tran"
+                                    f" {sqldb.SQL.SET} word ="
+                                    f" '{trans_phrase}'"
+                                    f" {sqldb.SQL.WHERE} base_lang_id ="
+                                    f" '{base_lang_id}'"
+                                    f" {sqldb.SQL.AND} language_code ="
+                                    f" '{language_code}'"
+                                )
+                            else:  # insert
+                                trans_sql = (
+                                    f"{sqldb.SQL.INSERTINTO} lang_tran"
+                                    " (base_lang_id,word,language_code)"
+                                    f" {sqldb.SQL.VALUES} ('{base_lang_id}','{trans_phrase}','{language_code}')"
+                                )
+
+                            result = self.DB.sql_execute(trans_sql, debug=False)
+                            error = self.DB.get_error_status()
+
+                        if error.code == -1:
+                            PopError(
+                                title="Database Error...",
+                                message=f"{SDELIM}{error.message}{SDELIM}",
+                            ).show()
+                            return -1
+
+            if self.DB.sql_commit == -1:
+                error = self.DB.get_error_status()
+                PopError(
+                    title="Database Error...",
+                    message=f"{SDELIM}{error.message}{SDELIM}",
+                ).show()
+                return -1
+            else:
+                phrase_grid.changed = False
+        return 1
+
+    def _process_ok(self, event: Action) -> int:
+        """
+        Handles processing the ok button.
+
+        Args:
+            event (Action): The triggering event.
+        Returns:
+            int: Returns 1 if the ok process id good, -1 otherwise
+        """
+        assert isinstance(event, Action), f"{event=}. Must be Action"
+
+        phrase_grid: Grid = event.widget_get(
+            container_tag="langtran_controls",
+            tag="phrase_grid",
+        )
+
+        changed = False
+
+        for row_index in range(phrase_grid.row_count):
+            if phrase_grid.valueorig_get(row=row_index, col=1) is None:
+                orig_value = ""
+            else:
+                orig_value = phrase_grid.valueorig_get(row=row_index, col=1).strip()
+
+            current_value = phrase_grid.value_get(row=row_index, col=1).strip()
+
+            if orig_value != current_value:
+                changed = True
+                break
+
+        if changed:
+            if (
+                PopYesNo(
+                    title="Save Changes...", message="Save Translated Text Changes?"
+                ).show()
+                == "yes"
+            ):
+                if self._save_handler(event) == -1:
+                    return -1
+
+        self.set_result("")
+
+        return 1
+
+    def layout(self) -> VBoxContainer:
+        """Generate the form UI layout"""
+
+        country_combo_items = [
+            Combo_Item(
+                display=f"{country.flag} {country.normal_name}",
+                data=country.language,
+                icon=None,
+                user_data=None,
+            )
+            for country in Countries().get_countries
+            if country.language != "en"  # English is my base language!
+        ]
+
+        country_combo = ComboBox(
+            tag="countries",
+            width=30,
+            items=country_combo_items,
+            translate=False,
+            display_na=False,
+            callback=self.event_handler,
+            buddy_control=Button(
+                text="Auto-Translate",
+                tag="auto_trans",
+                callback=self.event_handler,
+                height=1,
+                tooltip="Automatically translate with MS Bing",
+            ),
+        )
+
+        langtran_control_container = VBoxContainer(
+            tag="langtran_controls", align=Align.TOPLEFT
+        )
+
+        phrase_col_def = (
+            Col_Def(
+                label="Base Phrase",
+                tag="base_phrase",
+                width=50,
+                editable=False,
+                checkable=False,
+            ),
+            Col_Def(
+                label="Language Phrase",
+                tag="lang_phrase",
+                width=50,
+                editable=True,
+                checkable=False,
+            ),
+        )
+
+        phrase_grid = Grid(
+            tag="phrase_grid",
+            noselection=True,
+            height=15,
+            col_def=phrase_col_def,
+            callback=self.event_handler,
+        )
+
+        langtran_control_container.add_row(
+            country_combo,
+            phrase_grid,
+        )
+
+        control_container = VBoxContainer(tag="form_controls", align=Align.TOPRIGHT)
+
+        control_container.add_row(
+            langtran_control_container,
+            HBoxContainer(margin_right=5).add_row(
+                Button(tag="save", text="&Save", callback=self.event_handler, width=10),
+                Button(
+                    tag="export", text="&Export", callback=self.event_handler, width=10
+                ),
+                Button(
+                    tag="import", text="&Import", callback=self.event_handler, width=10
+                ),
+                Spacer(width=68),
+                Button(tag="ok", text="&Ok", callback=self.event_handler, width=10),
+            ),
+        )
+
+        return control_container

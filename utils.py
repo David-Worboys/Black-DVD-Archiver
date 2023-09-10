@@ -891,133 +891,909 @@ class Crypt:
                 raise ValueError(value_error)
 
 
-# The File class provides an easy-to-use wrapper around file info/manipulation calls
-def country_date_formatmask(country_or_format: str = "") -> tuple[str, str]:
+@dataclasses.dataclass(slots=True)
+class Country:
+    name: str = ""
+    alpha2: str = ""
+    alpha3: str = ""
+    numeric: str = ""
+    normal_name: str = ""
+    flag: str = ""
+    qt_date_mask: str = ""
+    language: str = ""
+
+    def __post_init__(self):
+        """Check instance vars are legal"""
+
+        assert (
+            isinstance(self.name, str) and self.name.strip() != ""
+        ), f"{self.name=}. Must be a str"
+        assert (
+            isinstance(self.alpha2, str) and len(self.alpha2) == 2
+        ), f"{self.alpha2=}. Must be a str 2 char long"
+        assert (
+            isinstance(self.alpha3, str) and len(self.alpha3) == 3
+        ), f"{self.alpha3=}. Must be a str 3 char long"
+        assert (
+            isinstance(self.numeric, str)
+            and self.numeric.strip() != ""
+            and self.numeric.isdigit()
+        ), f"{self.numeric=}. Must be a numeric str"
+        assert (
+            isinstance(self.flag, str) and self.flag.strip() != ""
+        ), f"{self.flag=}. Must be a str ({self.name=})"
+        assert (
+            isinstance(self.language, str) and self.language.strip() != ""
+        ), f"{self.language=}. Must be a str ({self.name=})"
+
+        if not self.qt_date_mask.strip():  # Just a default date where I do not have one
+            self.qt_date_mask = "yyyy-MM-dd"
+
+
+@dataclasses.dataclass
+class Countries:
+    _countries: list[Country] = dataclasses.field(default_factory=list)
+
+    def __post_init__(self):
+        self._countries = [
+            Country("Afghanistan", "AF", "AFG", "004", "Afghanistan", "🇦🇫", "", "ps"),
+            Country(
+                "Åland Islands", "AX", "ALA", "248", "Åland Islands", "🇦🇽", "", "sv"
+            ),
+            Country("Albania", "AL", "ALB", "008", "Albania", "🇦🇱", "yyyy-MM-dd", "sq"),
+            Country("Algeria", "DZ", "DZA", "012", "Algeria", "🇩🇿", "dd/MM/yyyy", "ar"),
+            Country(
+                "American Samoa", "AS", "ASM", "016", "American Samoa", "🇦🇸", "", "en"
+            ),
+            Country("Andorra", "AD", "AND", "020", "Andorra", "🇦🇩", "", "ca"),
+            Country("Angola", "AO", "AGO", "024", "Angola", "🇦🇴", "", "pt"),
+            Country("Anguilla", "AI", "AIA", "660", "Anguilla", "🇦🇮", "", "en"),
+            Country("Antarctica", "AQ", "ATA", "010", "Antarctica", "🇦🇶", "", "en"),
+            Country(
+                "Antigua and Barbuda",
+                "AG",
+                "ATG",
+                "028",
+                "Antigua and Barbuda",
+                "🇦🇬",
+                "",
+                "en",
+            ),
+            Country(
+                "Argentina", "AR", "ARG", "032", "Argentina", "🇦🇷", "dd/MM/yyyy", "es"
+            ),
+            Country("Armenia", "AM", "ARM", "051", "Armenia", "🇦🇲", "", "hy"),
+            Country("Aruba", "AW", "ABW", "533", "Aruba", "🇦🇼", "", "nl"),
+            Country(
+                "Australia", "AU", "AUS", "036", "Australia", "🇦🇺", "dd/MM/yyyy", "en"
+            ),
+            Country("Austria", "AT", "AUT", "040", "Austria", "🇦🇹", "dd.MM.yyyy", "de"),
+            Country(
+                "Azerbaijan", "AZ", "AZE", "031", "Azerbaijan", "🇦🇿", "dd.MM.yyyy", "az"
+            ),
+            Country("Bahamas", "BS", "BHS", "044", "Bahamas", "🇧🇸", "", "en"),
+            Country("Bahrain", "BH", "BHR", "048", "Bahrain", "🇧🇭", "dd/MM/yyyy", "ar"),
+            Country("Bangladesh", "BD", "BGD", "050", "Bangladesh", "🇧🇩", "", "bn"),
+            Country("Barbados", "BB", "BRB", "052", "Barbados", "🇧🇧", "", "en"),
+            Country("Belarus", "BY", "BLR", "112", "Belarus", "🇧🇾", "dd.MM.yyyy", "be"),
+            Country("Belgium", "BE", "BEL", "056", "Belgium", "🇧🇪", "dd/MM/yyyy", "nl"),
+            Country("Belize", "BZ", "BLZ", "084", "Belize", "🇧🇿", "", "en"),
+            Country("Benin", "BJ", "BEN", "204", "Benin", "🇧🇯", "dd/MM/yyyy", "fr"),
+            Country("Bermuda", "BM", "BMU", "060", "Bermuda", "🇧🇲", "", "en"),
+            Country("Bhutan", "BT", "BTN", "064", "Bhutan", "🇧🇹", "", "dz"),
+            Country(
+                "Bolivia, Plurinational State of",
+                "BO",
+                "BOL",
+                "068",
+                "Bolivia",
+                "🇧🇴",
+                "",
+                "es",
+            ),
+            Country(
+                "Bonaire, Sint Eustatius and Saba",
+                "BQ",
+                "BES",
+                "535",
+                "Bonaire, Sint Eustatius and Saba",
+                "🇧🇶",
+                "",
+                "nl",
+            ),
+            Country(
+                "Bosnia and Herzegovina",
+                "BA",
+                "BIH",
+                "070",
+                "Bosnia and Herzegovina",
+                "🇧🇦",
+                "yyyy-MM-dd",
+                "bs",
+            ),
+            Country("Botswana", "BW", "BWA", "072", "Botswana", "🇧🇼", "", "en"),
+            Country(
+                "Bouvet Island", "BV", "BVT", "074", "Bouvet Island", "🇧🇻", "", "no"
+            ),
+            Country("Brazil", "BR", "BRA", "076", "Brazil", "🇧🇷", "dd/MM/yyyy", "pt"),
+            Country(
+                "British Indian Ocean Territory",
+                "IO",
+                "IOT",
+                "086",
+                "British Indian Ocean Territory",
+                "🇮🇴",
+                "dd/MM/yyyy",
+                "en",
+            ),
+            Country("Brunei Darussalam", "BN", "BRN", "096", "Brunei", "🇧🇳", "", "ms"),
+            Country("Bulgaria", "BG", "BGR", "100", "Bulgaria", "🇧🇬", "", "bg"),
+            Country("Burkina Faso", "BF", "BFA", "854", "Burkina Faso", "🇧🇫", "", "fr"),
+            Country("Burundi", "BI", "BDI", "108", "Burundi", "🇧🇮", "", "rn"),
+            Country("Cambodia", "KH", "KHM", "116", "Cambodia", "🇰🇭", "", "km"),
+            Country("Cameroon", "CM", "CMR", "120", "Cameroon", "🇨🇲", "", "fr"),
+            Country("Canada", "CA", "CAN", "124", "Canada", "🇨🇦", "dd/MM/yyyy", "en"),
+            Country("Cabo Verde", "CV", "CPV", "132", "Cape Verde", "🇨🇻", "", "pt"),
+            Country(
+                "Cayman Islands", "KY", "CYM", "136", "Cayman Islands", "🇰🇾", "", "en"
+            ),
+            Country(
+                "Central African Republic",
+                "CF",
+                "CAF",
+                "140",
+                "Central African Republic",
+                "🇨🇫",
+                "yyyy-MM-dd",
+                "sg",
+            ),
+            Country("Chad", "TD", "TCD", "148", "Chad", "🇹🇩", "", "ar"),
+            Country("Chile", "CL", "CHL", "152", "Chile", "🇨🇱", "dd-MM-yyyy", "es"),
+            Country("China", "CN", "CHN", "156", "China", "🇨🇳", "yyyy-MM-dd", "zh"),
+            Country(
+                "Christmas Island",
+                "CX",
+                "CXR",
+                "162",
+                "Christmas Island",
+                "🇨🇽",
+                "",
+                "en",
+            ),
+            Country(
+                "Cocos (Keeling) Islands",
+                "CC",
+                "CCK",
+                "166",
+                "Cocos (Keeling) Islands",
+                "🇨🇨",
+                "",
+                "en",
+            ),
+            Country(
+                "Colombia", "CO", "COL", "170", "Colombia", "🇨🇴", "dd/MM/yyyy", "es"
+            ),
+            Country("Comoros", "KM", "COM", "174", "Comoros", "🇰🇲", "", "fr"),
+            Country("Congo", "CG", "COG", "178", "Congo", "🇨🇬", "", "fr"),
+            Country(
+                "Congo, Democratic Republic of the",
+                "CD",
+                "COD",
+                "180",
+                "Congo, Democratic Republic of the",
+                "🇨🇩",
+                "",
+                "fr",
+            ),
+            Country("Cook Islands", "CK", "COK", "184", "Cook Islands", "🇨🇰", "", "en"),
+            Country(
+                "Costa Rica", "CR", "CRI", "188", "Costa Rica", "🇨🇷", "dd/MM/yyyy", "es"
+            ),
+            Country("Côte d'Ivoire", "CI", "CIV", "384", "Ivory Coast", "🇨🇮", "", "fr"),
+            Country("Croatia", "HR", "HRV", "191", "Croatia", "🇭🇷", "dd.MM.yyyy", "hr"),
+            Country("Cuba", "CU", "CUB", "192", "Cuba", "🇨🇺", "", "es"),
+            Country("Curaçao", "CW", "CUW", "531", "Curaçao", "🇨🇼", "", "nl"),
+            Country("Cyprus", "CY", "CYP", "196", "Cyprus", "🇨🇾", "dd/MM/yyyy", "el"),
+            Country("Czechia", "CZ", "CZE", "203", "Czechia", "🇨🇿", "dd.MM.yyyy", "cs"),
+            Country("Denmark", "DK", "DNK", "208", "Denmark", "🇩🇰", "dd-MM-yyyy", "da"),
+            Country("Djibouti", "DJ", "DJI", "262", "Djibouti", "🇩🇯", "", "da"),
+            Country("Dominica", "DM", "DMA", "212", "Dominica", "🇩🇲", "", "en"),
+            Country(
+                "Dominican Republic",
+                "DO",
+                "DOM",
+                "214",
+                "Dominican Republic",
+                "🇩🇴",
+                "MM/dd/yyyy",
+                "es",
+            ),
+            Country("Ecuador", "EC", "ECU", "218", "Ecuador", "🇪🇨", "dd/MM/yyyy", "es"),
+            Country("Egypt", "EG", "EGY", "818", "Egypt", "🇪🇬", "dd/MM/yyyy", "ar"),
+            Country(
+                "El Salvador",
+                "SV",
+                "SLV",
+                "222",
+                "El Salvador",
+                "🇸🇻",
+                "MM-dd-yyyy",
+                "es",
+            ),
+            Country(
+                "Equatorial Guinea",
+                "GQ",
+                "GNQ",
+                "226",
+                "Equatorial Guinea",
+                "🇬🇶",
+                "",
+                "es",
+            ),
+            Country("Eritrea", "ER", "ERI", "232", "Eritrea", "🇪🇷", "", "aa"),
+            Country("Estonia", "EE", "EST", "233", "Estonia", "🇪🇪", "dd.MM.yyyy", "et"),
+            Country("Ethiopia", "ET", "ETH", "231", "Ethiopia", "🇪🇹", "", "aa"),
+            Country(
+                "Falkland Islands (Malvinas)",
+                "FK",
+                "FLK",
+                "238",
+                "Falkland Islands (Malvinas)",
+                "🇫🇰",
+                "",
+                "en",
+            ),
+            Country(
+                "Faroe Islands", "FO", "FRO", "234", "Faroe Islands", "🇫🇴", "", "da"
+            ),
+            Country("Fiji", "FJ", "FJI", "242", "Fiji", "🇫🇯", "", "en"),
+            Country("Finland", "FI", "FIN", "246", "Finland", "🇫🇮", "dd.M.yyyy", "fi"),
+            Country("France", "FR", "FRA", "250", "France", "🇫🇷", "dd/MM/yyyy", "fr"),
+            Country(
+                "French Guiana", "GF", "GUF", "254", "French Guiana", "🇬🇫", "", "fg"
+            ),
+            Country(
+                "French Polynesia",
+                "PF",
+                "PYF",
+                "258",
+                "French Polynesia",
+                "🇵🇫",
+                "",
+                "fr",
+            ),
+            Country(
+                "French Southern Territories",
+                "TF",
+                "ATF",
+                "260",
+                "French Southern Territories",
+                "🇹🇫",
+                "",
+                "fr",
+            ),
+            Country("Gabon", "GA", "GAB", "266", "Gabon", "🇬🇦", "", "fr"),
+            Country("Gambia", "GM", "GMB", "270", "Gambia", "🇬🇲", "", "en"),
+            Country("Georgia", "GE", "GEO", "268", "Georgia", "🇬🇪", "", "ka"),
+            Country("Germany", "DE", "DEU", "276", "Germany", "🇩🇪", "dd.MM.yyyy", "de"),
+            Country("Ghana", "GH", "GHA", "288", "Ghana", "🇬🇭", "", "en"),
+            Country("Gibraltar", "GI", "GIB", "292", "Gibraltar", "🇬🇮", "", "en"),
+            Country("Greece", "GR", "GRC", "300", "Greece", "🇬🇷", "dd/MM/yyyy", "el"),
+            Country("Greenland", "GL", "GRL", "304", "Greenland", "🇬🇱", "", "kl"),
+            Country("Grenada", "GD", "GRD", "308", "Grenada", "🇬🇩", "", "en"),
+            Country("Guadeloupe", "GP", "GLP", "312", "Guadeloupe", "🇬🇵", "", "fr"),
+            Country("Guam", "GU", "GUM", "316", "Guam", "🇬🇺", "", "en"),
+            Country(
+                "Guatemala", "GT", "GTM", "320", "Guatemala", "🇬🇹", "dd/MM/yyyy", "es"
+            ),
+            Country("Guernsey", "GG", "GGY", "831", "Guernsey", "🇬🇬", "", "en"),
+            Country("Guinea", "GN", "GIN", "324", "Guinea", "🇬🇳", "", "fr"),
+            Country(
+                "Guinea-Bissau", "GW", "GNB", "624", "Guinea-Bissau", "🇬🇼", "", "pt"
+            ),
+            Country("Guyana", "GY", "GUY", "328", "Guyana", "🇬🇾", "", "en"),
+            Country("Haiti", "HT", "HTI", "332", "Haiti", "🇭🇹", "", "fr"),
+            Country(
+                "Heard Island and McDonald Islands",
+                "HM",
+                "HMD",
+                "334",
+                "Heard Island and McDonald Islands",
+                "🇭🇲",
+                "",
+                "en",
+            ),
+            Country("Holy See", "VA", "VAT", "336", "Vatican", "🇻🇦", "", "la"),
+            Country(
+                "Honduras", "HN", "HND", "340", "Honduras", "🇭🇳", "MM-dd-yyyy", "es"
+            ),
+            Country(
+                "Hong Kong", "HK", "HKG", "344", "Hong Kong", "🇭🇰", "dd/MM/YYYY", "en"
+            ),
+            Country("Hungary", "HU", "HUN", "348", "Hungary", "🇭🇺", "yyyy.MM.dd", "hu"),
+            Country("Iceland", "IS", "ISL", "352", "Iceland", "🇮🇸", "dd.MM.yyyy", "is"),
+            Country("India", "IN", "IND", "356", "India", "🇮🇳", "dd/MM/yyyy", "en"),
+            Country(
+                "Indonesia", "ID", "IDN", "360", "Indonesia", "🇮🇩", "dd/MM/yyyy", "id"
+            ),
+            Country(
+                "Iran, Islamic Republic of", "IR", "IRN", "364", "Iran", "🇮🇷", "", "fa"
+            ),
+            Country("Iraq", "IQ", "IRQ", "368", "Iraq", "🇮🇶", "dd/MM/yyyy", "ar"),
+            Country("Ireland", "IE", "IRL", "372", "Ireland", "🇮🇪", "dd/MM/yyyy", "en"),
+            Country("Isle of Man", "IM", "IMN", "833", "Isle of Man", "🇮🇲", "", "en"),
+            Country("Israel", "IL", "ISR", "376", "Israel", "🇮🇱", "dd/MM/yyyy", "he"),
+            Country("Italy", "IT", "ITA", "380", "Italy", "🇮🇹", "dd/MM/yyyy", "it"),
+            Country("Jamaica", "JM", "JAM", "388", "Jamaica", "🇯🇲", "", "en"),
+            Country("Japan", "JP", "JPN", "392", "Japan", "🇯🇵", "yyyy/MM/dd", "ja"),
+            Country("Jersey", "JE", "JEY", "832", "Jersey", "🇯🇪", "", "en"),
+            Country("Jordan", "JO", "JOR", "400", "Jordan", "🇯🇴", "dd/MM/yyyy", "ar"),
+            Country("Kazakhstan", "KZ", "KAZ", "398", "Kazakhstan", "🇰🇿", "", "kk"),
+            Country("Kenya", "KE", "KEN", "404", "Kenya", "🇰🇪", "", "en"),
+            Country("Kiribati", "KI", "KIR", "296", "Kiribati", "🇰🇮", "", "en"),
+            Country(
+                "Korea, Democratic People's Republic of",
+                "KP",
+                "PRK",
+                "408",
+                "North Korea",
+                "🇰🇵",
+                "",
+                "ko",
+            ),
+            Country(
+                "Korea, Republic of",
+                "KR",
+                "KOR",
+                "410",
+                "South Korea",
+                "🇰🇷",
+                "yyyy.MM.dd",
+                "ko",
+            ),
+            Country("Kosovo", "XK", "XKX", "983", "Kosovo", "🇽🇰", "", "sq"),
+            Country("Kuwait", "KW", "KWT", "414", "Kuwait", "🇰🇼", "dd/MM/yyyy", "ar"),
+            Country("Kyrgyzstan", "KG", "KGZ", "417", "Kyrgyzstan", "🇰🇬", "", "ky"),
+            Country(
+                "Lao People's Democratic Republic",
+                "LA",
+                "LAO",
+                "418",
+                "Laos",
+                "🇱🇦",
+                "",
+                "lo",
+            ),
+            Country("Latvia", "LV", "LVA", "428", "Latvia", "🇱🇻", "yyyy.d.M", "lv"),
+            Country("Lebanon", "LB", "LBN", "422", "Lebanon", "🇱🇧", "dd/MM/yyyy", "ar"),
+            Country("Lesotho", "LS", "LSO", "426", "Lesotho", "🇱🇸", "", "st"),
+            Country("Liberia", "LR", "LBR", "430", "Liberia", "🇱🇷", "", "en"),
+            Country("Libya", "LY", "LBY", "434", "Libya", "🇱🇾", "dd/MM/yyyy", "ar"),
+            Country(
+                "Liechtenstein", "LI", "LIE", "438", "Liechtenstein", "🇱🇮", "", "de"
+            ),
+            Country(
+                "Lithuania", "LT", "LTU", "440", "Lithuania", "🇱🇹", "yyyy.MM.dd", "lt"
+            ),
+            Country(
+                "Luxembourg", "LU", "LUX", "442", "Luxembourg", "🇱🇺", "dd/MM/yyyy", "lb"
+            ),
+            Country("Macao", "MO", "MAC", "446", "Macao", "🇲🇴", "", "pt"),
+            Country(
+                "North Macedonia",
+                "MK",
+                "MKD",
+                "807",
+                "North Macedonia",
+                "🇲🇰",
+                "dd.NM.yyyy",
+                "mk",
+            ),
+            Country("Madagascar", "MG", "MDG", "450", "Madagascar", "🇲🇬", "", "mg"),
+            Country("Malawi", "MW", "MWI", "454", "Malawi", "🇲🇼", "", "en"),
+            Country(
+                "Malaysia", "MY", "MYS", "458", "Malaysia", "🇲🇾", "dd/MM/yyyy", "ms"
+            ),
+            Country("Maldives", "MV", "MDV", "462", "Maldives", "🇲🇻", "", "dv"),
+            Country("Mali", "ML", "MLI", "466", "Mali", "🇲🇱", "", "bm"),
+            Country("Malta", "MT", "MLT", "470", "Malta", "🇲🇹", "dd/MM/yyyy", "mt"),
+            Country(
+                "Marshall Islands",
+                "MH",
+                "MHL",
+                "584",
+                "Marshall Islands",
+                "🇲🇭",
+                "",
+                "en",
+            ),
+            Country("Martinique", "MQ", "MTQ", "474", "Martinique", "🇲🇶", "", "fr"),
+            Country("Mauritania", "MR", "MRT", "478", "Mauritania", "🇲🇷", "", "ar"),
+            Country("Mauritius", "MU", "MUS", "480", "Mauritius", "🇲🇺", "", "en"),
+            Country("Mayotte", "YT", "MYT", "175", "Mayotte", "🇾🇹", "", "fr"),
+            Country("Mexico", "MX", "MEX", "484", "Mexico", "🇲🇽", "dd/MM/yyyy", "es"),
+            Country(
+                "Micronesia, Federated States of",
+                "FM",
+                "FSM",
+                "583",
+                "Micronesia, Federated States of",
+                "🇫🇲",
+                "",
+                "en",
+            ),
+            Country(
+                "Moldova, Republic of", "MD", "MDA", "498", "Moldova", "🇲🇩", "", "ro"
+            ),
+            Country("Monaco", "MC", "MCO", "492", "Monaco", "🇲🇨", "", "fr"),
+            Country("Mongolia", "MN", "MNG", "496", "Mongolia", "🇲🇳", "", "mn"),
+            Country(
+                "Montenegro", "ME", "MNE", "499", "Montenegro", "🇲🇪", "dd.MM.yyyy", "sh"
+            ),
+            Country("Montserrat", "MS", "MSR", "500", "Montserrat", "🇲🇸", "", "en"),
+            Country("Morocco", "MA", "MAR", "504", "Morocco", "🇲🇦", "dd/MM/yyyy", "en"),
+            Country("Mozambique", "MZ", "MOZ", "508", "Mozambique", "🇲🇿", "", "pt"),
+            Country("Myanmar", "MM", "MMR", "104", "Myanmar", "🇲🇲", "", "my"),
+            Country("Namibia", "NA", "NAM", "516", "Namibia", "🇳🇦", "", "en"),
+            Country("Nauru", "NR", "NRU", "520", "Nauru", "🇳🇷", "", "en"),
+            Country("Nepal", "NP", "NPL", "524", "Nepal", "🇳🇵", "", "ne"),
+            Country(
+                "Netherlands",
+                "NL",
+                "NLD",
+                "528",
+                "Netherlands",
+                "🇳🇱",
+                "dd-MM-yyyy",
+                "nl",
+            ),
+            Country(
+                "New Caledonia", "NC", "NCL", "540", "New Caledonia", "🇳🇨", "", "fr"
+            ),
+            Country(
+                "New Zealand",
+                "NZ",
+                "NZL",
+                "554",
+                "New Zealand",
+                "🇳🇿",
+                "dd/MM/yyyy",
+                "en",
+            ),
+            Country(
+                "Nicaragua", "NI", "NIC", "558", "Nicaragua", "🇳🇮", "MM-dd-yyyy", "es"
+            ),
+            Country("Niger", "NE", "NER", "562", "Niger", "🇳🇪", "", "fr"),
+            Country("Nigeria", "NG", "NGA", "566", "Nigeria", "🇳🇬", "", "en"),
+            Country("Niue", "NU", "NIU", "570", "Niue", "🇳🇺", "", "en"),
+            Country(
+                "Norfolk Island", "NF", "NFK", "574", "Norfolk Island", "🇳🇫", "", "en"
+            ),
+            Country(
+                "Northern Mariana Islands",
+                "MP",
+                "MNP",
+                "580",
+                "Northern Mariana Islands",
+                "🇲🇵",
+                "",
+                "en",
+            ),
+            Country("Norway", "NO", "NOR", "578", "Norway", "🇳🇴", "dd.MM.yyyy", "no"),
+            Country("Oman", "OM", "OMN", "512", "Oman", "🇴🇲", "dd/MM/yyyy", "ar"),
+            Country("Pakistan", "PK", "PAK", "586", "Pakistan", "🇵🇰", "", "ur"),
+            Country("Palau", "PW", "PLW", "585", "Palau", "🇵🇼", "", "en"),
+            Country(
+                "Palestine, State of", "PS", "PSE", "275", "Palestine", "🇵🇸", "", "ar"
+            ),
+            Country("Panama", "PA", "PAN", "591", "Panama", "🇵🇦", "MM/dd/yyyy", "es"),
+            Country(
+                "Papua New Guinea",
+                "PG",
+                "PNG",
+                "598",
+                "Papua New Guinea",
+                "🇵🇬",
+                "",
+                "en",
+            ),
+            Country(
+                "Paraguay", "PY", "PRY", "600", "Paraguay", "🇵🇾", "dd/MM/yyyy", "es"
+            ),
+            Country("Peru", "PE", "PER", "604", "Peru", "🇵🇪", "dd/MM/yyyy", "es"),
+            Country(
+                "Philippines",
+                "PH",
+                "PHL",
+                "608",
+                "Philippines",
+                "🇵🇭",
+                "MM/dd/yyyy",
+                "tl",
+            ),
+            Country("Pitcairn", "PN", "PCN", "612", "Pitcairn", "🇵🇳", "", "en"),
+            Country("Poland", "PL", "POL", "616", "Poland", "🇵🇱", "dd.MM.yyyy", "pl"),
+            Country(
+                "Portugal", "PT", "PRT", "620", "Portugal", "🇵🇹", "dd-MM-yyyy", "pt"
+            ),
+            Country(
+                "Puerto Rico",
+                "PR",
+                "PRI",
+                "630",
+                "Puerto Rico",
+                "🇵🇷",
+                "MM-dd-yyyy",
+                "es",
+            ),
+            Country("Qatar", "QA", "QAT", "634", "Qatar", "🇶🇦", "dd/MM/yyyy", "ar"),
+            Country("Réunion", "RE", "REU", "638", "Réunion", "🇷🇪", "", "fr"),
+            Country("Romania", "RO", "ROU", "642", "Romania", "🇷🇴", "dd.MM.yyyy", "ro"),
+            Country(
+                "Russian Federation",
+                "RU",
+                "RUS",
+                "643",
+                "Russia",
+                "🇷🇺",
+                "dd.MM.yyyy",
+                "ru",
+            ),
+            Country("Rwanda", "RW", "RWA", "646", "Rwanda", "🇷🇼", "", "rw"),
+            Country(
+                "Saint Barthélemy",
+                "BL",
+                "BLM",
+                "652",
+                "Saint Barthélemy",
+                "🇧🇱",
+                "",
+                "fr",
+            ),
+            Country(
+                "Saint Helena, Ascension and Tristan da Cunha",
+                "SH",
+                "SHN",
+                "654",
+                "Saint Helena, Ascension and Tristan da Cunha",
+                "🇸🇭",
+                "",
+                "en",
+            ),
+            Country(
+                "Saint Kitts and Nevis",
+                "KN",
+                "KNA",
+                "659",
+                "Saint Kitts and Nevis",
+                "🇰🇳",
+                "",
+                "en",
+            ),
+            Country("Saint Lucia", "LC", "LCA", "662", "Saint Lucia", "🇱🇨", "", "en"),
+            Country(
+                "Saint Martin (French part)",
+                "MF",
+                "MAF",
+                "663",
+                "Saint Martin (French part)",
+                "🇲🇫",
+                "",
+                "fr",
+            ),
+            Country(
+                "Saint Pierre and Miquelon",
+                "PM",
+                "SPM",
+                "666",
+                "Saint Pierre and Miquelon",
+                "🇵🇲",
+                "",
+                "fr",
+            ),
+            Country(
+                "Saint Vincent and the Grenadines",
+                "VC",
+                "VCT",
+                "670",
+                "Saint Vincent and the Grenadines",
+                "🇻🇨",
+                "",
+                "en",
+            ),
+            Country("Samoa", "WS", "WSM", "882", "Samoa", "🇼🇸", "", "sm"),
+            Country("San Marino", "SM", "SMR", "674", "San Marino", "🇸🇲", "", "it"),
+            Country(
+                "Sao Tome and Principe",
+                "ST",
+                "STP",
+                "678",
+                "Sao Tome and Principe",
+                "🇸🇹",
+                "",
+                "pt",
+            ),
+            Country(
+                "Saudi Arabia",
+                "SA",
+                "SAU",
+                "682",
+                "Saudi Arabia",
+                "🇸🇦",
+                "dd/MM/yyyy",
+                "ar",
+            ),
+            Country("Senegal", "SN", "SEN", "686", "Senegal", "🇸🇳", "", "fr"),
+            Country("Serbia", "RS", "SRB", "688", "Serbia", "🇷🇸", "dd.MM.yyyy", "sr"),
+            Country("Seychelles", "SC", "SYC", "690", "Seychelles", "🇸🇨", "", "en"),
+            Country("Sierra Leone", "SL", "SLE", "694", "Sierra Leone", "🇸🇱", "", "en"),
+            Country(
+                "Singapore", "SG", "SGP", "702", "Singapore", "🇸🇬", "MM/dd/yyyy", "en"
+            ),
+            Country(
+                "Sint Maarten (Dutch part)",
+                "SX",
+                "SXM",
+                "534",
+                "Sint Maarten (Dutch part)",
+                "🇸🇽",
+                "",
+                "nl",
+            ),
+            Country(
+                "Slovakia", "SK", "SVK", "703", "Slovakia", "🇸🇰", "dd.MM.yyyy", "sk"
+            ),
+            Country(
+                "Slovenia", "SI", "SVN", "705", "Slovenia", "🇸🇮", "dd.MM.yyyy", "sl"
+            ),
+            Country(
+                "Solomon Islands", "SB", "SLB", "090", "Solomon Islands", "🇸🇧", "", "en"
+            ),
+            Country("Somalia", "SO", "SOM", "706", "Somalia", "🇸🇴", "", "so"),
+            Country(
+                "South Africa",
+                "ZA",
+                "ZAF",
+                "710",
+                "South Africa",
+                "🇿🇦",
+                "yyyy/MM/dd",
+                "af",
+            ),
+            Country(
+                "South Georgia and the South Sandwich Islands",
+                "GS",
+                "SGS",
+                "239",
+                "South Georgia and the South Sandwich Islands",
+                "🇬🇸",
+                "",
+                "en",
+            ),
+            Country("South Sudan", "SS", "SSD", "728", "South Sudan", "🇸🇸", "", "en"),
+            Country("Spain", "ES", "ESP", "724", "Spain", "🇪🇸", "dd/MM/yyyy", "es"),
+            Country("Sri Lanka", "LK", "LKA", "144", "Sri Lanka", "🇱🇰", "", "si"),
+            Country("Sudan", "SD", "SDN", "729", "Sudan", "🇸🇩", "dd/MM/yyyy", "ar"),
+            Country("Suriname", "SR", "SUR", "740", "Suriname", "🇸🇷", "", "nl"),
+            Country(
+                "Svalbard and Jan Mayen",
+                "SJ",
+                "SJM",
+                "744",
+                "Svalbard and Jan Mayen",
+                "🇸🇯",
+                "",
+                "no",
+            ),
+            Country("Eswatini", "SZ", "SWZ", "748", "Swaziland", "🇸🇿", "", "ss"),
+            Country("Sweden", "SE", "SWE", "752", "Sweden", "🇸🇪", "yyyy-MM-dd", "sv"),
+            Country(
+                "Switzerland",
+                "CH",
+                "CHE",
+                "756",
+                "Switzerland",
+                "🇨🇭",
+                "dd.MM.yyyy",
+                "de",
+            ),
+            Country(
+                "Syrian Arab Republic",
+                "SY",
+                "SYR",
+                "760",
+                "Syria",
+                "🇸🇾",
+                "dd/MM/yyyy",
+                "ar",
+            ),
+            Country(
+                "Taiwan, Republic of China",
+                "TW",
+                "TWN",
+                "158",
+                "Taiwan",
+                "🇹🇼",
+                "yyyy/MM/dd",
+                "zh",
+            ),
+            Country("Tajikistan", "TJ", "TJK", "762", "Tajikistan", "🇹🇯", "", "tg"),
+            Country(
+                "Tanzania, United Republic of",
+                "TZ",
+                "TZA",
+                "834",
+                "Tanzania",
+                "🇹🇿",
+                "",
+                "en",
+            ),
+            Country(
+                "Thailand", "TH", "THA", "764", "Thailand", "🇹🇭", "dd/MM/MMMM", "th"
+            ),
+            Country("Timor-Leste", "TL", "TLS", "626", "Timor-Leste", "🇹🇱", "", "pt"),
+            Country("Togo", "TG", "TGO", "768", "Togo", "🇹🇬", "", "fr"),
+            Country("Tokelau", "TK", "TKL", "772", "Tokelau", "🇹🇰", "", "en"),
+            Country("Tonga", "TO", "TON", "776", "Tonga", "🇹🇴", "", "to"),
+            Country(
+                "Trinidad and Tobago",
+                "TT",
+                "TTO",
+                "780",
+                "Trinidad and Tobago",
+                "🇹🇹",
+                "",
+                "en",
+            ),
+            Country("Tunisia", "TN", "TUN", "788", "Tunisia", "🇹🇳", "dd/MM/yyyy", "fr"),
+            Country("Türkiye", "TR", "TUR", "792", "Turkey", "🇹🇷", "dd.MM.yyyy", "tr"),
+            Country("Turkmenistan", "TM", "TKM", "795", "Turkmenistan", "🇹🇲", "", "tk"),
+            Country(
+                "Turks and Caicos Islands",
+                "TC",
+                "TCA",
+                "796",
+                "Turks and Caicos Islands",
+                "🇹🇨",
+                "",
+                "en",
+            ),
+            Country("Tuvalu", "TV", "TUV", "798", "Tuvalu", "🇹🇻", "", "en"),
+            Country("Uganda", "UG", "UGA", "800", "Uganda", "🇺🇬", "", "en"),
+            Country("Ukraine", "UA", "UKR", "804", "Ukraine", "🇺🇦", "dd.MM.yyyy", "uk"),
+            Country(
+                "United Arab Emirates",
+                "AE",
+                "ARE",
+                "784",
+                "United Arab Emirates",
+                "🇦🇪",
+                "dd/MM/yyyy",
+                "ar",
+            ),
+            Country(
+                "United Kingdom of Great Britain and Northern Ireland",
+                "GB",
+                "GBR",
+                "826",
+                "United Kingdom",
+                "🇬🇧",
+                "dd/MM/yyyy",
+                "en",
+            ),
+            Country(
+                "United States of America",
+                "US",
+                "USA",
+                "840",
+                "United States of America",
+                "🇺🇸",
+                "MM/dd/yyyy",
+                "en",
+            ),
+            Country(
+                "United States Minor Outlying Islands",
+                "UM",
+                "UMI",
+                "581",
+                "United States Minor Outlying Islands",
+                "🇺🇲",
+                "",
+                "en",
+            ),
+            Country("Uruguay", "UY", "URY", "858", "Uruguay", "🇺🇾", "dd/MM/yyyy", "es"),
+            Country("Uzbekistan", "UZ", "UZB", "860", "Uzbekistan", "🇺🇿", "", "uz"),
+            Country("Vanuatu", "VU", "VUT", "548", "Vanuatu", "🇻🇺", "", "bi"),
+            Country(
+                "Venezuela, Bolivarian Republic of",
+                "VE",
+                "VEN",
+                "862",
+                "Venezuela",
+                "🇻🇪",
+                "dd/MM/yyyy",
+                "es",
+            ),
+            Country(
+                "Viet Nam", "VN", "VNM", "704", "Vietnam", "🇻🇳", "dd/MM/yyyy", "vi"
+            ),
+            Country(
+                "Virgin Islands, British",
+                "VG",
+                "VGB",
+                "092",
+                "Virgin Islands, British",
+                "🇻🇬",
+                "",
+                "en",
+            ),
+            Country(
+                "Virgin Islands, U.S.",
+                "VI",
+                "VIR",
+                "850",
+                "Virgin Islands, U.S.",
+                "🇻🇮",
+                "",
+                "en",
+            ),
+            Country(
+                "Wallis and Futuna",
+                "WF",
+                "WLF",
+                "876",
+                "Wallis and Futuna",
+                "🇼🇫",
+                "",
+                "en",
+            ),
+            Country(
+                "Western Sahara", "EH", "ESH", "732", "Western Sahara", "🇪🇭", "", "ar"
+            ),
+            Country("Yemen", "YE", "YEM", "887", "Yemen", "🇾🇪", "dd/MM/yyyy", "ar"),
+            Country("Zambia", "ZM", "ZMB", "894", "Zambia", "🇿🇲", "", "en"),
+            Country("Zimbabwe", "ZW", "ZWE", "716", "Zimbabwe", "🇿🇼", "", "sn"),
+        ]
+
+    @property
+    def get_countries(self) -> list[Country]:
+        return self._countries
+
+
+def country_date_formatmask(country_code_or_date_mask: str = "") -> tuple[str, str]:
     """Pass in the country code and get the default format and QT mask for the date. Pass in a date format and get
     the QT mask for it.
 
     Args:
-        country_or_format (str): 2 digit iso ISO639-2 country code or a date format string
+        country_code_or_date_mask (str): 2/3 digit iso ISO639-2/3 country code or a date format string
 
     Returns:
         tuple(str,str) : country date format if found, otherwise iso date format yyyy-MM-dd and an edit mask for QT
 
     """
-    country_format = {
-        "AL": "yyyy-MM-dd",
-        "AE": "dd/MM/yyyy",
-        "AR": "dd/MM/yyyy",
-        "AU": "dd/MM/yyyy",
-        "AT": "dd.MM.yyyy",
-        "BE": "dd/MM/yyyy",
-        "Background": "yyyy-MM-dd",
-        "BH": "dd/MM/yyyy",
-        "BA": "yyyy-MM-dd",
-        "BY": "dd.MM.yyyy",
-        "BO": "dd-MM-yyyy",
-        "BR": "dd/MM/yyyy",
-        "CAF": "yyyy-MM-dd",
-        "CA": "dd/MM/yyyy",
-        "CH": "dd.MM.yyyy",
-        "CL": "dd-MM-yyyy",
-        "CN": "yyyy-MM-dd",
-        "CO": "dd/MM/yyyy",
-        "CR": "dd/MM/yyyy",
-        "CY": "dd/MM/yyyy",
-        "CZ": "dd.MM.yyyy",
-        "DE": "dd.MM.yyyy",
-        "DK": "dd-MM-yyyy",
-        "DO": "MM/dd/yyyy",
-        "DZ": "dd/MM/yyyy",
-        "EC": "dd/MM/yyyy",
-        "EG": "dd/MM/yyyy",
-        "ES": "dd/MM/yyyy",
-        "ESC": "dd/MM/yyyy",
-        "EE": "dd.MM.yyyy",
-        "FI": "dd.M.yyyy",
-        "FR": "dd/MM/yyyy",
-        "GB": "dd/MM/yyyy",
-        "GR": "dd/MM/yyyy",
-        "GT": "dd/MM/yyyy",
-        "HK": "dd/MM/YYYY",
-        "HN": "MM-dd-yyyy",
-        "HR": "dd.MM.yyyy",
-        "HU": "yyyy.MM.dd",
-        "ID": "dd/MM/yyyy",
-        "IND": "dd/MM/yyyy",
-        "IN": "dd/MM/yyyy",
-        "IE": "dd/MM/yyyy",
-        "IRQ": "dd/MM/yyyy",
-        "IS": "dd.MM.yyyy",
-        "IL": "dd/MM/yyyy",
-        "IT": "dd/MM/yyyy",
-        "JO": "dd/MM/yyyy",
-        "JP": "yyyy/MM/dd",
-        "KR": "yyyy.MM.dd",
-        "KW": "dd/MM/yyyy",
-        "LB": "dd/MM/yyyy",
-        "LY": "dd/MM/yyyy",
-        "LT": "yyyy.MM.dd",
-        "LU": "dd/MM/yyyy",
-        "LUG": "dd.MM.yyyy",
-        "LV": "yyyy.d.M",
-        "MA": "dd/MM/yyyy",
-        "MX": "dd/MM/yyyy",
-        "MK": "dd.NM.yyyy",
-        "MT": "dd/MM/yyyy",
-        "ME": "dd.MM.yyyy",
-        "MY": "dd/MM/yyyy",
-        "NI": "MM-dd-yyyy",
-        "NL": "dd-MM-yyyy",
-        "NO": "dd.MM.yyyy",
-        "NZ": "dd/MM/yyyy",
-        "OM": "dd/MM/yyyy",
-        "PA": "MM/dd/yyyy",
-        "PE": "dd/MM/yyyy",
-        "PH": "MM/dd/yyyy",
-        "PL": "dd.MM.yyyy",
-        "PR": "MM-dd-yyyy",
-        "PT": "dd-MM-yyyy",
-        "PY": "dd/MM/yyyy",
-        "QA": "dd/MM/yyyy",
-        "RO": "dd.MM.yyyy",
-        "RU": "dd.MM.yyyy",
-        "SA": "dd/MM/yyyy",
-        "CS": "dd.MM.yyyy",
-        "SD": "dd/MM/yyyy",
-        "SGC": "dd/MM/yyyy",
-        "SG": "MM/dd/yyyy",
-        "SV": "MM-dd-yyyy",
-        "RS": "dd.MM.yyyy",
-        "SK": "dd.MM.yyyy",
-        "SI": "dd.MM.yyyy",
-        "SE": "yyyy-MM-dd",
-        "SY": "dd/MM/yyyy",
-        "TH": "dd/MM/MMMM",
-        "THT": "dd/MM/YYYY",
-        "TN": "dd/MM/yyyy",
-        "TR": "dd.MM.yyyy",
-        "TW": "yyyy/MM/dd",
-        "UA": "dd.MM.yyyy",
-        "UY": "dd/MM/yyyy",
-        "US": "MM/dd/yyyy",
-        "VE": "dd/MM/yyyy",
-        "VN": "dd/MM/yyyy",
-        "YE": "dd/MM/yyyy",
-        "ZA": "yyyy/MM/dd",
-    }
+    country = Countries()
 
     assert (
-        isinstance(country_or_format, str) and len(country_or_format.strip()) >= 2
-    ), f"{country_or_format=}. Must be str and ISO639-2 code or a date mask"
+        isinstance(country_code_or_date_mask, str)
+        and len(country_code_or_date_mask.strip()) >= 2
+    ), f"{country_code_or_date_mask=}. Must be str and ISO639-2 code or a date mask"
 
+    matching_countries = ""
     format = ""
 
-    if country_or_format.upper() in country_format:
-        format = country_format[country_or_format.upper()]
+    for country in country.get_countries:
+        if (
+            country.alpha2.upper() == country_code_or_date_mask.upper()
+            or country.alpha3.upper() == country_code_or_date_mask.upper()
+        ):
+            matching_countries = country.qt_date_mask
+            break
 
-    if format.strip() == "" and country_or_format.strip() != "":
-        format = country_or_format
+    if matching_countries:
+        format = matching_countries
+
+    if format.strip() == "" and country_code_or_date_mask.strip() != "":
+        format = country_code_or_date_mask
 
     if format.strip() == "":
         format = "yyyy-MM-dd"  # iso date format country_or_format

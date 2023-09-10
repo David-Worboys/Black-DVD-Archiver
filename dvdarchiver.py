@@ -34,7 +34,7 @@ from menu_page_title_popup import Menu_Page_Title_Popup
 from sys_config import (DVD_Archiver_Base, DVD_Menu_Settings,
                         Get_DVD_Build_Folder, Get_Project_Layout_Names,
                         Set_Shelved_DVD_Layout, Video_Data)
-from utils import Text_To_File_Name
+from utils import Countries, Text_To_File_Name
 from video_cutter import Video_Editor
 from video_file_grid import Video_File_Grid
 
@@ -86,7 +86,7 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         if self._db_settings.setting_get("First_Run"):
             # Do stuff that the application only ever needs to do once on first
-            # startup of new installation
+            # startup of a new installation
             self._db_settings.setting_set("First_Run", False)
 
         self._menu_title_font_size = 24
@@ -252,6 +252,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                         self._dvd_folder_select(event)
                     case "exit_app":
                         self._DVD_Arch_App.app_exit()
+                    case "langtran":
+                        popups.Langtran_Popup().show()
                     case "make_dvd":
                         self._make_dvd(event)
                     case "new_dvd_layout":
@@ -290,14 +292,76 @@ class DVD_Archiver(DVD_Archiver_Base):
                             tag="video_editor_tab", enable=False
                         )
 
+                        # Because APPPOSTINIT is consumed in the video file grid, this is how we achieve the same thing
+                        # as CUSTOM is emitted at startup
+                        if self._startup:
+                            self._startup_handler(event)
+
                         self._startup = False
 
             case qtg.Sys_Events.INDEXCHANGED:
                 match event.tag:
                     case "existing_projects":
                         self._project_combo_change(event)
+                    case "countries":
+                        if not self._startup:
+                            self._language_setting_handler(event)
 
         return None
+
+    def _language_setting_handler(self, event: qtg.Action) -> None:
+        """Handles the setting of the application language
+
+        Args:
+            event (qtg.Action): The triggering event
+        """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
+        combo_data: qtg.Combo_Data = event.value
+        if combo_data.data == "N/A":  # Sets default language - untranslated is English
+            self._db_settings.setting_set(
+                setting_name="app_lang",
+                setting_value="",
+            )
+
+            self._db_settings.setting_set(
+                setting_name="app_country",
+                setting_value="",
+            )
+        else:
+            self._db_settings.setting_set(
+                setting_name="app_lang",
+                setting_value=combo_data.data,
+            )
+            self._db_settings.setting_set(
+                setting_name="app_country",
+                setting_value=combo_data.display,
+            )
+
+    def _startup_handler(self, event: qtg.Action) -> None:
+        """Performs activities that have to happen at startup
+
+        Args:
+            event (qtg.Action): The triggering event
+        """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
+        if event.widget_exist(
+            container_tag="app_lang", tag="countries"
+        ):  # Selects tha app language
+            country_combo: qtg.ComboBox = event.widget_get(
+                container_tag="app_lang", tag="countries"
+            )
+
+            if self._db_settings.setting_exist(setting_name="app_country"):
+                app_country = self._db_settings.setting_get(setting_name="app_country")
+
+                if app_country:
+                    result = country_combo.select_text(
+                        select_text=app_country,
+                        case_sensitive=False,
+                        partial_match=False,
+                    )
 
     def _tab_enable_handler(self, event: qtg.Action, enable: bool):
         """Enables or disables the tab dependent controls
@@ -306,6 +370,9 @@ class DVD_Archiver(DVD_Archiver_Base):
             event (qtg.Action): The triggering event
             enable (bool): True - enables tab sensitive controls, False - disables tab sensitive controls
         """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+        assert isinstance(enable, bool), f"{enable=}. Must be bool"
+
         if event.widget_exist(
             container_tag="main_controls", tag="existing_projects"
         ):  # Buttons are buddies so must exist
@@ -353,7 +420,10 @@ class DVD_Archiver(DVD_Archiver_Base):
         Args:
             event (qtg.Action): Triggering event (INDEXCHANGED in this case)
         """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
         new_project: qtg.Combo_Item = event.value
+
         if (
             not self._startup
             and new_project.display.strip()
@@ -399,16 +469,18 @@ class DVD_Archiver(DVD_Archiver_Base):
                 for item in layout_combo_items:
                     layout_combo.value_set(item)
 
-    def _archive_folder_select(self, event) -> None:
+    def _archive_folder_select(self, event: qtg.Action) -> None:
         """Select an archive folder and updates the settings in the database with the selected folder.
 
         Args:
-            event (Event): The triggering event
+            event (qtg.Action): The triggering event
 
         Note:
             The selected folder is saved in the database settings for future use.
 
         """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
         folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
 
         if folder is None or folder.strip() == "":
@@ -436,6 +508,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         Args:
             event (qtg.Action): Triggering event
         """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
 
         file_handler = file_utils.File()
 
@@ -507,6 +580,8 @@ class DVD_Archiver(DVD_Archiver_Base):
             The selected folder is saved in the database settings for future use.
 
         """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
         folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
         if folder is None or folder.strip() == "":
@@ -694,6 +769,8 @@ class DVD_Archiver(DVD_Archiver_Base):
         Args:
             event (qtg.Action): The triggering event.
         """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
         file_grid: qtg.Grid = event.widget_get(
             container_tag="video_file_controls",
             tag="video_input_files",
@@ -738,6 +815,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         Args:
             event:qtg.Action: The triggering event
         """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
 
         project_name = popups.PopTextGet(
             title="Enter Project Name",
@@ -780,6 +858,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         Args:
             event (qtg.Action): Triggering event
         """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
 
         file_handler = file_utils.File()
 
@@ -1095,29 +1174,76 @@ class DVD_Archiver(DVD_Archiver_Base):
             control=self._video_editor.layout(),
             enabled=False,
         )
+
         about_text = (
-            '<h2 style="text-align: center;"><strong><span style="color: #3366ff;">'
-            f" The {sys_consts.PROGRAM_NAME} -"
+            '<h2 style="text-align: center;"><strong><span style="color: #3366ff;"><a'
+            " href='https://github.com/David-Worboys/Black-DVD-Archiver/'> The"
+            f" {sys_consts.PROGRAM_NAME} -"
             f' {sys_consts.PROGRAM_VERSION}</span></strong></h2><p style="text-align:'
-            ' center;font-size: 15px;">&#169;'
+            ' center;font-size: 15px;">&#169;</a>'
             f" {sys_consts.COPYRIGHT_YEAR()} {sys_consts.AUTHOR}</p><p"
             ' style="text-align: center;"> <br/><img'
-            f' src={file_utils.App_Path("logo.jpg")} width="400"  /></p><p'
+            f' src={file_utils.App_Path("logo.jpg")} width="400"  /></p> <p'
             ' style="text-align: center;"> < a  href="https://www.moyhups.vic.edu.au/"'
-            " > 20th Century Alumnus: Moyhu Primary School Et Al. < /a ></p>  </p> <p "
+            " > Alumnus: Moyhu Primary School Et Al. < /a ></p>  </p> <p "
             f' style="text-align: center;">License: {sys_consts.LICENCE}</p>'
         )
+
+        language_codes = self._control_tab.lang_tran_get.get_existing_language_codes()
+        country_combo_items = [
+            qtg.Combo_Item(
+                display=f"{country.flag} {country.normal_name}",
+                data=country.language,
+                icon=None,
+                user_data=None,
+            )
+            for country in Countries().get_countries
+            if country.language != "en"
+            and country.language in language_codes  # English is my base language!
+        ]
+
+        country_combo = qtg.ComboBox(
+            # label="App Language",
+            tag="countries",
+            width=30,
+            items=country_combo_items,
+            translate=False,
+            display_na=True,
+            callback=self.event_handler,
+            tooltip="Select Default Language By Country",
+        )
+
         self._control_tab.page_add(
             tag="about_tab",
             title="About",
-            control=qtg.VBoxContainer().add_row(
+            control=qtg.VBoxContainer(align=qtg.Align.CENTER).add_row(
                 qtg.Label(
                     width=135,
                     height=32,
                     editable=False,
                     text=about_text,
                     translate=False,
-                )
+                ),
+                qtg.Spacer(),
+                # qtg.Spacer(),
+                qtg.VBoxContainer(
+                    tag="app_lang",
+                    text=(
+                        f"{sys_consts.SDELIM}{sys_consts.PROGRAM_NAME}{sys_consts.SDELIM} Language"
+                    ),
+                    align=qtg.Align.CENTER,
+                ).add_row(
+                    # qtg.Spacer(),
+                    qtg.VBoxContainer().add_row(
+                        qtg.Label(text="Default Language"), country_combo
+                    ),
+                    qtg.Spacer(),
+                    qtg.Button(
+                        text="Language Translation",
+                        tag="langtran",
+                        callback=self.event_handler,
+                    ),
+                ),
             ),
             enabled=True,
         )

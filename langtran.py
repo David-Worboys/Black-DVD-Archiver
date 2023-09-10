@@ -16,6 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import re
@@ -34,7 +35,7 @@ from utils import Singleton
 class Lang_Tran(metaclass=Singleton):
     """
     This class is used to translate text from one language to another.
-        - Rewritten 2022-05 by David Worboys to use sqllite storage.
+        - 2022-05 Rewritten by David Worboys to use sqllite storage.
     """
 
     def __init__(self):
@@ -44,6 +45,7 @@ class Lang_Tran(metaclass=Singleton):
         self._path = platformdirs.user_data_dir(appname=PROGRAM_NAME)
         self._language_code: str = ""
         self._DB: Optional[sqldb.SQLDB] = None
+        self._db_settings = sqldb.App_Settings(PROGRAM_NAME)
 
     def _config_db(self):
         file_manager = File()
@@ -109,6 +111,26 @@ class Lang_Tran(metaclass=Singleton):
                     f" <{self._db_file}>"
                 )
 
+    def get_existing_language_codes(self) -> list[str]:
+        """Get all existing language codes from the lang tran database
+
+        Returns:
+            list[str]: List of language codes
+
+        """
+        language_codes = []
+        trans_sql = f"{sqldb.SQL.SELECT} language_code {sqldb.SQL.FROM} lang_tran"
+
+        result = self.DB.sql_execute(trans_sql, debug=False)
+        error = self.DB.get_error_status()
+
+        if error.code == 1 and result:
+            for row_index, result_row in enumerate(result):
+                if result_row[0] is not None and result_row[0] not in language_codes:
+                    language_codes.append(result_row[0])
+
+        return language_codes
+
     def translate(self, trans_word: str, delim: str = SDELIM) -> str:
         """This method translates the word to the selected foreign language word or returns the original word if
         there is no translation.
@@ -143,6 +165,9 @@ class Lang_Tran(metaclass=Singleton):
             )
         ):
             return trans_word.strip(delim)
+
+        if self._db_settings.setting_exist("app_lang"):
+            self._language_code = self._db_settings.setting_get("app_lang")
 
         ignore_chars = "+="
         split_list = trans_word.split(delim)
@@ -188,7 +213,7 @@ class Lang_Tran(metaclass=Singleton):
                         base_lang_id = -666  # Should never be in base lang
 
                     if base_lang_id == -666:
-                        # If not in base dict and  not HTML and does not end in ignore chars add to base dict
+                        # If not in base dict and not HTML and does not end in ignore chars add to base dict
                         if (
                             word_token[-1:] not in ignore_chars
                             and word_token not in (" ", "", "&", ",", ";")

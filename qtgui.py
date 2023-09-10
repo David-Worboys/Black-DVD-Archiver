@@ -720,14 +720,12 @@ class Sys_Icon(Enum):
     @overload
     def get(
         self, iconformat: bool = True, width: int = 48, height: int = 48
-    ) -> qtG.QIcon:
-        ...
+    ) -> qtG.QIcon: ...
 
     @overload
     def get(
         self, iconformat: bool = True, width: int = 48, height: int = 48
-    ) -> qtG.QIcon | qtG.QPixmap:
-        ...
+    ) -> qtG.QIcon | qtG.QPixmap: ...
 
     def get(
         self, iconformat: bool = True, width: int = 48, height: int = 48
@@ -893,6 +891,12 @@ class _qtpyBase:
         for attr in dir(self):
             if hasattr(self, attr):
                 print("obj.%s = %s" % (attr, getattr(self, attr)))
+
+    @property
+    def lang_tran_get(self) -> Lang_Tran:
+        """Returns the Lang Tran object"""
+
+        return self._lang_tran
 
     @property
     def parent_get(self) -> Optional["_qtpyBase"]:
@@ -3232,31 +3236,24 @@ class _qtpyBase_Control(_qtpyBase):
         self.user_data = user_data
 
     @overload
-    def value_set(self, value: bool) -> None:
-        ...
+    def value_set(self, value: bool) -> None: ...
 
     @overload
-    def value_set(self, value: float) -> None:
-        ...
+    def value_set(self, value: float) -> None: ...
 
     @overload
-    def value_set(self, value: Combo_Data):
-        ...
+    def value_set(self, value: Combo_Data): ...
 
     @overload
-    def value_set(self, value: str):
-        ...
+    def value_set(self, value: str): ...
 
-    def value_set(self, value: datetime.date) -> None:
-        ...
+    def value_set(self, value: datetime.date) -> None: ...
 
     @overload
-    def value_set(self, value: datetime.datetime) -> None:
-        ...
+    def value_set(self, value: datetime.datetime) -> None: ...
 
     @overload
-    def value_set(self, value: Union[str, int, float]):
-        ...
+    def value_set(self, value: Union[str, int, float]): ...
 
     # @overload
     # def value_set(self, hour: int = 0, min: int = 0, sec: int = 0, msec: int = 0):
@@ -4063,72 +4060,57 @@ class Action(_qtpyBase):
         return widget
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> _qtpyBase_Control:
-        ...
+    def widget_get(
+        self, container_tag: str = "", tag: str = ""
+    ) -> _qtpyBase_Control: ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "Button":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "Button": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "ComboBox":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "ComboBox": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "FolderView":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "FolderView": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "Grid":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "Grid": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "GridContainer":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "GridContainer": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "Image":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "Image": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "LineEdit":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "LineEdit": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "FormContainer":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "FormContainer": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "HBoxContainer":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "HBoxContainer": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "VBoxContainer":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "VBoxContainer": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "ProgressBar":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "ProgressBar": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "RadioButton":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "RadioButton": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "Slider":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "Slider": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "Spinbox":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "Spinbox": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "Switch":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "Switch": ...
 
     @overload
-    def widget_get(self, container_tag: str = "", tag: str = "") -> "Tab":
-        ...
+    def widget_get(self, container_tag: str = "", tag: str = "") -> "Tab": ...
 
     def widget_get(self, container_tag: str = "", tag: str = "") -> _qtpyBase_Control:
         """Returns a widget from the parent app's widget dictionary.
@@ -4785,32 +4767,28 @@ class _Container(_qtpyBase_Control):
     @overload
     def add_control(
         self, control: _qtpyBase_Control, row: int, col: int
-    ) -> "GridContainer":
-        ...
+    ) -> "GridContainer": ...
 
     @overload
     def add_control(
         self,
         control: _qtpyBase_Control,
         zero_based: bool = False,
-    ) -> "FormContainer":
-        ...
+    ) -> "FormContainer": ...
 
     @overload
     def add_control(
         self,
         control: _qtpyBase_Control,
         zero_based: bool = False,
-    ) -> "HBoxContainer":
-        ...
+    ) -> "HBoxContainer": ...
 
     @overload
     def add_control(
         self,
         control: _qtpyBase_Control,
         zero_based: bool = False,
-    ) -> "VBoxContainer":
-        ...
+    ) -> "VBoxContainer": ...
 
     def add_control(
         self,
@@ -4892,20 +4870,22 @@ class _Container(_qtpyBase_Control):
         return self
 
     @overload
-    def add_row(self, *controls: _qtpyBase_Control, row: int = -1) -> "_Container":
-        ...
+    def add_row(self, *controls: _qtpyBase_Control, row: int = -1) -> "_Container": ...
 
     @overload
-    def add_row(self, *controls: _qtpyBase_Control, row: int = -1) -> "GridContainer":
-        ...
+    def add_row(
+        self, *controls: _qtpyBase_Control, row: int = -1
+    ) -> "GridContainer": ...
 
     @overload
-    def add_row(self, *controls: _qtpyBase_Control, row: int = -1) -> "HBoxContainer":
-        ...
+    def add_row(
+        self, *controls: _qtpyBase_Control, row: int = -1
+    ) -> "HBoxContainer": ...
 
     @overload
-    def add_row(self, *controls: _qtpyBase_Control, row: int = -1) -> "VBoxContainer":
-        ...
+    def add_row(
+        self, *controls: _qtpyBase_Control, row: int = -1
+    ) -> "VBoxContainer": ...
 
     def add_row(
         self, *controls: _qtpyBase_Control, row: int = -1
@@ -7973,12 +7953,10 @@ class Dateedit(_qtpyBase_Control):
         # self._widget.setMinimumDate(self._min_date)
 
     @overload
-    def date_get(self, date_format: str = "", date_tuple: bool = False) -> str:
-        ...
+    def date_get(self, date_format: str = "", date_tuple: bool = False) -> str: ...
 
     @overload
-    def date_get(self, date_format: str = "", date_tuple: bool = False) -> tuple:
-        ...
+    def date_get(self, date_format: str = "", date_tuple: bool = False) -> tuple: ...
 
     def date_get(
         self, date_format: str = "", date_tuple: bool = False
@@ -8091,12 +8069,10 @@ class Dateedit(_qtpyBase_Control):
         return qtC.QDate.fromString(date, date_format).isValid()
 
     @overload
-    def value_get(self, date_format: str = "", date_tuple: bool = False) -> str:
-        ...
+    def value_get(self, date_format: str = "", date_tuple: bool = False) -> str: ...
 
     @overload
-    def value_get(self, date_format: str = "", date_tuple: bool = False) -> tuple:
-        ...
+    def value_get(self, date_format: str = "", date_tuple: bool = False) -> tuple: ...
 
     def value_get(self, date_format: str = "", date_tuple: bool = False) -> str | tuple:
         """Gets the date
@@ -10039,8 +10015,7 @@ class Grid(_qtpyBase_Control):
     @overload
     def value_set(
         self, value: bool, row: int, col: int, user_data: any, tooltip: str = ""
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     def value_set(
@@ -10050,8 +10025,7 @@ class Grid(_qtpyBase_Control):
         col: int,
         user_data: any,
         tooltip: str = "",
-    ) -> NoReturn:
-        ...
+    ) -> NoReturn: ...
 
     @overload
     def value_set(
@@ -10061,8 +10035,7 @@ class Grid(_qtpyBase_Control):
         col: int,
         user_data: any,
         tooltip: str = "",
-    ) -> NoReturn:
-        ...
+    ) -> NoReturn: ...
 
     @overload
     def value_set(
@@ -10072,26 +10045,22 @@ class Grid(_qtpyBase_Control):
         col: int,
         user_data: any,
         tooltip: str = "",
-    ) -> NoReturn:
-        ...
+    ) -> NoReturn: ...
 
     @overload
     def value_set(
         self, value: float, row: int, col: int, user_data: any, tooltip: str = ""
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     def value_set(
         self, value: int, row: int, col: int, user_data: any, tooltip: str = ""
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     def value_set(
         self, value: str, row: int, col: int, user_data: any, tooltip: str = ""
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def value_set(
         self,
@@ -10263,7 +10232,7 @@ class Grid(_qtpyBase_Control):
             list[int]: List of item_ids
         """
         assert (
-            isinstance(row, int) and row >= 0 and row < self._widget.rowCount()
+            isinstance(row, int) and 0 <= row < self._widget.rowCount()
         ), f"{row=}. Must be an int >= 0 and < {self._widget.rowCount()} "
 
         self._widget: qtW.QTableWidget
@@ -10414,28 +10383,22 @@ class Grid(_qtpyBase_Control):
         return row, col_index
 
     @overload
-    def _data_type_decode(self, data_type: _Data_Type, value: str) -> int:
-        ...
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> int: ...
 
     @overload
-    def _data_type_decode(self, data_type: _Data_Type, value: str) -> float:
-        ...
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> float: ...
 
     @overload
-    def _data_type_decode(self, data_type: _Data_Type, value: str) -> bool:
-        ...
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> bool: ...
 
     @overload
-    def _data_type_decode(self, data_type: _Data_Type, value: str) -> str:
-        ...
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> str: ...
 
     @overload
-    def _data_type_decode(self, data_type: _Data_Type, value: str) -> qtC.QDate:
-        ...
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> qtC.QDate: ...
 
     @overload
-    def _data_type_decode(self, data_type: _Data_Type, value: str) -> qtC.QDateTime:
-        ...
+    def _data_type_decode(self, data_type: _Data_Type, value: str) -> qtC.QDateTime: ...
 
     def _data_type_decode(
         self, data_type: _Data_Type, value: str
@@ -10604,7 +10567,7 @@ class _Resizable_Rectangle(qtW.QGraphicsRectItem):
 
     def hoverLeaveEvent(self, event: qtW.QGraphicsSceneHoverEvent) -> None:
         """
-        Processes the hovering mouse leaving the shape when not pressed .
+        Processes the hovering mouse leaving the shape when not pressed.
 
         Args:
             event (qtW.QGraphicsSceneHoverEvent): Triggered when the mouse leaves the rectangle
@@ -10728,7 +10691,7 @@ class _Resizable_Rectangle(qtW.QGraphicsRectItem):
 
     def boundingRect(self):
         """
-        Returns a shape bounding rect -including the resize handles
+        Returns a shape bounding rect - including the resize handles
         """
         offset = self.handle_size + self.handle_space
 
@@ -12316,7 +12279,7 @@ class Menu(_qtpyBase_Control):
             parent (qtW.QWidget): The parent widget.
             container_tag (str): The tag name of the container that the menu is in.
             _menu (Union[dict[str, _Menu_Entry], None]): This is the menu dictionary that is created. Not set by user
-            _depth (int): Recursieve depth. Defaults to 0 and used for debugging.
+            _depth (int): Recursive depth. Defaults to 0 and used for debugging.
 
         Returns:
             qtW.QMenuBar : The created widget or the container housing it.
@@ -12755,9 +12718,7 @@ class ProgressBar(_qtpyBase_Control):
             value (int): The value to set the progressbar to.
         """
         assert (
-            isinstance(value, int)
-            and value >= self.range_min
-            and value <= self.range_max
+            isinstance(value, int) and self.range_min <= value <= self.range_max
         ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
         self._widget: qtW.QProgressBar
         self._widget.setValue(value)
@@ -13134,7 +13095,7 @@ class _Switch(qtW.QAbstractButton):
     offset = qtC.Property(int, read_offset, write_offset)
 
     def sizeHint(self):  # pylint: disable=invalid-name
-        """Overrides size hint in the ancestor .
+        """Overrides size hint in the ancestor.
 
         Returns:
             A QSize object with the width and height of the widget.
@@ -13676,12 +13637,10 @@ class Timeedit(_qtpyBase_Control):
         )
 
     @overload
-    def value_get(self, format: str = "", time_tuple=False) -> tuple:
-        ...
+    def value_get(self, format: str = "", time_tuple=False) -> tuple: ...
 
     @overload
-    def value_get(self, format: str = "", time_tuple=False) -> str:
-        ...
+    def value_get(self, format: str = "", time_tuple=False) -> str: ...
 
     def value_get(self, format: str = "", time_tuple=False) -> time_struct | str:
         """Returns the time value.
@@ -14789,7 +14748,7 @@ class Treeview(_qtpyBase_Control):
     def _extract_items(
         self, items: Union[str, list, tuple, dict]
     ) -> tuple[list[str], list[any]]:
-        """Returnsa tuple of two lists, the first list being the display strings, and the second list being the user data
+        """Returns a tuple of two lists, the first list being the display strings, and the second list being the user data
 
         Args:
             items (Union[str, list, tuple, dict]): The items to display. Can be a list, tuple or dict.
@@ -14860,8 +14819,8 @@ class Treeview(_qtpyBase_Control):
             levels.add(level)
 
         if len(levels) == 1:
-            return (True, list(levels)[0], items)
-        return (False, list(levels), items)
+            return True, list(levels)[0], items
+        return False, list(levels), items
 
 
 @dataclasses.dataclass
@@ -14983,9 +14942,7 @@ class Slider(_qtpyBase_Control):
             value (int): The value to set the slider to.
         """
         assert (
-            isinstance(value, int)
-            and value >= self.range_min
-            and value <= self.range_max
+            isinstance(value, int) and self.range_min <= value <= self.range_max
         ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
         self._widget: qtW.QSlider
 
@@ -15072,9 +15029,7 @@ class Spinbox(_qtpyBase_Control):
             value (int): The value to set the spinbox to.
         """
         assert (
-            isinstance(value, int)
-            and value >= self.range_min
-            and value <= self.range_max
+            isinstance(value, int) and self.range_min <= value <= self.range_max
         ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
         self._widget: qtW.QSpinBox
         self._widget.setValue(value)
