@@ -27,7 +27,8 @@ import sqlite3 as pysqlite3
 from decimal import Decimal
 from enum import unique
 from pathlib import Path
-from typing import Callable, overload
+from sqlite3 import Connection
+from typing import Callable, overload, TextIO
 
 import platformdirs
 
@@ -39,7 +40,7 @@ from utils import Get_Unique_Sysid, Is_Complied, strEnum
 
 
 @dataclasses.dataclass(slots=True)
-class _error:
+class Error:
     code: int
     message: str
 
@@ -233,20 +234,22 @@ class App_Settings:
         self._db_create()
 
     @property
-    def db_get(self):
+    def db_get(self) -> "SQLDB":
         """
+        Gets the SQL database connection
 
-        :return: SQLDB
+        Returns:
+            SQLDB: The SQL database connection
         """
         return self._appcfg_db
 
     @property
     def db_path_get(self) -> str:
         """
-
         Returns the database path stored in the App cfg database.
 
-        :return: str : database path or empty string ""
+        Returns:
+            str: database path or empty string ""
         """
         path: str = self.setting_get("dbpath")
 
@@ -268,8 +271,11 @@ class App_Settings:
         """
         Sets the database path in the App cfg database.  Path must exist and be writeable
 
-        :param path: str : a non-empty file path
-        :return: int : 1 - path saved ok, -1 path not saved
+        Args:
+            path (str): A non-empty file path
+
+        Returns:
+            str: 1 - path saved ok, -1 path not saved
         """
         assert isinstance(path, str), f"{path=}. Must be non-empty str"
 
@@ -304,7 +310,7 @@ class App_Settings:
         """Returns the password stored in the database
 
         Returns:
-            str | None : Password
+            str | None: Password
 
         """
         result = self.setting_get("dbpass")
@@ -335,7 +341,7 @@ class App_Settings:
         return self.setting_set("dbpass", password)
 
     def db_password_verify(self, password: str, password_hash: bool = True) -> bool:
-        """Verifies the database password against the given password. If the database password is hashed then the
+        """Verifies the database password against the given password. If the database password is hashed, then the
         given password must also be hashed.
 
         Args:
@@ -381,7 +387,7 @@ class App_Settings:
         """Determines if a database setting exists
 
         Args:
-            setting_name (str): THe setting name
+            setting_name (str): The setting name
 
         Returns:
             bool : True - setting exists, False it does not
@@ -771,10 +777,10 @@ class Crypto:
     """Crypto class for handling passwords securely"""
 
     def hash_password(self, clear_password: str) -> str:
-        """Hashes a password .
+        """Hashes a password.
 
         Args:
-            clear_password:  Non-hashed password
+            clear_password: Non-hashed password
 
         Returns:
             str: The hashed password
@@ -826,7 +832,7 @@ def get_rowcol_value(row: int, col: int, row_list: list) -> str:
 
     Args:
         row (int): The row of the desired value
-        col (int):  The col of the desired value
+        col (int): The col of the desired value
         row_list (list): The row list structure returned form a select statement
 
     Returns:
@@ -945,7 +951,7 @@ class SQLDB:
         has_header: bool = True,
         delimiter: str = ",",
         drop_table: bool = True,
-    ):
+    ) -> None:
         """Loads a CSV file into the database
 
         Args:
@@ -960,7 +966,20 @@ class SQLDB:
             None:
         """
 
-        def _get_col_props(file_ptr, delimiter: str, has_header: bool):
+        def _get_col_props(
+            file_ptr: TextIO, delimiter: str, has_header: bool
+        ) -> dict[str, list[int | None]]:
+            """Get column properties
+
+            Args:
+                file_ptr (TextIO): File Handle
+                delimiter (str): Delimiter used to extract columns
+                has_header (bool): Determine if the hile has a header row
+
+            Returns:
+                dict[str, list[int | None]]: Dictionary containing the column properties
+
+            """
             current_pos = file_ptr.tell()
             file_ptr.seek(0)
             col_def = {}
@@ -1199,12 +1218,12 @@ class SQLDB:
 
         Args:
             table (str): Table from which data is to be deleted
-            where_str (str): Where statement specifying scope of deletion
+            where_str (str): Where a statement specifying scope of deletion
             transactional (bool): Use Transactions (Default)
-            debug (bool) : Prints the SQL statement for debugging purposes
+            debug (bool): Prints the SQL statement for debugging purposes
 
         Returns:
-            list | tuple : Expect an empty tuple tp be returned. Check error after executing
+            list | tuple: Expect an empty tuple to be returned. Check error after executing
         """
         assert (
             isinstance(table, str) and table.strip() != ""
@@ -1221,7 +1240,7 @@ class SQLDB:
 
         return self.sql_execute(sql_statement, transactional=transactional, debug=debug)
 
-    def _check_col(self, col_item: list[str], tables: list[str]):
+    def _check_col(self, col_item: list[str], tables: list[str]) -> None:
         """Check if the column exists in the table. Throws an exception if it does not
 
         Args:
@@ -1229,7 +1248,7 @@ class SQLDB:
             tables (list[str]): list of tables
         """
 
-        # Table/Column can not start with a quote(') or ('-') or be a number
+        # Table/Column cannot start with a quote(') or ('-') or be a number
         assert (
             isinstance(col_item, list) and col_item
         ), f"DBG {col_item=}. Must be a list with at least one entry"
@@ -1371,11 +1390,11 @@ class SQLDB:
         transaction_commit: bool = True,
         debug: bool = False,
     ) -> tuple[int, str]:
-        """Update a table in the database - either insert or update depending on if a where clause exists.
+        """Updates a table in the database - either insert or update depending on if a where clause exists.
 
         Args:
             col_dict (dict): A dictionary of columns/values to be updated.
-            table_str (str): The table name(s) to be updated. Delimited by ,
+            table_str (str): The table name(s) to be updated. Delimited by,
             where_str (str): Where clause of the update statement
             transaction_commit (bool): Commits the database transaction if true. Defaults to True
             debug (bool): If True, prints the SQL statement to the console. Defaults to False
@@ -1697,7 +1716,7 @@ class SQLDB:
             table_name (str): Database table name
 
         Returns:
-            bool: True if table exist, False if table does not exist
+            bool: True if table exists, False if table does not exist
         """
         assert (
             isinstance(table_name, str) and table_name.strip() != ""
@@ -1717,8 +1736,8 @@ class SQLDB:
 
     def _convert_from_base(self, value: int) -> int | float:
         """
-        Converts an int value from the base value - most likely used with Currency Conversion
-        e.g. Integer 1234 will be converted to Decimal('12.34')
+        Converts an int value from the base value - most likely used with Currency Conversion,
+        e.g., Integer 1234 will be converted to Decimal('12.34')
 
         Args:
             value (int): Base value
@@ -1775,7 +1794,7 @@ class SQLDB:
 
         return 1
 
-    def add_func(self, func: Callable, num_args: int, func_name: str):
+    def add_func(self, func: Callable, num_args: int, func_name: str) -> None:
         """Adds a function to the database instance
 
         Args:
@@ -1794,19 +1813,20 @@ class SQLDB:
         self._dbconnection.create_function(func_name, num_args, func)
 
     @property
-    def get_connection(self):
+    def get_connection(self) -> Connection:
         """Gets the database connection
 
         Returns:
+            Connection : Database connection
 
         """
         return self._dbconnection
 
-    def get_error_status(self) -> _error:
+    def get_error_status(self) -> Error:
         """
         Return _error code and text in a tuple
 
-        :return: (erro): code =  1 if ok, -1 if _error message = _error text
+        :return: (Error): code =  1 if ok, -1 if _error message = _error text
         """
 
-        return _error(code=self._error, message=self._error_txt)
+        return Error(code=self._error, message=self._error_txt)
