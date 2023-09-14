@@ -19,6 +19,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
+from typing import cast
 
 import file_utils
 import popups
@@ -82,9 +83,12 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                         self.set_result("cancel")
                         super().close()
                     case "bulk_select":
-                        file_grid: qtg.Grid = event.widget_get(
-                            container_tag="file_controls",
-                            tag="video_input_files",
+                        file_grid: qtg.Grid = cast(
+                            qtg.Grid,
+                            event.widget_get(
+                                container_tag="file_controls",
+                                tag="video_input_files",
+                            ),
                         )
 
                         file_grid.checkitems_all(
@@ -109,9 +113,12 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                             self._db_settings.setting_set(
                                 "video_import_folder", video_folder
                             )
-                            file_grid: qtg.Grid = event.widget_get(
-                                container_tag="file_controls",
-                                tag="video_input_files",
+                            file_grid: qtg.Grid = cast(
+                                qtg.Grid,
+                                event.widget_get(
+                                    container_tag="file_controls",
+                                    tag="video_input_files",
+                                ),
                             )
 
                             file_grid.clear()
@@ -145,9 +152,12 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                 )
 
                 if result.error_code == file_handler.Path_Error.OK and result.files:
-                    file_grid: qtg.Grid = event.widget_get(
-                        container_tag="file_controls",
-                        tag="video_input_files",
+                    file_grid: qtg.Grid = cast(
+                        qtg.Grid,
+                        event.widget_get(
+                            container_tag="file_controls",
+                            tag="video_input_files",
+                        ),
                     )
 
                     file_grid.clear()
@@ -226,9 +236,12 @@ class Video_File_Picker_Popup(qtg.PopContainer):
             int: 1 all good, close the window. -1 keep window open
         """
         file_handler = file_utils.File()
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="file_controls",
+                tag="video_input_files",
+            ),
         )
 
         selected_files = file_grid.checkitems_get
@@ -288,8 +301,11 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         if event.event == qtg.Sys_Events.CLICKED:
             if event.value.row >= 0 and event.value.col >= 0:
                 # When the user clicks on a row in the grid, toggle the switch in that row
-                file_grid: qtg.Grid = event.widget_get(
-                    container_tag="file_controls", tag="video_input_files"
+                file_grid: qtg.Grid = cast(
+                    qtg.Grid,
+                    event.widget_get(
+                        container_tag="file_controls", tag="video_input_files"
+                    ),
                 )
 
                 if file_grid.checkitemrow_get(event.value.row, col=0):

@@ -475,7 +475,7 @@ class Combo_Item:
     display: str
     data: None | str | int | float | bytes | bool
     icon: None | str | qtG.QPixmap | qtG.QIcon
-    user_data: None | str | int | float | bytes | bool
+    user_data: None | str | int | float | bytes | bool | tuple | list
 
     def _post_init(self):
         # Checking the arguments passed to the constructor are of the correct type.
@@ -487,7 +487,7 @@ class Combo_Item:
             isinstance(self.icon, (str, qtG.QPixmap, qtG.QIcon)) or self.icon is None
         ), f"{self.icon=}. Must be None | str | qtG.QPixmap | qtG.QIcon"
         assert (
-            isinstance(self.user_data, (str, int, float, bytes, bool))
+            isinstance(self.user_data, (str, int, float, bytes, bool, tuple, list))
             or self.user_data is None
         ), f"{self.user_data=}. Must be None | str | int | float | bytes | bool"
 

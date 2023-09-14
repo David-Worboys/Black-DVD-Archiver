@@ -26,7 +26,7 @@ import pathlib
 import shelve
 import types
 from dataclasses import field
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, cast
 
 import fs
 import platformdirs
@@ -57,9 +57,11 @@ class PopAbout(PopContainer):
     # Defining the variables that will be used in the class.
     app_text: str = ""
     informative_text: str = ""
+    # noinspection PyTypeChecker
     informative_font: Font = field(default_factory=Font(size=12))
     width: int = 40
     height: int = 15
+    # noinspection PyTypeChecker
     border: Widget_Frame = field(default_factory=Widget_Frame())
     icon: Union[str, qtG.QPixmap, qtG.QIcon] = None
 
@@ -271,9 +273,13 @@ class PopFolderGet(PopContainer):
                         self.close()
 
                     case "dir_view":
-                        folderview_widget: FolderView = event.widget_get(
-                            container_tag="dir_container", tag="dir_view"
+                        folderview_widget: FolderView = cast(
+                            FolderView,
+                            event.widget_get(
+                                container_tag="dir_container", tag="dir_view"
+                            ),
                         )
+
                         if folderview_widget.expand_on_click:  # Ignore
                             current_folder = event.value_get(
                                 container_tag="folder_edit", tag="folder"
@@ -308,12 +314,16 @@ class PopFolderGet(PopContainer):
                         self._create_folder(event)
 
                     case "up_folder":
-                        folderview_widget = event.widget_get(
-                            container_tag="dir_container", tag="dir_view"
+                        folderview_widget = cast(
+                            FolderView,
+                            event.widget_get(
+                                container_tag="dir_container", tag="dir_view"
+                            ),
                         )
 
-                        folder_sle_widget: LineEdit = event.widget_get(
-                            container_tag="folder_edit", tag="folder"
+                        folder_sle_widget: LineEdit = cast(
+                            LineEdit,
+                            event.widget_get(container_tag="folder_edit", tag="folder"),
                         )
 
                         # Get text in single line edit
@@ -371,8 +381,9 @@ class PopFolderGet(PopContainer):
                 Sys_Events.PRESSED
             ):  # Currently, not allowing user entry of folder
                 if event.tag == "folder":
-                    folderview_widget = event.widget_get(
-                        container_tag="dir_container", tag="dir_view"
+                    folderview_widget = cast(
+                        FolderView,
+                        event.widget_get(container_tag="dir_container", tag="dir_view"),
                     )
                     entered_folder = pathlib.Path(event.value).expanduser().resolve()
 
@@ -683,8 +694,8 @@ class PopOKCancel(PopMessage):
                         self.close()
 
                     case "cancel":
-                        button: Button = event.widget_get(
-                            event.container_tag, event.tag
+                        button: Button = cast(
+                            Button, event.widget_get(event.container_tag, event.tag)
                         )
                         result = button.callback(event)
 
@@ -1076,9 +1087,12 @@ class Langtran_Popup(PopContainer):
                     col = grid_col_value.col
                     user_data = grid_col_value.user_data
 
-                    phrase_grid: Grid = event.widget_get(
-                        container_tag="langtran_controls",
-                        tag="phrase_grid",
+                    phrase_grid: Grid = cast(
+                        Grid,
+                        event.widget_get(
+                            container_tag="langtran_controls",
+                            tag="phrase_grid",
+                        ),
                     )
 
                     phrase_grid.value_set(
@@ -1092,7 +1106,7 @@ class Langtran_Popup(PopContainer):
                         self._country_combo_handler(event)
 
     def _import_handler(self, event: Action):
-        """Imports into the phrase grid the user seleced language translation file located in the users document folder
+        """Imports into the phrase grid the user selected language translation file located in the users document folder
 
         Args:
             event (Action): Triggering event
@@ -1102,13 +1116,19 @@ class Langtran_Popup(PopContainer):
         db_path: str = platformdirs.user_documents_dir()
         file_handler = file_utils.File()
 
-        phrase_grid: Grid = event.widget_get(
-            container_tag="langtran_controls",
-            tag="phrase_grid",
+        phrase_grid: Grid = cast(
+            Grid,
+            event.widget_get(
+                container_tag="langtran_controls",
+                tag="phrase_grid",
+            ),
         )
-        country_combo: ComboBox = event.widget_get(
-            container_tag="langtran_controls",
-            tag="countries",
+        country_combo: ComboBox = cast(
+            ComboBox,
+            event.widget_get(
+                container_tag="langtran_controls",
+                tag="countries",
+            ),
         )
 
         langtran_files = file_handler.filelist(db_path, ("dat",))
@@ -1176,13 +1196,19 @@ class Langtran_Popup(PopContainer):
         db_path: str = platformdirs.user_documents_dir()
         file_handler = file_utils.File()
 
-        phrase_grid: Grid = event.widget_get(
-            container_tag="langtran_controls",
-            tag="phrase_grid",
+        phrase_grid: Grid = cast(
+            Grid,
+            event.widget_get(
+                container_tag="langtran_controls",
+                tag="phrase_grid",
+            ),
         )
-        country_combo: ComboBox = event.widget_get(
-            container_tag="langtran_controls",
-            tag="countries",
+        country_combo: ComboBox = cast(
+            ComboBox,
+            event.widget_get(
+                container_tag="langtran_controls",
+                tag="countries",
+            ),
         )
 
         country_data: Combo_Data = country_combo.value_get()
@@ -1236,9 +1262,12 @@ class Langtran_Popup(PopContainer):
         ):
             trans_table = self._get_trans_table(event)
 
-            phrase_grid: Grid = event.widget_get(
-                container_tag="langtran_controls",
-                tag="phrase_grid",
+            phrase_grid: Grid = cast(
+                Grid,
+                event.widget_get(
+                    container_tag="langtran_controls",
+                    tag="phrase_grid",
+                ),
             )
 
             for row_index in range(phrase_grid.row_count):
@@ -1272,9 +1301,12 @@ class Langtran_Popup(PopContainer):
             event (Action): Triggering event
         """
         trans_table: dict = {}
-        phrase_grid: Grid = event.widget_get(
-            container_tag="langtran_controls",
-            tag="phrase_grid",
+        phrase_grid: Grid = cast(
+            Grid,
+            event.widget_get(
+                container_tag="langtran_controls",
+                tag="phrase_grid",
+            ),
         )
 
         # Default country combo to the country specified in the application selected country
@@ -1286,9 +1318,12 @@ class Langtran_Popup(PopContainer):
             )
 
             if app_country:
-                country_combo: ComboBox = event.widget_get(
-                    container_tag="langtran_controls",
-                    tag="countries",
+                country_combo: ComboBox = cast(
+                    ComboBox,
+                    event.widget_get(
+                        container_tag="langtran_controls",
+                        tag="countries",
+                    ),
                 )
 
                 result = country_combo.select_text(
@@ -1378,9 +1413,12 @@ class Langtran_Popup(PopContainer):
             ).show()
             == "yes"
         ):
-            phrase_grid: Grid = event.widget_get(
-                container_tag="langtran_controls",
-                tag="phrase_grid",
+            phrase_grid: Grid = cast(
+                Grid,
+                event.widget_get(
+                    container_tag="langtran_controls",
+                    tag="phrase_grid",
+                ),
             )
             language_code = self._get_language_code(event).lower()
 
@@ -1427,9 +1465,12 @@ class Langtran_Popup(PopContainer):
         """
         assert isinstance(event, Action), f"{event=}. Must be Action"
 
-        phrase_grid: Grid = event.widget_get(
-            container_tag="langtran_controls",
-            tag="phrase_grid",
+        phrase_grid: Grid = cast(
+            Grid,
+            event.widget_get(
+                container_tag="langtran_controls",
+                tag="phrase_grid",
+            ),
         )
         language_code = self._get_language_code(event).lower()
 
@@ -1516,9 +1557,12 @@ class Langtran_Popup(PopContainer):
         """
         assert isinstance(event, Action), f"{event=}. Must be Action"
 
-        phrase_grid: Grid = event.widget_get(
-            container_tag="langtran_controls",
-            tag="phrase_grid",
+        phrase_grid: Grid = cast(
+            Grid,
+            event.widget_get(
+                container_tag="langtran_controls",
+                tag="phrase_grid",
+            ),
         )
 
         changed = False

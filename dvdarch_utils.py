@@ -113,7 +113,7 @@ colors = {
 
 
 @dataclasses.dataclass(slots=True)
-class dvd_dims:
+class Dvd_Dims:
     storage_width: int = -1
     storage_height: int = -1
     display_width: int = -1
@@ -1186,7 +1186,7 @@ def Execute_Check_Output(
     return 1, output
 
 
-def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> dvd_dims:
+def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> Dvd_Dims:
     """Returns the DVD image dimensions. The hard coded values are  mandated by the dvd_format and the
     aspect ratio and must not be changed.  PAL is 720 x 576 and NTSC is 720 x 480 and is always stored
     that way on a DVD. But the display aspect ratio can be flagged on a DVD (PAL is 1024 x 576 and NTSC is
@@ -1211,7 +1211,7 @@ def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> dvd_dims:
 
     if dvd_format.upper() == sys_consts.NTSC:
         if aspect_ratio.upper() == sys_consts.AR169:
-            return dvd_dims(
+            return Dvd_Dims(
                 storage_width=720,
                 storage_height=480,
                 display_width=853,
@@ -1219,7 +1219,7 @@ def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> dvd_dims:
             )
 
         else:  # 4:3
-            return dvd_dims(
+            return Dvd_Dims(
                 storage_width=720,
                 storage_height=480,
                 display_width=720,
@@ -1227,14 +1227,14 @@ def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> dvd_dims:
             )
     else:  # PAL
         if aspect_ratio.upper() == sys_consts.AR169:
-            return dvd_dims(
+            return Dvd_Dims(
                 storage_width=720,
                 storage_height=576,
                 display_width=1024,
                 display_height=576,
             )
         else:  # 4:3
-            return dvd_dims(
+            return Dvd_Dims(
                 storage_width=720,
                 storage_height=576,
                 display_width=720,

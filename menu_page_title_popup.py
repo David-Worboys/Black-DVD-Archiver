@@ -21,7 +21,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
-from typing import Optional
+from typing import Optional, cast
 
 import platformdirs
 
@@ -82,8 +82,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         match event.event:
             case qtg.Sys_Events.WINDOWPOSTOPEN:
-                ok_button: qtg.Button = event.widget_get(
-                    container_tag="command_buttons", tag="ok"
+                ok_button: qtg.Button = cast(
+                    qtg.Button,
+                    event.widget_get(container_tag="command_buttons", tag="ok"),
                 )
                 ok_button.text_set("Make A DVD")
                 ok_button.icon_set(file_utils.App_Path("compact-disc.svg"))
@@ -108,14 +109,20 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                     case "delete_video_title":
                         self._remove_video_title(self._current_button_grid)
                     case "move_menu_up":
-                        menu_grid: qtg.Grid = event.widget_get(
-                            container_tag="menu_page_controls", tag="menu_titles"
+                        menu_grid: qtg.Grid = cast(
+                            qtg.Grid,
+                            event.widget_get(
+                                container_tag="menu_page_controls", tag="menu_titles"
+                            ),
                         )
                         self._move_grid_row(menu_grid, True)
 
                     case "move_menu_down":
-                        menu_grid: qtg.Grid = event.widget_get(
-                            container_tag="menu_page_controls", tag="menu_titles"
+                        menu_grid: qtg.Grid = cast(
+                            qtg.Grid,
+                            event.widget_get(
+                                container_tag="menu_page_controls", tag="menu_titles"
+                            ),
                         )
                         self._move_grid_row(menu_grid, False)
 
@@ -150,9 +157,12 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                     col = grid_col_value.col
                     user_data = grid_col_value.user_data
 
-                    menu_title_grid: qtg.Grid = event.widget_get(
-                        container_tag="menu_page_controls",
-                        tag="menu_titles",
+                    menu_title_grid: qtg.Grid = cast(
+                        qtg.Grid,
+                        event.widget_get(
+                            container_tag="menu_page_controls",
+                            tag="menu_titles",
+                        ),
                     )
 
                     menu_title_grid.value_set(
@@ -173,9 +183,12 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         temp_video_list: list[Video_Data] = self.video_data_list
 
-        menu_title_grid: qtg.Grid = event.widget_get(
-            container_tag="menu_page_controls",
-            tag="menu_titles",
+        menu_title_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="menu_page_controls",
+                tag="menu_titles",
+            ),
         )
         buttons_per_page = DVD_Menu_Settings().buttons_per_page
 
@@ -187,6 +200,10 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             menu_pages: list[list[Video_Data]] = []
 
             for row_index, menu_item in enumerate(dvd_menu_layout):
+                # Keeping Pycharm typing happy
+                row_index: int
+                menu_item: tuple[str, list[list[Video_Data]]]
+
                 videos: list[Video_Data] = []
                 menu_title_grid.value_set(
                     row=row_index,
@@ -536,9 +553,12 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         Returns:
             int: Returns 1 if cancel process is ok, -1 otherwise.
         """
-        menu_title_grid: qtg.Grid = event.widget_get(
-            container_tag="menu_page_controls",
-            tag="menu_titles",
+        menu_title_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="menu_page_controls",
+                tag="menu_titles",
+            ),
         )
         video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
 
@@ -581,13 +601,17 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         self.set_result("")
 
-        menu_title_grid: qtg.Grid = event.widget_get(
-            container_tag="menu_page_controls",
-            tag="menu_titles",
+        menu_title_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="menu_page_controls",
+                tag="menu_titles",
+            ),
         )
 
-        deactivate_switch: qtg.Switch = event.widget_get(
-            container_tag="menu_move", tag="deactivate_filters"
+        deactivate_switch: qtg.Switch = cast(
+            qtg.Switch,
+            event.widget_get(container_tag="menu_move", tag="deactivate_filters"),
         )
 
         menu_title_col_index = menu_title_grid.colindex_get("menu_title")
@@ -603,6 +627,10 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             return -1
 
         for row_index, menu_item in enumerate(self.menu_layout):
+            # Keeping pycharm types happy
+            row_index: int
+            menu_item: tuple[str, list[Video_Data]]
+
             if not menu_item[0].strip():
                 if (
                     popups.PopYesNo(
@@ -665,9 +693,12 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        menu_title_grid: qtg.Grid = event.widget_get(
-            container_tag="menu_page_controls",
-            tag="menu_titles",
+        menu_title_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="menu_page_controls",
+                tag="menu_titles",
+            ),
         )
 
         if not menu_title_grid.checkitems_get:
@@ -737,15 +768,18 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             int: Returns 1 if ok , -1 otherwise
         """
 
-        menu_title_grid: qtg.Grid = event.widget_get(
-            container_tag="menu_page_controls",
-            tag="menu_titles",
+        menu_title_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="menu_page_controls",
+                tag="menu_titles",
+            ),
         )
 
         video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
-            row_data: list[tuple[str, list[list[Video_Data]]]] | list = []
+            row_data = []
 
             for row in range(menu_title_grid.row_count):
                 grid_col_values = []
@@ -792,7 +826,8 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 row_data.append(grid_col_values)
 
             result = Set_Shelved_DVD_Layout(
-                dvd_layout_name=self.dvd_layout_name, dvd_menu_layout=row_data
+                dvd_layout_name=self.dvd_layout_name,
+                dvd_menu_layout=row_data,  # Pycharm sad but tests Ok!
             )
 
             if result:

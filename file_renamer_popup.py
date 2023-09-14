@@ -16,11 +16,11 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
-import dataclasses
-
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+import dataclasses
+from typing import cast
+
 import file_utils
 import popups
 import qtgui as qtg
@@ -88,9 +88,12 @@ class File_Renamer_Popup(qtg.PopContainer):
                     col = grid_col_value.col
                     user_data = grid_col_value.user_data
 
-                    file_grid: qtg.Grid = event.widget_get(
-                        container_tag="file_controls",
-                        tag="video_input_files",
+                    file_grid: qtg.Grid = cast(
+                        qtg.Grid,
+                        event.widget_get(
+                            container_tag="file_controls",
+                            tag="video_input_files",
+                        ),
                     )
 
                     file_grid.value_set(
@@ -111,8 +114,9 @@ class File_Renamer_Popup(qtg.PopContainer):
 
         file_handler = file_utils.File()
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="file_controls", tag="video_input_files"
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(container_tag="file_controls", tag="video_input_files"),
         )
 
         col_index = file_grid.colindex_get("new_file_name")
@@ -137,9 +141,12 @@ class File_Renamer_Popup(qtg.PopContainer):
         """
         assert isinstance(event, qtg.Action), "event must be an instance qtg.Action"
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="file_controls",
+                tag="video_input_files",
+            ),
         )
 
         col_index: int = file_grid.colindex_get("new_file_name")
@@ -167,8 +174,9 @@ class File_Renamer_Popup(qtg.PopContainer):
 
         file_handler = file_utils.File()
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="file_controls", tag="video_input_files"
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(container_tag="file_controls", tag="video_input_files"),
         )
 
         col_index: int = file_grid.colindex_get("new_file_name")
@@ -250,9 +258,12 @@ class File_Renamer_Popup(qtg.PopContainer):
 
         file_handler = file_utils.File()
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="file_controls",
+                tag="video_input_files",
+            ),
         )
 
         col_index = file_grid.colindex_get("new_file_name")

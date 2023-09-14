@@ -21,6 +21,7 @@
 # fmt: off
 import datetime
 import shelve
+from typing import cast
 
 import platformdirs
 
@@ -141,13 +142,16 @@ class Video_File_Grid(DVD_Archiver_Base):
         if not dvd_folder:
             return None
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls", tag="video_input_files"
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls", tag="video_input_files"
+            ),
         )
 
         row_unique_id = int(
             event.container_tag.split("|")[0]
-        )  # Grid button container tag has the row_id embedded as the 1st element and delimtered by |
+        )  # Grid button container tag has the row_id embedded as the 1st element and delimitered by |
         row = file_grid.row_from_item_id(row_unique_id)
 
         user_data: Video_Data = file_grid.userdata_get(
@@ -169,6 +173,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
     def check_file(self, file_grid: qtg.Grid, vd_id: int, checked: bool) -> None:
         """Checks the file (identified by vd_id) in the file grid.
+
         Args:
             file_grid (qtg.Grid): An instance of the `Grid` class.
             vd_id (int): The Video_Data ID of the source file that is to be checked.
@@ -329,9 +334,12 @@ class Video_File_Grid(DVD_Archiver_Base):
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "bulk_select":
-                        file_grid: qtg.Grid = event.widget_get(
-                            container_tag="video_file_controls",
-                            tag="video_input_files",
+                        file_grid: qtg.Grid = cast(
+                            qtg.Grid,
+                            event.widget_get(
+                                container_tag="video_file_controls",
+                                tag="video_input_files",
+                            ),
                         )
 
                         file_grid.checkitems_all(
@@ -390,9 +398,12 @@ class Video_File_Grid(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
         )
 
         file_handler = file_utils.File()
@@ -522,9 +533,12 @@ class Video_File_Grid(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
         )
 
         file_handler = file_utils.File()
@@ -653,9 +667,12 @@ class Video_File_Grid(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
         )
 
         if (
@@ -689,9 +706,12 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         assert isinstance(up, bool), f"{up=}. Must be bool"
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtgGrid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
         )
 
         checked_items: tuple[qtg.Grid_Item] = (
@@ -856,9 +876,12 @@ class Video_File_Grid(DVD_Archiver_Base):
         else:
             project_file_name = self._grid_db
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
         )
 
         removed_files = []
@@ -947,9 +970,12 @@ class Video_File_Grid(DVD_Archiver_Base):
                     project_file_name
                 ) as db:  # TODO should this be stored in the app db?
                     row_data = []
-                    file_grid: qtg.Grid = event.widget_get(
-                        container_tag="video_file_controls",
-                        tag="video_input_files",
+                    file_grid: qtg.Grid = cast(
+                        qtg.Grid,
+                        event.widget_get(
+                            container_tag="video_file_controls",
+                            tag="video_input_files",
+                        ),
                     )
                     for row in range(file_grid.row_count):
                         col_value = []
@@ -1048,9 +1074,12 @@ class Video_File_Grid(DVD_Archiver_Base):
             event (qtg.Action): The event triggering the grouping.
         """
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
         )
 
         checked_items = file_grid.checkitems_get
@@ -1117,9 +1146,12 @@ class Video_File_Grid(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
         )
 
         checked_items = file_grid.checkitems_get
@@ -1164,9 +1196,12 @@ class Video_File_Grid(DVD_Archiver_Base):
         ).show()
 
         if video_file_list:
-            file_grid: qtg.Grid = event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
+            file_grid: qtg.Grid = cast(
+                qtg.Grid,
+                event.widget_get(
+                    container_tag="video_file_controls",
+                    tag="video_input_files",
+                ),
             )
 
             with qtg.sys_cursor(qtg.Cursor.hourglass):
@@ -1424,9 +1459,12 @@ class Video_File_Grid(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
         )
         total_duration = 0
         self.project_video_standard = ""

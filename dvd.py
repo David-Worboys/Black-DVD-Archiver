@@ -25,7 +25,7 @@ import locale
 import math
 import subprocess
 from random import randint
-from typing import Final, Optional
+from typing import Final, Optional, cast
 
 import psutil
 import xmltodict
@@ -580,7 +580,7 @@ class DVD:
         if not self._db_settings.setting_exist("serial_number"):
             self._db_settings.setting_set("serial_number", 0)
 
-        serial_number: int = self._db_settings.setting_get("serial_number")
+        serial_number: int = cast(int, self._db_settings.setting_get("serial_number"))
         serial_number += 1
         self._db_settings.setting_set("serial_number", serial_number)
 
@@ -1152,7 +1152,7 @@ class DVD:
         buttons_per_page: int,
         buttons_across,
         button_aspect_ratio: float,
-        dvd_dims: dvdarch_utils.dvd_dims,
+        dvd_dims: dvdarch_utils.Dvd_Dims,
         border_top: int = 0,
         border_left: int = 0,
         border_bottom: int = 15,
@@ -1185,7 +1185,7 @@ class DVD:
             isinstance(button_aspect_ratio, float) and button_aspect_ratio > 0
         ), f"{button_aspect_ratio=}. Must be float > than zero"
         assert isinstance(
-            dvd_dims, dvdarch_utils.dvd_dims
+            dvd_dims, dvdarch_utils.Dvd_Dims
         ), f"{dvd_dims=}. Must be a valid dvd_dims object"
         assert (
             isinstance(border_top, int) and border_top >= 0
@@ -1337,7 +1337,7 @@ class DVD:
         buttons_per_page: int,
         buttons_across,
         button_aspect_ratio: float,
-        dvd_dims: dvdarch_utils.dvd_dims,
+        dvd_dims: dvdarch_utils.Dvd_Dims,
         border_top: int = 0,
         border_left: int = 0,
         border_bottom: int = 15,

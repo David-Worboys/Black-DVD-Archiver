@@ -545,7 +545,8 @@ def flatten(
     items = []
     for key, value in dictionary.items():
         new_key = str(parent_key) + separator + key if parent_key else key
-        if isinstance(value, MutableMapping):
+
+        if isinstance(value, dict):
             items.extend(flatten(value, new_key, separator).items())
         elif isinstance(value, list):
             for child_key, child_value in enumerate(value):
@@ -556,7 +557,7 @@ def flatten(
 
 
 def Find_All(search_string: str, pattern: str) -> Generator[int, Any, None]:
-    """Find all generator  - gets the positions of the pattern  in the search_string."""
+    """Find all generators - gets the positions of the pattern  in the search_string."""
     assert isinstance(search_string, str), f"{search_string=}. Must be str"
     assert isinstance(pattern, str), f"{pattern=}. Must be str"
 

@@ -21,6 +21,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
+from typing import cast
 
 import dvdarch_utils
 import file_utils
@@ -128,28 +129,33 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
             if not font_name:
                 font_name = self._default_font
 
-            text_color_combo: qtg.ComboBox = event.widget_get(
-                container_tag=item,
-                tag="text_color",
+            text_color_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(
+                    container_tag=item,
+                    tag="text_color",
+                ),
             )
 
-            background_color_combo: qtg.ComboBox = event.widget_get(
-                container_tag=item, tag="background_color"
+            background_color_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(container_tag=item, tag="background_color"),
             )
 
-            font_combo: qtg.ComboBox = event.widget_get(
-                container_tag=item, tag="title_font"
+            font_combo: qtg.ComboBox = cast(
+                qtg.ComboBox, event.widget_get(container_tag=item, tag="title_font")
             )
 
-            font_size: qtg.Spinbox = event.widget_get(
-                container_tag=item, tag="font_size"
+            font_size: qtg.Spinbox = cast(
+                qtg.Spinbox, event.widget_get(container_tag=item, tag="font_size")
             )
 
             if item == "button_text":
                 transparency = dvd_menu_settings.button_background_transparency
 
-                background_transparency: qtg.Spinbox = event.widget_get(
-                    container_tag=item, tag="transparency"
+                background_transparency: qtg.Spinbox = cast(
+                    qtg.Spinbox,
+                    event.widget_get(container_tag=item, tag="transparency"),
                 )
 
                 background_transparency.value_set(transparency)
@@ -176,55 +182,73 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
             if event.container_tag == "menu_text":
                 example_text = " Menu Title "
 
-                text_color_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="menu_text",
-                    tag="text_color",
+                text_color_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(
+                        container_tag="menu_text",
+                        tag="text_color",
+                    ),
                 )
 
-                background_color_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="menu_text", tag="background_color"
+                background_color_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(container_tag="menu_text", tag="background_color"),
                 )
 
-                font_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="menu_text", tag="title_font"
+                font_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(container_tag="menu_text", tag="title_font"),
                 )
 
-                font_size: qtg.Spinbox = event.widget_get(
-                    container_tag="menu_text", tag="font_size"
+                font_size: qtg.Spinbox = cast(
+                    qtg.Spinbox,
+                    event.widget_get(container_tag="menu_text", tag="font_size"),
                 )
 
-                image: qtg.Image = event.widget_get(
-                    container_tag="menu_text",
-                    tag="example",
+                image: qtg.Image = cast(
+                    qtg.Image,
+                    event.widget_get(
+                        container_tag="menu_text",
+                        tag="example",
+                    ),
                 )
 
                 transparency = 100
             else:
                 example_text = " Button Title "
 
-                text_color_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="button_text", tag="text_color"
+                text_color_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(container_tag="button_text", tag="text_color"),
                 )
 
-                background_color_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="button_text", tag="background_color"
+                background_color_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(
+                        container_tag="button_text", tag="background_color"
+                    ),
                 )
 
-                font_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="button_text", tag="title_font"
+                font_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(container_tag="button_text", tag="title_font"),
                 )
 
-                font_size: qtg.Spinbox = event.widget_get(
-                    container_tag="button_text", tag="font_size"
+                font_size: qtg.Spinbox = cast(
+                    qtg.Spinbox,
+                    event.widget_get(container_tag="button_text", tag="font_size"),
                 )
 
                 transparency: int = event.value_get(
                     container_tag="button_text", tag="transparency"
                 )
 
-                image: qtg.Image = event.widget_get(
-                    container_tag="button_text",
-                    tag="example",
+                image: qtg.Image = cast(
+                    qtg.Image,
+                    event.widget_get(
+                        container_tag="button_text",
+                        tag="example",
+                    ),
                 )
 
             char_pixel_size = qtg.g_application.char_pixel_size(
@@ -272,21 +296,25 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
         )
 
         for item in ("menu_text", "button_text"):
-            text_color_combo: qtg.ComboBox = event.widget_get(
-                container_tag=item,
-                tag="text_color",
+            text_color_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(
+                    container_tag=item,
+                    tag="text_color",
+                ),
             )
 
-            background_color_combo: qtg.ComboBox = event.widget_get(
-                container_tag=item, tag="background_color"
+            background_color_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(container_tag=item, tag="background_color"),
             )
 
-            font_combo: qtg.ComboBox = event.widget_get(
-                container_tag=item, tag="title_font"
+            font_combo: qtg.ComboBox = cast(
+                qtg.ComboBox, event.widget_get(container_tag=item, tag="title_font")
             )
 
-            font_size: qtg.Spinbox = event.widget_get(
-                container_tag=item, tag="font_size"
+            font_size: qtg.Spinbox = cast(
+                qtg.Spinbox, event.widget_get(container_tag=item, tag="font_size")
             )
 
             if item == "menu_text":
@@ -297,8 +325,9 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
                     background_color_combo.value_get().data
                 )
             else:
-                background_transparency: qtg.Spinbox = event.widget_get(
-                    container_tag=item, tag="transparency"
+                background_transparency: qtg.Spinbox = cast(
+                    qtg.Spinbox,
+                    event.widget_get(container_tag=item, tag="transparency"),
                 )
                 dvd_menu_settings.button_font = font_combo.value_get().data
                 dvd_menu_settings.button_font_color = text_color_combo.value_get().data

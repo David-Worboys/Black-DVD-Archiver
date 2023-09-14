@@ -28,7 +28,7 @@ from decimal import Decimal
 from enum import unique
 from pathlib import Path
 from sqlite3 import Connection
-from typing import Callable, overload, TextIO
+from typing import Callable, TextIO, overload
 
 import platformdirs
 

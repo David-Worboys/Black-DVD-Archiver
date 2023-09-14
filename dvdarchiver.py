@@ -19,8 +19,11 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+from typing import cast
+
 import platformdirs
 
 import file_utils
@@ -47,7 +50,7 @@ class DVD_Archiver(DVD_Archiver_Base):
 
     """
 
-    def __init__(self, program_name) -> None:
+    def __init__(self, program_name: str = "") -> None:
         """
         Sets up the instance of the class, and initializes all its attributes.
 
@@ -56,10 +59,12 @@ class DVD_Archiver(DVD_Archiver_Base):
 
 
         """
+        assert isinstance(program_name, str), f"{program_name=}. Must be str"
+
         super().__init__()
 
         self._DVD_Arch_App = qtg.QtPyApp(
-            display_name=sys_consts.PROGRAM_NAME,
+            display_name=program_name if program_name else sys_consts.PROGRAM_NAME,
             callback=self.event_handler,
             height=900,
             icon=file_utils.App_Path("gitlogo.jpg"),
@@ -279,8 +284,12 @@ class DVD_Archiver(DVD_Archiver_Base):
                         if event.widget_exist(
                             container_tag="main_controls", tag="existing_projects"
                         ):
-                            project_combo: qtg.ComboBox = event.widget_get(
-                                container_tag="main_controls", tag="existing_projects"
+                            project_combo: qtg.ComboBox = cast(
+                                qtg.ComboBox,
+                                event.widget_get(
+                                    container_tag="main_controls",
+                                    tag="existing_projects",
+                                ),
                             )
 
                             project_combo.select_text(
@@ -349,8 +358,9 @@ class DVD_Archiver(DVD_Archiver_Base):
         if event.widget_exist(
             container_tag="app_lang", tag="countries"
         ):  # Selects tha app language
-            country_combo: qtg.ComboBox = event.widget_get(
-                container_tag="app_lang", tag="countries"
+            country_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(container_tag="app_lang", tag="countries"),
             )
 
             if self._db_settings.setting_exist(setting_name="app_country"):
@@ -376,16 +386,21 @@ class DVD_Archiver(DVD_Archiver_Base):
         if event.widget_exist(
             container_tag="main_controls", tag="existing_projects"
         ):  # Buttons are buddies so must exist
-            project_combo: qtg.ComboBox = event.widget_get(
-                container_tag="main_controls", tag="existing_projects"
+            project_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(
+                    container_tag="main_controls", tag="existing_projects"
+                ),
             )
 
-            delete_button: qtg.Button = event.widget_get(
-                container_tag="main_controls", tag="delete_project"
+            delete_button: qtg.Button = cast(
+                qtg.Button,
+                event.widget_get(container_tag="main_controls", tag="delete_project"),
             )
 
-            new_button: qtg.Button = event.widget_get(
-                container_tag="main_controls", tag="new_project"
+            new_button: qtg.Button = cast(
+                qtg.Button,
+                event.widget_get(container_tag="main_controls", tag="new_project"),
             )
 
             delete_button.enable_set(enable)
@@ -394,18 +409,24 @@ class DVD_Archiver(DVD_Archiver_Base):
             project_combo.enable_set(enable)
 
         if event.widget_exist(container_tag="main_controls", tag="existing_layouts"):
-            dvd_layout_combo: qtg.ComboBox = event.widget_get(
-                container_tag="main_controls", tag="existing_layouts"
+            dvd_layout_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(container_tag="main_controls", tag="existing_layouts"),
             )
-            delete_button: qtg.Button = event.widget_get(
-                container_tag="main_controls", tag="delete_dvd_layout"
+            delete_button: qtg.Button = cast(
+                qtg.Button,
+                event.widget_get(
+                    container_tag="main_controls", tag="delete_dvd_layout"
+                ),
             )
 
-            new_button: qtg.Button = event.widget_get(
-                container_tag="main_controls", tag="new_dvd_layout"
+            new_button: qtg.Button = cast(
+                qtg.Button,
+                event.widget_get(container_tag="main_controls", tag="new_dvd_layout"),
             )
-            make_button: qtg.Button = event.widget_get(
-                container_tag="main_controls", tag="make_dvd"
+            make_button: qtg.Button = cast(
+                qtg.Button,
+                event.widget_get(container_tag="main_controls", tag="make_dvd"),
             )
 
             make_button.enable_set(enable)
@@ -437,13 +458,19 @@ class DVD_Archiver(DVD_Archiver_Base):
             ) and event.widget_exist(
                 container_tag="main_controls", tag="existing_layouts"
             ):
-                project_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="main_controls",
-                    tag="existing_projects",
+                project_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(
+                        container_tag="main_controls",
+                        tag="existing_projects",
+                    ),
                 )
-                layout_combo: qtg.ComboBox = event.widget_get(
-                    container_tag="main_controls",
-                    tag="existing_layouts",
+                layout_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(
+                        container_tag="main_controls",
+                        tag="existing_layouts",
+                    ),
                 )
 
                 layout_combo.clear()
@@ -512,8 +539,9 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         file_handler = file_utils.File()
 
-        dvd_layout_combo: qtg.ComboBox = event.widget_get(
-            container_tag="main_controls", tag="existing_layouts"
+        dvd_layout_combo: qtg.ComboBox = cast(
+            qtg.ComboBox,
+            event.widget_get(container_tag="main_controls", tag="existing_layouts"),
         )
 
         layout_data = dvd_layout_combo.value_get()
@@ -624,8 +652,9 @@ class DVD_Archiver(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event} is not an instance of qtg.Action"
 
-        dvd_layout_combo: qtg.ComboBox = event.widget_get(
-            container_tag="main_controls", tag="existing_layouts"
+        dvd_layout_combo: qtg.ComboBox = cast(
+            qtg.ComboBox,
+            event.widget_get(container_tag="main_controls", tag="existing_layouts"),
         )
 
         dvd_layout_name = f"{Text_To_File_Name(self._file_control.project_name)}.{Text_To_File_Name(dvd_layout_combo.value_get().display)}"
@@ -646,9 +675,12 @@ class DVD_Archiver(DVD_Archiver_Base):
             ).show()
             return None
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
         )
 
         checked_items: tuple[qtg.Grid_Item] = file_grid.checkitems_get
@@ -771,13 +803,17 @@ class DVD_Archiver(DVD_Archiver_Base):
         """
         assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
         )
 
-        dvd_layout_combo: qtg.ComboBox = event.widget_get(
-            container_tag="main_controls", tag="existing_layouts"
+        dvd_layout_combo: qtg.ComboBox = cast(
+            qtg.ComboBox,
+            event.widget_get(container_tag="main_controls", tag="existing_layouts"),
         )
 
         layout_name = popups.PopTextGet(
@@ -824,8 +860,11 @@ class DVD_Archiver(DVD_Archiver_Base):
         ).show()
 
         if project_name.strip():
-            project_combo: qtg.ComboBox = event.widget_get(
-                container_tag="main_controls", tag="existing_projects"
+            project_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(
+                    container_tag="main_controls", tag="existing_projects"
+                ),
             )
 
             if project_combo.select_text(project_name, partial_match=False) >= 0:
@@ -842,9 +881,13 @@ class DVD_Archiver(DVD_Archiver_Base):
                         user_data=None,
                     )
                 )
-                file_grid: qtg.Grid = event.widget_get(
-                    container_tag="video_file_controls", tag="video_input_files"
+                file_grid: qtg.Grid = cast(
+                    qtg.Grid,
+                    event.widget_get(
+                        container_tag="video_file_controls", tag="video_input_files"
+                    ),
                 )
+
                 file_grid.clear()
 
                 Set_Shelved_DVD_Layout(
@@ -862,8 +905,9 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         file_handler = file_utils.File()
 
-        project_combo: qtg.ComboBox = event.widget_get(
-            container_tag="main_controls", tag="existing_projects"
+        project_combo: qtg.ComboBox = cast(
+            qtg.ComboBox,
+            event.widget_get(container_tag="main_controls", tag="existing_projects"),
         )
 
         _, dvd_layouts = Get_Project_Layout_Names(self._file_control.project_name)
@@ -1339,4 +1383,4 @@ class DVD_Archiver(DVD_Archiver_Base):
 
 
 if __name__ == "__main__":
-    DVD_Archiver(sys_consts.PROGRAM_NAME).run()
+    DVD_Archiver().run()

@@ -21,7 +21,7 @@
 # fmt: off
 import dataclasses
 from time import sleep
-from typing import Callable
+from typing import Callable, cast
 
 import psutil
 import PySide6.QtGui as qtG
@@ -747,7 +747,8 @@ class Video_Editor(DVD_Archiver_Base):
             Transforms a list of cut in points to cut out points.
 
             Args:
-                edit_list (list[Tuple[int, int, str]]): A list of tuples representing the cut in. cut out points and clip name of a video.
+                edit_list (list[Tuple[int, int, str]]): A list of tuples representing the cut in & cut out points and
+                    clip name of a video.
                 frame_count (int): The total number of frames in the video.
 
             Returns:
@@ -1312,11 +1313,13 @@ class Video_Editor(DVD_Archiver_Base):
         assert isinstance(
             event, qtg.Action
         ), f"{event=}. Must be of type qtg.Action but got {type(event)} instead"
-        select_start: qtg.Button = event.widget_get(
-            container_tag="video_buttons", tag="selection_start"
+        select_start: qtg.Button = cast(
+            qtg.Button,
+            event.widget_get(container_tag="video_buttons", tag="selection_start"),
         )
-        select_end: qtg.Button = event.widget_get(
-            container_tag="video_buttons", tag="selection_end"
+        select_end: qtg.Button = cast(
+            qtg.Button,
+            event.widget_get(container_tag="video_buttons", tag="selection_end"),
         )
 
         if init:  # Initial button state
@@ -1519,7 +1522,7 @@ class Video_Editor(DVD_Archiver_Base):
             Args:
 
             Returns:
-                qtg.VBoxContainer : A vboxcontainer housing the video cutter
+                qtg.VBoxContainer: A vboxcontainer housing the video cutter
 
             """
             step_unit_list = [
