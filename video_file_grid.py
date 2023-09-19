@@ -390,6 +390,13 @@ class Video_File_Grid(DVD_Archiver_Base):
     def project_changed(
         self, event: qtg.Action, project_name: str, save_existing: bool
     ):
+        """Handles the change of a project
+
+        Args:
+            event (qtg.Action): The triggering event
+            project_name (str): The name of the project
+            save_existing (bool): If True saves the existing project, else does not
+        """
         assert (
             isinstance(project_name, str) and project_name.strip() != ""
         ), f"{project_name=}. Must be non-empty str"
@@ -707,7 +714,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         assert isinstance(up, bool), f"{up=}. Must be bool"
 
         file_grid: qtg.Grid = cast(
-            qtgGrid,
+            qtg.Grid,
             event.widget_get(
                 container_tag="video_file_controls",
                 tag="video_input_files",
@@ -858,7 +865,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         """Loads the grid from the database
 
         Args:
-            event (qtg.Action) : Calling event
+            event (qtg.Action): Calling event
         """
         assert isinstance(
             event, qtg.Action
@@ -1258,6 +1265,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         Args:
             selected_files (list[Video_Data]): list of video file data
+
         Returns:
             str: A string containing information about any rejected files.
         """
@@ -1281,7 +1289,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 if grid_video_data.video_path == file_video_data.video_path:
                     break
-            else:  # File not in grid already
+            else:  # File not in the grid
                 if file_video_data.encoding_info.video_tracks <= 0:
                     file_video_data.encoding_info = (
                         dvdarch_utils.Get_File_Encoding_Info(file_video_data.video_path)
