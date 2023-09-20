@@ -35,6 +35,7 @@ import sys_consts
 import utils
 from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
+from dvdarch_utils import Execute_Check_Output
 from file_renamer_popup import File_Renamer_Popup
 from sys_config import DVD_Archiver_Base, Video_Data, Video_File_Settings
 
@@ -240,6 +241,16 @@ class Video_Editor(DVD_Archiver_Base):
                     case "video_slider":
                         pass
                         # self._seek(event.value)
+
+    @property
+    def get_task_manager(self) -> Task_Manager:
+        """Returns the task manager instance
+
+        Returns:
+            Task_Manager : The task manager instance
+
+        """
+        return self._background_task_manager
 
     def is_available(self) -> bool:
         """Checks if the media player is supported on the platform
@@ -887,78 +898,19 @@ class Video_Editor(DVD_Archiver_Base):
                         ),
                     )
 
-            # Calculate the start and end times of the segment based on the frame numbers
-            start_time = start_frame / self._frame_rate
-            end_time = end_frame / self._frame_rate
-
-            # Calculate the nearest key frames before and after the cut
-            result, before_key_frame = dvdarch_utils.Get_Nearest_Key_Frame(
-                input_file, start_time, "prev"
+            command = dvdarch_utils.Get_File_Cut_Command(
+                input_file=input_file,
+                output_file=temp_file,
+                start_frame=start_frame,
+                end_frame=end_frame,
+                frame_rate=self._frame_rate,
             )
-
-            if result == -1:
-                return -1, "Failed To Get Before Key Frame"
-
-            result, after_key_frame = dvdarch_utils.Get_Nearest_Key_Frame(
-                input_file, end_time, "next"
-            )
-
-            if result == -1:
-                return -1, "Failed To Get After Key Frame"
-
-            # Set the start time and duration of the segment to re-encode
-            segment_start = (
-                before_key_frame if before_key_frame is not None else start_time
-            )
-
-            segment_duration = (
-                after_key_frame - segment_start
-                if after_key_frame is not None
-                else end_time - segment_start
-            )
-
-            # command = [sys_consts.FFMPG,"-v","debug", "-i", input_file] #DBG
-            command = [sys_consts.FFMPG, "-i", input_file]
-
-            # Check if re-encoding is necessary
-            command += ["-map", "0:v", "-map", "0:a"]
-
-            if before_key_frame is not None and after_key_frame is not None:
-                # Re-encode the segment
-                if not utils.Is_Complied():
-                    print(f"DBG Re-Encode Seg {before_key_frame=} {after_key_frame=}")
-
-                command += ["-force_key_frames", f"{before_key_frame}+1"]
-                command += ["-tune", "fastdecode"]
-                command += ["-ss", str(segment_start)]
-                command += ["-t", str(segment_duration)]
-                command += ["-avoid_negative_ts", "make_zero"]
-                command += ["-c:v", codec]
-                command += ["-c:a", "copy"]
-                command += [
-                    "-threads",
-                    str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
-                ]
-                command += [temp_file, "-y"]
-            else:
-                # Copy the segment
-                if not utils.Is_Complied():
-                    print("DBG Copy Seg")
-
-                command += ["-ss", str(segment_start)]
-                command += ["-t", str(segment_duration)]
-                command += ["-avoid_negative_ts", "make_zero"]
-                command += ["-c", "copy"]
-                command += [
-                    "-threads",
-                    str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
-                ]
-                command += [temp_file, "-y"]
 
             self._tasks_submitted += 1
             self._background_task_manager.add_task(
                 name=f"cut_video_{cut_index}",
-                command=command,
+                method=Execute_Check_Output,
+                arguments=command,
                 callback=notification_call_back,
             )
 

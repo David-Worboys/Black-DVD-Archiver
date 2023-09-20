@@ -21,11 +21,14 @@
 # fmt: off
 import dataclasses
 import glob
+import hashlib
+import math
 import os
 import os.path
 import platform
 import pprint
 import shlex
+import shutil
 import subprocess
 from typing import Generator, Optional
 
@@ -999,6 +1002,223 @@ def Get_Codec(input_file: str) -> tuple[int, str]:
     return 1, output.strip()
 
 
+def Get_File_Cut_Command(
+    input_file: str, output_file, start_frame: int, end_frame: int, frame_rate: float
+) -> tuple[list, str]:
+    """
+    Generates an FFmpeg command to cut a segment from the input video file based on frame numbers. The start and end
+    frames are specified, along with the frame rate of the video. The resulting FFmpeg command can be used to
+    extract the desired segment of the video file and save it to the specified output file.
+
+    Args:
+        input_file (str): The path to the input video file.
+        output_file (str): The path to the output video file.
+        start_frame (int): The frame number to start the segment from.
+        end_frame (int): The frame number to end the segment at.
+        frame_rate (float): The frame rate of the video.
+
+    Returns:
+        tuple[list, str]:
+            - A list containing the FFmpeg command arguments or an empty list if an error occurs.
+            - An error message as a string, or an empty string if no error occurred.
+    """
+    assert (
+        isinstance(input_file, str) and input_file.strip() != ""
+    ), f"{input_file=}. Must be a non-empty str"
+    assert (
+        isinstance(output_file, str) and output_file.strip()
+    ), f"{output_file=}. Must be a non-empty str"
+    assert (
+        isinstance(start_frame, int) and start_frame >= 0
+    ), f"{start_frame=}. Must be an int >= 0"
+    assert (
+        isinstance(end_frame, int) and end_frame >= 0 and end_frame > start_frame
+    ), f"{end_frame=}. Must be an int >= 0 and > start"
+    assert (
+        isinstance(frame_rate, float) and frame_rate > 0
+    ), f"{frame_rate=}. Must be a float >= 0"
+
+    # Calculate the start and end times of the segment based on the frame numbers
+    start_time = start_frame / frame_rate
+    end_time = end_frame / frame_rate
+
+    # Calculate the nearest key frames before and after the cut
+    result, before_key_frame = Get_Nearest_Key_Frame(input_file, start_time, "prev")
+
+    if result == -1:
+        return [], "Failed To Get Before Key Frame"
+
+    result, after_key_frame = Get_Nearest_Key_Frame(input_file, end_time, "next")
+
+    if result == -1:
+        return [], "Failed To Get After Key Frame"
+
+    # Set the start time and duration of the segment to re-encode
+    segment_start = before_key_frame if before_key_frame is not None else start_time
+
+    segment_duration = (
+        after_key_frame - segment_start
+        if after_key_frame is not None
+        else end_time - segment_start
+    )
+
+    # command = [sys_consts.FFMPG,"-v","debug", "-i", input_file] #DBG
+    command = [sys_consts.FFMPG, "-i", input_file]
+
+    # Check if re-encoding is necessary
+    command += ["-map", "0:v", "-map", "0:a"]
+
+    if before_key_frame is not None and after_key_frame is not None:
+        # Re-encode the segment
+        if not utils.Is_Complied():
+            print(
+                "DBG Re-Encode Seg"
+                f" {start_frame=} {end_frame=} {segment_duration=} {before_key_frame=} {after_key_frame=}"
+            )
+
+        command += ["-force_key_frames", f"{before_key_frame}+1"]
+        command += ["-tune", "fastdecode"]
+        command += ["-ss", str(segment_start)]
+        command += ["-t", str(segment_duration)]
+        command += ["-avoid_negative_ts", "make_zero"]
+        command += ["-c:v", codec]
+        command += ["-c:a", "copy"]
+        command += [
+            "-threads",
+            str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        ]
+        command += [temp_file, "-y"]
+    else:
+        # Copy the segment
+        if not utils.Is_Complied():
+            print(
+                "DBG Copy Segment"
+                f" {start_frame=} {end_frame=} {segment_duration=} {before_key_frame=} {after_key_frame=}"
+            )
+
+        command += ["-ss", str(segment_start)]
+        command += ["-t", str(segment_duration)]
+        command += ["-avoid_negative_ts", "make_zero"]
+        command += ["-c", "copy"]
+        command += [
+            "-threads",
+            str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        ]
+        command += [output_file, "-y"]
+
+    return command, ""
+
+
+def Split_Large_Video(
+    source: str, output_folder: str, desired_chunk_size_gb: int
+) -> tuple[int, str]:
+    """
+    Splits a large video file into smaller chunks using FFmpeg (stream copy).
+
+    Args:
+        source (str): The source path of the video file to split.
+        output_folder (str): The folder where the split video files will be saved.
+        desired_chunk_size_gb (int): The maximum size (in GB) for each split video chunk.
+
+    Returns:
+        tuple[int, str]:
+            - arg1: 1 for success, -1 for failure.
+            - arg2: An error message, or a list of chunk files delimitered by | if arg 1 is 1.
+    """
+    assert (
+        isinstance(source, str) and source.strip()
+    ), f"Invalid source video path: {source}"
+    assert (
+        isinstance(output_folder, str) and output_folder.strip()
+    ), f"Invalid output folder: {output_folder}"
+    assert (
+        isinstance(desired_chunk_size_gb, int) and desired_chunk_size_gb > 0
+    ), "Invalid max_size_gb"
+
+    if not os.path.exists(source):
+        return -1, f"Video file not found: {source}"
+
+    if os.path.isdir(source):
+        print(f"Source path is a directory: {source}")
+        return -1, "Source path is a directory: {source}"
+
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    chunk_file_list = []
+
+    min_chunk_duration_s = 180  # Minimum chunk duration is 3 minutes
+
+    file_handler = file_utils.File()
+
+    source_dir, source_name, source_extn = file_handler.split_file_path(source)
+
+    encoding_info = Get_File_Encoding_Info(source)
+
+    if encoding_info.error:
+        return -1, encoding_info.error
+
+    file_size = os.path.getsize(source)
+
+    num_chunks = math.ceil(
+        file_size / (desired_chunk_size_gb * (1024**3))
+    )  # Convert GB to bytes
+
+    chunk_duration = encoding_info.video_duration / num_chunks
+    chunk_frames = chunk_duration * encoding_info.video_frame_rate // 1
+
+    chunk_adjust = True
+
+    while chunk_adjust:  # Need to make sure our last chunk is a good size
+        for i in range(num_chunks):
+            if i == num_chunks - 1:  # Last chunk
+                start_frame = int(i * chunk_frames)
+                end_frame = int(
+                    (i + 1) * chunk_frames
+                    if i < num_chunks - 1
+                    else encoding_info.video_frame_count
+                )
+
+                num_frames = end_frame - start_frame
+                duration = num_frames * encoding_info.video_frame_rate
+
+                if duration < min_chunk_duration_s:
+                    num_chunks += 1
+                    break
+        else:
+            chunk_adjust = False
+
+    for i in range(num_chunks):
+        start_frame = int(i * chunk_frames)
+        end_frame = int(
+            (i + 1) * chunk_frames
+            if i < num_chunks - 1
+            else encoding_info.video_frame_count
+        )
+
+        chunk_file = file_handler.file_join(
+            output_folder, f"{source_name}_{i + 1}", source_extn
+        )
+        chunk_file_list.append(chunk_file)
+
+        command, error_message = Get_File_Cut_Command(
+            input_file=source,
+            output_file=chunk_file,
+            start_frame=start_frame,
+            end_frame=end_frame,
+            frame_rate=encoding_info.video_frame_rate,
+        )
+
+        if error_message:
+            return -1, message
+
+        result, output = Execute_Check_Output(commands=command)
+
+        if result == -1:
+            return -1, output  # Output contains error message now
+    return 1, "|".join(chunk_file_list)
+
+
 def Stream_Optimise(output_file: str) -> tuple[int, str]:
     """Optimizes a video file for streaming.
 
@@ -1590,3 +1810,248 @@ def Resize_Image(
         return -1, "Could Not Resize Image"
 
     return 1, ""
+
+
+class Video_File_Copier:
+    """Copies video file folders to an archive location. Files are checksumed to ensure copy is correct"""
+
+    def __init__(self):
+        pass
+
+    def verify_files_integrity(self, folder_path: str, hash_algorithm="sha256") -> bool:
+        """
+        Verify the integrity of files in a folder by comparing their checksums with stored checksum files.
+
+        Args:
+            folder_path (str): The path of the folder containing files and checksum files.
+            hash_algorithm (str): The hash algorithm to use (e.g., "md5", "sha256").
+        Returns:
+            bool: True if all files' checksums match the stored checksums, False otherwise.
+        """
+        if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
+            return False
+
+        for root, _, files in os.walk(folder_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+
+                # Check if the file has a corresponding checksum file
+                checksum_file_path = f"{file_path}.{hash_algorithm}"
+                if not os.path.exists(checksum_file_path):
+                    return False
+
+                # Read the stored checksum from the checksum file
+                with open(checksum_file_path, "r") as checksum_file:
+                    expected_checksum = checksum_file.read()
+
+                # Calculate the checksum of the file
+                actual_checksum = self.calculate_checksum(file_path, hash_algorithm)
+
+                # Compare the expected and actual checksums
+                if actual_checksum != expected_checksum:
+                    return False
+
+        # All files have matching checksums
+        return True
+
+    def calculate_checksum(self, file_path: str, hash_algorithm="sha256") -> str:
+        """
+        Calculate the checksum of a file.
+
+        Args:
+            file_path (str): The path of the file to calculate the checksum for.
+            hash_algorithm (str): The hash algorithm to use (e.g., "md5", "sha256").
+
+        Returns:
+            str: The checksum value.
+        """
+        if not os.path.exists(file_path):
+            return ""
+
+        hasher = hashlib.new(hash_algorithm)
+
+        with open(file_path, "rb") as f:
+            while True:
+                data = f.read(65536)  # Read in 64K chunks
+                if not data:
+                    break
+                hasher.update(data)
+
+        return hasher.hexdigest()
+
+    def write_checksum_file(self, file_path: str, checksum: str) -> tuple[int, str]:
+        """
+        Write the checksum value to a checksum file.
+
+        Args:
+            file_path (str): The path of the checksum file.
+            checksum (str): The checksum value.
+
+        Returns:
+            tuple[int, str]:
+                - arg1: 1 for success, -1 for failure.
+                - arg2: An error message, or an empty string if successful.
+        """
+        try:
+            with open(file_path, "w") as f:
+                f.write(checksum)
+            return 1, ""
+        except Exception as e:
+            return -1, f"Error writing checksum file: {e}"
+
+    def copy_folder_into_folders(
+        self,
+        source_folder: str,
+        destination_root_folder: str,
+        menu_title: str,
+        folder_size_gb: int,
+        hash_algorithm="sha256",
+    ) -> tuple[int, str]:
+        """
+        Copy the contents of a source folder into subfolders of a specified size (in GB), verify checksum, and check disk space.
+
+        Args:
+            source_folder (str): The source folder whose contents will be copied.
+            destination_root_folder (str): The root folder where subfolders will be created to store the copied contents.
+            menu_title (str): The menu title is used in archive folder naming
+            folder_size_gb (int): The maximum size (in GB) of each subfolder.
+            hash_algorithm (str): The hash algorithm to use for checksum calculation (e.g., "md5", "sha256").
+
+        Returns:
+            tuple[int, str]:
+                - arg1: 1 for success, -1 for failure.
+                - arg2: An error message, or an empty string if successful.
+        """
+        assert (
+            isinstance(source_folder, str) and source_folder.strip()
+        ), f"Invalid source folder path: {source_folder}"
+        assert (
+            isinstance(destination_root_folder, str) and destination_root_folder.strip()
+        ), f"Invalid destination root folder: {destination_root_folder}"
+        assert (
+            isinstance(menu_title, str) and menu_title.strip() != ""
+        ), f"{menu_title=}. Must be non-empty str"
+        assert (
+            isinstance(folder_size_gb, int) and folder_size_gb > 0.5
+        ), f"{folder_size_gb=}. Must be > 0.5"
+
+        file_handler = file_utils.File()
+
+        if not os.path.exists(source_folder):
+            return -1, f"Source folder not found: {source_folder}"
+        if not os.path.isdir(source_folder):
+            return -1, f"Source path is not a directory: {source_folder}"
+
+        if not os.path.exists(destination_root_folder):
+            os.makedirs(destination_root_folder)
+
+        if os.path.abspath(source_folder) == os.path.abspath(destination_root_folder):
+            return -1, "Source and destination paths cannot be the same."
+
+        try:
+            # Calculate disk space required for copy
+            folder_size_bytes = folder_size_gb * 1024**3  # Convert GB to bytes
+
+            # Check if there's enough free space on the destination disk
+            destination_disk_path = os.path.abspath(destination_root_folder)
+            free_space, message = Get_Space_Available(destination_disk_path)
+
+            if free_space == -1:
+                return -1, message
+
+            if free_space < folder_size_bytes:
+                return -1, "Not enough free space on the destination disk."
+
+            subfolder_index = 0
+            current_subfolder_size_bytes = 0
+
+            all_files = []
+            for root, _, files in os.walk(source_folder):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    file_creation_time = os.path.getctime(
+                        file_path
+                    )  # Get creation time
+                    all_files.append((file_path, file_creation_time))
+
+            all_files.sort(key=lambda x: x[1])  # Sort by creation time (second element)
+
+            for file_path, _ in all_files:
+                chunked_files = []
+                delete_chunked = False
+
+                # Check if the file is larger than max_chunk_size_gb and split it if needed
+                if os.path.getsize(file_path) > folder_size_gb * 1024**3:
+                    result, result = Split_Large_Video(
+                        file_path, destination_root_folder, folder_size_gb
+                    )
+
+                    if result == -1:
+                        return -1, result
+
+                    chunked_files = result.split("|")
+                    delete_chunked = True
+                else:
+                    chunked_files.append(file_path)
+
+                for chunked_file in chunked_files:
+                    source_checksum_before = self.calculate_checksum(
+                        chunked_file, hash_algorithm
+                    )
+
+                    # Create disk_folder, if adding the file to the current subfolder would exceed the size limit
+                    if (
+                        subfolder_index == 0  # Always want disk 1 folder
+                        or current_subfolder_size_bytes + os.path.getsize(chunked_file)
+                        > folder_size_bytes
+                    ):
+                        subfolder_index += 1
+                        current_subfolder_size_bytes = 0
+                        destination_folder = os.path.join(
+                            destination_root_folder,
+                            f"Disk_{subfolder_index:02} - {menu_title}",
+                        )
+
+                        if file_handler.make_dir(destination_folder) == -1:
+                            return (
+                                -1,
+                                "Failed to create directory: {destination_folder}",
+                            )
+
+                    # Copy the file to the current subfolder
+                    destination_file_path = file_handler.file_join(
+                        destination_folder, os.path.basename(chunked_file)
+                    )
+                    shutil.copy2(chunked_file, destination_file_path)
+
+                    destination_checksum_after = self.calculate_checksum(
+                        destination_file_path, hash_algorithm
+                    )
+
+                    if source_checksum_before != destination_checksum_after:
+                        return -1, "File copy resulted in corruption."
+
+                    checksum_file_path = f"{destination_file_path}.{hash_algorithm}"
+
+                    result, message = self.write_checksum_file(
+                        checksum_file_path, destination_checksum_after
+                    )
+                    if result == -1:
+                        return -1, message
+
+                    current_subfolder_size_bytes += os.path.getsize(
+                        destination_file_path
+                    )
+
+                    if (
+                        delete_chunked
+                    ):  # Only chunked files created by file splitting are deleted.
+                        result = file_handler.remove_file(chunked_file)
+
+                        if result == -1:
+                            return -1, f"Failed to delete chunked file : {chunked_file}"
+
+            return 1, ""
+
+        except Exception as e:
+            return -1, f"Error copying folder into sub-folders: {e}"

@@ -20,20 +20,20 @@
 # fmt: off
 import dataclasses
 import datetime
-import hashlib
 import locale
 import math
 import subprocess
 from random import randint
-from typing import Final, Optional, cast
+from typing import Final
 
 import psutil
 import xmltodict
 
 import dvdarch_utils
 import file_utils
-import sqldb
 import sys_consts
+import utils
+from archive_management import Archive_Manager
 from sys_config import Video_Data
 
 # fmt: on
@@ -43,6 +43,7 @@ SPUMUX_BUFFER: Final[int] = 43
 
 @dataclasses.dataclass
 class DVD_Config:
+    _archive_folder: str = ""
     _input_videos: list[Video_Data] | tuple[Video_Data] = dataclasses.field(
         default_factory=tuple
     )
@@ -59,6 +60,7 @@ class DVD_Config:
     _menu_aspect_ratio: str = sys_consts.AR43
     _menu_buttons_across: int = 2
     _menu_buttons_per_page: int = 4
+    _project_name: str = ""
     _serial_number: str = ""
     _timestamp_font: str = ""
     _timestamp_font_point_size: int = 11
@@ -83,6 +85,16 @@ class DVD_Config:
 
         # Restore the previous locale settings
         locale.setlocale(locale.LC_TIME, current_locale)
+
+    @property
+    def archive_folder(self) -> str:
+        return self._archive_folder
+
+    @archive_folder.setter
+    def archive_folder(self, value: str):
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._archive_folder = value
 
     @property
     def input_videos(self) -> list[Video_Data] | tuple[Video_Data]:
@@ -176,7 +188,7 @@ class DVD_Config:
 
             return
 
-        # At this point something is really wrong
+        # At this point, something is really wrong
         raise RuntimeError(f"{value=}. Menu Font not found")
 
     @property
@@ -294,6 +306,17 @@ class DVD_Config:
         self._menu_buttons_per_page = value
 
     @property
+    def project_name(self) -> str:
+        return self._project_name
+
+    @project_name.setter
+    def project_name(self, value: str) -> None:
+        assert (
+            isinstance(value, str) and value.strip() != ""
+        ), f"{value=}. Must be a non_empty str"
+        self._project_name = value
+
+    @property
     def serial_number(self) -> str:
         return self._serial_number
 
@@ -337,7 +360,7 @@ class DVD_Config:
 
             return
 
-        # At this point something is really wrong
+        # At this point, something is really wrong
 
         raise RuntimeError(f"{value=}. Timestamp Font not found")
 
@@ -457,10 +480,6 @@ class DVD:
 
     _BACKGROUND_CANVAS_FILE: Final[str] = "background_canvas.png"
 
-    # Database
-    _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
-    _application_db: Optional[sqldb.SQLDB] = None
-
     # Internal instance vars
     _dvd_setup: DVD_Config = dataclasses.field(default_factory=DVD_Config)
     _dvd_timestamp_x_offset: int = 10  # TODO Make user configurable
@@ -491,6 +510,10 @@ class DVD:
         self._dvd_setup = value
 
     @property
+    def dvd_working_folder(self) -> str:
+        return self._dvd_working_folder
+
+    @property
     def working_folder(self) -> str:
         return self._working_folder
 
@@ -501,18 +524,6 @@ class DVD:
         ), f"{value=}. Must be a non-empty string"
 
         self._working_folder = value
-
-    @property
-    def application_db(self) -> sqldb.SQLDB | None:
-        return self._application_db
-
-    @application_db.setter
-    def application_db(self, value: sqldb.SQLDB | None) -> None:
-        assert (
-            isinstance(value, sqldb.SQLDB)
-        ) or value is None, f"{value=}. Must be an instance of sqldb.SQLDB or None"
-
-        self._application_db = value
 
     @property
     def dvd_image_folder(self) -> str:
@@ -556,42 +567,91 @@ class DVD:
 
         return 1, ""
 
-    def generate_dvd_serial_number(
-        self, product_code: str = "HV", product_description="Home Video"
-    ) -> str:
+    def _archive_dvd_files(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
         """
-        Generates a DVD serial number with the format "DVD-AB-000001-5"
+        Archives the specified video files into a DVD image and saves the ISO image to the specified folder.
 
-        Parameters:
-            product_code (str): A string that identifies the product code, e.g. "HV" for home video.
-            product_description (str): A string that describes the product code, e.g. "Home Video" for home video.
+        Args:
+            cell_coords (list[_Cell_Coords]): The calculated grid layout
+            representing the video files to be archived.
 
         Returns:
-            str: A string containing the generated DVD serial number.
+            tuple[int, str]:
+            - arg 1:1 Ok . -1 otherwise.
+            - arg 2: "" if ok, otherwise an error message
+
         """
-        assert (
-            isinstance(product_code, str) and product_code.strip() != ""
-        ), f"{product_code=}. Must be a non-empty string"
-        assert (
-            isinstance(product_description, str) and product_description.strip() != ""
-        ), f"{product_description=}. Must be a non-empty string"
 
-        # Increment the sequential number for each DVD produced
-        if not self._db_settings.setting_exist("serial_number"):
-            self._db_settings.setting_set("serial_number", 0)
+        assert isinstance(
+            cell_coords, list
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert all(
+            isinstance(item, _Cell_Coords) for item in cell_coords
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
 
-        serial_number: int = cast(int, self._db_settings.setting_get("serial_number"))
-        serial_number += 1
-        self._db_settings.setting_set("serial_number", serial_number)
+        if (
+            self.dvd_setup.archive_folder and cell_coords
+        ):  # Only archive if an archive folder is specified.
+            archive_manager = Archive_Manager(
+                archive_folder=self.dvd_setup.archive_folder
+            )
+            menu_layout: list[tuple[str, list[Video_Data]]] = []
+            video_list: list[Video_Data] = []
 
-        # Generate the serial number string
-        serial_number_str = "{:06d}".format(serial_number)
-        serial_number_checksum = hashlib.md5(serial_number_str.encode()).hexdigest()[0]
-        serial_number_str = (
-            f"DVD-{product_code}-{serial_number_str}-{serial_number_checksum}"
-        )
+            page_index = cell_coords[0].page
 
-        return serial_number_str
+            for cell_coord in cell_coords:
+                if page_index != cell_coord.page:  # page break
+                    if video_list:
+                        menu_layout.append(
+                            (
+                                (
+                                    f"menu_{page_index}"
+                                    if self.dvd_setup.menu_title[page_index].strip()
+                                    == ""
+                                    else self.dvd_setup.menu_title[page_index]
+                                ),
+                                video_list,
+                            )
+                        )
+                    page_index = cell_coord.page
+                    video_list = []
+                video_list.append(cell_coord.video_file)
+            else:
+                if video_list:
+                    menu_layout.append(
+                        (
+                            (
+                                f"menu_{page_index}"
+                                if self.dvd_setup.menu_title[page_index].strip() == ""
+                                else self.dvd_setup.menu_title[page_index]
+                            ),
+                            video_list,
+                        )
+                    )
+
+            result, message = archive_manager.archive_dvd_build(
+                dvd_name=(
+                    f"{self.dvd_setup.serial_number} - {self._dvd_setup.project_name}"
+                ),
+                dvd_folder=self.dvd_image_folder,
+                iso_folder=self.iso_folder,
+                menu_layout=menu_layout,
+            )
+
+            if result == -1:
+                return -1, message
+            else:
+                file_handler = file_utils.File()
+
+                result, message = file_handler.remove_dir_contents(
+                    self.dvd_working_folder
+                )
+
+                if result == -1:
+                    return -1, message
+
+        return 1, ""
 
     def _build_working_folders(self) -> tuple[int, str]:
         """Builds the working file structure.
@@ -604,25 +664,26 @@ class DVD:
             - arg2: error message or "" if ok
         """
         file_handler = file_utils.File()
+        working_folder_name = utils.Get_Unique_Id()
 
         self._dvd_working_folder = file_handler.file_join(
             self.working_folder, f"{sys_consts.PROGRAM_NAME} DVD Builder"
         )
 
-        if file_handler.path_exists(
-            self._dvd_working_folder
-        ) and file_handler.path_writeable(
-            self._dvd_working_folder
-        ):  # Blow it away
-            result, message = file_handler.remove_dir_contents(self._dvd_working_folder)
+        if not file_handler.path_exists(self.working_folder):
+            if file_handler.path_writeable(self.working_folder):
+                result = file_handler.make_dir(self._dvd_working_folder)
 
-            if result == -1:
-                return -1, message
+                if result == -1:
+                    return -1, f"{self._dvd_working_folder=}. Could Not Be Created"
+            else:
+                return -1, f"{self._dvd_working_folder=}. Is Not Writeable"
 
-        if file_handler.path_exists(
-            self.working_folder
-        ) and file_handler.path_writeable(self.working_folder):
-            file_handler.make_dir(self._dvd_working_folder)
+        self._dvd_working_folder = file_handler.file_join(
+            self._dvd_working_folder, working_folder_name
+        )
+
+        file_handler.make_dir(self._dvd_working_folder)
 
         if file_handler.path_exists(
             self._dvd_working_folder
@@ -1011,11 +1072,17 @@ class DVD:
         if result == -1:
             return -1, message
 
+        result, message = self._archive_dvd_files(cell_coords=cell_coords)
+
+        if result == -1:
+            return -1, message
+
         return 1, ""
 
     def _create_labels(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
         """
         Create images for each label to be placed on the button images.
+
         Args:
             cell_coords (list[_Cell_Coords]): The list of cell coordinates.
 
@@ -1172,6 +1239,7 @@ class DVD:
             border_left (int): The width of the border at the left edge of the canvas.
             border_bottom (int): The width of the border at the bottom edge of the canvas.
             border_right (int): The width of the border at the right edge of the canvas.
+
         Returns:
             tuple[list[_Cell_Coords], str]:
             - arg 1: A list of _Cell_Coords objects representing the layout of the rectangles within the canvas.
@@ -1935,9 +2003,12 @@ class DVD:
             return 1, ""
 
         # ===== Main
-        assert (
-            isinstance(cell_coords, list) and len(cell_coords) > 0
-        ), f"{cell_coords=}. Must be a non-empty list"
+        assert isinstance(
+            cell_coords, list
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert all(
+            isinstance(item, _Cell_Coords) for item in cell_coords
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
 
         file_handler = file_utils.File()
 
@@ -2259,6 +2330,13 @@ class DVD:
             - arg2: error message or "" if ok
 
         """
+        assert isinstance(
+            cell_coords, list
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert all(
+            isinstance(item, _Cell_Coords) for item in cell_coords
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+
         for cell_coord in cell_coords:
             if cell_coord.video_file.menu_image_file_path == "":
                 continue
@@ -2336,6 +2414,13 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
+        assert isinstance(
+            cell_coords, list
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert all(
+            isinstance(item, _Cell_Coords) for item in cell_coords
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+
         file_handler = file_utils.File()
 
         path_name, file_name, file_extn = file_handler.split_file_path(
@@ -2443,6 +2528,12 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
+        assert isinstance(
+            cell_coords, list
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert all(
+            isinstance(item, _Cell_Coords) for item in cell_coords
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
 
         file_handler = file_utils.File()
 
@@ -2515,6 +2606,13 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
+        assert isinstance(
+            cell_coords, list
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert all(
+            isinstance(item, _Cell_Coords) for item in cell_coords
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+
         file_handler = file_utils.File()
 
         path_name, file_name, _ = file_handler.split_file_path(
@@ -2564,6 +2662,13 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
+        assert isinstance(
+            cell_coords, list
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert all(
+            isinstance(item, _Cell_Coords) for item in cell_coords
+        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+
         file_handler = file_utils.File()
 
         path_name, file_name, _ = file_handler.split_file_path(

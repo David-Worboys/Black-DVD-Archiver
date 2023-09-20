@@ -23,6 +23,7 @@ import dataclasses
 import json
 from datetime import datetime
 
+import dvdarch_utils
 import file_utils
 import sys_consts
 from sys_config import Video_Data
@@ -146,10 +147,12 @@ class Archive_Manager:
         self._error_code = 1
 
         file_handler = file_utils.File()
+        video_file_copier = dvdarch_utils.Video_File_Copier()
 
         dvd_name = Text_To_File_Name(dvd_name)
 
         backup_path = file_handler.file_join(self.archive_folder, dvd_name)
+        video_folders = []
 
         if not file_handler.path_exists(dvd_folder):
             self._error_message = (
@@ -239,26 +242,44 @@ class Archive_Manager:
                             f" {sys_consts.SDELIM}{backup_item_folder}{sys_consts.SDELIM}"
                         ),
                     )
+                for menu_index, menu in enumerate(menu_layout):
+                    menu_index: int
+                    menu: tuple[str, list[Video_Data]]
 
-                for menu in menu_layout:
                     menu_title = menu[0]
 
                     if menu_title.strip():
+                        menu_title = Text_To_File_Name(menu_title)
+
                         menu_dir = file_handler.file_join(
                             dir_path=backup_item_folder,
                             file_name=Text_To_File_Name(menu_title),
                         )
+                        menu_dir_temp = file_handler.file_join(
+                            dir_path=backup_item_folder,
+                            file_name=f"{Text_To_File_Name(menu_title)}_temp",
+                        )
                     else:
-                        menu_dir = backup_item_folder
+                        menu_title = f"menu_{menu_index + 1}"
+                        menu_dir = file_handler.file_join(
+                            dir_path=backup_item_folder,
+                            file_name=menu_title,
+                        )
+                        menu_dir_temp = file_handler.file_join(
+                            dir_path=backup_item_folder,
+                            file_name=menu_title,
+                        )
 
-                    if not file_handler.path_exists(menu_dir):
-                        if file_handler.make_dir(menu_dir) == -1:
+                    video_folders.append((menu_dir_temp, menu_dir, menu_title))
+
+                    if not file_handler.path_exists(menu_dir_temp):
+                        if file_handler.make_dir(menu_dir_temp) == -1:
                             self._error_code = -1
                             return (
                                 -1,
                                 (
                                     "Failed To Create Backup Folder"
-                                    f" :{sys_consts.SDELIM}{menu_dir}{sys_consts.SDELIM}"
+                                    f" :{sys_consts.SDELIM}{menu_dir_temp}{sys_consts.SDELIM}"
                                 ),
                             )
 
@@ -272,7 +293,7 @@ class Archive_Manager:
                         )
 
                         backup_path = file_handler.file_join(
-                            dir_path=menu_dir,
+                            dir_path=menu_dir_temp,
                             file_name=backup_file_name,
                             ext=menu_video_data.video_extension,
                         )
@@ -283,6 +304,25 @@ class Archive_Manager:
 
                         if self._error_code == -1:
                             return -1, self._error_message
+
+        if video_folders:
+            for video_folder_tuple in video_folders:
+                result, message = video_file_copier.copy_folder_into_folders(
+                    video_folder_tuple[0],
+                    video_folder_tuple[1],
+                    video_folder_tuple[2],
+                    4,
+                )
+
+                if result == -1:
+                    return -1, message
+
+            for video_folders in video_folders:  # Remove temp folders
+                result, message = file_handler.remove_dir_contents(video_folders[0])
+
+                if result == -1:
+                    return -1, message
+
         return 1, ""
 
     def delete_edit_cuts(self, file_path: str) -> tuple[int, str]:
