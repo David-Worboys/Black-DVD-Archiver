@@ -125,6 +125,8 @@ class Video_Editor(DVD_Archiver_Base):
         Returns:
             int: 1:Ok, -1 Shutdown terminated
         """
+        self._background_task_manager.throw_errors = False
+
         if self._background_task_manager.list_running_tasks():
             if (
                 popups.PopYesNo(
@@ -134,13 +136,14 @@ class Video_Editor(DVD_Archiver_Base):
                 == "no"
             ):
                 return -1
-        if self._video_file_input:
-            self.archive_edit_list_write()
-            self._get_dvd_settings()
-            self.processed_files_callback(self._video_file_input)
+        with qtg.sys_cursor(qtg.Cursor.hourglass):
+            if self._video_file_input:
+                self.archive_edit_list_write()
+                self._get_dvd_settings()
+                self.processed_files_callback(self._video_file_input)
 
-        self._background_task_manager.stop()
-        self._video_handler.stop()
+            self._background_task_manager.stop()
+            self._video_handler.stop()
 
         return 1
 

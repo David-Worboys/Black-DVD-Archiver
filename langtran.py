@@ -198,6 +198,7 @@ class Lang_Tran(metaclass=Singleton):
                     )
             else:
                 if word_token != "":
+                    word_token = word_token.replace("'", "''")
                     trans_sql = (
                         f"{sqldb.SQL.SELECT} id, word {sqldb.SQL.FROM} lang_tran"
                         f" {sqldb.SQL.WHERE} word = '{word_token}'"

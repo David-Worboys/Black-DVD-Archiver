@@ -20,6 +20,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import hashlib
+
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 from typing import cast
@@ -31,7 +33,9 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
+import utils
 from archive_management import Archive_Manager
+from background_task_manager import Task_Manager_Popup
 from dvd import DVD, DVD_Config
 from menu_page_title_popup import Menu_Page_Title_Popup
 from sys_config import (DVD_Archiver_Base, DVD_Menu_Settings,
@@ -98,9 +102,9 @@ class DVD_Archiver(DVD_Archiver_Base):
         self._timestamp_font_point_size = 9
         self._default_font = sys_consts.DEFAULT_FONT
 
-        self._dvd = DVD()  # Needs DB config to be completed before calling this
         self._video_editor: Video_Editor | None = None
         self._save_existing_project = True
+        self._task_stack = {}  # Used to keep track of running tasks
 
     def db_init(self) -> sqldb.SQLDB:
         """
@@ -140,7 +144,7 @@ class DVD_Archiver(DVD_Archiver_Base):
     def _db_tables_create(self) -> None:
         """Create a database tables used by the DVD Archiver in the SQL database using sqldb.
 
-        If the tables already exists, this method does nothing.  If an error occurs during table creation
+        If the tables already exist, this method does nothing.  If an error occurs during table creation
         or initialization, a RuntimeError is raised with an error message.
 
         Raises:
@@ -197,7 +201,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 )
 
     def event_handler(self, event: qtg.Action) -> int | None:
-        """Handles  application events
+        """Handles application events
 
         Args:
             event (Action): The triggering event
@@ -230,7 +234,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                         self._shutdown = False
                         return -1
             case qtg.Sys_Events.APPPOSTINIT:
-                pass  # Consumed in video_file_grid caught in custom/project_changed below
+                pass  # Consumed in video_file_grid caught in CUSTOM/project_changed below
             case qtg.Sys_Events.CHANGED:  # Tab changed!
                 match event.tag:
                     case "control_tab":
@@ -265,6 +269,12 @@ class DVD_Archiver(DVD_Archiver_Base):
                         self._new_dvd_layout(event)
                     case "new_project":
                         self._new_project(event)
+                    case "task_manager":
+                        task_manager = self._video_editor.get_task_manager
+                        if task_manager is not None:
+                            Task_Manager_Popup(
+                                task_manager=self._video_editor.get_task_manager
+                            ).show()
                     case "video_editor":  # Signal from file_grid
                         dvd_folder = Get_DVD_Build_Folder()
 
@@ -278,7 +288,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                                 tag="video_editor_tab", enable=True
                             )
 
-            case qtg.Sys_Events.CUSTOM:
+            case qtg.Sys_Events.CUSTOM:  # APPPOSTINIT is consumed and CUSTOM is emitted in its place
                 match event.tag:
                     case "project_changed":
                         if event.widget_exist(
@@ -308,7 +318,7 @@ class DVD_Archiver(DVD_Archiver_Base):
 
                         self._startup = False
 
-            case qtg.Sys_Events.INDEXCHANGED:
+            case qtg.Sys_Events.INDEXCHANGED:  # Combobox changes
                 match event.tag:
                     case "existing_projects":
                         self._project_combo_change(event)
@@ -631,6 +641,43 @@ class DVD_Archiver(DVD_Archiver_Base):
                 value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
             )
 
+    def _generate_dvd_serial_number(
+        self, product_code: str = "HV", product_description="Home Video"
+    ) -> str:
+        """
+        Generates a DVD serial number with the format "DVD-AB-000001-5"
+
+        Parameters:
+            product_code (str): A string that identifies the product code, e.g. "HV" for home video.
+            product_description (str): A string that describes the product code, e.g. "Home Video" for home video.
+
+        Returns:
+            str: A string containing the generated DVD serial number.
+        """
+        assert (
+            isinstance(product_code, str) and product_code.strip() != ""
+        ), f"{product_code=}. Must be a non-empty string"
+        assert (
+            isinstance(product_description, str) and product_description.strip() != ""
+        ), f"{product_description=}. Must be a non-empty string"
+
+        # Increment the sequential number for each DVD produced
+        if not self._db_settings.setting_exist("serial_number"):
+            self._db_settings.setting_set("serial_number", 0)
+
+        serial_number: int = cast(int, self._db_settings.setting_get("serial_number"))
+        serial_number += 1
+        self._db_settings.setting_set("serial_number", serial_number)
+
+        # Generate the serial number string
+        serial_number_str = "{:06d}".format(serial_number)
+        serial_number_checksum = hashlib.md5(serial_number_str.encode()).hexdigest()[0]
+        serial_number_str = (
+            f"DVD-{product_code}-{serial_number_str}-{serial_number_checksum}"
+        )
+
+        return serial_number_str
+
     def _make_dvd(self, event: qtg.Action) -> None:
         """
         Builds a DVD with the given video files and menu attributes.
@@ -648,9 +695,60 @@ class DVD_Archiver(DVD_Archiver_Base):
             - The result and error message are used to show an error dialog if the build fails.
 
         """
+
         assert isinstance(
             event, qtg.Action
         ), f"{event} is not an instance of qtg.Action"
+
+        def run_dvd_build(dvd_instance: DVD) -> tuple[int, str]:
+            """This is a wrapper function only used to run the DVD build process in multi-thread mode
+
+            Args:
+                dvd_instance (DVD): The dvd instance that creates the DVD files and folders
+
+            Returns:
+                tuple[int, str]:
+                - arg1 1: ok, -1: fail
+                - arg2: error message or "" if ok
+
+            """
+
+            error_code, error_message = dvd_instance.build()
+
+            return error_code, error_message
+
+        def notification_call_back(status: int, message: str, output: str, name):
+            """
+            The notification_call_back function is called by the task_submit function.
+
+
+            Args:
+                status: int: Determine if the task was successful or not
+                message: str: Pass a message to the user
+                output: str: Return the output of the task
+                name: Identify the task that has completed
+
+            """
+            if status == -1:
+                popups.PopError(
+                    title="Task Failed...",
+                    message=(
+                        f" Task {name=} Failed! Error : {message} Output : {output}"
+                    ),
+                ).show()
+                # self._task_status = status
+                # self._task_message = message
+                # self._task_errored = True
+            else:
+                if name in self._task_stack:
+                    del self._task_stack[name]
+
+        # self._tasks_submitted -= 1
+        def error_callback(error_message: str):
+            popups.PopError(
+                title="Task Crash...",
+                message=f" Task Manager Crash : {error_message}",
+            ).show()
 
         dvd_layout_combo: qtg.ComboBox = cast(
             qtg.ComboBox,
@@ -702,7 +800,6 @@ class DVD_Archiver(DVD_Archiver_Base):
             return None
 
         video_files: list[Video_Data] = []
-        menu_labels: list[str] = []
         menu_title: list[str] = []
         dvd_menu_settings = DVD_Menu_Settings()
 
@@ -718,81 +815,97 @@ class DVD_Archiver(DVD_Archiver_Base):
                     )
                     video_files.append(video_item)
 
-                    if video_item.video_file_settings.button_title.strip():
-                        menu_labels.append(video_item.video_file_settings.button_title)
-                    else:
-                        menu_labels.append(video_item.video_file)
+        if video_files:
+            dvd_config = DVD_Config()
 
-        result = -1
-        message = ""
+            dvd_config.project_name = self._file_control.project_name
 
-        with qtg.sys_cursor(qtg.Cursor.hourglass):
-            if video_files:
-                dvd_config = DVD_Config()
-
-                # TODO: Move this to the GUI, currently the following is guaranteed as set in DB when created
-                sql_result = self._app_db.sql_select(
-                    col_str="code,description",
-                    table_str=sys_consts.PRODUCT_LINE,
-                    where_str="code='HV'",
+            if self._db_settings.setting_exist(sys_consts.ARCHIVE_FOLDER):
+                dvd_config.archive_folder = self._db_settings.setting_get(
+                    sys_consts.ARCHIVE_FOLDER
                 )
 
-                if sql_result:  # Expect only one result
-                    product_code = sql_result[0][0]
-                    product_description = sql_result[0][1]
+            sql_result = self._app_db.sql_select(
+                col_str="code,description",
+                table_str=sys_consts.PRODUCT_LINE,
+                where_str="code='HV'",
+            )
 
-                    dvd_serial_number = self._dvd.generate_dvd_serial_number(
-                        product_code=product_code,
-                        product_description=product_description,
-                    )
-                    dvd_config.serial_number = dvd_serial_number
+            if sql_result:  # Expect only one result
+                product_code = sql_result[0][0]
+                product_description = sql_result[0][1]
 
-                dvd_config.input_videos = video_files
-
-                dvd_config.menu_title = menu_title
-                dvd_config.menu_background_color = (
-                    dvd_menu_settings.menu_background_color
+                dvd_serial_number = self._generate_dvd_serial_number(
+                    product_code=product_code,
+                    product_description=product_description,
                 )
-                dvd_config.menu_font = dvd_menu_settings.menu_font
-                dvd_config.menu_font_color = dvd_menu_settings.menu_font_color
-                dvd_config.menu_font_point_size = dvd_menu_settings.menu_font_point_size
-                dvd_config.button_background_color = (
-                    dvd_menu_settings.button_background_color
+                dvd_config.serial_number = dvd_serial_number
+
+            dvd_config.input_videos = video_files
+
+            dvd_config.menu_title = menu_title
+            dvd_config.menu_background_color = dvd_menu_settings.menu_background_color
+            dvd_config.menu_font = dvd_menu_settings.menu_font
+            dvd_config.menu_font_color = dvd_menu_settings.menu_font_color
+            dvd_config.menu_font_point_size = dvd_menu_settings.menu_font_point_size
+            dvd_config.button_background_color = (
+                dvd_menu_settings.button_background_color
+            )
+            dvd_config.button_font = dvd_menu_settings.button_font
+            dvd_config.button_font_color = dvd_menu_settings.button_font_color
+            dvd_config.button_font_point_size = dvd_menu_settings.button_font_point_size
+            dvd_config.button_background_transparency = (
+                dvd_menu_settings.button_background_transparency / 100
+            )
+
+            dvd_config.timestamp_font = self._default_font
+            dvd_config.timestamp_font_point_size = self._timestamp_font_point_size
+
+            dvd_config.video_standard = self._file_control.project_video_standard
+
+            dvd_config.menu_buttons_across = dvd_menu_settings.buttons_across
+            dvd_config.menu_buttons_per_page = dvd_menu_settings.buttons_per_page
+
+            dvd_creator = DVD()
+            dvd_creator.dvd_setup = dvd_config
+            dvd_creator.working_folder = dvd_folder
+
+            if self._video_editor.get_task_manager is None:
+                with qtg.sys_cursor(qtg.Cursor.hourglass):
+                    result, message = dvd_creator.build()
+
+                    if result == -1:
+                        popups.PopError(
+                            title="DVD Build Error...",
+                            message=(
+                                "Failed To Create A"
+                                f" DVD!!\n{sys_consts.SDELIM}{message}{sys_consts.SDELIM}"
+                            ),
+                        ).show()
+            else:
+                task_name = (
+                    dvd_config.menu_title[0]
+                    if dvd_config.menu_title
+                    else dvd_config.serial_number
                 )
-                dvd_config.button_font = dvd_menu_settings.button_font
-                dvd_config.button_font_color = dvd_menu_settings.button_font_color
-                dvd_config.button_font_point_size = (
-                    dvd_menu_settings.button_font_point_size
+
+                if task_name in self._task_stack:
+                    for task_index in range(len(self._task_stack.items())):
+                        temp_name = f"{task_name}_{task_index}"
+                        if temp_name not in self._task_stack:
+                            task_name = temp_name
+                            break
+
+                self._task_stack[task_name] = (dvd_creator, menu_layout)
+
+                self._video_editor.get_task_manager.set_error_callback(error_callback)
+
+                self._video_editor.get_task_manager.add_task(
+                    name=task_name,
+                    method=run_dvd_build,
+                    arguments=dvd_creator,
+                    callback=notification_call_back,
                 )
-                dvd_config.button_background_transparency = (
-                    dvd_menu_settings.button_background_transparency / 100
-                )
-
-                dvd_config.timestamp_font = self._default_font
-                dvd_config.timestamp_font_point_size = self._timestamp_font_point_size
-
-                dvd_config.video_standard = self._file_control.project_video_standard
-
-                dvd_config.menu_buttons_across = dvd_menu_settings.buttons_across
-                dvd_config.menu_buttons_per_page = dvd_menu_settings.buttons_per_page
-
-                self._dvd.dvd_setup = dvd_config
-                self._dvd.working_folder = dvd_folder
-                self._dvd.application_db = self._app_db
-
-                result, message = self._dvd.build()
-
-                if result == 1:
-                    result, message = self.archive_dvd_files(menu_layout)
-
-        if result == -1:
-            popups.PopError(
-                title="DVD Build Error...",
-                message=(
-                    "Failed To Create A"
-                    f" DVD!!\n{sys_consts.SDELIM}{message}{sys_consts.SDELIM}"
-                ),
-            ).show()
 
     def _new_dvd_layout(self, event: qtg.Action) -> None:
         """
@@ -1005,54 +1118,6 @@ class DVD_Archiver(DVD_Archiver_Base):
                     text="A Default Project Has Been Created",
                 ).show()
         return None
-
-    def archive_dvd_files(
-        self, menu_layout: list[tuple[str, list[Video_Data]]]
-    ) -> tuple[int, str]:
-        """
-        Archives the specified video files into a DVD image and saves the ISO image to the specified folder.
-
-        Args:
-            menu_layout (list[tuple[str, list[Video_Data]]]): A list of tuples (menu title,Video_Data)
-            representing the video files to be archived.
-
-        Returns:
-            tuple[int, str]:
-            - arg 1:1 Ok . -1 otherwise.
-            - arg 2: "" if ok, otherwise an error message
-
-        """
-        assert isinstance(
-            menu_layout, list
-        ), f"{menu_layout=} must be a list of tuples of str,Video_Data"
-
-        for menu in menu_layout:
-            assert isinstance(menu[0], str), f"{menu[0]=} must be a str"
-            assert isinstance(menu[1], list), f"{menu[1]=} must be a list"
-            assert all(
-                isinstance(fd, Video_Data) for fd in menu[1]
-            ), f"All elements in {menu[1]=} must be Video_Data"
-
-        dvd_image_folder = self._dvd.dvd_image_folder
-        iso_folder = self._dvd.iso_folder
-        archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
-
-        if menu_layout:
-            archive_manager = Archive_Manager(archive_folder=archive_folder)
-
-            result, message = archive_manager.archive_dvd_build(
-                dvd_name=(
-                    f"{self._dvd.dvd_setup.serial_number} -"
-                    f" {self._file_control.project_name}"
-                ),
-                dvd_folder=dvd_image_folder,
-                iso_folder=iso_folder,
-                menu_layout=menu_layout,
-            )
-
-            if result == -1:
-                return -1, message
-        return 1, ""
 
     def _processed_files_handler(self, video_file_input: list[Video_Data]):
         assert isinstance(video_file_input, list), f"{video_file_input=}. Must be list"
@@ -1334,7 +1399,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     ),
                 ),
             ),
-            qtg.Spacer(width=3),
+            qtg.Spacer(width=1),
             qtg.Label(
                 text="DVD Layout:",
                 buddy_control=qtg.HBoxContainer().add_row(
@@ -1366,7 +1431,17 @@ class DVD_Archiver(DVD_Archiver_Base):
             ),
             qtg.Spacer(width=1),
             qtg.Button(
-                tag="exit_app", text="Exit", callback=self.event_handler, width=13
+                tag="exit_app",
+                text="Exit",
+                callback=self.event_handler,
+                width=12,
+                buddy_control=qtg.Button(
+                    tag="task_manager",
+                    callback=self.event_handler,
+                    tooltip="Running Tasks/Jobs",
+                    icon=file_utils.App_Path("tasks.svg"),
+                    width=1,
+                ),
             ),
         )
 
