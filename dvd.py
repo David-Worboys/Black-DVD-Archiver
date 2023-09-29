@@ -44,6 +44,7 @@ SPUMUX_BUFFER: Final[int] = 43
 @dataclasses.dataclass
 class DVD_Config:
     _archive_folder: str = ""
+    _archive_size: str = sys_consts.DVD_ARCHIVE_SIZE
     _input_videos: list[Video_Data] | tuple[Video_Data] = dataclasses.field(
         default_factory=tuple
     )
@@ -95,6 +96,18 @@ class DVD_Config:
         assert isinstance(value, str), f"{value=}. Must be str"
 
         self._archive_folder = value
+
+    @property
+    def archive_size(self) -> str:
+        return self._archive_size
+
+    @archive_size.setter
+    def archive_size(self, value: str):
+        assert isinstance(value, str) and value in (
+            sys_consts.BLUERAY_ARCHIVE_SIZE,
+            sys_consts.DVD_ARCHIVE_SIZE,
+        ), f"{value=}, Must be BLUERAY_ARCHIVE_SIZE or DVD_ARCHIVE_SIZE"
+        self._archive_size = value
 
     @property
     def input_videos(self) -> list[Video_Data] | tuple[Video_Data]:
@@ -593,7 +606,8 @@ class DVD:
             self.dvd_setup.archive_folder and cell_coords
         ):  # Only archive if an archive folder is specified.
             archive_manager = Archive_Manager(
-                archive_folder=self.dvd_setup.archive_folder
+                archive_folder=self.dvd_setup.archive_folder,
+                archive_size=self.dvd_setup.archive_size,
             )
             menu_layout: list[tuple[str, list[Video_Data]]] = []
             video_list: list[Video_Data] = []
@@ -629,7 +643,6 @@ class DVD:
                             video_list,
                         )
                     )
-
             result, message = archive_manager.archive_dvd_build(
                 dvd_name=(
                     f"{self.dvd_setup.serial_number} - {self._dvd_setup.project_name}"

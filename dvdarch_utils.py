@@ -1038,6 +1038,13 @@ def Get_File_Cut_Command(
         isinstance(frame_rate, float) and frame_rate > 0
     ), f"{frame_rate=}. Must be a float >= 0"
 
+    result, message = Get_Codec(input_file)
+
+    if result == -1:
+        return [], message
+
+    codec = message
+
     # Calculate the start and end times of the segment based on the frame numbers
     start_time = start_frame / frame_rate
     end_time = end_frame / frame_rate
@@ -1087,7 +1094,7 @@ def Get_File_Cut_Command(
             "-threads",
             str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
         ]
-        command += [temp_file, "-y"]
+        command += [output_file, "-y"]
     else:
         # Copy the segment
         if not utils.Is_Complied():
@@ -1100,10 +1107,6 @@ def Get_File_Cut_Command(
         command += ["-t", str(segment_duration)]
         command += ["-avoid_negative_ts", "make_zero"]
         command += ["-c", "copy"]
-        command += [
-            "-threads",
-            str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
-        ]
         command += [output_file, "-y"]
 
     return command, ""
@@ -1210,7 +1213,7 @@ def Split_Large_Video(
         )
 
         if error_message:
-            return -1, message
+            return -1, error_message
 
         result, output = Execute_Check_Output(commands=command)
 
@@ -1374,12 +1377,14 @@ def Execute_Check_Output(
                 "DBG Call commands shlex split  ***  "
                 f" {shlex.split(' '.join(commands))}"
             )
+            print(f"DBG Lets Do It!")
             output = subprocess.check_output(
                 commands if not execute_as_string else " ".join(commands),
                 universal_newlines=True,
                 shell=shell,
                 env=env,
             )
+            print(f"DBG And Done {output=}")
         else:
             output = subprocess.check_output(
                 commands if not execute_as_string else " ".join(commands),
@@ -1401,6 +1406,7 @@ def Execute_Check_Output(
             message = (
                 f" {call_error.returncode} Command  Crashed!\n {' '.join(commands)}"
             )
+        print(f"DBG {sys_consts.PROGRAM_NAME} Exception: {message=}")
         return -1, message
 
     return 1, output
@@ -1657,8 +1663,7 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         mi = subprocess.check_output(
             [sys_consts.MEDIAINFO, fmt, video_file],
             universal_newlines=True,
-            # stderr=subprocess.STDOUT,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT if debug else subprocess.DEVNULL,
         ).strip()
 
         video_info = xmltodict.parse(mi)
@@ -1669,10 +1674,17 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
             print("=========== Video Info Debug ===========")
 
         track_info = list(_find_keys(video_info, "track"))
-
         for tracks in track_info:
             for track_dict in tracks:
+                if not isinstance(track_dict, dict):
+                    video_file_details.error = (
+                        f"Failed To Get Encoding Details : {video_file}"
+                    )
+
+                    return video_file_details
+
                 track_type = ""
+
                 for key, value in track_dict.items():
                     if key == "@type":
                         track_type = value
@@ -1736,7 +1748,7 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
     except OSError as call_error:
         video_file_details.error = f"{sys_consts.MEDIAINFO} Failed! To Run\n {fmt}"
 
-    if debug and not utils.Is_Complied():
+    if debug:
         print(f"=========== video_details Debug {video_file} ===========")
         pprint.pprint(video_file_details)
         print("=========== video_details Debug ===========")

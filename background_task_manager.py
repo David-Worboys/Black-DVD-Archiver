@@ -20,10 +20,11 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import asyncio
-import concurrent.futures
+import concurrent
 import dataclasses
 import signal
 import threading
+from time import sleep
 from typing import Callable, Optional, cast
 
 import popups
@@ -31,9 +32,8 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 
+
 # fmt: on
-
-
 @dataclasses.dataclass(slots=True)
 class _Task:
     """
@@ -48,7 +48,7 @@ class _Task:
 
     name: str
     method: Callable
-    arguments: any
+    arguments: list | tuple
     callback: Callable[[int, str, str, str], None]  # status, message, output, task_name
     crashed: bool = False
     kill_signal: bool = False
@@ -57,10 +57,9 @@ class _Task:
         """Configures instance for use"""
         assert isinstance(self.name, str), f"{self.name=}. Must be a string"
         assert isinstance(self.method, Callable), f"{self.method=}. Must be a callable"
-        # assert isinstance(self.arguments, list), f"{self.arguments=}. Must be a list"
-        # assert all(
-        #    isinstance(command, str) for command in self.arguments
-        # ), f"{self.arguments=}. Must be a str"
+        assert isinstance(
+            self.arguments, (list, tuple)
+        ), f"{self.arguments=}. Must be a list or tuple"
         assert isinstance(
             self.callback, Callable
         ), f"{self.callback=}. Must be a callable"
@@ -77,6 +76,7 @@ class Task_Manager:
 
     error_callback: Optional[Callable[[str], None]] = None
 
+    # Private instance variables
     _throw_errors: bool = True
     _task_queue: list[_Task] | None = None
     _running_tasks: dict[str, _Task] | None = None
@@ -102,10 +102,21 @@ class Task_Manager:
 
     @property
     def throw_errors(self) -> bool:
+        """Return True to allow errors to be thrown, False otherwise
+
+        Returns:
+            bool: True to allow errors to be thrown, False otherwise
+
+        """
         return self._throw_errors
 
     @throw_errors.setter
     def throw_errors(self, value: bool):
+        """Throw errors is set True to allow errors to be thrown
+
+        Args:
+            value (bool): True, throw errors, False do not throw errors
+        """
         assert isinstance(value, bool), f"{value=}. Must be bool"
         self._throw_errors = value
 
@@ -121,10 +132,13 @@ class Task_Manager:
         assert isinstance(signum, int), f"{signum=}. Must be an integer"
         # assert isinstance(frame, any), f"{frame=}. Must be any"
 
-        print("_Task Manager has crashed with SIGSEGV (signal 9)")
         self._crash_event.set()
 
         if self.error_callback is not None and self.throw_errors:
+            print(
+                f"{sys_consts.PROGRAM_NAME} Task Manager has crashed with SIGSEGV"
+                " (signal 9)"
+            )
             self.error_callback("Task Manager has crashed with SIGSEGV (signal 9)")
 
     async def _process_task(self, task: _Task):
@@ -178,27 +192,34 @@ class Task_Manager:
                 del self._running_tasks[task.name]
 
         while True:
-            if self._stop_event.is_set() and not self._task_queue:
-                # Check if the stop event is set and the task queue is empty
-                break
+            try:
+                if self._stop_event.is_set() and not self._task_queue:
+                    # Stopping and no tasks so break out of the loop
+                    break
 
-            if self._task_queue:
-                task = self._task_queue.pop(0)
-                await process_task(task)
-            else:
-                await asyncio.sleep(0.1)
+                if self._task_queue:
+                    task = self._task_queue.pop(0)
+                    await process_task(task)
+                else:  # no tasks have a rest
+                    await asyncio.sleep(0.1)
 
-            # Check for tasks that need to be killed
-            for task_name, task in self._running_tasks.items():
-                if task.kill_signal:
-                    # Set the kill signal for the task
-                    task.kill_signal = False  # Reset the kill signal
-                    task.crashed = True  # Mark the task as crashed if needed
-                    if self.throw_errors:
-                        task.callback(-1, "killed", "", task.name)
+                # Check for tasks that need to be killed
+                for task_name, task in self._running_tasks.items():
+                    if task.kill_signal:  # She's dead Jim
+                        task.kill_signal = False
+                        task.crashed = True
+                        if self.throw_errors:
+                            task.callback(-1, "killed", "", task.name)
 
-                    if task_name in self._running_tasks:
-                        del self._running_tasks[task_name]
+                        if task_name in self._running_tasks:
+                            del self._running_tasks[task_name]
+            except Exception as e:
+                message = (
+                    f"{sys_consts.PROGRAM_NAME} Generated An Unlikely Multitasking"
+                    f" Exception {e=}"
+                )
+                self.error_callback(message)
+                print(message)
 
     def add_task(
         self,
@@ -224,6 +245,7 @@ class Task_Manager:
         assert isinstance(callback, Callable), f"{callback=}. Must be a callable"
 
         task = _Task(name=name, method=method, arguments=arguments, callback=callback)
+
         self._task_queue.append(task)
 
     def list_running_tasks(self) -> list[str]:
@@ -268,7 +290,9 @@ class Task_Manager:
 
         if self._thread is None or not self._thread.is_alive():
             self._stop_event = threading.Event()
-            self._thread = threading.Thread(target=self._start_task_handler)
+            self._thread = threading.Thread(
+                target=self._start_task_handler, daemon=True
+            )
             self._thread.start()
 
     def _start_task_handler(self):
@@ -378,6 +402,7 @@ class Task_Manager_Popup(qtg.PopContainer):
                                     self.task_manager.kill_task(task_name)
 
                                 task_grid.clear()
+                                sleep(0.5)
 
                                 col_index: int = task_grid.colindex_get("task_name")
 
@@ -401,6 +426,17 @@ class Task_Manager_Popup(qtg.PopContainer):
                         if self._process_ok(event) == 1:
                             self.set_result(event.tag)
                             super().close()
+                    case "select_all":
+                        task_grid = cast(
+                            qtg.Grid,
+                            event.widget_get(
+                                container_tag="task_controls", tag="task_manager_grid"
+                            ),
+                        )
+
+                        task_grid.checkitems_all(
+                            checked=event.value, col_tag="task_name"
+                        )
 
     def _process_ok(self, event: qtg.Action) -> int:
         """
@@ -417,7 +453,7 @@ class Task_Manager_Popup(qtg.PopContainer):
 
     def layout(self) -> qtg.VBoxContainer:
         """Generate the form UI layout"""
-        file_control_container = qtg.VBoxContainer(
+        task_control_container = qtg.VBoxContainer(
             tag="task_controls", align=qtg.Align.TOPLEFT
         )
 
@@ -431,7 +467,7 @@ class Task_Manager_Popup(qtg.PopContainer):
             ),
         )
 
-        video_input_files = qtg.Grid(
+        running_tasks = qtg.Grid(
             tag="task_manager_grid",
             noselection=True,
             height=15,
@@ -439,8 +475,15 @@ class Task_Manager_Popup(qtg.PopContainer):
             callback=self.event_handler,
         )
 
-        file_control_container.add_row(
-            video_input_files,
+        task_control_container.add_row(
+            qtg.Checkbox(
+                text="Select All",
+                tag="select_all",
+                callback=self.event_handler,
+                tooltip="Select All Tasks",
+                width=10,
+            ),
+            running_tasks,
         )
 
         control_container = qtg.VBoxContainer(
@@ -448,16 +491,17 @@ class Task_Manager_Popup(qtg.PopContainer):
         )
 
         control_container.add_row(
-            file_control_container,
-            qtg.HBoxContainer(tag="command_buttons").add_row(
+            task_control_container,
+            qtg.HBoxContainer(tag="command_buttons", margin_right=5).add_row(
                 qtg.Button(
                     tag="kill_tasks",
                     text="Kill Tasks",
                     callback=self.event_handler,
                     width=10,
                 ),
+                qtg.Spacer(width=24),
                 qtg.Command_Button_Container(
-                    ok_callback=self.event_handler,  # cancel_callback=self.event_handler
+                    ok_callback=self.event_handler,
                 ),
             ),
         )

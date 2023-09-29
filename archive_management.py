@@ -22,6 +22,7 @@
 import dataclasses
 import json
 from datetime import datetime
+from typing import Final
 
 import dvdarch_utils
 import file_utils
@@ -31,11 +32,11 @@ from utils import Text_To_File_Name
 
 # fmt: on
 
-# Following used in archive_dvd_build method below - changes here mean changes there!
-DVD_IMAGE = "dvd_image"
-ISO_IMAGE = "iso_image"
-VIDEO_SOURCE = "video_source"
-MISC = "misc"
+# THe Following constants are used in the archive_dvd_build the method below - changes here mean changes there!
+DVD_IMAGE: Final[str] = "dvd_image"
+ISO_IMAGE: Final[str] = "iso_image"
+VIDEO_SOURCE: Final[str] = "video_source"
+MISC: Final[str] = "misc"
 
 
 @dataclasses.dataclass
@@ -43,6 +44,7 @@ class Archive_Manager:
     """Manages archiving of video artefacts - dvd_image, video source files etc"""
 
     archive_folder: str
+    archive_size: str = sys_consts.DVD_ARCHIVE_SIZE
 
     # Private instance variables
     _error_message: str = ""
@@ -54,6 +56,10 @@ class Archive_Manager:
         assert (
             isinstance(self.archive_folder, str) and self.archive_folder.strip() != ""
         ), f"{self.archive_folder=}. Must Be non-empty str"
+        assert isinstance(self.archive_size, str) and self.archive_size in (
+            sys_consts.BLUERAY_ARCHIVE_SIZE,
+            sys_consts.DVD_ARCHIVE_SIZE,
+        ), f"{self.archive_size=}, Must be BLUERAY_ARCHIVE_SIZE or DVD_ARCHIVE_SIZE"
 
         self._error_message = self._make_folder_structure()
 
@@ -259,8 +265,8 @@ class Archive_Manager:
                             dir_path=backup_item_folder,
                             file_name=f"{Text_To_File_Name(menu_title)}_temp",
                         )
-                    else:
-                        menu_title = f"menu_{menu_index + 1}"
+                    else:  # If no menu title, then use the menu number
+                        menu_title = f"menu_{menu_index + 1:02}"
                         menu_dir = file_handler.file_join(
                             dir_path=backup_item_folder,
                             file_name=menu_title,
@@ -311,7 +317,9 @@ class Archive_Manager:
                     video_folder_tuple[0],
                     video_folder_tuple[1],
                     video_folder_tuple[2],
-                    4,
+                    (
+                        4 if self.archive_size == sys_consts.DVD_ARCHIVE_SIZE else 25
+                    ),  # sys_consts.BLUERAY_ARCHIVE_SIZE
                 )
 
                 if result == -1:

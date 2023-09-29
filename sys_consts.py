@@ -68,6 +68,8 @@ NTSC_FRAMERATE: Final[float] = 29.97
 AVERAGE_BITRATE: Final[int] = 5500  # kilobits/sec
 SINGLE_SIDED_DVD_SIZE: Final[int] = 40258730  # kb ~ 4.7GB DVD5
 DOUBLE_SIDED_DVD_SIZE: Final[int] = 72453177  # kb ~ 8.5GB DVD9
+BLUERAY_ARCHIVE_SIZE: Final[str] = "25GB"
+DVD_ARCHIVE_SIZE: Final[str] = "4GB"
 
 SHELVE_FILE_EXTNS = ("dir", "dat", "bak")
 # fmt: off

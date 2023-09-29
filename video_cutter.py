@@ -19,11 +19,11 @@
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+
 import dataclasses
 from time import sleep
 from typing import Callable, cast
 
-import psutil
 import PySide6.QtGui as qtG
 
 import dvdarch_utils
@@ -32,12 +32,12 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
-import utils
 from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
 from dvdarch_utils import Execute_Check_Output
 from file_renamer_popup import File_Renamer_Popup
-from sys_config import DVD_Archiver_Base, Video_Data, Video_File_Settings
+from sys_config import (DVD_Archiver_Base, Encoding_Details, Video_Data,
+                        Video_File_Settings)
 
 # fmt: on
 
@@ -104,7 +104,7 @@ class Video_Editor(DVD_Archiver_Base):
             display_width=self.display_width, display_height=self.display_height
         )
 
-        self._background_task_manager = Task_Manager()
+        self._background_task_manager: Task_Manager = Task_Manager()
         self._background_task_manager.start()
 
         self._video_handler.frame_changed_handler.connect(self._frame_handler)
@@ -515,6 +515,67 @@ class Video_Editor(DVD_Archiver_Base):
                     title="Archive Edit List", message=f"Write Failed : {message}"
                 ).show()
 
+    def _get_encoding_info(self, video_file_path: str) -> tuple[int, Encoding_Details]:
+        """Gets the encoding info for a video file
+
+        Belts and braces because should never need this loopiness unless something goes off the rails in thread handling.
+        This meothpd is only useful where thread handling is used to assemble or cut files in threads
+
+        Args:
+            video_file_path: This file path to the video file
+
+        Returns:
+            int : arg 1 if ok, 0 otherwise
+            Encoding_Details: arg 2 encoding details if all good otherwise blank encoding details with the error filled
+            out
+        """
+        assert (
+            isinstance(video_file_path, str) and video_file_path.strip() != ""
+        ), f"{video_file_path=}. Must be a non-empty string"
+
+        blank_encoding_info = Encoding_Details()
+
+        file_handler = file_utils.File()
+        file_path, file_name, file_extn = file_handler.split_file_path(video_file_path)
+
+        if not file_handler.file_exists(
+            directory_path=file_path, file_name=file_name, file_extension=file_extn
+        ):
+            blank_encoding_info.error = f"File does not exist : {video_file_path=}"
+            blank_encoding_info.video_duration = 0
+            popups.PopError(
+                title="Failed to Get Encoding Info...",
+                message=(
+                    "Failed To Get Encoding Info Or Duration Is 0"
+                    f" Secs : {video_file_path=} :"
+                    f" {blank_encoding_info.error} :"
+                    f" {blank_encoding_info.video_duration}"
+                ),
+            ).show()
+
+        for i in range(20):  # Loop 20 times with a 3 second sleep = 1 Minute
+            encoding_info = dvdarch_utils.Get_File_Encoding_Info(video_file_path)
+
+            if (
+                encoding_info.error.strip() == "" and encoding_info.video_duration > 0
+            ):  # Should break first time if thread handling did its job!
+                return 1, encoding_info
+
+            sleep(3)
+        else:
+            blank_encoding_info.error = encoding_info.error
+            popups.PopError(
+                title="Failed to Get Encoding Info...",
+                message=(
+                    "Failed To Get Encoding Info Or Duration Is 0"
+                    f" Secs : {video_file_path=} :"
+                    f" {encoding_info.error} :"
+                    f" {encoding_info.video_duration}"
+                ),
+            ).show()
+
+            return -1, blank_encoding_info
+
     def _assemble_segments(self, event: qtg.Action) -> None:
         """
         Takes the specified segments from the input file and makes new video files from them.
@@ -548,153 +609,165 @@ class Video_Editor(DVD_Archiver_Base):
                 options=("As A Single File", "As Individual Files"),
             ).show()
 
-            if result == "As Individual Files":
-                _, filename, extension = file_handler.split_file_path(
-                    self._video_file_input[0].video_path
-                )
-
-                assembled_file = file_handler.file_join(
-                    self._edit_folder, f"{filename}_", extension
-                )
-
-                video_data = []
-
-                with qtg.sys_cursor(qtg.Cursor.hourglass):
-                    result, video_files_string = self._cut_video_with_editlist(
-                        input_file=self._video_file_input[0].video_path,
-                        output_file=assembled_file,
-                        edit_list=edit_list,
-                        cut_out=False,
+            match result:
+                case "As Individual Files":
+                    _, filename, extension = file_handler.split_file_path(
+                        self._video_file_input[0].video_path
                     )
 
-                    if (
-                        result == -1
-                    ):  # video_files_string is the error message and not the ',' delimitered file list
-                        popups.PopError(
-                            title="Error Cutting File...",
-                            message=f"<{video_files_string}>",
-                        ).show()
-                    else:
-                        for video_file_path in video_files_string.split(","):
-                            (
-                                video_path,
-                                video_file,
-                                video_extension,
-                            ) = file_handler.split_file_path(video_file_path)
-
-                            video_file_settings = Video_File_Settings()
-
-                            if self._db_settings.setting_exist("vf_denoise"):
-                                video_file_settings.denoise = (
-                                    self._db_settings.setting_get("vf_denoise")
-                                )
-
-                            if self._db_settings.setting_exist("vf_white_balance"):
-                                video_file_settings.white_balance = (
-                                    self._db_settings.setting_get("vf_white_balance")
-                                )
-
-                            if self._db_settings.setting_exist("vf_sharpen"):
-                                video_file_settings.sharpen = (
-                                    self._db_settings.setting_get("vf_sharpen")
-                                )
-
-                            if self._db_settings.setting_exist("vf_auto_levels"):
-                                video_file_settings.auto_bright = (
-                                    self._db_settings.setting_get("vf_auto_levels")
-                                )
-
-                            video_file_settings.button_title = (
-                                file_handler.extract_title(video_file)
-                            )
-
-                            video_data.append(
-                                Video_Data(
-                                    video_folder=video_path,
-                                    video_file=video_file,
-                                    video_extension=video_extension,
-                                    encoding_info=dvdarch_utils.Get_File_Encoding_Info(
-                                        video_file_path
-                                    ),
-                                    video_file_settings=video_file_settings,
-                                )
-                            )
-
-                if video_data:
-                    result = File_Renamer_Popup(
-                        video_data_list=video_data, container_tag="file_renamer"
-                    ).show()
-
-                    for video_file in video_data:
-                        self._video_file_input.append(video_file)
-
-                    self.processed_files_callback(self._video_file_input)
-
-            elif result == "As A Single File":
-                _, filename, extension = file_handler.split_file_path(
-                    self._video_file_input[0].video_path
-                )
-
-                assembled_file = file_handler.file_join(
-                    self._edit_folder, f"{filename}_assembled", extension
-                )
-
-                with qtg.sys_cursor(qtg.Cursor.hourglass):
-                    result, video_files_string = self._cut_video_with_editlist(
-                        input_file=self._video_file_input[0].video_path,
-                        output_file=assembled_file,
-                        edit_list=edit_list,
-                        cut_out=False,
+                    assembled_file = file_handler.file_join(
+                        self._edit_folder, f"{filename}_", extension
                     )
 
-                    if (
-                        result == -1
-                    ):  # video_files_string is the error message and not the ',' delimitered file list
-                        popups.PopError(
-                            title="Error Cutting File...",
-                            message=f"<{video_files_string}>",
-                        ).show()
-                    else:
-                        result, message = dvdarch_utils.Concatenate_Videos(
-                            temp_files=video_files_string.split(","),
+                    video_data = []
+
+                    with qtg.sys_cursor(qtg.Cursor.hourglass):
+                        result, video_files_string = self._cut_video_with_editlist(
+                            input_file=self._video_file_input[0].video_path,
                             output_file=assembled_file,
-                            delete_temp_files=True,
+                            edit_list=edit_list,
+                            cut_out=False,
                         )
 
-                        if result == -1:
+                        if (
+                            result == -1
+                        ):  # video_files_string is the error message and not the ',' delimitered file list
                             popups.PopError(
-                                title="Error Concatenating Files...",
-                                message=f"<{message}>",
+                                title="Error Cutting File...",
+                                message=f"<{video_files_string}>",
                             ).show()
+                        else:
+                            for video_file_path in video_files_string.split(","):
+                                (
+                                    video_path,
+                                    video_file,
+                                    video_extension,
+                                ) = file_handler.split_file_path(video_file_path)
 
-                            return None
+                                video_file_settings = Video_File_Settings()
 
-                        (
-                            assembled_path,
-                            assembled_filename,
-                            assembled_extension,
-                        ) = file_handler.split_file_path(assembled_file)
+                                result, encoding_info = self._get_encoding_info(
+                                    video_file_path
+                                )
 
-                        self._video_file_input.append(
-                            Video_Data(
-                                video_folder=assembled_path,
-                                video_file=assembled_filename,
-                                video_extension=assembled_extension,
-                                encoding_info=dvdarch_utils.Get_File_Encoding_Info(
-                                    video_files_string
-                                ),
-                                video_file_settings=self._video_file_input[
-                                    0
-                                ].video_file_settings,
-                            )
-                        )
+                                if result == -1:
+                                    return None
+
+                                if self._db_settings.setting_exist("vf_denoise"):
+                                    video_file_settings.denoise = (
+                                        self._db_settings.setting_get("vf_denoise")
+                                    )
+
+                                if self._db_settings.setting_exist("vf_white_balance"):
+                                    video_file_settings.white_balance = (
+                                        self._db_settings.setting_get(
+                                            "vf_white_balance"
+                                        )
+                                    )
+
+                                if self._db_settings.setting_exist("vf_sharpen"):
+                                    video_file_settings.sharpen = (
+                                        self._db_settings.setting_get("vf_sharpen")
+                                    )
+
+                                if self._db_settings.setting_exist("vf_auto_levels"):
+                                    video_file_settings.auto_bright = (
+                                        self._db_settings.setting_get("vf_auto_levels")
+                                    )
+
+                                video_file_settings.button_title = (
+                                    file_handler.extract_title(video_file)
+                                )
+
+                                video_data.append(
+                                    Video_Data(
+                                        video_folder=video_path,
+                                        video_file=video_file,
+                                        video_extension=video_extension,
+                                        encoding_info=encoding_info,
+                                        video_file_settings=video_file_settings,
+                                    )
+                                )
+                    if video_data:
+                        result = File_Renamer_Popup(
+                            video_data_list=video_data, container_tag="file_renamer"
+                        ).show()
+
+                        for video_file in video_data:
+                            self._video_file_input.append(video_file)
 
                         self.processed_files_callback(self._video_file_input)
-            else:
-                popups.PopMessage(
-                    title="No Assembly Method Selected...",
-                    message="No Output As No Assembly Method Selected!",
-                ).show()
+
+                case "As A Single File":
+                    _, filename, extension = file_handler.split_file_path(
+                        self._video_file_input[0].video_path
+                    )
+
+                    assembled_file = file_handler.file_join(
+                        self._edit_folder, f"{filename}_assembled", extension
+                    )
+
+                    with qtg.sys_cursor(qtg.Cursor.hourglass):
+                        result, video_files_string = self._cut_video_with_editlist(
+                            input_file=self._video_file_input[0].video_path,
+                            output_file=assembled_file,
+                            edit_list=edit_list,
+                            cut_out=False,
+                        )
+
+                        if (
+                            result == -1
+                        ):  # video_files_string is the error message and not the ',' delimitered file list
+                            popups.PopError(
+                                title="Error Cutting File...",
+                                message=f"<{video_files_string}>",
+                            ).show()
+                        else:
+                            result, message = dvdarch_utils.Concatenate_Videos(
+                                temp_files=video_files_string.split(","),
+                                output_file=assembled_file,
+                                delete_temp_files=True,
+                            )
+
+                            if result == -1:
+                                popups.PopError(
+                                    title="Error Concatenating Files...",
+                                    message=f"<{message}>",
+                                ).show()
+
+                                return None
+
+                            (
+                                assembled_path,
+                                assembled_filename,
+                                assembled_extension,
+                            ) = file_handler.split_file_path(assembled_file)
+
+                            result, encoding_info = self._get_encoding_info(
+                                assembled_file
+                            )
+
+                            if result == -1:
+                                return None
+
+                            self._video_file_input.append(
+                                Video_Data(
+                                    video_folder=assembled_path,
+                                    video_file=assembled_filename,
+                                    video_extension=assembled_extension,
+                                    encoding_info=encoding_info,
+                                    video_file_settings=self._video_file_input[
+                                        0
+                                    ].video_file_settings,
+                                )
+                            )
+
+                            self.processed_files_callback(self._video_file_input)
+                case _:
+                    popups.PopMessage(
+                        title="No Assembly Method Selected...",
+                        message="No Output As No Assembly Method Selected!",
+                    ).show()
         else:
             popups.PopMessage(
                 title="No Entries In The Edit List...",
@@ -727,16 +800,40 @@ class Video_Editor(DVD_Archiver_Base):
                 - arg 1 (int): -1
                 - arg 2 (str): An error message.
         """
-        self._task_errored = False
-        self._task_status = -1
-        self._task_message = ""
-        self._tasks_submitted = 0
+        # Used for background task information
+        tasks_completed = 0
+        task_status = 0
+        task_message = 0
+        task_errored = False
 
         # ===== Helper
-        def notification_call_back(status: int, message: str, output: str, name):
+
+        def run_edit_cut(ffmpeg_cut_commands: list[str]) -> tuple[int, str]:
+            """This is a wrapper function only used to run the Execute_check_Output in multi-thread mode
+
+            Args:
+                arguments: list[str]: A list of commands for Execute_check_Output
+
+            Returns:
+                tuple[int, str]:
+                - arg1 1: ok, -1: fail
+                - arg2: error message or "" if ok
+
             """
-            The notification_call_back function is called by the task_submit function.
-            It's purpose is to update the progress bar and check for processing errors.
+            assert all(
+                isinstance(arg, str) for arg in ffmpeg_cut_commands
+            ), f"{ffmpeg_cut_commands=}. must be a list of strings"
+
+            error_code, error_message = Execute_Check_Output(
+                commands=ffmpeg_cut_commands, debug=False
+            )
+
+            return error_code, error_message
+
+        def notification_call_back(status: int, message: str, output: str, name: str):
+            """
+            The notification_call_back function is called by the multi-thread task_manager.
+
 
             Args:
                 status: int: Determine if the task was successful or not
@@ -745,14 +842,18 @@ class Video_Editor(DVD_Archiver_Base):
                 name: Identify the task that has completed
 
             """
+            nonlocal task_errored
+            nonlocal task_status
+            nonlocal task_message
+            nonlocal tasks_completed
+
+            task_status = status
+            task_message = message
+
             if status == -1:
-                self._task_status = status
-                self._task_message = message
-                self._task_errored = True
-
-            self._tasks_submitted -= 1
-
-            self._progress_bar.value_set((len(edit_list) - 1) - self._tasks_submitted)
+                pass
+            else:
+                tasks_completed += 1
 
         def transform_cut_in_to_cut_out(
             edit_list: list[tuple[int, int, str]], frame_count: int
@@ -851,12 +952,6 @@ class Video_Editor(DVD_Archiver_Base):
 
         out_path, out_file, out_extn = file_handler.split_file_path(output_file)
 
-        result, message = dvdarch_utils.Get_Codec(input_file)
-
-        if result == -1:
-            return -1, message
-        codec = message
-
         temp_files = []
 
         if cut_out:
@@ -865,6 +960,9 @@ class Video_Editor(DVD_Archiver_Base):
             )
 
         self._progress_bar.range_set(0, len(edit_list))
+        self._progress_bar.value_set(len(edit_list))
+
+        task_list = []
         for cut_index, (start_frame, end_frame, clip_name) in enumerate(edit_list):
             if end_frame - start_frame <= 0:  # Probably should not happen
                 continue
@@ -901,7 +999,7 @@ class Video_Editor(DVD_Archiver_Base):
                         ),
                     )
 
-            command = dvdarch_utils.Get_File_Cut_Command(
+            command, message = dvdarch_utils.Get_File_Cut_Command(
                 input_file=input_file,
                 output_file=temp_file,
                 start_frame=start_frame,
@@ -909,19 +1007,31 @@ class Video_Editor(DVD_Archiver_Base):
                 frame_rate=self._frame_rate,
             )
 
-            self._tasks_submitted += 1
+            task_list.append((cut_index, command))
+
+        tasks_submitted = 0
+
+        for task_tuple in task_list:
             self._background_task_manager.add_task(
-                name=f"cut_video_{cut_index}",
-                method=Execute_Check_Output,
-                arguments=command,
+                name=f"cut_video_{task_tuple[0]}",
+                method=run_edit_cut,
+                arguments=task_tuple[1],
                 callback=notification_call_back,
             )
+            tasks_submitted += 1
 
-        while self._tasks_submitted > 0 and not self._task_errored:
-            if self._task_errored:
+        current_task = 0
+        while tasks_completed < tasks_submitted:
+            if bool(task_errored):
                 self._progress_bar.reset()
-                return -1, self._task_message
-            sleep(0.5)
+                return -1, str(task_message)
+
+            if current_task != tasks_completed:
+                current_task = tasks_completed
+                self._progress_bar.value_set(tasks_submitted - current_task)
+
+            sleep(0.1)
+
         self._progress_bar.reset()
 
         if cut_out:  # Concat temp file for final file and remove the temp files

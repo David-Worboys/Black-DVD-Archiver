@@ -33,8 +33,6 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
-import utils
-from archive_management import Archive_Manager
 from background_task_manager import Task_Manager_Popup
 from dvd import DVD, DVD_Config
 from menu_page_title_popup import Menu_Page_Title_Popup
@@ -253,6 +251,14 @@ class DVD_Archiver(DVD_Archiver_Base):
                 match event.tag:
                     case "archive_folder_select":
                         self._archive_folder_select(event)
+                    case "backup_bluray":
+                        self._db_settings.setting_set(
+                            "archive_disk_size", sys_consts.BLUERAY_ARCHIVE_SIZE
+                        )
+                    case "backup_dvd":
+                        self._db_settings.setting_set(
+                            "archive_disk_size", sys_consts.DVD_ARCHIVE_SIZE
+                        )
                     case "delete_dvd_layout":
                         self._delete_dvd_layout(event)
                     case "delete_project":
@@ -270,10 +276,10 @@ class DVD_Archiver(DVD_Archiver_Base):
                     case "new_project":
                         self._new_project(event)
                     case "task_manager":
-                        task_manager = self._video_editor.get_task_manager
-                        if task_manager is not None:
+                        if self._video_editor.get_task_manager:
                             Task_Manager_Popup(
-                                task_manager=self._video_editor.get_task_manager
+                                title="Task Manager",
+                                task_manager=self._video_editor.get_task_manager,
                             ).show()
                     case "video_editor":  # Signal from file_grid
                         dvd_folder = Get_DVD_Build_Folder()
@@ -700,7 +706,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event} is not an instance of qtg.Action"
 
-        def run_dvd_build(dvd_instance: DVD) -> tuple[int, str]:
+        def run_dvd_build(dvd_instance: tuple[DVD]) -> tuple[int, str]:
             """This is a wrapper function only used to run the DVD build process in multi-thread mode
 
             Args:
@@ -712,14 +718,13 @@ class DVD_Archiver(DVD_Archiver_Base):
                 - arg2: error message or "" if ok
 
             """
-
-            error_code, error_message = dvd_instance.build()
+            error_code, error_message = dvd_instance[0].build()
 
             return error_code, error_message
 
         def notification_call_back(status: int, message: str, output: str, name):
             """
-            The notification_call_back function is called by the task_submit function.
+            The notification_call_back function is called by the multi-thread task_manager
 
 
             Args:
@@ -730,25 +735,18 @@ class DVD_Archiver(DVD_Archiver_Base):
 
             """
             if status == -1:
-                popups.PopError(
-                    title="Task Failed...",
-                    message=(
-                        f" Task {name=} Failed! Error : {message} Output : {output}"
-                    ),
-                ).show()
-                # self._task_status = status
-                # self._task_message = message
-                # self._task_errored = True
+                pass
             else:
                 if name in self._task_stack:
                     del self._task_stack[name]
 
         # self._tasks_submitted -= 1
         def error_callback(error_message: str):
-            popups.PopError(
-                title="Task Crash...",
-                message=f" Task Manager Crash : {error_message}",
-            ).show()
+            pass
+            # popups.PopError(
+            #    title="Task Crash...",
+            #    message=f" Task Manager Crash : {error_message}",
+            # ).show()
 
         dvd_layout_combo: qtg.ComboBox = cast(
             qtg.ComboBox,
@@ -824,6 +822,10 @@ class DVD_Archiver(DVD_Archiver_Base):
                 dvd_config.archive_folder = self._db_settings.setting_get(
                     sys_consts.ARCHIVE_FOLDER
                 )
+            if self._db_settings.setting_exist("archive_disk_size"):
+                dvd_config.archive_size = self._db_settings.setting_get(
+                    "archive_disk_size"
+                )
 
             sql_result = self._app_db.sql_select(
                 col_str="code,description",
@@ -883,11 +885,9 @@ class DVD_Archiver(DVD_Archiver_Base):
                             ),
                         ).show()
             else:
-                task_name = (
-                    dvd_config.menu_title[0]
-                    if dvd_config.menu_title
-                    else dvd_config.serial_number
-                )
+                task_name = dvd_config.menu_title[0]
+                if dvd_config.menu_title[0].strip() == "":
+                    task_name = dvd_config.serial_number
 
                 if task_name in self._task_stack:
                     for task_index in range(len(self._task_stack.items())):
@@ -903,7 +903,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 self._video_editor.get_task_manager.add_task(
                     name=task_name,
                     method=run_dvd_build,
-                    arguments=dvd_creator,
+                    arguments=(dvd_creator,),
                     callback=notification_call_back,
                 )
 
@@ -1137,6 +1137,12 @@ class DVD_Archiver(DVD_Archiver_Base):
         Returns:
             FormContainer: The application layout
         """
+        if self._db_settings.setting_exist("archive_disk_size"):
+            archive_disk_size = self._db_settings.setting_get("archive_disk_size")
+        else:
+            archive_disk_size = sys_consts.DVD_ARCHIVE_SIZE
+            self._db_settings.setting_set("archive_disk_size", archive_disk_size)
+
         archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
         dvd_build_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
@@ -1322,9 +1328,53 @@ class DVD_Archiver(DVD_Archiver_Base):
             tooltip="Select Default Language By Country",
         )
 
+        app_lang_container = qtg.VBoxContainer(
+            tag="app_lang",
+            text=(
+                f"{sys_consts.SDELIM}{sys_consts.PROGRAM_NAME}{sys_consts.SDELIM} Language"
+            ),
+            align=qtg.Align.CENTER,
+        ).add_row(
+            # qtg.Spacer(),
+            qtg.VBoxContainer().add_row(
+                qtg.Label(text="Default Language"), country_combo
+            ),
+            qtg.Spacer(),
+            qtg.Button(
+                text="Language Translation",
+                tag="langtran",
+                callback=self.event_handler,
+            ),
+        )
+
+        backup_disk_size_container = qtg.VBoxContainer(
+            text="Archive Disk Size", width=20
+        ).add_row(
+            qtg.Spacer(),
+            qtg.RadioButton(
+                text="25 GB Blu-ray",
+                tag="backup_bluray",
+                callback=self.event_handler,
+                checked=(
+                    True
+                    if archive_disk_size == sys_consts.BLUERAY_ARCHIVE_SIZE
+                    else False
+                ),
+            ),
+            qtg.RadioButton(
+                text="4  GB DVD",
+                tag="backup_dvd",
+                callback=self.event_handler,
+                checked=(
+                    True if archive_disk_size == sys_consts.DVD_ARCHIVE_SIZE else False
+                ),
+            ),
+            qtg.Spacer(),
+        )
+
         self._control_tab.page_add(
             tag="about_tab",
-            title="About",
+            title="About/System",
             control=qtg.VBoxContainer(align=qtg.Align.CENTER).add_row(
                 qtg.Label(
                     width=135,
@@ -1333,25 +1383,15 @@ class DVD_Archiver(DVD_Archiver_Base):
                     text=about_text,
                     translate=False,
                 ),
-                qtg.Spacer(),
                 # qtg.Spacer(),
-                qtg.VBoxContainer(
-                    tag="app_lang",
-                    text=(
-                        f"{sys_consts.SDELIM}{sys_consts.PROGRAM_NAME}{sys_consts.SDELIM} Language"
-                    ),
-                    align=qtg.Align.CENTER,
+                qtg.HBoxContainer(
+                    text="System Settings",
+                    margin_top=10,
+                    margin_left=10,
+                    margin_right=10,
+                    margin_bottom=5,
                 ).add_row(
-                    # qtg.Spacer(),
-                    qtg.VBoxContainer().add_row(
-                        qtg.Label(text="Default Language"), country_combo
-                    ),
-                    qtg.Spacer(),
-                    qtg.Button(
-                        text="Language Translation",
-                        tag="langtran",
-                        callback=self.event_handler,
-                    ),
+                    backup_disk_size_container, qtg.Spacer(width=2), app_lang_container
                 ),
             ),
             enabled=True,
@@ -1438,7 +1478,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 buddy_control=qtg.Button(
                     tag="task_manager",
                     callback=self.event_handler,
-                    tooltip="Running Tasks/Jobs",
+                    tooltip="Manage Running Tasks/Jobs",
                     icon=file_utils.App_Path("tasks.svg"),
                     width=1,
                 ),

@@ -288,11 +288,12 @@ def Get_Window_ID(
         self_item is not None
         and hasattr(self_item, "_widget")
         and self_item._widget is not None
+        and shiboken6.isValid(self_item._widget)
     ):  # Cannot use guiwidget_get in the if because if it is None then a runtime error is triggered
         window_id = self_item.guiwidget_get.window().winId()
     elif parent is not None and hasattr(parent, "dialog"):
         window_id = parent.dialog.window().winId()
-    elif parent is not None and hasattr(parent, "window"):
+    elif parent is not None and hasattr(parent, "window") and shiboken6.isValid(parent):
         window_id = parent.window().winId()
     elif (
         parent is not None and hasattr(parent, "_widget") and parent._widget is not None
@@ -2155,10 +2156,14 @@ class _qtpyBase_Control(_qtpyBase):
         window_id = Get_Window_ID(self.parent_app, self.parent, self)
 
         # Check if widget exists as it sometimes is destroyed before event is fired
-        if callable(self.callback) and self.parent_app.widget_exist(
-            window_id=window_id,
-            container_tag=self.container_tag,
-            tag=self.tag,
+        if (
+            window_id >= 0
+            and callable(self.callback)
+            and self.parent_app.widget_exist(
+                window_id=window_id,
+                container_tag=self.container_tag,
+                tag=self.tag,
+            )
         ):
             if self.parent_app.widget_exist(
                 window_id=window_id,
