@@ -20,10 +20,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import hashlib
-
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+import hashlib
 from typing import cast
 
 import platformdirs

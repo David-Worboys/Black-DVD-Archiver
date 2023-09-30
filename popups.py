@@ -30,7 +30,7 @@ from typing import Callable, Optional, Union, cast
 
 import fs
 import platformdirs
-import translators
+# import translators # 2023-09-30 # David Worboys removed auto translation because of connection and stability issues
 from pathvalidate import ValidationError, validate_filepath
 from PySide6 import QtCore as qtC
 from PySide6 import QtGui as qtG
@@ -772,7 +772,8 @@ class PopOptions(PopContainer):
     selected option"""
 
     message: str = ""
-    options: Optional[Union[list[str], tuple[str, ...]]] = None
+    options: Optional[dict[str, str]] = field(default_factory=dict)
+    translate: bool = True
 
     def __post_init__(self):
         """Constructor for the PopOptions class that checks the arguments and sets instance variables.
@@ -782,11 +783,11 @@ class PopOptions(PopContainer):
         """
         super().__post_init__()
         assert isinstance(
-            self.options, (list, tuple)
-        ), f"{self.options=}. Must be a list or tuple"
+            self.options, (dict)
+        ), f"{self.options=}. Must be a dict dict[text:tag]"
         assert (
             len(self.options) > 0
-        ), f"{self.options=}. Must be a list or tuple with at leat one item in it"
+        ), f"{self.options=}. Must be a dict with at least one item in it"
         assert isinstance(self.message, str), f"{self.message=}. Mut be str"
 
         self.original_option: str = ""
@@ -797,11 +798,13 @@ class PopOptions(PopContainer):
         # Creates a GUI for the dialog box with a list of options.
         option_container = VBoxContainer(tag="option_container", text=self.message)
 
-        for index, option in enumerate(self.options):
+        # for index, option in enumerate(self.options):
+        index = 0
+        for option, tag in self.options.items():
             if index == 0:
                 self.original_option = option
 
-            tag = f"{option}-{index}".strip().replace(" ", "")
+            tag = f"{tag}|{index}".strip().replace(" ", "")
 
             if len(option) > max_width:
                 max_width = len(option) + 5
@@ -812,6 +815,7 @@ class PopOptions(PopContainer):
                     callback=self.event_handler,
                     tag=tag,
                     checked=True if index == 0 else False,
+                    translate=self.translate,
                 )
             )
 
@@ -819,6 +823,8 @@ class PopOptions(PopContainer):
                 radio_selection_width = len(self.trans_str(option))
 
             self._options[tag] = option
+
+            index += 1
 
         option_container.width = radio_selection_width
 
@@ -844,11 +850,13 @@ class PopOptions(PopContainer):
             case int(Sys_Events.CLICKED):
                 match event.tag:
                     case "ok":
-                        for key, value in self._options.items():
+                        for tag, option in self._options.items():
+                            print(f"DBG {tag=} {option=}")
                             if event.value_get(
-                                container_tag="option_container", tag=key
+                                container_tag="option_container", tag=tag
                             ):
-                                self._result = value
+                                print(f"DBG {tag=} {option=}")
+                                self._result = tag.split("|")[0]
                                 break
 
                         self.close()
@@ -1056,15 +1064,39 @@ class Langtran_Popup(PopContainer):
             event (qtg.Action): The triggering event
         """
         assert isinstance(event, Action), f"{event=}. Must be Action"
+        if "|" in event.tag:  # Grid control tag
+            tag = event.tag.split("|")[1]
+            row_unique_id = int(
+                event.tag.split("|")[0]
+            )  # Grid button tag has the row_id embedded as the 1st element and delimitered by |
+        else:
+            row_unique_id = -1
+            tag = event.tag
 
         match event.event:
             case Sys_Events.WINDOWPOSTOPEN:
                 self._windows_open_handler(event)
 
             case Sys_Events.CLICKED:
-                match event.tag:
+                match tag:
                     case "auto_trans":
                         self._auto_translate(event)
+                    case "copy_text":
+                        phrase_grid: Grid = cast(
+                            Grid,
+                            event.widget_get(
+                                container_tag="langtran_controls",
+                                tag="phrase_grid",
+                            ),
+                        )
+                        row = phrase_grid.row_from_item_id(row_unique_id)
+
+                        if row >= 0:
+                            base_phrase = phrase_grid.value_get(
+                                row=row, col=phrase_grid.colindex_get("base_phrase")
+                            )
+                            clipboard = self.parent_app.app_get.clipboard()
+                            clipboard.setText(base_phrase)
                     case "export":
                         self._export_handler(event)
                     case "import":
@@ -1115,6 +1147,15 @@ class Langtran_Popup(PopContainer):
 
         db_path: str = platformdirs.user_documents_dir()
         file_handler = file_utils.File()
+        db_path = file_handler.file_join(dir_path=db_path, file_name="langtran")
+
+        if not file_handler.file_exists(db_path):
+            if file_handler.make_dir(db_path) == -1:
+                PopError(
+                    title="Failed To Create Folder...",
+                    message=f"Failed To Create Language  Folder : {db_path}",
+                ).show()
+                return None
 
         phrase_grid: Grid = cast(
             Grid,
@@ -1132,20 +1173,27 @@ class Langtran_Popup(PopContainer):
         )
 
         langtran_files = file_handler.filelist(db_path, ("dat",))
+        if not langtran_files.files:
+            PopMessage(
+                title="No Language Files Available...",
+                message=f"There are no language files in : {db_path}!",
+            ).show()
+            return None
 
         langtran_dict = {}
-        langtran_names = []
+        langtran_names = {}
 
         for file in langtran_files.files:
             _, name, _ = file_handler.split_file_path(file)
 
             langtran_dict[name] = file_handler.file_join(db_path, name)
-            langtran_names.append(name)
+            langtran_names[name] = name
 
         result = PopOptions(
             title="Choose Language File...",
             message="Please Choose Language File",
             options=langtran_names,
+            translate=False,
         ).show()
 
         if result in langtran_dict:
@@ -1186,7 +1234,7 @@ class Langtran_Popup(PopContainer):
                 return None
 
     def _export_handler(self, event: Action) -> None:
-        """Exports the phrase grid as a language translation file to the users document folder
+        """Exports the phrase grid as a language translation file to the users document folder under langtran
 
         Args:
             event (Action): Triggering event
@@ -1195,6 +1243,15 @@ class Langtran_Popup(PopContainer):
 
         db_path: str = platformdirs.user_documents_dir()
         file_handler = file_utils.File()
+        db_path = file_handler.file_join(dir_path=db_path, file_name="langtran")
+
+        if not file_handler.file_exists(db_path):
+            if file_handler.make_dir(db_path) == -1:
+                PopError(
+                    title="Failed To Create Folder...",
+                    message=f"Failed To Create Language  Folder : {db_path}",
+                ).show()
+                return None
 
         phrase_grid: Grid = cast(
             Grid,
@@ -1270,25 +1327,45 @@ class Langtran_Popup(PopContainer):
                 ),
             )
 
+            size_warning_label = event.widget_get(
+                container_tag="langtran_controls",
+                tag="phrase_too_long",
+            )
+
+            size_warning_label.visible_set(False)
+
             for row_index in range(phrase_grid.row_count):
-                result_row = phrase_grid.userdata_get(row=row_index, col=0)
+                result_row = phrase_grid.userdata_get(
+                    row=row_index, col=phrase_grid.colindex_get("base_phrase")
+                )
                 base_lang_id = result_row[0]
                 base_phrase = result_row[1]
 
                 if (
                     base_lang_id in trans_table
                 ):  # Populate with translated phrases if available
+                    lang_phrase = trans_table[base_lang_id][1]
+
+                    if len(lang_phrase) > len(base_phrase):
+                        phrase_grid.checkitemrow_set(
+                            row=row_index,
+                            col=phrase_grid.colindex_get("lang_phrase"),
+                            checked=True,
+                        )
+
+                        size_warning_label.visible_set(True)
+
                     phrase_grid.value_set(
-                        value=trans_table[base_lang_id][1],
+                        value=lang_phrase,
                         row=row_index,
-                        col=1,
+                        col=phrase_grid.colindex_get("lang_phrase"),
                         user_data=trans_table[base_lang_id],
                     )
                 else:
                     phrase_grid.value_set(
                         value="",
                         row=row_index,
-                        col=1,
+                        col=phrase_grid.colindex_get("lang_phrase"),
                         user_data=(),
                     )
 
@@ -1309,7 +1386,7 @@ class Langtran_Popup(PopContainer):
             ),
         )
 
-        # Default country combo to the country specified in the application selected country
+        # Default country combo to the country specified in the application-selected country
         if self._db_settings.setting_exist(
             setting_name="app_country",
         ):
@@ -1343,23 +1420,54 @@ class Langtran_Popup(PopContainer):
         result = self.DB.sql_execute(trans_sql, debug=False)
         error = self.DB.get_error_status()
 
+        size_warning_label = event.widget_get(
+            container_tag="langtran_controls",
+            tag="phrase_too_long",
+        )
+
+        size_warning_label.visible_set(False)
+
         if error.code == 1 and result:  # Have base words
             for row_index, result_row in enumerate(result):
                 base_lang_id = result_row[0]
                 base_phrase = result_row[1]
 
+                phrase_grid.row_widget_set(
+                    row=row_index,
+                    col=phrase_grid.colindex_get("copy"),
+                    widget=Button(
+                        tag="copy_text",
+                        width=1,
+                        height=1,
+                        icon=file_utils.App_Path("text.svg"),
+                        tooltip="Copy Text To Clipboard",
+                        callback=self.event_handler,
+                    ),
+                )
+
                 phrase_grid.value_set(
                     value=base_phrase,
                     row=row_index,
-                    col=0,
+                    col=phrase_grid.colindex_get("base_phrase"),
                     user_data=result_row,
                 )
 
                 if base_lang_id in trans_table:
+                    lang_phrase = trans_table[base_lang_id][1]
+
+                    if len(lang_phrase) > len(base_phrase):
+                        phrase_grid.checkitemrow_set(
+                            row=row_index,
+                            col=phrase_grid.colindex_get("lang_phrase"),
+                            checked=True,
+                        )
+
+                        size_warning_label.visible_set(True)
+
                     phrase_grid.value_set(
-                        value=trans_table[base_lang_id][1],
+                        value=lang_phrase,
                         row=row_index,
-                        col=1,
+                        col=phrase_grid.colindex_get("lang_phrase"),
                         user_data=trans_table[base_lang_id],
                     )
         phrase_grid.changed = False
@@ -1397,6 +1505,7 @@ class Langtran_Popup(PopContainer):
 
     def _auto_translate(self, event: Action):
         """Attempts to automatically translate the base phrases
+        2023-09-30 David Worboys removed auto translation because of connection and stability issues
 
         Args:
             event (Action): The triggering event
@@ -1424,29 +1533,31 @@ class Langtran_Popup(PopContainer):
 
             with sys_cursor(Cursor.hourglass):
                 try:
-                    if language_code not in translators.get_languages():
-                        PopError(
-                            title="Language Is Not Supported...",
-                            message=(
-                                "MS Bing Does Not Support  Translating That Language!"
-                            ),
-                        ).show()
-                        return None
+                    # 2023-09-30 David Worboys removed auto translation because of connection and stability issues
+                    # if language_code not in translators.get_languages():
+                    #    PopError(
+                    #        title="Language Is Not Supported...",
+                    #        message=(
+                    #            "MS Bing Does Not Support  Translating That Language!"
+                    #        ),
+                    #    ).show()
+                    #    return None
 
                     for row in range(phrase_grid.row_count):
                         base_phrase = phrase_grid.value_get(row=row, col=0)
-                        trans_text = translators.translate_text(
-                            query_text=base_phrase,
-                            to_language=language_code,
-                        )
+                        # 2023-09-30 David Worboys removed auto translation because of connection and stability issues
+                        # trans_text = translators.translate_text(
+                        #    query_text=base_phrase,
+                        #    to_language=language_code,
+                        # )
 
-                        if trans_text:
-                            phrase_grid.value_set(
-                                value=trans_text,
-                                row=row,
-                                col=1,
-                                user_data=None,
-                            )
+                        # if trans_text:
+                        #    phrase_grid.value_set(
+                        #        value=trans_text,
+                        #        row=row,
+                        #        col=1,
+                        #        user_data=None,
+                        #    )
                 except Exception as e:
                     PopError(
                         title="Language Translation Failed...",
@@ -1476,8 +1587,12 @@ class Langtran_Popup(PopContainer):
 
         with sys_cursor(Cursor.hourglass):
             for row in range(phrase_grid.row_count):
-                base_phrase = phrase_grid.value_get(row=row, col=0)
-                trans_phrase = phrase_grid.value_get(row=row, col=1)
+                base_phrase = phrase_grid.value_get(
+                    row=row, col=phrase_grid.colindex_get("base_phrase")
+                )
+                trans_phrase = phrase_grid.value_get(
+                    row=row, col=phrase_grid.colindex_get("lang_phrase")
+                )
 
                 if trans_phrase.strip():
                     trans_sql = (
@@ -1568,10 +1683,17 @@ class Langtran_Popup(PopContainer):
         changed = False
 
         for row_index in range(phrase_grid.row_count):
-            if phrase_grid.valueorig_get(row=row_index, col=1) is None:
+            if (
+                phrase_grid.valueorig_get(
+                    row=row_index, col=phrase_grid.colindex_get("lang_phrase")
+                )
+                is None
+            ):
                 orig_value = ""
             else:
-                orig_value = phrase_grid.valueorig_get(row=row_index, col=1).strip()
+                orig_value = phrase_grid.valueorig_get(
+                    row=row_index, col=phrase_grid.colindex_get("lang_phrase")
+                ).strip()
 
             current_value = phrase_grid.value_get(row=row_index, col=1).strip()
 
@@ -1614,13 +1736,24 @@ class Langtran_Popup(PopContainer):
             translate=False,
             display_na=False,
             callback=self.event_handler,
-            buddy_control=Button(
-                text="Auto-Translate",
-                tag="auto_trans",
-                callback=self.event_handler,
-                height=1,
-                tooltip="Automatically translate with MS Bing",
+            buddy_control=HBoxContainer(width=70).add_row(
+                Spacer(width=3),
+                Label(
+                    text="Checked Phrases Are Too Long And Will Cause Layout Issues!",
+                    tag="phrase_too_long",
+                    width=60,
+                    visible=False,
+                    txt_font=Font(forecolor="red"),
+                ),
             ),
+            # 2023-09-30 David Worboys removed auto translation because of connection and stability issues
+            # buddy_control=Button(
+            #    text="Auto-Translate",
+            #    tag="auto_trans",
+            #    callback=self.event_handler,
+            #    height=1,
+            #    tooltip="Automatically translate with MS Bing",
+            # ),
         )
 
         langtran_control_container = VBoxContainer(
@@ -1628,6 +1761,13 @@ class Langtran_Popup(PopContainer):
         )
 
         phrase_col_def = (
+            Col_Def(
+                label="",
+                tag="copy",
+                width=2,
+                editable=False,
+                checkable=False,
+            ),
             Col_Def(
                 label="Base Phrase",
                 tag="base_phrase",
@@ -1640,7 +1780,7 @@ class Langtran_Popup(PopContainer):
                 tag="lang_phrase",
                 width=50,
                 editable=True,
-                checkable=False,
+                checkable=True,
             ),
         )
 
@@ -1669,7 +1809,7 @@ class Langtran_Popup(PopContainer):
                 Button(
                     tag="import", text="&Import", callback=self.event_handler, width=10
                 ),
-                Spacer(width=68),
+                Spacer(width=71),
                 Button(tag="ok", text="&Ok", callback=self.event_handler, width=10),
             ),
         )

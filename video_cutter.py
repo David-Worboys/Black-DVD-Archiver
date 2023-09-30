@@ -606,11 +606,14 @@ class Video_Editor(DVD_Archiver_Base):
             result = popups.PopOptions(
                 title="Choose Clip Assembly Method...",
                 message="Please Choose How To Assemble Clips",
-                options=("As A Single File", "As Individual Files"),
+                options={
+                    "As A Single File": "As_A_Single_File",
+                    "As Individual Files": "As_Individual_Files",
+                },
             ).show()
 
             match result:
-                case "As Individual Files":
+                case "As_Individual_Files":
                     _, filename, extension = file_handler.split_file_path(
                         self._video_file_input[0].video_path
                     )
@@ -698,7 +701,7 @@ class Video_Editor(DVD_Archiver_Base):
 
                         self.processed_files_callback(self._video_file_input)
 
-                case "As A Single File":
+                case "As_A_Single_File":
                     _, filename, extension = file_handler.split_file_path(
                         self._video_file_input[0].video_path
                     )
