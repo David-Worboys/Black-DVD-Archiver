@@ -290,7 +290,7 @@ class DVD_Menu_Settings:
         """
         if not self._db_settings.setting_exist("menu_font_point_size"):
             self._db_settings.setting_set("menu_font_point_size", 24)
-        return self._db_settings.setting_get("menu_font_point_size")
+        return int(self._db_settings.setting_get("menu_font_point_size"))
 
     @menu_font_point_size.setter
     def menu_font_point_size(self, value: int) -> None:
@@ -335,6 +335,87 @@ class DVD_Menu_Settings:
         assert isinstance(value, str), f"{value=}. Must be str"
 
         self._db_settings.setting_set("menu_font", value)
+
+    @property
+    def page_pointer_left(self) -> str:
+        """
+        Returns the left page pointer file
+
+        Args:
+
+        Returns:
+            str: The left page pointer file
+
+        """
+
+        if not self._db_settings.setting_exist("page_pointer_left"):
+            file_handler = file_utils.File()
+            if file_handler.file_exists(
+                directory_path=sys_consts.ICON_PATH,
+                file_name="pointer.black.left",
+                file_extension="png",
+            ):
+                self._db_settings.setting_set(
+                    "page_pointer_left", "pointer.black.left.png"
+                )
+
+        return self._db_settings.setting_get("page_pointer_left")
+
+    @page_pointer_left.setter
+    def page_pointer_left(self, value: str) -> None:
+        """
+        Sets the left page pointer.
+
+        Args:
+            value (str): The left page pointer file
+
+        Returns:
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._db_settings.setting_set("page_pointer_left", value)
+
+    @property
+    def page_pointer_right(self) -> str:
+        """
+        Returns the right page pointer file
+
+        Args:
+
+        Returns:
+            str: The right page pointer file
+
+        """
+
+        if not self._db_settings.setting_exist("page_pointer_right"):
+            file_handler = file_utils.File()
+
+            if file_handler.file_exists(
+                directory_path=sys_consts.ICON_PATH,
+                file_name="pointer.black.right",
+                file_extension="png",
+            ):
+                self._db_settings.setting_set(
+                    "page_pointer_right", "pointer.black.right.png"
+                )
+
+        return self._db_settings.setting_get("page_pointer_right")
+
+    @page_pointer_right.setter
+    def page_pointer_right(self, value: str) -> None:
+        """
+        Sets the right page pointer file.
+
+        Args:
+            value (str): The right page pointer file
+
+        Returns:
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._db_settings.setting_set("page_pointer_right", value)
 
     @property
     def button_background_color(self) -> str:

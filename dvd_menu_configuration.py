@@ -76,11 +76,55 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
                 if not self._startup:
                     self._font_combo_change(event)
             case qtg.Sys_Events.INDEXCHANGED:
+                match event.tag:
+                    case "left_page_pointer":
+                        self._set_page_pointer_image(event, "left")
+
+                    case "right_page_pointer":
+                        self._set_page_pointer_image(event, "right")
+
                 if not self._startup:
                     self._font_combo_change(event)
 
+    def _set_page_pointer_image(self, event: qtg.Action, position: str):
+        """Sets the page pointer image at actual size for an example
+
+        Args:
+            event (qtg.Action): The triggering event
+            position (str): The image position - left or right
+        """
+        assert isinstance(event, qtg.Action), f"{event=}. Must be Action"
+        assert isinstance(position, str) and position in (
+            "left",
+            "right",
+        ), f"{position=}. Must be left or right"
+
+        file_handler = file_utils.File()
+        image_file = event.value.data
+        file_path, file_name, file_extn = file_handler.split_file_path(image_file)
+        if file_handler.file_exists(
+            directory_path=file_path,
+            file_name=file_name,
+            file_extension=file_extn,
+        ):
+            page_pointer_image: qtg.Image = cast(
+                qtg.Image,
+                event.widget_get(
+                    container_tag="menu_properties",
+                    tag=f"{position}_pointer_file",
+                ),
+            )
+
+            page_pointer_image.image_set(
+                image_file,
+                height=80,
+                width=80,
+                pixel_unit=True,
+                high_quality=True,
+            )
+
     def _font_combo_init(self, event) -> None:
-        """Initializes the font combo boxes
+        """Initializes the page pointer and font combo boxes
 
         Args:
             event (qtg.Action): The triggering event
@@ -89,6 +133,35 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
 
         file_handler = file_utils.File()
         dvd_menu_settings = DVD_Menu_Settings()
+
+        left_page_pointer_combo: qtg.ComboBox = cast(
+            qtg.ComboBox,
+            event.widget_get(container_tag="menu_properties", tag="left_page_pointer"),
+        )
+
+        right_page_pointer_combo: qtg.ComboBox = cast(
+            qtg.ComboBox,
+            event.widget_get(container_tag="menu_properties", tag="right_page_pointer"),
+        )
+
+        page_pointer_left = dvd_menu_settings.page_pointer_left
+        page_pointer_right = dvd_menu_settings.page_pointer_right
+
+        for index, combo_data in enumerate(left_page_pointer_combo.get_items):
+            if (
+                page_pointer_left is not None
+                and combo_data.user_data == page_pointer_left
+            ):
+                left_page_pointer_combo.select_index(index)
+                break
+
+        for index, combo_data in enumerate(right_page_pointer_combo.get_items):
+            if (
+                page_pointer_right is not None
+                and combo_data.user_data == page_pointer_right
+            ):
+                right_page_pointer_combo.select_index(index)
+                break
 
         event.value_set(
             container_tag="menu_properties",
@@ -295,6 +368,26 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
             container_tag="menu_properties", tag="buttons_across"
         )
 
+        left_page_pointer_combo: qtg.ComboBox = cast(
+            qtg.ComboBox,
+            event.widget_get(container_tag="menu_properties", tag="left_page_pointer"),
+        )
+
+        right_page_pointer_combo: qtg.ComboBox = cast(
+            qtg.ComboBox,
+            event.widget_get(container_tag="menu_properties", tag="right_page_pointer"),
+        )
+
+        if left_page_pointer_combo.value_get().user_data.strip():
+            dvd_menu_settings.page_pointer_left = (
+                left_page_pointer_combo.value_get().user_data
+            )
+
+        if right_page_pointer_combo.value_get().user_data.strip():
+            dvd_menu_settings.page_pointer_right = (
+                right_page_pointer_combo.value_get().user_data
+            )
+
         for item in ("menu_text", "button_text"):
             text_color_combo: qtg.ComboBox = cast(
                 qtg.ComboBox,
@@ -342,6 +435,7 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
     def layout(self) -> qtg.VBoxContainer:
         """Generate the form UI layout"""
 
+        # #### Helper ####
         def _text_config(tag: str, title: str) -> qtg.FormContainer:
             return qtg.FormContainer(tag=tag, text=title).add_row(
                 qtg.ComboBox(
@@ -399,6 +493,58 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
                 ),
             )
 
+        # #### Main ####
+        file_handler = file_utils.File()
+
+        result = file_handler.filelist(sys_consts.ICON_PATH, ("png",))
+        left_page_pointer_list = []
+        right_page_pointer_list = []
+
+        if result.files:
+            for file in result.files:
+                file_path = file_handler.file_join(sys_consts.ICON_PATH, file)
+                if "left" in file.lower():
+                    left_page_pointer_list.append(
+                        qtg.Combo_Item(
+                            display="",
+                            data=file_path,
+                            icon=file_path,
+                            user_data=file,
+                        )
+                    )
+                elif "right" in file.lower():
+                    right_page_pointer_list.append(
+                        qtg.Combo_Item(
+                            display="",
+                            data=file_path,
+                            icon=file_path,
+                            user_data=file,
+                        )
+                    )
+                else:
+                    left_page_pointer_list.append(
+                        qtg.Combo_Item(
+                            display="",
+                            data=file_path,
+                            icon=file_path,
+                            user_data=file,
+                        )
+                    )
+                    right_page_pointer_list.append(
+                        qtg.Combo_Item(
+                            display="",
+                            data=file_path,
+                            icon=file_path,
+                            user_data=file,
+                        )
+                    )
+        left_page_pointer_list = sorted(
+            left_page_pointer_list, key=lambda x: x.user_data
+        )
+        right_page_pointer_list = sorted(
+            right_page_pointer_list, key=lambda x: x.user_data
+        )
+
         color_list = [
             qtg.Combo_Item(display=color, data=color, icon=None, user_data=color)
             for color in dvdarch_utils.Get_Color_Names()
@@ -432,6 +578,37 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
                     ),
                 )
             ),
+            qtg.Spacer(),
+            qtg.HBoxContainer(text="DVD Page Change Icon (80 px X 80 px)").add_row(
+                qtg.ComboBox(
+                    tag="left_page_pointer",
+                    label="Left Page",
+                    width=5,
+                    height=1,
+                    callback=self.event_handler,
+                    items=left_page_pointer_list,
+                    display_na=False,
+                    translate=False,
+                    buddy_control=qtg.Image(
+                        tag="left_pointer_file", pixel_unit=True, width=80, height=80
+                    ),
+                ),
+                qtg.Spacer(width=3),
+                qtg.ComboBox(
+                    tag="right_page_pointer",
+                    label="Right Page",
+                    width=5,
+                    height=1,
+                    callback=self.event_handler,
+                    items=right_page_pointer_list,
+                    display_na=False,
+                    translate=False,
+                    buddy_control=qtg.Image(
+                        tag="right_pointer_file", pixel_unit=True, width=80, height=80
+                    ),
+                ),
+            ),
+            qtg.Spacer(),
             qtg.HBoxContainer().add_row(
                 _text_config("menu_text", "Menu Font"),
                 _text_config("button_text", "Button Font"),

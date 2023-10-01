@@ -849,6 +849,8 @@ class DVD_Archiver(DVD_Archiver_Base):
             dvd_config.menu_font = dvd_menu_settings.menu_font
             dvd_config.menu_font_color = dvd_menu_settings.menu_font_color
             dvd_config.menu_font_point_size = dvd_menu_settings.menu_font_point_size
+            dvd_config.page_pointer_left_file = dvd_menu_settings.page_pointer_left
+            dvd_config.page_pointer_right_file = dvd_menu_settings.page_pointer_right
             dvd_config.button_background_color = (
                 dvd_menu_settings.button_background_color
             )

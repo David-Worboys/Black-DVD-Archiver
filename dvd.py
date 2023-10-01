@@ -61,6 +61,8 @@ class DVD_Config:
     _menu_aspect_ratio: str = sys_consts.AR43
     _menu_buttons_across: int = 2
     _menu_buttons_per_page: int = 4
+    _page_pointer_left_file: str = ""
+    _page_pointer_right_file: str = ""
     _project_name: str = ""
     _serial_number: str = ""
     _timestamp_font: str = ""
@@ -203,6 +205,67 @@ class DVD_Config:
 
         # At this point, something is really wrong
         raise RuntimeError(f"{value=}. Menu Font not found")
+
+    @property
+    def page_pointer_left_file(self) -> str:
+        """
+        Returns the left page pointer file
+
+        Args:
+
+        Returns:
+            str: The left page pointer file
+
+        """
+
+        return self._page_pointer_left_file
+
+    @page_pointer_left_file.setter
+    def page_pointer_left_file(self, value: str) -> None:
+        """
+        Sets the left page pointer file.
+
+        Args:
+            value (str): The left page pointer file
+
+        Returns:
+
+        """
+        assert (
+            isinstance(value, str) and value.strip() != ""
+        ), f"{value=}. Must be non-empty str"
+
+        self._page_pointer_left_file = value
+
+    @property
+    def page_pointer_right_file(self) -> str:
+        """
+        Returns the right page pointer file
+
+        Args:
+
+        Returns:
+            str: The right page pointer file
+
+        """
+        return self._page_pointer_right_file
+
+    @page_pointer_right_file.setter
+    def page_pointer_right_file(self, value: str) -> None:
+        """
+        Sets the right page pointer file.
+
+        Args:
+            value (str): The right page pointer file
+
+        Returns:
+
+        """
+        assert (
+            isinstance(value, str) and value.strip() != ""
+        ), f"{value=}. Must be non-empty str"
+
+        self._page_pointer_right_file = value
 
     @property
     def button_background_color(self) -> str:
@@ -2025,13 +2088,27 @@ class DVD:
 
         file_handler = file_utils.File()
 
-        # TODO Black Choices - make user configurable
         pointer_left = "pointer_left"
         pointer_right = "pointer_right"
 
-        right_pointer_file = "pointer.black.right"
-        left_pointer_file = "pointer.black.left"
-        pointer_file_extn = "png"
+        # TODO Make sys_consts.ICON_PATH user configurable
+        page_pointer_left_file = file_handler.file_join(
+            sys_consts.ICON_PATH, self.dvd_setup.page_pointer_left_file
+        )
+        page_pointer_right_file = file_handler.file_join(
+            sys_consts.ICON_PATH, self.dvd_setup.page_pointer_right_file
+        )
+
+        left_path, left_file, left_extn = file_handler.split_file_path(
+            page_pointer_left_file
+        )
+        right_path, right_file, right_extn = file_handler.split_file_path(
+            page_pointer_right_file
+        )
+
+        right_pointer_file = right_file
+        left_pointer_file = left_file
+        pointer_file_extn = left_extn
 
         left_pointer_icon_path = file_handler.file_join(
             sys_consts.ICON_PATH,
