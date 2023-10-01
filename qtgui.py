@@ -2261,22 +2261,20 @@ class _qtpyBase_Control(_qtpyBase):
             if hasattr(self._event_filter, "focusIn") and hasattr(
                 self._event_filter.focusIn, "connect"
             ):
-                self._event_filter.focusIn.connect(
-                    lambda *args: (self.focusInEvent(args))
-                )
+                self._event_filter.focusIn.connect(functools.partial(self.focusInEvent))
 
             if hasattr(self._event_filter, "focusOut") and hasattr(
                 self._event_filter.focusOut, "connect"
             ):
                 self._event_filter.focusOut.connect(
-                    lambda *args: (self.focusOutEvent(args))
+                    functools.partial(self.focusOutEvent)
                 )
 
             if hasattr(self._event_filter, "mousePressed") and hasattr(
                 self._event_filter.mousePressed, "connect"
             ):
                 self._event_filter.mousePressed.connect(
-                    lambda *args: self._event_handler(Sys_Events.PRESSED, args)
+                    functools.partial(self._event_handler, Sys_Events.PRESSED)
                 )
 
             self._install_event(Sys_Events.CLICKED, "clicked")
@@ -4556,10 +4554,10 @@ class _Container(_qtpyBase_Control):
         if self.scroll:
             self._scroll_container = qtW.QScrollArea(parent)
             self._scroll_container.verticalScrollBar().valueChanged.connect(
-                lambda *args: self._scroll_handler(Sys_Events.SCROLLV, args)
+                functools.partial(self._scroll_handler, Sys_Events.SCROLLV)
             )
             self._scroll_container.horizontalScrollBar().valueChanged.connect(
-                lambda *args: self._scroll_handler(Sys_Events.SCROLLH, args)
+                functools.partial(self._scroll_handler, Sys_Events.SCROLLH)
             )
 
         controls_across: int = container.controls_across
@@ -7487,11 +7485,11 @@ class _Custom_Dateedit(qtW.QWidget):
         self.calendar.setWindowFlags(qtC.Qt.Popup)
         self.calendar.installEventFilter(self)
 
-        self.dropDownButton.pressed.connect(self.showPopup)
-        self.dropDownButton.released.connect(self.calendar.hide)
-        self.lineEdit.editingFinished.connect(self.editingFinished)
-        self.calendar.clicked.connect(self.setDate)
-        self.calendar.activated.connect(self.setDate)
+        self.dropDownButton.pressed.connect(functools.partial(self.showPopup))
+        self.dropDownButton.released.connect(functools.partial(self.calendar.hide))
+        self.lineEdit.editingFinished.connect(functools.partial(self.editingFinished))
+        self.calendar.clicked.connect(functools.partial(self.setDate, "clicked"))
+        self.calendar.activated.connect(functools.partial(self.setDate, "activated"))
 
         self.lineEdit.setInputMask(self.get_mask())
 
@@ -7569,11 +7567,12 @@ class _Custom_Dateedit(qtW.QWidget):
 
         return qtC.QDate.fromString(self.text(), self.format())
 
-    def setDate(self, date: qtC.QDate) -> None:
+    def setDate(self, date: qtC.QDate, status: str) -> None:
         """Sets the date of the calendar widget to the date passed in
 
         Args:
             date (qtC.QDate): The date to be set.
+            status (str): clicked or activated
         """
         assert isinstance(date, qtC.QDate), f"{date=}. Must be QDate"
 
@@ -15068,6 +15067,8 @@ class Video_Player(qtC.QObject):
         """
         super().__init__(parent)
 
+        # os.environ["QT_MEDIA_BACKEND"] = "gstreamer" # Nice to know how to use gstreamer if you have to!
+
         assert parent is None or isinstance(
             parent, qtC.QObject
         ), f"{parent =} must be None or a qtC.QObject"
@@ -15093,7 +15094,6 @@ class Video_Player(qtC.QObject):
 
     def _setup_media_player(self) -> None:
         """Sets up the media_player and connects signals"""
-
         self._video_sink = qtM.QVideoSink()
         self._audio_output = qtM.QAudioOutput()
 
@@ -15103,15 +15103,35 @@ class Video_Player(qtC.QObject):
         self._audio_output.setVolume(1)
 
         # Hook up signals
-        self._video_sink.videoFrameChanged.connect(self._frame_handler)
-        self._media_player.durationChanged.connect(self._duration_changed)
-        self._media_player.positionChanged.connect(self._position_changed)
-        self._media_player.errorOccurred.connect(self._player_error)
-        self._media_player.mediaStatusChanged.connect(self._media_status_change)
-        self._media_player.seekableChanged.connect(self._seekable_changed)
-        self._frame_changed_handler.connect(self._video_sink.setVideoFrame)
+        self._video_sink.videoFrameChanged.connect(
+            functools.partial(self._frame_handler)
+        )
 
-        self.is_available_handler.connect(self._media_player.isAvailable)
+        self._media_player.durationChanged.connect(
+            functools.partial(self._duration_changed)
+        )
+
+        self._media_player.positionChanged.connect(
+            functools.partial(self._position_changed)
+        )
+
+        self._media_player.errorOccurred.connect(functools.partial(self._player_error))
+
+        self._media_player.mediaStatusChanged.connect(
+            functools.partial(self._media_status_change)
+        )
+
+        self._media_player.seekableChanged.connect(
+            functools.partial(self._seekable_changed)
+        )
+
+        self._frame_changed_handler.connect(
+            functools.partial(self._video_sink.setVideoFrame)
+        )
+
+        self.is_available_handler.connect(
+            functools.partial(self._media_player.isAvailable)
+        )
 
     def available(self) -> bool:
         """

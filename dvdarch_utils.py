@@ -1655,6 +1655,9 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
 
     debug = True
 
+    if utils.Is_Complied():
+        debug = False
+
     fmt = "--output=XML"
 
     video_file_details = Encoding_Details()
@@ -1668,7 +1671,7 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
 
         video_info = xmltodict.parse(mi)
 
-        if debug and not utils.Is_Complied():
+        if debug:
             print(f"=========== Video Info Debug {video_file} ===========")
             pprint.pprint(video_info)
             print("=========== Video Info Debug ===========")
