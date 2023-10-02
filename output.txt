@@ -1,0 +1,124 @@
+A Default Project Has Been Created
+%
+DVD Properties
+The Folder Where The DVD Archive Is Stored
+Select The  DVD Archive Folder
+The Folder Where The DVD Image Is Stored
+Select The  DVD Build Folder
+DVD Options
+Select Default Language By Country
+Default Language
+Language Translation
+Make A DVD
+Make A DVD
+Project:
+Delete Selected Project
+Create A New Project
+DVD Layout:
+Delete Selected DVD Layout
+Create A New DVD Layout
+Exit
+%
+Menu Properties
+The number of DVD menu buttons on a DVD menu page
+The number of DVD menu buttons across a DVD menu page
+Move Selected Button Title Up
+Move Selected Button Title Down
+Remove Selected Video Title From The DVD Menu
+Move Selected DVD Menu Page Up
+Move Selected DVD Menu Page Down
+Remove Selected Menu Page From The DVD Menu
+Saves The DVD Menu Layout
+Deactivate Filters
+&Ok
+Select The Parent Folder
+Create A New Folder
+Doubleclick On The Folder To Select or Open
+&Ok
+&Ok
+&Cancel
+&Ok
+&Cancel
+&Apply
+&Yes
+&No
+&Ok
+Auto-Translate
+Automatically translate with MS Bing
+&Save
+&Export
+&Import
+&Ok
+Ok
+Cancel
+Apply
+Ok
+Apply
+Cancel
+Cancel
+Apply
+Ok
+Yes
+No
+No
+Yes
+Yes
+No
+test
+Clear The DVD Menu Button Image
+Mark In Edit Point
+Mark Out Edit Point
+Step Back
+Play
+Step Forward
+Pause Play
+Choose The Step Unit
+Set The DVD Menu Button Image
+Video Cutter
+Assemble Edit Points Into New Videos
+Delete Edit Points From Video
+Delete Edit Points From Edit List
+Move This Edit Point Up!
+Move This Edit Point Down!
+Select All
+Select All Edit Points
+Edit List
+Video Filters
+Normalise
+Bring Out Shadow Details
+Denoise
+Lightly Reduce Video Noise
+White Balance
+Fix White Balance Problems
+Sharpen
+Lightly Sharpen Video
+Auto Levels
+Improve Exposure
+Menu Title
+DVD Settings
+Cut Video or Change Settings/Name
+Default Video Filters
+Normalise
+Bring Out Shadow Details
+Denoise
+Lightly Reduce Video Noise
+White Balance
+Fix White Balance Problems
+Sharpen
+Lightly Sharpen Video
+Auto Levels
+Improve Exposure
+Configure The DVD Menu
+Group Selected Video Files On The Same DVD Menu Page
+Ungroup Selected Video Files
+Join The Selected Files
+Toggle Between Video File Names and Button Title Names
+Move This Video File Up!
+Move This Video File Down!
+Remove Selected Video Files From DVD Input Files
+Select Files
+Select Video Files
+Select All
+DVD Input Files
+&Select Video Folder
+Select All

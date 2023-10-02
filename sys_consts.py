@@ -31,7 +31,7 @@ executable_folder = file_utils.App_Path()
 file_sep = file_utils.File().ossep
 
 PROGRAM_NAME: Final[str] = "Black DVD Archiver"
-PROGRAM_VERSION: Final[str] = "β1.0.0"
+PROGRAM_VERSION: Final[str] = "β2.0.0"
 AUTHOR: Final[str] = "David Worboys"
 LICENCE: Final[str] = "GNU V3 GPL"
 

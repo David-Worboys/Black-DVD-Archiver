@@ -1,7 +1,11 @@
-# The Black DVD Archiver — βeta 1.0 Release
-### Author: David Worboys 2023-09-01
+# The Black DVD Archiver — βeta 2.0 Release
+### Author: David Worboys 2023-10-01
 The Black DVD Archiver is an application that will place user selected video files on a DVD and the source files in an 
 archive location specified by the user. 
+
+The archive files are split into 25 GB or 4 GB folders, so that they can be burnt off to optical disk for backup. A 
+sha256 checksum file is associated with each source video file to allow users to verify future data integrity of the 
+video source files.  
 
 ## Why Black? 
 Henry Ford is reputed to have said "...You can have any colour you like as long as it is black..." likewise, you can have 
@@ -20,14 +24,14 @@ Can the author be persuaded to be more flexible and add additional features? Pos
 * A Simple Video Editor
 * Limited Video Filters With Fixed Settings
 * DVDs Have A Simplified Menu Structure
-* Saves The Input/Ouput Files In A User-Selected Archive Folder. 
+* Saves The Input/Output Files Into A User-Selected [Archive Folder Structure](#archive-folder-structure). 
   * This Can Be Placed On A NAS And Accessed By A Media Player.
   * An ISO image of the DVD is produced so that DVD burning software can produce the physical DVD. 
-    * Brasero is a good choice, choose the "Burn Image" option (https://wiki.gnome.org/Apps/Brasero) 
-  
-  _Example Archive Folder Structure_
-   ![](./userguide_images/archive_file_structure.png)
-
+    * Brasero is a good choice, choose the "Burn Image" option (https://wiki.gnome.org/Apps/Brasero)
+  * The archive files are split into 25 GB or 4 GB folders, so that they can be burnt off to optical disk for backup. 
+    * Check sums are calculated for source video files and are stored with them to verify the integrity of the source 
+    video files at a later date   
+   
 ## Why Archive To DVD?
 In short, because DVDs are offline, they last, and they are easy to share.
 
@@ -48,7 +52,7 @@ depends on people passing on their login details after they die and making arran
 _Archiving important material should take an in depth planned approach that utilises some (or all) of the above methods to 
 avoid long-term data loss, taking into account the deficiencies of each backup method._ 
 
-**_Offline optical disks (DVD/Blu-ray) are
+**_Offline optical discs (DVD/Blu-ray) are
 the last best line of defence and the longest lasting and most accessible for individuals, particularly if neglected._**
 
 **Archiving for individuals** means a descendant can be digging through a hot dusty attic in say 50 years or a century 
@@ -58,7 +62,7 @@ Because DVDs are ubiquitous and held in official archives, it is highly likely a
 transfer their contents to future media for playback and sharing.
 
 Successful consumer media playback and recording formats have very long lives, and because people collect them, there is 
-an incentive to find a way to play them back. Records, Cassettes, VHS, CD,  DVD and Blu-ray are all testaments to this.
+an incentive to find a way to play them back. Records, Cassettes, VHS, CD, DVD and Blu-ray are all testaments to this.
 
 Case in point VHS tapes, I have some now over 40 years old and I can still play them. 
 
@@ -72,8 +76,10 @@ Verbatim archival grade DVD-R's are also a good choice: https://www.verbatim.com
 
 The best approach would be burn copies to both and store in separate locations. 
 
-**Never use Blu-ray LTH disks for archival storage as they will not last as long as the original Blu-ray discs**
-https://www.verbatim.com/subcat/optical-media/m-disc/
+**Never use Blu-ray LTH discs for archival storage as they will not last as long as the original HTL (MABL - Metal 
+Ablative Layer) Blu-ray discs**
+https://francearchives.fr/file/5f281a39048987dcef88202816a5c8ade880552e/static_6187.pdf (In French, 2012)
+
 
 ![](./userguide_images/media_longevity.png)
 Source: https://ia801503.us.archive.org/7/items/nist-ir-8387/NIST.IR.8387.pdf
@@ -84,6 +90,9 @@ Source: https://ia801503.us.archive.org/7/items/nist-ir-8387/NIST.IR.8387.pdf
 * 16:9 Aspect ratio, usually from camcorders, uses the same resolution just remaps pixels from square to rectangular
 * Interlaced videos are kept as interlaced. Resizing and deinterlacing are best left to the display device
 * Only 4 GB Single Layer DVDs are supported as they are assumed to have the best archival qualities
+* The Archive folders are split into 25 GB (Blu-ray) or 4 GB (DVD) folders as chosen by the user
+  * Each video file has an associated sha256 checksum file to allow users to verify the integrity of the video file 
+  contents
 * Supported Container Formats 
   * mp4, avi, mkv, vob,mod,mov,webm,m4v,3gp, 
     3g2, mj2,mkv,mpg,mpeg,ts, m2ts, mts,qt,
@@ -94,18 +103,19 @@ Source: https://ia801503.us.archive.org/7/items/nist-ir-8387/NIST.IR.8387.pdf
 ## System Requirements
 The Black DVD Archiver is a Linux program licensed under the terms of the GNU General Public License v3.0.
 * A Linux operating system — Debian based
-* Developed and tested on Linux Mint
+* Developed and tested on Linux Mint and tested on MX Linux
 * 16+ GB RAM
 * 50+ GB of free disk space
 
 ## Installation
 
-* Download the "black-dvd-archiver" (https://github.com/David-Worboys/Black-DVD-Archiver/releases/tag/%CE%B21.0.0) to your Programs folder.
+* Download the "black-dvd-archiver" (https://github.com/David-Worboys/Black-DVD-Archiver/releases/tag/%CE%B21.0.0) to 
+your Programs folder.
 
-* Right click on the "black-dvd-archiver" file and select "Properties". This will open the window below, select 
+* Right-click on the "black-dvd-archiver" file and select "Properties." This will open the window below, select 
 "Permissions" and tick "Allow executing file as program" and then "Close" 
  ![](./userguide_images/allow_executing_as_a_program.png)
-* Double-click on the "black-dvd-archiver". It will take a few seconds to start.
+* Double-click on the "black-dvd-archiver." It will take a few seconds to start.
 
 ## The Main Window
 ![](./userguide_images/main_screen.png)
@@ -126,7 +136,7 @@ panel
  * _DVD_Used_ - The percent of the DVD used by the selected files.
    * Only 99% is available this allows 1% to cover for any time overruns.
      * The added benefit of providing a small buffer on the outer edge of the DVD is to protect the DVD from edge damage 
- * _Archive Folder_ - This is set by the user
+ * _Archive Folder_ - This is set by the user — refer to  [Archive Disk](#archive-disk-size) for further discussion
    * The Archive Folder is where the DVD image, ISO image (used to burn a DVD) and 
    DVD source files are stored.
    * The Archive Folder is best placed on a NAS (Network Attached Storage) device 
@@ -138,8 +148,8 @@ panel
      * 6 - Check sum
      * Userguide_Example — The Project Name 
  * _DVD Build Folder_ - This is set by the user
-   * The folder in which all the assets required to build a DVD are marshalled
-   * It will be overwritten on the next DVD build
+   * The folder in which all the assets required to build a DVD are marshalled into uniquely named sub-folders
+     * These folders will be deleted on successfully completing a DVD build.
    * The relevant files will be copied from here to the _Archive Folder_ when a DVD build is complete
  
 ### DVD Input Files Panel
@@ -161,8 +171,8 @@ At the bottom of the video file grid is the _Default Video Filters_ and control 
 
 #### Video File Filters
 * _Default Video Filters_ - These are the video filters applied by default to the project files.
-In general, it is best not to filter unless absolutely  required as it takes time and can impact image 
-quality. The settings chosen for these filters are aimed at having the minimal impact on video  quality
+    In general, it is best not to filter unless absolutely required as it takes time and can impact image quality. The 
+    settings chosen for these filters are aimed at having the minimal impact on video quality
 
   * _Normalise_ - Attempts to bring out the shadow details
   * _Denoise_ - Applies a light noise filter to the video files (Can be slow)
@@ -173,7 +183,7 @@ quality. The settings chosen for these filters are aimed at having the minimal i
 
 #### Command Buttons
 The operation of these buttons is as follows:
-  * ![](./userguide_images/file_select_button.png) — Opens [The Choose Video  Files Window](#the-choose-video-files-window)
+  * ![](./userguide_images/file_select_button.png) — Opens [The Choose Video Files Window](#the-choose-video-files-window)
   * ![](./userguide_images/delete_button.png) — Delete the checked (selected) video files from the file grid
   * ![](./userguide_images/down_arrow.png) — Moves the checked (selected) video files down in the grid
   * ![](./userguide_images/up_arrow.png) — Moves the checked (selected) video files up in the grid
@@ -187,8 +197,22 @@ The operation of these buttons is as follows:
   * ![](./userguide_images/configure_dvd_button.png) — Opens the [DVD Menu Configuration Window](#dvd-menu-configuration-window) 
 
 At the bottom of the _Main Window_ are the following buttons:
-* ![](./userguide_images/exit_button.png) — Exits the "Black DVD Archiver"
+* ![](./userguide_images/running_tasks.png) - Opens the "Task Manager" popup window.
+  * The "Black DVD Archiver" runs the "Make DVD" process as a background task.
+    * This allows the user to submit multiple "Make DVD" requests whilst waiting for the "Make DVD" processes to 
+    complete
+    
+  * ![](./userguide_images/task_manager.png)
+  
+    *  Select "Select All" or check (select) the task that needs to be killed.
+    * Click "Kill Task" to kill the selected tasks.
+    * Clik "Ok" to close the "Task Manager" popup.
+      * If this is done without killing taks then the tasks are left running and the window closes
+   
+
+* ![](./userguide_images/exit_button.png) — Exit the "Black DVD Archiver"
     * Save's the current view which is then loaded when the "Black DVD Archiver" is started again
+    * Prompts to kill running background tasks if the user wishes to exit immediatly
 * ![](./userguide_images/dvd_layout.png) — Manages project DVD layouts. 
   * The DVD layout combo box allows users to select the desired DVD layout by clicking on it.
   * If a project has more than 2 hours of video, then more than one DVD layout will be needed
@@ -207,11 +231,11 @@ At the bottom of the _Main Window_ are the following buttons:
       
 * ![](./userguide_images/make_dvd_button.png) — Opens the [DVD Layout Window](#dvd-layout-window) which allows the user to create a DVD
 
-## The Choose Video  Files Window
+## The Choose Video Files Window
 ![](./userguide_images/choose_video_files.png)
 This window allows the user to choose the video files for the DVD project. 
 * Click on the video files required and click on the _Ok_ button when done.
-* _Select All_ - Checking this selects all video files in the grid. Unchecking deselects all files in te grid
+* _Select All_ - Checking this selects all video files in the grid. Unchecking deselects all files in the grid
 
 ![](./userguide_images/select_video_folder_button.png) — Use this button to select the video file source folder
 * Opens the window below which allows the user to navigate the folder tree to the desired folder.
@@ -232,7 +256,22 @@ buttons are laid out in the most pleasing possible manner by an internal algorit
   * The Minimum is 1 and the Maximum is 6
 * _Buttons Across_ - Set the maximum number of DVD buttons across the menu page
   * The Minimum is 1 and the Maximum is 4
+
+### DVD Page Change Icon (80px X 80 px)
+
+The DVD page change icons are placed on the DVD menu when more than one DVD menu is generated.
+
+The actual icon display size is a square 80 pixels by 80 pixels, and these are displayed at actual size beside each
+icon selection combo box
+
+The current icon set is not as pleasing as I would like and will be expanded/revamped in a future release. Feel free to 
+send me additional icons that are 80 pixels square.
+
+* _Left Page_ - This combo box allows the user to select the left page change icon for the DVD menu
+* _Right Page_ - This combo box allows the user to select the right page change icon for the DVD menu
+
 ### Menu Font Panel
+
 * _Text Color_ - This combo box sets the colour of the title text at the top of each DVD menu page
   * This is the same for all DVD menu pages
 * _Background Color_ - This combo box sets the background colour of the DVD menu page
@@ -255,12 +294,12 @@ buttons are laid out in the most pleasing possible manner by an internal algorit
   * Given that the text and background colour are overlaid on the bottom part of the image button, making this a little 
   transparent might be more visually pleasing
 
-![](./userguide_images/dvd_screenshot.png)
+![](./userguide_images/dvd_menu_2.png)
 
 ## Video Editor Tab
 ![](./userguide_images/video_editor_tab.png)
-This tab enables basic video editing functionality. It is accessed via the ![](./userguide_images/settings_button.png) 
-button on the [DVD Input Files Panel](#dvd-input-files-panel)  
+This tab enables basic video editing functionality. It is accessed via the ![](./userguide_images/settings_button.png)button on the
+[DVD Input Files Panel](#dvd-input-files-panel)  
 
 ### DVD Settings Panel
 ![](./userguide_images/dvd_settings.png)
@@ -274,7 +313,7 @@ these settings in greater detail.
 The video cutter panel is where a video is displayed, edit points are set and where a DVD image button image is 
 selected. 
 
-**If the video is interlaced the image might appear to have jagged lines hrough it. This is normal and will 
+**If the video is interlaced, the image might appear to have jagged lines through it. This is normal and will 
 not show on DVD play back**
 
 The scroll bar is used to quickly move through the video. The scrollbar handle is clicked and dragged left or right 
@@ -305,8 +344,8 @@ edit point.
     * Clicking on the frame jumps the video to that point
     * Clicking on the **X** removes the set video frame
     * **Set this after all editing on the clip is complete as this setting is an absolute offset into the video clip and
-  in not adjusted when the clip is edited**
-* ![](./userguide_images/source_file.png) — Displays the selected source file. This is not user editable
+  is not adjusted when the clip is edited**
+* ![](./userguide_images/source_file.png) — Displays the selected source file. This is not user-editable
 
 ### Edit List Panel
 ![](./userguide_images/edit_list.png)
@@ -315,6 +354,8 @@ The edit list panel displays the list of edit points for the selected video clip
 
 * _Select All_ - Checking this selects all the edit points in the grid. Unchecking deselects all the edit points in te 
 grid
+* _Bar Graph_ -  On the top right a bar graph indicates the percentage of files remaining to be completed during the 
+file cutting process
 * _Clip Name_ - Double-clicking in this field allows the user to enter a clip name
   * This is of most use if the video is to be cut into multiple clips
   * If the edit point is to be cut out, then there is no need to enter a clip name
@@ -323,10 +364,14 @@ grid
 * ![](./userguide_images/up_arrow.png) — Moves the checked (selected) edit points up in the grid
 * ![](./userguide_images/scissors.png) — Cut the edit points from the video file
 * ![](./userguide_images/join_button.png) — Opens a pop-up window to allow the user to choose how the selected edit 
-points are assembled
+points are assembled.
+
+  The file cuts are performed as simultaneous background tasks to speed the cutting process, but it can still take time 
+if the video source files are large and the user will have to wait.
+
   * ![](./userguide_images/clip_assembley_method.png)
     * The following two methods are available to assemble the edit 
-    points
+    points.
       * _As A Single File_ - The edit points are joined into a single file
       * _As Individual Files_ - Each edit point becomes a file named according to the clip name or, if not provided, a 
       default name. This will open the file namer popup when the edit points are cut out.
@@ -338,8 +383,8 @@ points are assembled
 ![](./userguide_images/dvd_layout_window.png)
 The DVD layout window allows the user to modify the DVD layout before proceeding to generate the DVD.
 
-This window opens in response to clicking on ![](./userguide_images/make_dvd_button.png) in the 
-[Main Window](#the-main-window). Further information is found under [Command Buttons](#command-buttons)
+This window opens in response to clicking on ![](./userguide_images/make_dvd_button.png)in the [Main Window](#the-main-window). Further information is found under 
+[Command Buttons](#command-buttons)
 
 The layout displayed in this example reflects the use of grouping displayed in the main window and visible in the 
 background
@@ -358,9 +403,155 @@ generation process as fast as possible
 ### Button Title Grid
 ![](./userguide_images/button_title_grid.png)
 
-Button Title grids detail the video clips button title on each DVD page.
-A user can double-click on the _Button Title_ field and change the button title for the video clip
+Button Title grids detail the video clips button title on each DVD page. A user can double-click on the _Button Title_ 
+field and change the button title for the video clip
 
 * ![](./userguide_images/up_arrow.png) — Move the checked (selected) button title(s) up
 * ![](./userguide_images/down_arrow.png) — Move the checked (selected) button title(s) down
 * ![](./userguide_images/delete_button_2.png) — Delete the checked (selected) button title(s)
+## About/System Tab
+![](./userguide_images/about_system_tab.png)
+This tab:
+  * Displays the Black DVD Archiver version with clickable links to access the associated Github repository
+  * Provides access to the "System Settings" panel.
+
+### System Settings
+"System Settings" contains the "Archive Disk Size" and the "Black DVD Archiver Language" control panels
+
+![](./userguide_images/system_settings.png)
+#### Archive Disk Size
+
+![](./userguide_images/archive_disk_size.png)
+
+The "Archive Disk Size" panel allows the user to select the archive video optical disk size. This allows the user to 
+burn off the **_video_source_** folder **_Disk_xx_** sub-folders onto backup optical discs for offline long-term archival 
+storage of the source video files.
+
+**Only 25 GB for Blu-ray discs and 4 GB for DVD discs is permitted. This is because these are single layer optical discs 
+and these are assumed to have better long-term archival longevity.**
+
+The source video of the DVD is backed up into the archive folder — refer to the Archive Folder section in 
+[DVD Properties](#the-dvd-properties-panel) - and is currently stored in its orginal video format.
+These source files may be much larger than the DVD compressed video. In my case, I used DV compression of the captured 
+video into files contained in an avi file wrapper. These files consume 13GB per hour!
+
+##### Archive Folder Structure
+Under the "Archive Folder" selected by the user — refer to the Archive Folder section in [DVD Properties](#the-dvd-properties-panel) - 
+each DVD build results in a new archive folder being created and named automatically by the "Black DVD Archiver"
+* Under DVD Properites, the user selected the "Archive Folder" as a location to store the archived files associated with 
+producing a DVD image. 
+
+  Ideallly this would be on a backed-up NAS (Network Attached Storage) but could be any old drive, internal or external, 
+  and accessed by a media player (I am a fan of Serviio https://www.serviio.org ) for easy playback of the video on a TV.
+  ![](./userguide_images/archive_folder_selection.png)
+
+  Let's consider this example
+
+  ![](./userguide_images/archive_folder_structure.png)
+
+* Folder **_DVD-HV-000436-7_-_Userguide_Example_** was created under the **_video_backup_** folder at the successful 
+conclusion of the [Make DVD Process](#dvd-layout-window) initiated by the user when the "Make A DVD" button was clicked.
+* Folder _**video_source**_ contains the source video files in the original video format to maintain original quality.
+  * The folder structure mirrors the DVD menu structure
+    * ![](./userguide_images/dvd_menu_1.png)
+    * ![](./userguide_images/dvd_menu_2.png)
+  * Thus **DVD menu 1** (Swanhill Pioneer Museum - Jan 1981)  becomes **_video_source_** folder 
+**_Swanhill_Pioneer_Museum_-_Jan_1981** and
+  * **DVD menu 2** (Kondrook Market - 1981 Late)  becomes **_video_source_** folder **_Kondrook_Market_-_1981_Late_-_Jan_1981**
+  * This allows for folder navigation on media players that mirrors the DVD menu video structure
+  * Under the folder **_Swanhill_Pioneer_Museum_-_Jan_1981_** the source video folders are broken up into sub folders, 
+  **_Disk_01_**, **_Disk_02_**_ and **_Disk_03_**.
+  
+    * In each of these folders, the source video files are stored — ending in **_.avi_** in this case.
+    
+        _**If a source video file does not fit on to an archive disk, then it is split into parts and additional Disk_xx 
+            folders are created as needed. Note: in the current implementation, these folders are not optimally packed**_
+    
+    * Along with the source video file, a check sum file (extension **_.sha256_**) is also created.
+    
+        This check sum file can be used to check the associated source video file for data corruption at a later date.
+    
+      * For example, **_Pyap_Cruise.avi_** & **_Pyap_Cruise.avi.sha256_** form a _check_ pair
+      * To check a video file at a later date, a sha256 check sum of the file is computed and compared with the check sum 
+      stored in the paired **_.sha256_** file.
+        * If they match, the avi file has not experienced data corruption.
+        * This link contains instructions on how to do this on linux: https://lindevs.com/generate-and-verify-sha-256-hash-of-file-in-linux/
+* Folder **_iso_image_** contains a DVD disk image (**_dvd_iso_**) that can be burnt to a DVD optical disc.
+  * Brasero is a good choice, choose the "Burn Image" option (https://wiki.gnome.org/Apps/Brasero)
+* Folder **_dvd_image_** stores the DVD files in a folder structure that mirrors the DVD. This allows media players to 
+play the DVD which an iso file does not permit.  
+
+#### Black DVD Archiver Language
+![](./userguide_images/archiver_language.png)
+
+The "Black DVD Archiver Language" panel allows a user to select the default language the "Black DVD Archiver" displays by
+selecting the country in the "Default Language" combo box.
+* **Note: A country only displays in the "Default Language" combo box if it has been set-up or imported in the "Language 
+Translation" popup window.**
+* Once a language is selected, then the user must exit the "Black DVD Archiver" and restart for the language selection to
+take effect
+* At this time no language translations have been provided
+
+##### Language Translation Popup Window
+The "Language Translation Popup Window" is accessed by clicking on the ![](./userguide_images/language_translation_button.png) 
+button.
+
+This opens the "Language Translation Popup Window" where users can select the country of the language and enter 
+translated phrases.
+
+  **Note: A translated phrase currently must be the same length or of a shorter length than the corresponding English 
+phrase to avoid control layout issues in the "Black DVD Archiver"**
+
+
+
+![](./userguide_images/language_translation_popup.png)
+
+##### Command Buttons
+The operation of the command buttons is as follows:
+
+![](./userguide_images/langtran_country_combo.png) — This combo box allows the user to select the country they are 
+performing the translation for. 
+  * This must be the first action the user takes if not importing a language translation
+
+![](./userguide_images/title_button.png) — This grid button copies the corresponding English (Base) phrase to the 
+clipboard. 
+* This can be used to paste into Google translate or a similar website.
+* Double-clicking in the corresponding "Language Phase" column allows the user to type or paste the translated phrase.
+
+![](./userguide_images/save_button_translate.png) — This button saves the entered translation phrases into the database
+
+![](./userguide_images/export_button_traslate.png) — This button exports the translated language to the users Document 
+folder in a subfolder named **langtran**
+ * ![](./userguide_images/langtran.png)
+ * **Note: The three files created when exporting a country language. All three must be copied when sending to someone else**
+
+![](./userguide_images/import_button_translate.png)—This button imports a country language from the  **langtran** folder.
+* When clicked, it will open the pop-up below to allow the user to select a country language to import.
+  * ![](./userguide_images/import_language_popup.png)
+    * Pressing "Ok" imports the country language
+    * Pressing "Cancel" will stop the import process
+
+![](./userguide_images/ok_button_translae.png)  — This button closes the "Language Translation Popup Window"
+* If any translation changes have been made, it will prompt the user to save the translations before closing the window.
+
+##### Note
+* The English (Base) phrases the "Black DVD Archiver" displays for translation are automatically extracted when a window 
+ is opened. 
+
+  * If a window has not been opened, then those English phrases will be missing. 
+    * This particularly applies to error and warning messages.
+    * When such a window is opened for the first time, it will place those English (Base Phrase) in the langtran 
+    database and the user will need to translate them as they arise.
+    
+  * An effort will be made to fully populate the English (Base) phrases by V 1.0
+*  Because of the way the "Black DVD Archiver" lays out the GUI (Graphical User Interface), translated phrases that are 
+too long will mess up the layout of the user interface graphical elements.
+      * To help prevent this, the user will be warned when a translated prharse is too long
+        * First, a red warning message will be displayed at the top of the screen
+        * Second, the offending translated phrase will display a "check" mark when "Saved"
+            * ![](./userguide_images/trans_phase_too_long..png)
+
+
+
+ 
+

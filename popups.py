@@ -851,11 +851,9 @@ class PopOptions(PopContainer):
                 match event.tag:
                     case "ok":
                         for tag, option in self._options.items():
-                            print(f"DBG {tag=} {option=}")
                             if event.value_get(
                                 container_tag="option_container", tag=tag
                             ):
-                                print(f"DBG {tag=} {option=}")
                                 self._result = tag.split("|")[0]
                                 break
 

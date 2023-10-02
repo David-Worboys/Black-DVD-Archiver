@@ -229,7 +229,7 @@ class Lang_Tran(metaclass=Singleton):
                                 " word)"
                                 f" {sqldb.SQL.VALUES} (NULL,'{word_token.strip()}')"
                             )
-                            result = self.DB.sql_execute(sql, debug=True)
+                            result = self.DB.sql_execute(sql, debug=False)
                             error = self.DB.get_error_status()
 
                             if error.code == 1:
