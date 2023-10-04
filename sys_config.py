@@ -50,9 +50,7 @@ def Get_DVD_Build_Folder() -> str:
         ).show()
         return ""
 
-    dvd_folder = file_handler.file_join(
-        dvd_folder, f"{sys_consts.PROGRAM_NAME} Video Editor"
-    )
+    dvd_folder = file_handler.file_join(dvd_folder, sys_consts.VIDEO_EDITOR_FOLDER_NAME)
     return dvd_folder
 
 

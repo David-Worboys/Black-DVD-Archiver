@@ -32,6 +32,7 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
+import utils
 from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
 from dvdarch_utils import Execute_Check_Output
@@ -40,6 +41,101 @@ from sys_config import (DVD_Archiver_Base, Encoding_Details, Video_Data,
                         Video_File_Settings)
 
 # fmt: on
+
+# These global functions and variables are only used by the hy the multi-thread task_manager process and exist by
+# necessity as this seems the only way to communicate the variable values to rest of the dvdarchiver code
+gi_task_error_code = -1
+gi_thread_status = -1
+gs_thread_error_message = ""
+gs_task_error_message = ""
+gs_thread_status = ""
+gs_thread_message = ""
+gs_thread_output = ""
+gs_thread_task_name = ""
+
+gb_task_errored = False
+gi_tasks_completed = -1
+
+
+def Run_Video_Cuts(ffmpeg_cut_commands: list[str]) -> tuple[int, str]:
+    """This is a wrapper function used hy the multi-thread task_manager to run the Execute_Check_Output process
+
+    Args:
+        ffmpeg_cut_commands (list[str]): The FFMPEG video cut commands as
+
+    Returns:
+        tuple[int, str]:
+        - arg1 1: ok, -1: fail
+        - arg2: error message or "" if ok
+    """
+    global gi_task_error_code
+    global gs_task_error_message
+
+    if not utils.Is_Complied():
+        print(f"DBG {ffmpeg_cut_commands=}")
+
+    gi_task_error_code, gs_task_error_message = Execute_Check_Output(
+        commands=ffmpeg_cut_commands, debug=False
+    )
+
+    if not utils.Is_Complied():
+        print(f"DBG Run_DVD_Build {gi_task_error_code=} {gs_task_error_message=}")
+
+    return gi_task_error_code, gs_task_error_message
+
+
+def Notification_Call_Back(status: int, message: str, output: str, name):
+    """
+    The notification_call_back function is called by the multi-thread task_manager when a task completes
+
+
+    Args:
+        status: int: Determine if the task was successful or not
+        message: str: Pass a message to the user
+        output: str: Return the output of the task
+        name: Identify the task that has completed
+
+    """
+    global gs_thread_status
+    global gs_thread_message
+    global gs_thread_output
+    global gs_thread_task_name
+
+    global gi_tasks_completed
+    global gb_task_errored
+
+    gs_thread_status = status
+    gs_thread_message = message
+    gs_thread_output = output
+    gs_thread_task_name = name
+
+    if status == -1:
+        gb_task_errored = True
+    else:
+        gi_tasks_completed += 1
+
+    if not utils.Is_Complied():
+        print(
+            "DBG Notification_Call_Back"
+            f" {gs_thread_status=} {gs_thread_message=} {gs_thread_output=} {gs_thread_task_name=}"
+        )
+
+
+# self._tasks_submitted -= 1
+def Error_Callback(error_message: str):
+    """The Error_Callback function is called by the multi-thread task_manager when a task errors
+
+    Args:
+        error_message (str): The error message generated when the calling thread broke
+    """
+    global gs_thread_error_message
+
+    gs_thread_error_message = error_message
+    if not utils.Is_Complied():
+        print(f"DBG Error_Callback {gs_thread_error_message=}")
+
+
+################################
 
 
 @dataclasses.dataclass
@@ -804,59 +900,19 @@ class Video_Editor(DVD_Archiver_Base):
                 - arg 2 (str): An error message.
         """
         # Used for background task information
-        tasks_completed = 0
-        task_status = 0
-        task_message = 0
-        task_errored = False
+        global gi_task_error_code
+        global gi_thread_status
+        global gs_thread_error_message
+        global gs_task_error_message
+        global gs_thread_status
+        global gs_thread_message
+        global gs_thread_output
+        global gs_thread_task_name
+
+        global gb_task_errored
+        global gi_tasks_completed
 
         # ===== Helper
-
-        def run_edit_cut(ffmpeg_cut_commands: list[str]) -> tuple[int, str]:
-            """This is a wrapper function only used to run the Execute_check_Output in multi-thread mode
-
-            Args:
-                arguments: list[str]: A list of commands for Execute_check_Output
-
-            Returns:
-                tuple[int, str]:
-                - arg1 1: ok, -1: fail
-                - arg2: error message or "" if ok
-
-            """
-            assert all(
-                isinstance(arg, str) for arg in ffmpeg_cut_commands
-            ), f"{ffmpeg_cut_commands=}. must be a list of strings"
-
-            error_code, error_message = Execute_Check_Output(
-                commands=ffmpeg_cut_commands, debug=False
-            )
-
-            return error_code, error_message
-
-        def notification_call_back(status: int, message: str, output: str, name: str):
-            """
-            The notification_call_back function is called by the multi-thread task_manager.
-
-
-            Args:
-                status: int: Determine if the task was successful or not
-                message: str: Pass a message to the user
-                output: str: Return the output of the task
-                name: Identify the task that has completed
-
-            """
-            nonlocal task_errored
-            nonlocal task_status
-            nonlocal task_message
-            nonlocal tasks_completed
-
-            task_status = status
-            task_message = message
-
-            if status == -1:
-                pass
-            else:
-                tasks_completed += 1
 
         def transform_cut_in_to_cut_out(
             edit_list: list[tuple[int, int, str]], frame_count: int
@@ -1017,20 +1073,21 @@ class Video_Editor(DVD_Archiver_Base):
         for task_tuple in task_list:
             self._background_task_manager.add_task(
                 name=f"cut_video_{task_tuple[0]}",
-                method=run_edit_cut,
-                arguments=task_tuple[1],
-                callback=notification_call_back,
+                method=Run_Video_Cuts,
+                arguments=(task_tuple[1],),
+                callback=Notification_Call_Back,
             )
             tasks_submitted += 1
 
         current_task = 0
-        while tasks_completed < tasks_submitted:
-            if bool(task_errored):
+        gi_tasks_completed = 0
+        while gi_tasks_completed < tasks_submitted:
+            if bool(gb_task_errored):
                 self._progress_bar.reset()
-                return -1, str(task_message)
+                return -1, str(gs_task_error_message)
 
-            if current_task != tasks_completed:
-                current_task = tasks_completed
+            if current_task != gi_tasks_completed:
+                current_task = gi_tasks_completed
                 self._progress_bar.value_set(tasks_submitted - current_task)
 
             sleep(0.1)

@@ -615,10 +615,14 @@ class File:
 
         return "", "", ""
 
-    def remove_dir_contents(self, file_path_name: str) -> tuple[int, str]:
-        """Removes a directory and all its contents - specified by file_path_name.
+    def remove_dir_contents(self, file_path: str, keep_parent=False) -> tuple[int, str]:
+        """Removes a directory and all its contents - specified by file_path.
+
         Args:
-            file_path_name (str): The file path of the directory to be removed.
+            file_path (str): The file path of the directory to be removed.
+            keep_parent (bool): True - Keeps the parent file_path, removes sub-folders and files, False otherwise blow
+                                the file_path away and all sub-folders and files
+
         Returns:
             tuple[int,str]:
             - arg1 1: ok, -1: fail
@@ -626,17 +630,17 @@ class File:
         """
 
         assert (
-            isinstance(file_path_name, str) and file_path_name.strip() != ""
-        ), f"{file_path_name=}. Must be a non-empty str"
+            isinstance(file_path, str) and file_path.strip() != ""
+        ), f"{file_path=}. Must be a non-empty str"
 
-        if not os.path.exists(file_path_name):
-            return -1, f"{file_path_name} Does Not Exist."
-        elif not os.access(file_path_name, os.W_OK):
-            return -1, f"No Write Access To {file_path_name}."
+        if not os.path.exists(file_path):
+            return -1, f"{file_path} Does Not Exist."
+        elif not os.access(file_path, os.W_OK):
+            return -1, f"No Write Access To {file_path}."
 
         try:
             # Iterate through all the entries within the directory and delete them
-            with os.scandir(file_path_name) as entries:
+            with os.scandir(file_path) as entries:
                 for entry in entries:
                     if entry.is_dir() and not entry.is_symlink():
                         # Recursively delete directories using shutil.rmtree()
@@ -645,8 +649,9 @@ class File:
                         # Delete files using os.remove()
                         os.remove(entry.path)
 
-                # Remove the directory itself
-                shutil.rmtree(file_path_name)
+                if not keep_parent:
+                    # Remove the parent directory
+                    shutil.rmtree(file_path)
 
         except (OSError, PermissionError, FileNotFoundError) as error:
             return -1, f"Failed To Remove Dir/Contents: {str(error)}"

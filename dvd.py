@@ -743,7 +743,7 @@ class DVD:
         working_folder_name = utils.Get_Unique_Id()
 
         self._dvd_working_folder = file_handler.file_join(
-            self.working_folder, f"{sys_consts.PROGRAM_NAME} DVD Builder"
+            self.working_folder, sys_consts.DVD_BUILD_FOLDER_NAME
         )
 
         if not file_handler.path_exists(self.working_folder):

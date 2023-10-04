@@ -2255,7 +2255,7 @@ class _qtpyBase_Control(_qtpyBase):
             pass
 
     def _install_event_handlers(self):
-        """Attaches events to the low level GUI object created in _Create_Widger"""
+        """Attaches events to the low-level GUI object created in _Create_Widger"""
 
         if callable(self.callback) and hasattr(self._widget, "connect"):
             if hasattr(self._event_filter, "focusIn") and hasattr(

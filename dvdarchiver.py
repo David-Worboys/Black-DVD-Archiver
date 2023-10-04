@@ -32,6 +32,7 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
+import utils
 from background_task_manager import Task_Manager_Popup
 from dvd import DVD, DVD_Config
 from menu_page_title_popup import Menu_Page_Title_Popup
@@ -43,6 +44,85 @@ from video_cutter import Video_Editor
 from video_file_grid import Video_File_Grid
 
 # fmt: on
+
+# These global functions and variables are only used by the hy the multi-thread task_manager process and exist by
+# necessity as this seems the only way to communicate the variable values to rest of the dvdarchiver code
+gi_task_error_code = -1
+gi_thread_status = -1
+gs_thread_error_message = ""
+gs_task_error_message = ""
+gs_thread_status = ""
+gs_thread_message = ""
+gs_thread_output = ""
+gs_thread_task_name = ""
+
+
+def Run_DVD_Build(dvd_instance: DVD) -> tuple[int, str]:
+    """This is a wrapper function used hy the multi-thread task_manager to run the DVD build process
+
+    Args:
+        dvd_instance (DVD): The DVD instance that creates the DVD files and folders.
+
+    Returns:
+        tuple[int, str]:
+        - arg1 1: ok, -1: fail
+        - arg2: error message or "" if ok
+    """
+    global gi_task_error_code
+    global gs_task_error_message
+
+    gi_task_error_code, gs_task_error_message = dvd_instance.build()
+
+    if not utils.Is_Complied():
+        print(f"DBG Run_DVD_Build {gi_task_error_code=} {gs_task_error_message=}")
+
+    return gi_task_error_code, gs_task_error_message
+
+
+def Notification_Call_Back(status: int, message: str, output: str, name):
+    """
+    The notification_call_back function is called by the multi-thread task_manager when a task completes
+
+
+    Args:
+        status: int: Determine if the task was successful or not
+        message: str: Pass a message to the user
+        output: str: Return the output of the task
+        name: Identify the task that has completed
+
+    """
+    global gs_thread_status
+    global gs_thread_message
+    global gs_thread_output
+    global gs_thread_task_name
+
+    gs_thread_status = status
+    gs_thread_message = message
+    gs_thread_output = output
+    gs_thread_task_name = name
+
+    if not utils.Is_Complied():
+        print(
+            "DBG Notification_Call_Back"
+            f" {gs_thread_status=} {gs_thread_message=} {gs_thread_output=} {gs_thread_task_name=}"
+        )
+
+
+# self._tasks_submitted -= 1
+def Error_Callback(error_message: str):
+    """The Error_Callback function is called by the multi-thread task_manager when a task errors
+
+    Args:
+        error_message (str): The error message generated when the calling thread broke
+    """
+    global gs_thread_error_message
+
+    gs_thread_error_message = error_message
+    if not utils.Is_Complied():
+        print(f"DBG Error_Callback {gs_thread_error_message=}")
+
+
+################################
 
 
 class DVD_Archiver(DVD_Archiver_Base):
@@ -223,6 +303,25 @@ class DVD_Archiver(DVD_Archiver_Base):
                         == "yes"
                     ):
                         if self._video_editor.shutdown() == 1:
+                            # Remove the temporary DVD Build Folder subdirectories
+                            with qtg.sys_cursor(qtg.Cursor.hourglass):
+                                if self._db_settings.setting_exist(
+                                    sys_consts.DVD_BUILD_FOLDER
+                                ):
+                                    file_handler = file_utils.File()
+
+                                    working_folder = self._db_settings.setting_get(
+                                        sys_consts.DVD_BUILD_FOLDER
+                                    )
+
+                                    dvd_working_folder = file_handler.file_join(
+                                        working_folder, sys_consts.DVD_BUILD_FOLDER_NAME
+                                    )
+
+                                    file_handler.remove_dir_contents(
+                                        dvd_working_folder, keep_parent=True
+                                    )
+
                             return 1
                         else:
                             self._shutdown = False
@@ -705,48 +804,6 @@ class DVD_Archiver(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event} is not an instance of qtg.Action"
 
-        def run_dvd_build(dvd_instance: tuple[DVD]) -> tuple[int, str]:
-            """This is a wrapper function only used to run the DVD build process in multi-thread mode
-
-            Args:
-                dvd_instance (DVD): The dvd instance that creates the DVD files and folders
-
-            Returns:
-                tuple[int, str]:
-                - arg1 1: ok, -1: fail
-                - arg2: error message or "" if ok
-
-            """
-            error_code, error_message = dvd_instance[0].build()
-
-            return error_code, error_message
-
-        def notification_call_back(status: int, message: str, output: str, name):
-            """
-            The notification_call_back function is called by the multi-thread task_manager
-
-
-            Args:
-                status: int: Determine if the task was successful or not
-                message: str: Pass a message to the user
-                output: str: Return the output of the task
-                name: Identify the task that has completed
-
-            """
-            if status == -1:
-                pass
-            else:
-                if name in self._task_stack:
-                    del self._task_stack[name]
-
-        # self._tasks_submitted -= 1
-        def error_callback(error_message: str):
-            pass
-            # popups.PopError(
-            #    title="Task Crash...",
-            #    message=f" Task Manager Crash : {error_message}",
-            # ).show()
-
         dvd_layout_combo: qtg.ComboBox = cast(
             qtg.ComboBox,
             event.widget_get(container_tag="main_controls", tag="existing_layouts"),
@@ -899,13 +956,13 @@ class DVD_Archiver(DVD_Archiver_Base):
 
                 self._task_stack[task_name] = (dvd_creator, menu_layout)
 
-                self._video_editor.get_task_manager.set_error_callback(error_callback)
+                self._video_editor.get_task_manager.set_error_callback(Error_Callback)
 
                 self._video_editor.get_task_manager.add_task(
                     name=task_name,
-                    method=run_dvd_build,
+                    method=Run_DVD_Build,
                     arguments=(dvd_creator,),
-                    callback=notification_call_back,
+                    callback=Notification_Call_Back,
                 )
 
     def _new_dvd_layout(self, event: qtg.Action) -> None:

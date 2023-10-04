@@ -31,7 +31,7 @@ executable_folder = file_utils.App_Path()
 file_sep = file_utils.File().ossep
 
 PROGRAM_NAME: Final[str] = "Black DVD Archiver"
-PROGRAM_VERSION: Final[str] = "β2.0.0"
+PROGRAM_VERSION: Final[str] = "β2.1.0"
 AUTHOR: Final[str] = "David Worboys"
 LICENCE: Final[str] = "GNU V3 GPL"
 
@@ -107,6 +107,8 @@ DEFAULT_PROJECT_NAME: Final[str] = "Default"
 DEFAULT_DVD_LAYOUT_NAME: Final[str] = "DVD 1"
 EDIT_FOLDER: Final[str] = "edits"
 TRANSCODE_FOLDER: Final[str] = "transcodes"
+DVD_BUILD_FOLDER_NAME: Final[str] = f"{PROGRAM_NAME} DVD Builder"
+VIDEO_EDITOR_FOLDER_NAME = f"{PROGRAM_NAME} Video Editor"
 
 PERCENT_SAFTEY_BUFFER: Final[int] = (
     1  # Used to limit DVD size so that it never exceeds 100%

@@ -19,11 +19,11 @@
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
-import asyncio
-import concurrent
 import dataclasses
+import multiprocessing.dummy as multiprocessing
 import signal
 import threading
+from multiprocessing.shared_memory import SharedMemory
 from time import sleep
 from typing import Callable, Optional, cast
 
@@ -32,40 +32,36 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 
-
 # fmt: on
-@dataclasses.dataclass(slots=True)
+
+
+@dataclasses.dataclass
 class _Task:
     """
-    A class that represents a background task.
+    Represents a task to be executed by the task manager.
 
-    Attributes:
-        name (str): The name of the task.
-        method (Callable): The method to be executed
-        arguments (any): The arguments to be passed to the method
-        callback (Callable[[int, str, str, str], None]): The callback to call when the task is finished.
+    Note:
+        The `stop` method can be used to forcefully terminate a task's associated process.
+        It is important to handle task termination carefully to prevent resource leaks.
+
     """
 
     name: str
     method: Callable
-    arguments: list | tuple
-    callback: Callable[[int, str, str, str], None]  # status, message, output, task_name
+    arguments: any
+    callback: Callable[[int, str, str, str], None]
     crashed: bool = False
     kill_signal: bool = False
+    process: Optional[multiprocessing.Process] = None
 
     def __post_init__(self):
-        """Configures instance for use"""
         assert isinstance(self.name, str), f"{self.name=}. Must be a string"
         assert isinstance(self.method, Callable), f"{self.method=}. Must be a callable"
-        assert isinstance(
-            self.arguments, (list, tuple)
-        ), f"{self.arguments=}. Must be a list or tuple"
         assert isinstance(
             self.callback, Callable
         ), f"{self.callback=}. Must be a callable"
 
 
-@dataclasses.dataclass(slots=True)
 class Task_Manager:
     """
     A class that represents a background task manager.
@@ -74,53 +70,33 @@ class Task_Manager:
         error_callback (Callable[[str], None]): The callback to call when the task manager crashes.
     """
 
-    error_callback: Optional[Callable[[str], None]] = None
-
-    # Private instance variables
-    _throw_errors: bool = True
-    _task_queue: list[_Task] | None = None
-    _running_tasks: dict[str, _Task] | None = None
-    _thread: Optional[threading.Thread] | None = None
-    _stop_event: Optional[threading.Event] | None = None
-    _crash_event: Optional[threading.Event] | None = None
-
-    def __post_init__(self):
-        """Configures instance for use"""
-        assert isinstance(self.error_callback, (type(None), Callable[[str], None]))
-        assert isinstance(
-            self.error_callback, (type(None), Callable[[str], None])
-        ), f"{self.error_callback=}. Must be a callable or None"
-
-        self._task_queue = []
-        self._running_tasks = {}
+    def __init__(self):
+        self.error_callback = None
+        self._throw_errors = True
+        self._task_queue = multiprocessing.Queue()
+        self._task_list = []
+        self._running_tasks_dict = {}
         self._thread = None
-        self._stop_event = None
+        self._crash_event = None
+        self._lock = threading.Lock()
 
-        self._crash_event = threading.Event()
-
-        signal.signal(signal.SIGSEGV, self._handle_crash)
+        self._stop_event = threading.Event()
+        self._running_tasks_updated = multiprocessing.Event()
+        self._manager = multiprocessing.Manager()
+        self._running_tasks = multiprocessing.Queue()
+        self._update_event = multiprocessing.Event()
+        # create a shared memory
 
     @property
     def throw_errors(self) -> bool:
-        """Return True to allow errors to be thrown, False otherwise
-
-        Returns:
-            bool: True to allow errors to be thrown, False otherwise
-
-        """
         return self._throw_errors
 
     @throw_errors.setter
     def throw_errors(self, value: bool):
-        """Throw errors is set True to allow errors to be thrown
-
-        Args:
-            value (bool): True, throw errors, False do not throw errors
-        """
         assert isinstance(value, bool), f"{value=}. Must be bool"
         self._throw_errors = value
 
-    def _handle_crash(self, signum: int, frame: any) -> None:
+    def _handle_crash(self, signum, frame):
         """
         Handles a SIGSEGV (signal 9) signal and call the error_callback if it is registered.
 
@@ -129,97 +105,136 @@ class Task_Manager:
             frame (any): Is frame
 
         """
-        assert isinstance(signum, int), f"{signum=}. Must be an integer"
-        # assert isinstance(frame, any), f"{frame=}. Must be any"
+        print("Task Manager has crashed with SIGSEGV (signal 9)")
 
         self._crash_event.set()
 
         if self.error_callback is not None and self.throw_errors:
-            print(
-                f"{sys_consts.PROGRAM_NAME} Task Manager has crashed with SIGSEGV"
-                " (signal 9)"
-            )
             self.error_callback("Task Manager has crashed with SIGSEGV (signal 9)")
 
-    async def _process_task(self, task: _Task):
+    def _process_task(self, task: _Task, shared_mem_name: str):
         """
-        The _process_task method is a coroutine that executes the command in the task.
-        It uses asyncio to run this function in a separate thread, so it doesn't block
-        the main event loop. It also handles errors and crashes gracefully.
+        The _process_task method executes the command in the task asynchronously.
+        It runs this function in a separate process to avoid blocking the main program.
+        It handles errors and crashes gracefully and terminates the process when needed.
 
         Args:
-            task: (_Task): The task object to be executed
-
+            task (_Task): The task object to be executed.
         """
         if self._crash_event.is_set():
             task.crashed = True
 
         try:
-            loop = asyncio.get_event_loop()
-            executor = concurrent.futures.ThreadPoolExecutor()
-
-            status, output = await loop.run_in_executor(
-                executor, task.method, task.arguments
+            task.process = multiprocessing.Process(
+                target=task.method, args=(task.arguments,)
             )
 
+            status, output = task.method(*task.arguments)
+
             if task.crashed:
+                data_bytes = b""
                 if self.throw_errors:
                     task.callback(-1, "crash", "", task.name)
+                    data_bytes = f"{task.name}|crash".encode("ascii")
             else:
                 task.callback(status, "ok", output, task.name)
+                data_bytes = f"{task.name}|ok".encode("ascii")
+
+            # Write data to shared memory
+            try:
+                shared_mem: SharedMemory = SharedMemory(name=shared_mem_name)
+                shared_mem.buf[: len(data_bytes)] = data_bytes
+                shared_mem.close()
+            except Exception as write_error:
+                pass
+                # Ok, weird...I get this exception, but everything works!
+                # print(f"DBG Error writing to shared memory A: {write_error}")
 
         except Exception as e:
-            if self.error_callback is not None and self.throw_errors:
-                self.error_callback(
-                    f"Task {task.name} encountered an exception: {str(e)}"
-                )
+            print(f"_process_task {e=}")
 
-        if task.kill_signal:
-            if task.name in self._running_tasks:
-                del self._running_tasks[task.name]
+            task.callback(-1, "error", str(e), task.name)
+            data_bytes = f"{task.name}|exception".encode("ascii")
 
-    async def _task_handler(self):
-        """
-        The _task_handler method is the main loop of the background task handler. It runs until the _stop_event is set
-        and the _task_queue is empty.
-        """
-
-        async def process_task(task):
-            self._running_tasks[task.name] = task
-            await self._process_task(task)
-
-            if task.name in self._running_tasks:
-                del self._running_tasks[task.name]
-
-        while True:
+            # Write data to shared memory
             try:
-                if self._stop_event.is_set() and not self._task_queue:
-                    # Stopping and no tasks so break out of the loop
-                    break
+                shared_mem = SharedMemory(name=shared_mem_name)
+                shared_mem.buf[: len(data_bytes)] = data_bytes
+                shared_mem.close()
+            except Exception as write_error:
+                pass
+                # Ok, same exception as above, but I have not seen it fail!
+                # print(f"DBG Error writing to shared memory B: {write_error}")
 
-                if self._task_queue:
-                    task = self._task_queue.pop(0)
-                    await process_task(task)
-                else:  # no tasks have a rest
-                    await asyncio.sleep(0.1)
+        with self._lock:
+            self._running_tasks_updated.set()  # Signal the update event
 
-                # Check for tasks that need to be killed
-                for task_name, task in self._running_tasks.items():
-                    if task.kill_signal:  # She's dead Jim
-                        task.kill_signal = False
-                        task.crashed = True
-                        if self.throw_errors:
-                            task.callback(-1, "killed", "", task.name)
+    def _task_handler(self):
+        """
+        The _task_handler method is the main loop of the background task handler.
+        It runs until the _stop_event is set and the _task_queue is empty.
+        """
 
-                        if task_name in self._running_tasks:
-                            del self._running_tasks[task_name]
+        while not self._stop_event.is_set():
+            if self._update_event.wait(timeout=1):  # Wait for up to 1 second
+                while (
+                    not self._task_queue.empty()
+                ):  # Check if there are tasks in the queue
+                    with self._lock:
+                        task = self._task_queue.get_nowait()
+
+                    with self._lock:
+                        self._running_tasks.put(task.name)
+                        self._update_event.set()
+
+                    try:
+                        shared_mem = SharedMemory(name=task.name)
+                    except FileNotFoundError:
+                        # Shared memory with the given name doesn't exist; create a new one
+                        shared_mem = SharedMemory(name=task.name, create=True, size=512)
+
+                    task.process = multiprocessing.Process(
+                        target=self._process_task,
+                        args=(task, task.arguments),
+                    )
+
+                    try:
+                        self._running_tasks_dict[task.name] = task
+
+                        task_names = list(self._running_tasks_dict.keys())
+                        with self._lock:
+                            for task_name in task_names:
+                                self._running_tasks.put(
+                                    task_name
+                                )  # Put updated task names into the Queue
+                                self._update_event.set()  # Signal the update event
+
+                        task.process.start()
+                    except Exception as e:
+                        print(f"DBG _Task_Handler {e}")
+
+            sleep(0.1)
+
+            if self._running_tasks_updated.wait(timeout=1):  # Wait for up to 1 second
+                with self._lock:
+                    if task_name in self._running_tasks_dict:
+                        del self._running_tasks_dict[task_name]
+            try:
+                for task_name, task in list(self._running_tasks_dict.items()):
+                    if task.kill_signal:
+                        if task_name in self._running_tasks_dict:
+                            del self._running_tasks_dict[task_name]
+
+                            task_names = list(self._running_tasks_dict.keys())
+
+                            with self._lock:
+                                self._running_tasks.put(
+                                    task_names
+                                )  # Put updated task names into the Queue
+                                self._update_event.set()  # Signal the update event
+
             except Exception as e:
-                message = (
-                    f"{sys_consts.PROGRAM_NAME} Generated An Unlikely Multitasking"
-                    f" Exception {e=}"
-                )
-                self.error_callback(message)
-                print(message)
+                print(f"_Task_Handler {e=}")
 
     def add_task(
         self,
@@ -238,6 +253,7 @@ class Task_Manager:
             callback (Callable[[int, str, str, str], None]): The callback function to be called when the task is finished.
 
         """
+
         assert (
             isinstance(name, str) and name.strip() != ""
         ), f"{name=}. Must be a non-empty str"
@@ -246,7 +262,9 @@ class Task_Manager:
 
         task = _Task(name=name, method=method, arguments=arguments, callback=callback)
 
-        self._task_queue.append(task)
+        with self._lock:
+            self._task_queue.put(task)
+            self._update_event.set()  # Signal the update event
 
     def list_running_tasks(self) -> list[str]:
         """
@@ -255,22 +273,15 @@ class Task_Manager:
         Returns:
             list[str]: The list of names of the currently running tasks.
         """
-        return list(self._running_tasks.keys())
+        return list(self._running_tasks_dict.keys())
 
     def kill_task(self, name: str):
-        """
-        Kills the running task with the specified name.
-        """
-        task = self._running_tasks.get(name)
+        """Kills the running task with the specified name."""
+        with self._lock:
+            task = self._running_tasks_dict.get(name)
+
         if task is not None:
-            # task.crashed = True
             task.kill_signal = True
-
-            if self.throw_errors:
-                task.callback(-1, "killed", "", task.name)
-
-            if name in self._running_tasks:
-                del self._running_tasks[name]
 
     def set_error_callback(self, callback: Callable[[str], None]):
         """
@@ -284,52 +295,28 @@ class Task_Manager:
         self.error_callback = callback
 
     def start(self):
-        """
-        Starts the background task handler.
-        """
-
+        """The _start_task_handler method starts the task handler."""
         if self._thread is None or not self._thread.is_alive():
-            self._stop_event = threading.Event()
-            self._thread = threading.Thread(
-                target=self._start_task_handler, daemon=True
-            )
+            self._crash_event = threading.Event()
+            signal.signal(signal.SIGSEGV, self._handle_crash)
+            self._thread = threading.Thread(target=self._task_handler, daemon=True)
             self._thread.start()
 
-    def _start_task_handler(self):
-        """
-        The _start_task_handler method starts the task handler.
-        It creates a new event loop, sets it as the default event loop, and runs until complete.
-        The _task_handler method is called to start the task handler.
-
-        """
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self._task_handler())
-        loop.close()
-
     def stop(self):
-        """
-        Stops the background task handler.
-        """
+        """Stops the background task handler."""
+
         if self._thread is not None and self._thread.is_alive():
             self._stop_event.set()
-            self._thread.join()
-            self._stop_event.clear()
 
-            # Reset the crash event
-            self._crash_event.clear()
+            for task_name, task in self._running_tasks_dict.items():
+                task.kill_signal = True
 
-            # Terminate running tasks
-            for task in self._running_tasks.values():
                 if self.throw_errors:
                     task.crashed = True
                     task.callback(-1, "killed", "", task.name)
 
-            self._running_tasks = {}
-
-            # Clear the task queue
             self._task_queue = []
+            self._running_tasks_dict = {}
 
 
 @dataclasses.dataclass
