@@ -45,8 +45,8 @@ from video_file_grid import Video_File_Grid
 
 # fmt: on
 
-# These global functions and variables are only used by the hy the multi-thread task_manager process and exist by
-# necessity as this seems the only way to communicate the variable values to rest of the dvdarchiver code
+# These global functions and variables are only used by the multi-thread task_manager process and exist by
+# necessity as this seems the only way to communicate the variable values to the rest of the dvdarchiver code
 gi_task_error_code = -1
 gi_thread_status = -1
 gs_thread_error_message = ""
@@ -864,9 +864,6 @@ class DVD_Archiver(DVD_Archiver_Base):
                 video_data_items: list[Video_Data] = menu_item[1]
 
                 for video_item in video_data_items:
-                    self._file_control.check_file(
-                        file_grid=file_grid, vd_id=video_item.vd_id, checked=True
-                    )
                     video_files.append(video_item)
 
         if video_files:
