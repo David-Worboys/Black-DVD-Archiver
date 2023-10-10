@@ -24,7 +24,7 @@ import dataclasses
 import hashlib
 import os
 import sqlite3 as pysqlite3
-from decimal import Decimal
+from _decimal import Decimal
 from enum import unique
 from pathlib import Path
 from sqlite3 import Connection
@@ -34,7 +34,8 @@ import platformdirs
 
 from file_utils import File
 from sys_consts import SDELIM
-from utils import Get_Unique_Sysid, Is_Complied, strEnum
+from utils import Get_Unique_Sysid, Is_Complied, strEnum, NUMBER
+
 
 # fmt: on
 
@@ -159,7 +160,7 @@ class ColDef:
     cascade_delete: bool = True  # FK deletes cascade to children
     index: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert (
             isinstance(self.name, str) and self.name.strip() != ""
         ), f"{self.name=}. Must be a non-empty str"
@@ -355,6 +356,7 @@ class App_Settings:
         assert (
             isinstance(password, str) and password.strip() != ""
         ), f"{password}. Must be non-empty str"
+        assert isinstance(password_hash, bool), f"{password_hash=}. Must be bool"
 
         if password_hash:
             if Crypto().verify_password(self.db_password_get(), password):
@@ -403,7 +405,7 @@ class App_Settings:
         )
 
         setting_result = self._appcfg_db.sql_execute(sql_statement)
-        result = self._appcfg_db.get_error_status()
+        result: Error = self._appcfg_db.get_error_status()
 
         self._error_code = result.code
         self._error_txt = result.message
@@ -464,7 +466,7 @@ class App_Settings:
         )
 
         setting_result = self._appcfg_db.sql_execute(sql_statement)
-        error = self._appcfg_db.get_error_status()
+        error: Error = self._appcfg_db.get_error_status()
 
         self._error_code = error.code
         self._error_txt = error.message
@@ -480,7 +482,7 @@ class App_Settings:
             )
 
             sql_result = self._appcfg_db.sql_execute(sql_statement)
-            error = self._appcfg_db.get_error_status()
+            error: Error = self._appcfg_db.get_error_status()
 
             self._error_code = error.code
             self._error_txt = error.message
@@ -489,8 +491,10 @@ class App_Settings:
                 if not sql_result:  # No Rows
                     return None
 
-                setting_value = sql_result[0][0]  # row 1 col 1
-                setting_datatype = sql_result[0][1]  # row 1 col 2
+                setting_value: str | bool | int | float = sql_result[0][
+                    0
+                ]  # row 1 col 1
+                setting_datatype: SQL = sql_result[0][1]  # row 1 col 2
 
                 match setting_datatype:
                     case SQL.BOOLEAN:
@@ -511,12 +515,14 @@ class App_Settings:
                         )
         return None
 
-    def setting_set(self, setting_name: str, setting_value: any) -> int:
+    def setting_set(
+        self, setting_name: str, setting_value: bool | int | float | str | None
+    ) -> int:
         """Sets the value associated with the setting_name
 
         Args:
             setting_name (str): Name of setting
-            setting_value (any): Value of setting
+            setting_value (bool | int | float | str | None): Value of setting
 
         Returns:
             int: 1 ok, -1 fail
@@ -525,18 +531,22 @@ class App_Settings:
             isinstance(setting_name, str) and setting_name.strip() != ""
         ), f"{setting_name=}. Must be non-empty str"
 
+        assert isinstance(
+            setting_value, (bool, int, float, str)
+        ), f"{setting_value=}. Must be bool, int, float or str"
+
         sql_statement = (
             f"{SQL.SELECT} id {SQL.FROM} {SYSDEF.SYSTABLE} "
             + f"{SQL.WHERE} app_name ='{self._app_name}' "
         )
 
         app = self._appcfg_db.sql_execute(sql_statement)
-        result = self._appcfg_db.get_error_status()
+        result: Error = self._appcfg_db.get_error_status()
 
         self._error_code = result.code
 
         if self._error_code == 1:
-            app_id = app[0][0]  # Row 1 Col 1
+            app_id: int = app[0][0]  # Row 1 Col 1
 
             if app_id > 0:
                 sql_statement = (
@@ -546,7 +556,7 @@ class App_Settings:
                 )
 
                 setting_result = self._appcfg_db.sql_execute(sql_statement)
-                result = self._appcfg_db.get_error_status()
+                result: Error = self._appcfg_db.get_error_status()
 
                 self._error_code = result.code
 
@@ -724,9 +734,9 @@ class App_Settings:
                 )
 
                 self._appcfg_db.sql_execute(sql_statement)
-                result = self._appcfg_db.get_error_status()
+                result_error: Error = self._appcfg_db.get_error_status()
 
-                self._error_code = result.code
+                self._error_code = result_error.code
 
                 if self._error_code == 1:
                     if self._appcfg_db.sql_commit == 1:
@@ -822,9 +832,9 @@ class Crypto:
             "sha512", clear_password.encode("utf-8"), salt.encode("ascii"), 100_000
         )
 
-        pwdhash = binascii.hexlify(pwdhash).decode("ascii")
+        pwdhash_str = binascii.hexlify(pwdhash).decode("ascii")
 
-        return pwdhash == password_hash
+        return pwdhash_str == password_hash
 
 
 def get_rowcol_value(row: int, col: int, row_list: list) -> str:
@@ -878,7 +888,7 @@ class SQLDB:
         if dbpath.strip() == "":
             dbpath = os.getcwd()
 
-        self._multiplier_int = 10**currency_num_decs
+        self._multiplier_int: int = 10**currency_num_decs
 
         if not suffix.startswith("."):
             suffix = "." + suffix
@@ -988,22 +998,20 @@ class SQLDB:
             for line_no, line in enumerate(csv_file.readlines()):
                 if line_no == 0:
                     if has_header:
-                        col_names = line.strip().split(delimiter)
+                        col_names: list[str] = line.strip().split(delimiter)
                     else:
-                        for col_index, col_value in enumerate(
-                            line.strip().split(delimiter)
-                        ):
+                        for col_index, _ in enumerate(line.strip().split(delimiter)):
                             col_names.append(f"col{col_index}")
                 else:
-                    scan_pos = file_ptr.tell()
+                    scan_pos: int = file_ptr.tell()
 
                     for col_index, col_name in enumerate(col_names):
-                        col_values = line.strip().split(delimiter)
+                        col_values: list[str] = line.strip().split(delimiter)
 
                         if col_name not in col_def:
                             col_def[col_name] = [-1, None, 0, 0]
 
-                        col_definition = col_def[col_name]
+                        col_definition: dict | None = col_def[col_name]
 
                         if len(col_values[col_index]) > col_definition[0]:
                             col_definition[0] = len(col_values[col_index])
@@ -1342,7 +1350,8 @@ class SQLDB:
             if udf_function_name in column or (
                 func_name in column.lower() for func_name in SQLFUN.list()
             ):
-                # Ignore user defined and SQL Lite function massaging of cols - coder knows what they are doing!: TODO: Process it!
+                # Ignore user defined and SQL Lite function massaging of cols - coder knows what they are doing!:
+                # TODO: Process it!
                 pass
             elif SDELIM in column:  # SQL Lite Concat -
                 concat_cols = column.split(SDELIM)
@@ -1734,7 +1743,7 @@ class SQLDB:
                 return True
         return False
 
-    def _convert_from_base(self, value: int) -> int | float:
+    def _convert_from_base(self, value: int) -> Decimal:
         """
         Converts an int value from the base value - most likely used with Currency Conversion,
         e.g., Integer 1234 will be converted to Decimal('12.34')
@@ -1747,29 +1756,25 @@ class SQLDB:
         """
         assert isinstance(value, int), f"{value=}. Must be int"
 
-        value = Decimal(value) / self._multiplier_int
+        return Decimal(value) / self._multiplier_int
 
-        return value
-
-    def _convert_to_base(self, value: int | float) -> int:
+    def _convert_to_base(self, value: NUMBER) -> int:
         """
         Coverts a numeric value to a base value - most likely used with Currency Conversion
         e.g. value = Column(Sqlite Decimal(2)) means a value such as
         Decimal('12.34') will be converted to 1234
 
         Args:
-            value (int | float): Numeric valur to be converted
+            value (NUMBER): Numeric value to be converted
 
         Returns:
             int: The converted value
         """
         assert isinstance(value, (int, float)), f"{value=}. Must be int|float"
 
-        value = int(Decimal(value) * self._multiplier_int)
+        return int(Decimal(value) * self._multiplier_int)
 
-        return value
-
-    def _error_message(self, title: str, message: str, fatal=True) -> int:
+    def _error_message(self, title: str, message: str, fatal: bool = True) -> int:
         """Packages an _error message into the correct instance variables
         Args:
             title (str): Title of error message
