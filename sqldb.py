@@ -24,7 +24,7 @@ import dataclasses
 import hashlib
 import os
 import sqlite3 as pysqlite3
-from _decimal import Decimal
+from decimal import Decimal
 from enum import unique
 from pathlib import Path
 from sqlite3 import Connection
@@ -34,8 +34,7 @@ import platformdirs
 
 from file_utils import File
 from sys_consts import SDELIM
-from utils import Get_Unique_Sysid, Is_Complied, strEnum, NUMBER
-
+from utils import NUMBER, Get_Unique_Sysid, Is_Complied, strEnum
 
 # fmt: on
 
