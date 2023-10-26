@@ -16,6 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 # TODO Split file into multiple files - well this is bigger than Ben Hur now, needs its own git project,
 # doco, examples etc. Code needs review as well...sigh, where to find the time!
 
@@ -1639,7 +1640,8 @@ class _Widget_Registry:
             isinstance(tag, str) and tag.strip() != ""
         ), f"{tag=}. Must be a non-empty str"
         assert isinstance(
-            widget, (_qtpyBase, _qtpySDI_Frame)  # QT 6.5.0
+            widget,
+            (_qtpyBase, _qtpySDI_Frame),  # QT 6.5.0
         ), f"{widget=}. Must be an instance of _qtpyBase"
 
         container_tag = f"{window_id}_{container_tag}"
@@ -1694,7 +1696,7 @@ class _Widget_Registry:
                     continue
 
                 if isinstance(item.widget, (_Container, Grid)):
-                    # Down the rabbit hole and and blow it all away
+                    # Down the rabbit hole and blow it all away
                     self.widget_del(
                         window_id=window_id,
                         container_tag=item.tag,
@@ -2228,6 +2230,7 @@ class _qtpyBase_Control(_qtpyBase):
         """Installs the event handler for the given event on the widget.
 
         Note: Pyside6 6.5.1 broke lambda connects - TODO test later releases
+              Nuitka 1.8.4  Seems to have addressed the issue
 
         Args:
             event (Sys_Events): Event to install
@@ -2254,28 +2257,47 @@ class _qtpyBase_Control(_qtpyBase):
         except AttributeError:
             pass
 
-    def _install_event_handlers(self):
+    def _install_event_handlers(self, use_lambda: bool = False):
         """Attaches events to the low-level GUI object created in _Create_Widger"""
 
         if callable(self.callback) and hasattr(self._widget, "connect"):
             if hasattr(self._event_filter, "focusIn") and hasattr(
                 self._event_filter.focusIn, "connect"
             ):
-                self._event_filter.focusIn.connect(functools.partial(self.focusInEvent))
+                if use_lambda:
+                    self._event_filter.focusIn.connect(
+                        lambda args: self.focusInEvent(args)
+                    )
+                else:
+                    self._event_filter.focusIn.connect(
+                        functools.partial(self.focusInEvent)
+                    )
 
             if hasattr(self._event_filter, "focusOut") and hasattr(
                 self._event_filter.focusOut, "connect"
             ):
-                self._event_filter.focusOut.connect(
-                    functools.partial(self.focusOutEvent)
-                )
+                if use_lambda:
+                    self._event_filter.focusOut.connect(
+                        lambda args: self.focusOutEvent(args)
+                    )
+                else:
+                    self._event_filter.focusOut.connect(
+                        functools.partial(self.focusOutEvent)
+                    )
 
             if hasattr(self._event_filter, "mousePressed") and hasattr(
                 self._event_filter.mousePressed, "connect"
             ):
-                self._event_filter.mousePressed.connect(
-                    functools.partial(self._event_handler, Sys_Events.PRESSED)
-                )
+                if use_lambda:
+                    self._event_filter.mousePressed.connect(
+                        lambda args: self._event_handler(
+                            self._event_handler, Sys_Events.PRESSED
+                        )
+                    )
+                else:
+                    self._event_filter.mousePressed.connect(
+                        functools.partial(self._event_handler, Sys_Events.PRESSED)
+                    )
 
             self._install_event(Sys_Events.CLICKED, "clicked")
             self._install_event(Sys_Events.ACTIVATED, "cellActivated")
@@ -3769,7 +3791,8 @@ class QtPyApp(_qtpyBase):
         ), f"{container_tag=}. Must be str"
         assert isinstance(tag, str) and tag.strip() != "", f"{tag=}. Must be str"
         assert isinstance(
-            widget, (_qtpyBase, _qtpySDI_Frame)  # QT 6.5.0
+            widget,
+            (_qtpyBase, _qtpySDI_Frame),  # QT 6.5.0
         ), f"{widget=}. Must be an instance of _qtpyBase"
         # if not isinstance(widget, _qtpyBase): #QT 6.5.0
         #    print(f"DBG {widget=} {type(widget)=}")
@@ -4292,6 +4315,7 @@ class _Container(_qtpyBase_Control):
         None  # = qtW.QScrollArea(parent) #None
     )
     _scroll_current_widget: Optional[_qtpyBase_Control] = None
+    _use_lambda: bool = False
 
     def __post_init__(self) -> None:
         """Sets up the class variables and makes sure that the variables are of the correct type"""
@@ -4553,12 +4577,23 @@ class _Container(_qtpyBase_Control):
 
         if self.scroll:
             self._scroll_container = qtW.QScrollArea(parent)
-            self._scroll_container.verticalScrollBar().valueChanged.connect(
-                functools.partial(self._scroll_handler, Sys_Events.SCROLLV)
-            )
-            self._scroll_container.horizontalScrollBar().valueChanged.connect(
-                functools.partial(self._scroll_handler, Sys_Events.SCROLLH)
-            )
+            if self._use_lambda:
+                self._scroll_container.verticalScrollBar().valueChanged.connect(
+                    lambda: self._scroll_handler(Sys_Events.SCROLLV)
+                )
+            else:
+                self._scroll_container.verticalScrollBar().valueChanged.connect(
+                    functools.partial(self._scroll_handler, Sys_Events.SCROLLV)
+                )
+
+            if self._use_lambda:
+                self._scroll_container.horizontalScrollBar().valueChanged.connect(
+                    lambda: self._scroll_handler(Sys_Events.SCROLLH)
+                )
+            else:
+                self._scroll_container.horizontalScrollBar().valueChanged.connect(
+                    functools.partial(self._scroll_handler, Sys_Events.SCROLLH)
+                )
 
         controls_across: int = container.controls_across
         max_text_len: int = container.max_text_len
@@ -5138,9 +5173,7 @@ class _Container(_qtpyBase_Control):
         )
 
     # TODO Keep return type uptodate
-    def widget_get(
-        self, container_tag: str, tag: str
-    ) -> Union[
+    def widget_get(self, container_tag: str, tag: str) -> Union[
         _qtpyBase_Control,
         "Button",
         "Checkbox",
@@ -6366,7 +6399,9 @@ class PopContainer(_qtpyBase_Control):
     title: str = ""
     container: Optional[_Container] = None
     dialog: _Dialog = None
-    parent_app: QtPyApp = None  # Changed to public 2023/03/05 because of a very occasional focus_out error
+    parent_app: QtPyApp = (
+        None  # Changed to public 2023/03/05 because of a very occasional focus_out error
+    )
 
     # private instance variables
     _allow_close: bool = False
@@ -7452,7 +7487,7 @@ class _Custom_Dateedit(qtW.QWidget):
 
     min_date = qtC.QDate(1, 1, 100)  # qtC.QDate(100, 1, 1)
 
-    def __init__(self, parent: qtW.QWidget = None) -> None:
+    def __init__(self, parent: qtW.QWidget = None, use_lambda=False) -> None:
         """Constructor for the custom date edit widget that validates arguments and sets instance variables.
             Sets the input mask for the lineEdit widget to the mask returned by the get_mask() function
 
@@ -7485,11 +7520,24 @@ class _Custom_Dateedit(qtW.QWidget):
         self.calendar.setWindowFlags(qtC.Qt.Popup)
         self.calendar.installEventFilter(self)
 
-        self.dropDownButton.pressed.connect(functools.partial(self.showPopup))
-        self.dropDownButton.released.connect(functools.partial(self.calendar.hide))
-        self.lineEdit.editingFinished.connect(functools.partial(self.editingFinished))
-        self.calendar.clicked.connect(functools.partial(self.setDate, "clicked"))
-        self.calendar.activated.connect(functools.partial(self.setDate, "activated"))
+        if use_lambda:
+            self.dropDownButton.pressed.connect(lambda: self.showPopup())
+            self.dropDownButton.released.connect(lambda: self.calendar.hide())
+            self.lineEdit.editingFinished.connect(lambda: self.editingFinished())
+            self.calendar.clicked.connect(lambda args: self.setDate(args, "clicked"))
+            self.calendar.activated.connect(
+                lambda args: self.setDate(args, "activated")
+            )
+        else:
+            self.dropDownButton.pressed.connect(functools.partial(self.showPopup))
+            self.dropDownButton.released.connect(functools.partial(self.calendar.hide))
+            self.lineEdit.editingFinished.connect(
+                functools.partial(self.editingFinished)
+            )
+            self.calendar.clicked.connect(functools.partial(self.setDate, "clicked"))
+            self.calendar.activated.connect(
+                functools.partial(self.setDate, "activated")
+            )
 
         self.lineEdit.setInputMask(self.get_mask())
 
@@ -7637,6 +7685,7 @@ class _Custom_Dateedit(qtW.QWidget):
                 return True
         except:
             pass
+
         self.clear()
         return False
 
@@ -8346,7 +8395,11 @@ class FolderView(_qtpyBase_Control):
         event: Sys_Events = args[0]
 
         if len(args) > 1:
-            selected_index: qtC.QModelIndex = args[1]
+            if isinstance(args[1], tuple) and len(args) > 1:  # Lambda event handler mod
+                selected_index: qtC.QModelIndex = args[1][0]
+            else:
+                selected_index: qtC.QModelIndex = args[1]
+
             selected_node = namedtuple(
                 "selected_node", "name, path, size, modified, date_modified type, isdir"
             )
@@ -8978,12 +9031,21 @@ class Grid(_qtpyBase_Control):
                 event = arg
             elif isinstance(arg, tuple):
                 if len(arg) == 1:
-                    widget_item = arg[0]
+                    if isinstance(arg[0], qtC.QModelIndex):  # Lambda event handler mod
+                        model_index = arg[0]
+
+                        row = model_index.row()
+                        col = model_index.column()
+
+                        if row >= 0 and col >= 0:
+                            widget_item = self._widget.item(row, col)
+                    else:
+                        widget_item = arg[0]
                 elif len(arg) == 2:
                     row, col = arg
                 elif len(arg) == 4:
                     row_prev, col_prev, row, col = arg
-            elif isinstance(arg, qtC.QModelIndex):
+            elif isinstance(arg, qtC.QModelIndex):  # Functools partial handler
                 row = arg.row()
                 col = arg.column()
 
@@ -12275,6 +12337,7 @@ class Menu(_qtpyBase_Control):
         container_tag: str,
         _menu: Union[dict[str, _Menu_Entry], None] = None,
         _depth: int = 0,
+        _use_lambda: bool = False,
     ) -> qtW.QMenuBar:
         """Creates a menu bar widget
 
@@ -12376,24 +12439,43 @@ class Menu(_qtpyBase_Control):
                         event_handler = _Event_Handler(
                             parent_app=parent_app, parent=self
                         )
-                        menu_item.guiwidget_get.triggered.connect(
-                            functools.partial(
-                                event_handler.event,
-                                window_id=window_id,
-                                callback=menu_item.element.callback,
-                                action=menu_item.element.callback.__name__,
-                                container_tag=container_tag,
-                                tag=menu_item.tag,
-                                event=Sys_Events.MENUCLICKED,
-                                value=None,
-                                widget_dict=parent_app.widget_dict_get(
+                        if _use_lambda:
+                            menu_item.guiwidget_get.triggered.connect(
+                                lambda: event_handler.event(
                                     window_id=window_id,
+                                    callback=menu_item.element.callback,
+                                    action=menu_item.element.callback.__name__,
                                     container_tag=container_tag,
-                                ),
-                                parent=parent,
-                                control_name=self.__class__.__name__,
+                                    tag=menu_item.tag,
+                                    event=Sys_Events.MENUCLICKED,
+                                    value=None,
+                                    widget_dict=parent_app.widget_dict_get(
+                                        window_id=window_id,
+                                        container_tag=container_tag,
+                                    ),
+                                    parent=parent,
+                                    control_name=self.__class__.__name__,
+                                )
                             )
-                        )
+                        else:
+                            menu_item.guiwidget_get.triggered.connect(
+                                functools.partial(
+                                    event_handler.event,
+                                    window_id=window_id,
+                                    callback=menu_item.element.callback,
+                                    action=menu_item.element.callback.__name__,
+                                    container_tag=container_tag,
+                                    tag=menu_item.tag,
+                                    event=Sys_Events.MENUCLICKED,
+                                    value=None,
+                                    widget_dict=parent_app.widget_dict_get(
+                                        window_id=window_id,
+                                        container_tag=container_tag,
+                                    ),
+                                    parent=parent,
+                                    control_name=self.__class__.__name__,
+                                )
+                            )
         return self._widget
 
     def element_add(self, parent_tag: str, menu_element: Menu_Element) -> None:
@@ -13822,7 +13904,7 @@ class Tab(_qtpyBase_Control):
             int: 1. If the event is accepted, -1. If the event is rejected
         """
         assert isinstance(args[0], Sys_Events), f"{args[0]=}. Must be Sys_Events"
-        assert isinstance(args[1], int), f"{args[1]=}. Must be int"
+        # assert isinstance(args[1], int), f"{args[1]=}. Must be int"
 
         event = args[0]
         tab_index = args[1]
@@ -14644,7 +14726,7 @@ class Treeview(_qtpyBase_Control):
         return items
 
     def value_get(self) -> tuple[(str, any)]:
-        """Returns a value tuple of the current node of the the Tree view.
+        """Returns a value tuple of the current node of the Tree view.
 
         Returns:
             tuple[(str,any)] : Current Tree view node value tuple (node text, node user value)
@@ -14946,7 +15028,7 @@ class Slider(_qtpyBase_Control):
             value (int): The value to set the slider to.
         """
         assert (
-            isinstance(value, int) and self.range_min <= value <= self.range_max
+            isinstance(value, int) and self.range_min <= value <= self.range_max + 1
         ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
         self._widget: qtW.QSlider
 
@@ -15089,6 +15171,7 @@ class Video_Player(qtC.QObject):
         self._display_height = display_height
         self._frame_rate: float = -1.0
         self._input_file = ""
+        self._use_lambda = False
 
         self._setup_media_player()
 
@@ -15103,35 +15186,49 @@ class Video_Player(qtC.QObject):
         self._audio_output.setVolume(1)
 
         # Hook up signals
-        self._video_sink.videoFrameChanged.connect(
-            functools.partial(self._frame_handler)
-        )
+        if (
+            self._use_lambda
+        ):  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and Nuitka < 1.8.4 == boom!
+            self._video_sink.videoFrameChanged.connect(self._frame_handler)
+            self._media_player.durationChanged.connect(self._duration_changed)
+            self._media_player.positionChanged.connect(self._position_changed)
+            self._media_player.errorOccurred.connect(self._player_error)
+            self._media_player.mediaStatusChanged.connect(self._media_status_change)
+            self._media_player.seekableChanged.connect(self._seekable_changed)
+            self._media_player.errorOccurred.connect(self._player_error)
+            self._frame_changed_handler.connect(self._video_sink.setVideoFrame)
+            self.is_available_handler.connect(self._media_player.isAvailable)
+        else:  # This saves the day!
+            self._video_sink.videoFrameChanged.connect(
+                functools.partial(self._frame_handler)
+            )
 
-        self._media_player.durationChanged.connect(
-            functools.partial(self._duration_changed)
-        )
+            self._media_player.durationChanged.connect(
+                functools.partial(self._duration_changed)
+            )
 
-        self._media_player.positionChanged.connect(
-            functools.partial(self._position_changed)
-        )
+            self._media_player.positionChanged.connect(
+                functools.partial(self._position_changed)
+            )
 
-        self._media_player.errorOccurred.connect(functools.partial(self._player_error))
+            self._media_player.errorOccurred.connect(
+                functools.partial(self._player_error)
+            )
 
-        self._media_player.mediaStatusChanged.connect(
-            functools.partial(self._media_status_change)
-        )
+            self._media_player.mediaStatusChanged.connect(
+                functools.partial(self._media_status_change)
+            )
+            self._media_player.seekableChanged.connect(
+                functools.partial(self._seekable_changed)
+            )
 
-        self._media_player.seekableChanged.connect(
-            functools.partial(self._seekable_changed)
-        )
+            self._frame_changed_handler.connect(
+                functools.partial(self._video_sink.setVideoFrame)
+            )
 
-        self._frame_changed_handler.connect(
-            functools.partial(self._video_sink.setVideoFrame)
-        )
-
-        self.is_available_handler.connect(
-            functools.partial(self._media_player.isAvailable)
-        )
+            self.is_available_handler.connect(
+                functools.partial(self._media_player.isAvailable)
+            )
 
     def available(self) -> bool:
         """
