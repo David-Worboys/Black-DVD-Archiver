@@ -112,7 +112,7 @@ class Task_Manager:
         if self.error_callback is not None and self.throw_errors:
             self.error_callback("Task Manager has crashed with SIGSEGV (signal 9)")
 
-    def _process_task(self, task: _Task, shared_mem_name: str):
+    def _process_task(self, task: _Task, args):
         """
         The _process_task method executes the command in the task asynchronously.
         It runs this function in a separate process to avoid blocking the main program.
@@ -121,6 +121,8 @@ class Task_Manager:
         Args:
             task (_Task): The task object to be executed.
         """
+        shared_mem_name = task.name
+
         if self._crash_event.is_set():
             task.crashed = True
 
@@ -137,23 +139,20 @@ class Task_Manager:
                     task.callback(-1, "crash", "", task.name)
                     data_bytes = f"{task.name}|crash".encode("ascii")
             else:
-                task.callback(status, "ok", output, task.name)
+                task.callback(status, "ok", "" if output is None else output, task.name)
                 data_bytes = f"{task.name}|ok".encode("ascii")
 
             # Write data to shared memory
             try:
-                shared_mem: SharedMemory = SharedMemory(name=shared_mem_name)
-                shared_mem.buf[: len(data_bytes)] = data_bytes
-                shared_mem.close()
+                with self._lock:
+                    shared_mem: SharedMemory = SharedMemory(name=shared_mem_name)
+                    shared_mem.buf[: len(data_bytes)] = data_bytes
+                    shared_mem.close()
             except Exception as write_error:
-                pass
-                # Ok, weird...I get this exception, but everything works!
-                # print(f"DBG Error writing to shared memory A: {write_error}")
+                print(f"DBG Error writing to shared memory A: {write_error}")
 
         except Exception as e:
-            print(f"_process_task {e=}")
-
-            task.callback(-1, "error", str(e), task.name)
+            task.callback(-1, "error", "" if e is None else e, task.name)
             data_bytes = f"{task.name}|exception".encode("ascii")
 
             # Write data to shared memory
@@ -196,6 +195,7 @@ class Task_Manager:
                     task.process = multiprocessing.Process(
                         target=self._process_task,
                         args=(task, task.arguments),
+                        name=task.name,
                     )
 
                     try:

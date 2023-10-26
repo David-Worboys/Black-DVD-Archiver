@@ -16,6 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
@@ -51,6 +52,7 @@ def Get_DVD_Build_Folder() -> str:
         return ""
 
     dvd_folder = file_handler.file_join(dvd_folder, sys_consts.VIDEO_EDITOR_FOLDER_NAME)
+
     return dvd_folder
 
 
@@ -635,6 +637,7 @@ class Encoding_Details:
     _video_frame_rate: float = 0.0
     _video_standard: str = ""
     _video_frame_count: int = 0
+    _video_bitrate: int = 0
 
     def __post_init__(self) -> None:
         pass
@@ -859,6 +862,30 @@ class Encoding_Details:
         self._video_ar = value
 
     @property
+    def video_bitrate(self) -> int:
+        """
+        The video_bitrate method returns the bitrate of the video.
+
+        Returns:
+            int: Video bitrate
+
+        """
+        return self._video_bitrate
+
+    @video_bitrate.setter
+    def video_bitrate(self, value: int) -> None:
+        """
+        The video_bitrate method sets the bitrate of the video.
+
+        Args:
+            value (int): Set the number of frames in the video
+
+        """
+        assert isinstance(value, int), f"{value=}. Must be int"
+
+        self._video_bitrate = value
+
+    @property
     def video_par(self) -> float:
         """
         The video_par method returns the pixel aspect ratio of a video.
@@ -963,6 +990,20 @@ class Encoding_Details:
             str: The video standard of the video
 
         """
+        if self._video_standard not in (sys_consts.PAL, sys_consts.NTSC):
+            if (
+                self.video_width == sys_consts.PAL_SPECS.width_43
+                and self.video_height == sys_consts.PAL_SPECS.height_43
+                and self.video_frame_rate == sys_consts.PAL_SPECS.frame_rate
+            ):
+                self._video_standard = sys_consts.PAL
+            elif (
+                self.video_width == sys_consts.NTSC_SPECS.width_43
+                and self.video_height == sys_consts.NTSC_SPECS.height_43
+                and self.video_frame_rate == sys_consts.NTSC_SPECS.frame_rate
+            ):
+                self._video_standard = sys_consts.NTSC
+
         return self._video_standard
 
     @video_standard.setter
@@ -977,9 +1018,24 @@ class Encoding_Details:
         assert isinstance(value, str) and value.upper() in (
             sys_consts.PAL,
             sys_consts.NTSC,
+            "N/A",
         ), f"{value=}. Must be PAL or NTSC"
 
-        self._video_standard = value.upper()
+        if value.upper() == "N/A":
+            if (
+                self.video_width == sys_consts.PAL_SPECS.width_43
+                and self.video_height == sys_consts.PAL_SPECS.height_43
+                and self.video_frame_rate == sys_consts.PAL_SPECS.frame_rate
+            ):
+                value = sys_consts.PAL
+            elif (
+                self.video_width == sys_consts.NTSC_SPECS.width_43
+                and self.video_height == sys_consts.NTSC_SPECS.height_43
+                and self.video_frame_rate == sys_consts.NTSC_SPECS.frame_rate
+            ):
+                value = sys_consts.NTSC
+
+            self._video_standard = value.upper()
 
     @property
     def video_frame_count(self) -> int:
@@ -1011,7 +1067,7 @@ class Encoding_Details:
         The video_scan_order method returns the scan order of an interlaced video.
 
         Returns:
-            str: The scan order of the video
+            str: The scan order of the video, bff (bottom field first) ot tff (top field first)
 
         """
         return self._video_scan_order
@@ -1025,17 +1081,20 @@ class Encoding_Details:
             value (str): Set the scan order of the video
 
         """
-        assert isinstance(value, str), f"{value=}. Must be str"
+        assert isinstance(value, str) and value.lower() in (
+            "bff",
+            "tff",
+        ), f"{value=}. Must be 'bff' | 'tff''"
 
         self._video_scan_order = value
 
     @property
     def video_scan_type(self) -> str:
         """
-        The video_scan_type method returns the scan type of an interlaced video.
+        The video_scan_type method returns the scan type of the video.
 
         Returns:
-            str: The scan type of the video
+            str: The scan type of the video, interlaced or prgressive
 
         """
         return self._video_scan_type
@@ -1049,7 +1108,10 @@ class Encoding_Details:
             value (str): Set the scan type of the video
 
         """
-        assert isinstance(value, str), f"{value=}. Must be str"
+        assert isinstance(value, str) and value.lower() in (
+            "interlaced",
+            "progressive",
+        ), f"{value=}. Must be interlaced or progressive"
 
         self._video_scan_type = value
 

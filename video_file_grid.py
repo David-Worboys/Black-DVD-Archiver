@@ -94,7 +94,10 @@ class Video_File_Grid(DVD_Archiver_Base):
 
     def process_edited_video_files(self, video_file_input: list[Video_Data]) -> None:
         """
-        Called in DVD Archiver
+        Called in DVD Archiver to handle the edited video files and place in the file list grid
+
+        Args:
+            video_file_input (list[Video_Data]): THhe edited video file list
         """
         assert isinstance(video_file_input, list), f"{video_file_input=}. Must be list"
         assert all(
@@ -1223,17 +1226,18 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 loaded_files = []
                 for row_index in reversed(range(file_grid.row_count)):
-                    file_name = file_grid.value_get(row_index, 0)
-
                     grid_video_data: Video_Data = file_grid.userdata_get(
                         row=row_index, col=file_grid.colindex_get("settings")
                     )
+
+                    file_name = grid_video_data.video_path
 
                     video_standard = grid_video_data.encoding_info.video_standard
 
                     if project_video_standard != video_standard:
                         rejected += (
-                            f"{sys_consts.SDELIM}{file_name} : {sys_consts.SDELIM} Not"
+                            f"{sys_consts.SDELIM}{file_name} :"
+                            f" {sys_consts.SDELIM} Not"
                             " Project Video Standard "
                             f"{sys_consts.SDELIM}{project_video_standard}{sys_consts.SDELIM} \n"
                         )
@@ -1295,13 +1299,13 @@ class Video_File_Grid(DVD_Archiver_Base):
                         dvdarch_utils.Get_File_Encoding_Info(file_video_data.video_path)
                     )
 
-                    if file_video_data.encoding_info.error:  # Error Occurred
-                        rejected += (
-                            "File Error"
-                            f" {sys_consts.SDELIM}{file_video_data.video_path} :"
-                            f"  {file_video_data.encoding_info.error}{sys_consts.SDELIM} \n"
-                        )
-                        continue
+                if file_video_data.encoding_info.error:  # Error Occurred
+                    rejected += (
+                        "File Error"
+                        f" {sys_consts.SDELIM}{file_video_data.video_path} :"
+                        f"  {file_video_data.encoding_info.error}{sys_consts.SDELIM} \n"
+                    )
+                    continue
 
                 toolbox = self._get_toolbox(file_video_data)
 
@@ -1412,13 +1416,19 @@ class Video_File_Grid(DVD_Archiver_Base):
             user_data=video_user_data,
         )
 
+        encoder_str = (
+            video_user_data.encoding_info.video_format
+            + f":{ video_user_data.encoding_info.video_scan_order}"
+            if video_user_data.encoding_info.video_scan_order != ""
+            else (
+                f"{video_user_data.encoding_info.video_format} :"
+                f" { video_user_data.encoding_info.video_scan_type}"
+            )
+        )
+
         file_grid.value_set(
-            value=(
-                video_user_data.encoding_info.video_format
-                + f":{ video_user_data.encoding_info.video_scan_order}"
-                if video_user_data.encoding_info.video_scan_order != ""
-                else ""
-            ),
+            value=encoder_str,
+            tooltip=encoder_str,
             row=row_index,
             col=file_grid.colindex_get("encoder"),
             user_data=video_user_data,
@@ -1665,7 +1675,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             qtg.Col_Def(
                 label="Video File",
                 tag="video_file",
-                width=70,
+                width=80,
                 editable=False,
                 checkable=True,
             ),

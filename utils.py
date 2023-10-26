@@ -224,21 +224,19 @@ def Find_Common_Words(word_list: list[str]) -> list[str]:
         isinstance(word, str) for word in word_list
     ), f"{word_list=}. Must be a list of str"
 
-    common_words = []
+    common_words: list[str] = []
 
     for outer_index, word_line in enumerate(word_list):
-        words = re.sub(r"[\W_]+", " ", word_line.lower())
-        words = words.split()
+        words = re.sub(r"[\W_]+", " ", word_line.lower()).split()
         words = set(word for word in words if word.isalpha())
 
-        other_words = set()
+        other_words: set[str] = set()
 
         for inner_index, match_word_line in enumerate(word_list):
             if inner_index == outer_index:  # same thing, skip
                 continue
 
-            match_words = re.sub(r"[\W_]+", " ", match_word_line.lower())
-            match_words = match_words.split()
+            match_words = re.sub(r"[\W_]+", " ", match_word_line.lower()).split()
             match_words = set(word for word in match_words if word.isalpha())
             other_words |= match_words
 
@@ -2167,8 +2165,6 @@ def levenshtein(str1: str, str2: str) -> float:
 
     for str2_index in list(range(0, str2_len)):
         for str1_index in list(range(0, str1_len)):
-            str1_index: int
-            str2_index: int
             if str1[str1_index] == str2[str2_index]:
                 matrix[str2_index + 1][str1_index + 1] = min(
                     matrix[str2_index + 1][str1_index] + 1,

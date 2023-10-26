@@ -379,18 +379,55 @@ class DVD_Archiver(DVD_Archiver_Base):
                                 title="Task Manager",
                                 task_manager=self._video_editor.get_task_manager,
                             ).show()
+                    case "transcode_none":
+                        self._db_settings.setting_set(
+                            "archive_disk_transcode", sys_consts.TRANSCODE_NONE
+                        )
+                    case "transcode_h264":
+                        self._db_settings.setting_set(
+                            "archive_disk_transcode", sys_consts.TRANSCODE_H264
+                        )
+                    case "transcode_h265":
+                        self._db_settings.setting_set(
+                            "archive_disk_transcode", sys_consts.TRANSCODE_H265
+                        )
                     case "video_editor":  # Signal from file_grid
                         dvd_folder = Get_DVD_Build_Folder()
+                        video_data: list[Video_Data] = event.value
 
-                        if dvd_folder.strip() != "":
-                            video_data: list[Video_Data] = event.value
-                            self._video_editor.set_source(
-                                video_file_input=video_data, output_folder=dvd_folder
-                            )
-                            self._control_tab.select_tab(tag_name="video_editor_tab")
-                            self._control_tab.enable_set(
-                                tag="video_editor_tab", enable=True
-                            )
+                        if (
+                            video_data[0].encoding_info.video_duration
+                            < 5  # ~ ! seconds
+                            or video_data[0].encoding_info.error.strip() != ""
+                        ):
+                            popups.PopError(
+                                title="Video File Is Invalid...",
+                                message=(
+                                    "Selected Video File Is Not  Supported, Corrupt Or"
+                                    " Too Short < 5 seconds"
+                                    f" ({video_data[0].encoding_info.video_duration} seconds)"
+                                    f" : {video_data[0].video_path} "
+                                ),
+                            ).show()
+                            return None
+
+                        if dvd_folder.strip() == "":
+                            popups.PopError(
+                                title="DVD Build Folder Not Set...",
+                                message=(
+                                    "Please Enter The DVD Build Folder To Edit Video"
+                                    " Files"
+                                ),
+                            ).show()
+                            return None
+
+                        self._video_editor.set_source(
+                            video_file_input=video_data, output_folder=dvd_folder
+                        )
+                        self._control_tab.select_tab(tag_name="video_editor_tab")
+                        self._control_tab.enable_set(
+                            tag="video_editor_tab", enable=True
+                        )
 
             case qtg.Sys_Events.CUSTOM:  # APPPOSTINIT is consumed and CUSTOM is emitted in its place
                 match event.tag:
@@ -879,6 +916,15 @@ class DVD_Archiver(DVD_Archiver_Base):
                 dvd_config.archive_size = self._db_settings.setting_get(
                     "archive_disk_size"
                 )
+            else:
+                dvd_config.archive_size = sys_consts.DVD_ARCHIVE_SIZE
+
+            if self._db_settings.setting_exist("archive_disk_transcode"):
+                dvd_config.transcode_type = self._db_settings.setting_get(
+                    "archive_disk_transcode"
+                )
+            else:
+                dvd_config.transcode_type = sys_consts.TRANSCODE_NONE
 
             sql_result = self._app_db.sql_select(
                 col_str="code,description",
@@ -1179,7 +1225,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         assert all(
             isinstance(video_file, Video_Data) for video_file in video_file_input
         ), f"{video_file_input=}. Must be list of Video_Data"
-
+        print(f"DBG HEH 1 {video_file_input=}")
         # Note when changing tabpages I call process_edited_video_files and that makes this call
         # redundant - worse it would fire twice!. TODO Consider This Unintended Consequence!
         # self._file_control.process_edited_video_files(video_file_input=video_file_input)
@@ -1192,11 +1238,20 @@ class DVD_Archiver(DVD_Archiver_Base):
         Returns:
             FormContainer: The application layout
         """
+
         if self._db_settings.setting_exist("archive_disk_size"):
             archive_disk_size = self._db_settings.setting_get("archive_disk_size")
         else:
             archive_disk_size = sys_consts.DVD_ARCHIVE_SIZE
             self._db_settings.setting_set("archive_disk_size", archive_disk_size)
+
+        if self._db_settings.setting_exist("archive_disk_transcode"):
+            transcode_type = self._db_settings.setting_get("archive_disk_transcode")
+        else:
+            transcode_type = sys_consts.TRANSCODE_NONE
+            transcode_type = self._db_settings.setting_set(
+                "archive_disk_transcode", transcode_type
+            )
 
         archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
         dvd_build_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
@@ -1402,29 +1457,76 @@ class DVD_Archiver(DVD_Archiver_Base):
             ),
         )
 
-        backup_disk_size_container = qtg.VBoxContainer(
-            text="Archive Disk Size", width=20
-        ).add_row(
-            qtg.Spacer(),
-            qtg.RadioButton(
-                text="25 GB Blu-ray",
-                tag="backup_bluray",
-                callback=self.event_handler,
-                checked=(
-                    True
-                    if archive_disk_size == sys_consts.BLUERAY_ARCHIVE_SIZE
-                    else False
+        backup_disk_size_container = qtg.HBoxContainer(text="Archive Disks", width=20)
+
+        backup_disk_size_container.add_row(
+            qtg.VBoxContainer(text="Disk Size", width=20).add_row(
+                qtg.RadioButton(
+                    text="25 GB Blu-ray",
+                    tag="backup_bluray",
+                    callback=self.event_handler,
+                    checked=(
+                        True
+                        if archive_disk_size == sys_consts.BLUERAY_ARCHIVE_SIZE
+                        else False
+                    ),
                 ),
-            ),
-            qtg.RadioButton(
-                text="4  GB DVD",
-                tag="backup_dvd",
-                callback=self.event_handler,
-                checked=(
-                    True if archive_disk_size == sys_consts.DVD_ARCHIVE_SIZE else False
+                qtg.RadioButton(
+                    text="4  GB DVD",
+                    tag="backup_dvd",
+                    callback=self.event_handler,
+                    checked=(
+                        True
+                        if archive_disk_size == sys_consts.DVD_ARCHIVE_SIZE
+                        else False
+                    ),
                 ),
+            )
+        )
+
+        backup_disk_size_container.add_row(
+            qtg.Spacer(width=1),
+            qtg.VBoxContainer(text="Transcode Source", width=20).add_row(
+                # qtg.Spacer(),
+                qtg.RadioButton(
+                    text="No Transcode",
+                    tag="transcode_none",
+                    tooltip=(
+                        "Best Quality As Original Source Format Is Untouched. This Is"
+                        " The Preferred Archiving Solution"
+                    ),
+                    callback=self.event_handler,
+                    checked=(
+                        True if transcode_type == sys_consts.TRANSCODE_NONE else False
+                    ),
+                ),
+                qtg.RadioButton(
+                    text="H264 (AVC)",
+                    tag="transcode_h264",
+                    tooltip=(
+                        "Quality Lost As Source Video Is Compressed - Widely"
+                        " Supported By DLNA Media Players like Serviio And Used by"
+                        " Blu-ray disks"
+                    ),
+                    callback=self.event_handler,
+                    checked=(
+                        True if transcode_type == sys_consts.TRANSCODE_H264 else False
+                    ),
+                ),
+                qtg.RadioButton(
+                    text="H265 (HEVC)",
+                    tag="transcode_h265",
+                    tooltip=(
+                        "Quality Lost As Source Video Is Compressed - Successor To H264"
+                        " With Smaller File Size And Longer Encode Times"
+                    ),
+                    callback=self.event_handler,
+                    checked=(
+                        True if transcode_type == sys_consts.TRANSCODE_H265 else False
+                    ),
+                ),
+                # qtg.Spacer(),
             ),
-            qtg.Spacer(),
         )
 
         self._control_tab.page_add(

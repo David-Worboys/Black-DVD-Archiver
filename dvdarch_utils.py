@@ -123,11 +123,54 @@ class Dvd_Dims:
     display_height: int = -1
 
 
+@dataclasses.dataclass(slots=True)
+class Cut_Video_Def:
+    input_file: str = ""
+    output_file: str = ""
+    start_cut: int = 0.0  # Frame
+    end_cut: int = 0.0  # Frame
+    frame_rate: float = 0.0
+    tag: str = ""
+
+    def __post_init__(self) -> None:
+        assert (
+            isinstance(self.input_file, str) and self.input_file.strip() != ""
+        ), f"{self.input_file=}. Must be a non-empty str"
+        assert (
+            isinstance(self.output_file, str) and self.output_file.strip() != ""
+        ), f"{self.output_file=}. Must be a non-empty str"
+        assert (
+            isinstance(self.start_cut, int) and self.start_cut >= 0
+        ), f"{self.start_cut=}. Must be a int >= 0"
+        assert (
+            isinstance(self.end_cut, int) and self.end_cut >= 0
+        ), f"{self.end_cut=}. Must be a int >= 0"
+
+        assert (
+            isinstance(self.frame_rate, float) and self.frame_rate >= 24
+        ), f"{self.end_cut_secs=}. Must be a float >= 24"
+
+        assert (
+            self.end_cut > self.start_cut
+        ), f"{self.end_cut=} must be > {self.start_cut} "
+
+        assert isinstance(self.tag, str), f"{self.tag=}. Must be str"
+
+    @property
+    def start_cut_secs(self) -> float:
+        return self.start_cut / self.frame_rate
+
+    @property
+    def end_cut_secs(self) -> float:
+        return self.end_cut / self.frame_rate
+
+
 def Concatenate_Videos(
     temp_files: list[str],
     output_file: str,
     audio_codec: str = "",
     delete_temp_files: bool = False,
+    debug: bool = False,
 ) -> tuple[int, str]:
     """
     Concatenates video files using ffmpeg.
@@ -137,6 +180,7 @@ def Concatenate_Videos(
         output_file (str): The output file name
         audio_codec (str, optional): The audio codec to checked against (aac is special)
         delete_temp_files (bool, optional): Whether to delete the temp files, defaults to False
+        debug (bool): True, print debug info, otherwise do not
 
     Returns:
         tuple[int, str]:
@@ -153,9 +197,14 @@ def Concatenate_Videos(
     assert isinstance(audio_codec, str), f"{audio_codec=}. Must be a str"
     assert isinstance(delete_temp_files, bool), f"{delete_temp_files=}. Must be a bool"
 
+    if debug:
+        print(f"DBG CV {temp_files=} {output_file=} {audio_codec=} {delete_temp_files}")
+
     file_handler = file_utils.File()
     out_path, _, _ = file_handler.split_file_path(output_file)
-    file_list_txt = file_handler.file_join(out_path, "video_data_list", "txt")
+    file_list_txt = file_handler.file_join(
+        out_path, f"video_data_list_{utils.Get_Unique_Id()}", "txt"
+    )
 
     if not file_handler.path_writeable(out_path):
         return -1, f"Can Not Be Write To {out_path}!"
@@ -208,11 +257,16 @@ def Concatenate_Videos(
             "-threads",
             str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
             "-y",
-        ]
+        ],
+        debug=debug,
     )
 
+    if debug:
+        print(f"CONCAT {result=} {message=}")
+
     if result == -1:
-        file_handler.remove_file(file_list_txt)
+        if not debug:
+            file_handler.remove_file(file_list_txt)
         return -1, message
 
     # Remove the file list and temp files
@@ -456,7 +510,6 @@ def Get_Font_Example(
         return pointsize, subprocess.check_output(command, stderr=subprocess.DEVNULL)
 
     except subprocess.CalledProcessError as e:
-        print(f"DBG Render Error {e=}")
         return -1, b""
 
 
@@ -539,7 +592,7 @@ def Create_Transparent_File(
     width: int, height: int, out_file: str, border_color=""
 ) -> tuple[int, str]:
     """Creates a transparent file of a given width and height.
-    If a border color is provided a rectangle of that color is drawn
+    If a border color is provided, a rectangle of that color is drawn
     around the edge of the file
 
     Args:
@@ -758,7 +811,7 @@ def Transcode_H26x(
     interlaced: bool = True,
     bottom_field_first: bool = True,
     h265: bool = False,
-    high_quality=True,
+    high_quality: bool = True,
 ) -> tuple[int, str]:
     """Converts an input video to H.264/5 at supplied resolution and frame rate.
     The video is transcoded to a file in the output folder.
@@ -800,7 +853,14 @@ def Transcode_H26x(
 
     _, input_file_name, input_file_extn = file_handler.split_file_path(input_file)
 
-    output_file = file_handler.file_join(output_folder, f"{input_file_name}_edit.mp4")
+    output_file = file_handler.file_join(output_folder, f"{input_file_name}.mp4")
+
+    if not utils.Is_Complied():
+        print(
+            "DBG Trans_H26x"
+            f" {input_file=} {frame_rate=} {width=} {height=} {interlaced=} {bottom_field_first=} ER"
+            f" {'5M' if height <= 576 else '15M'=}"
+        )
 
     # Construct the FFmpeg command
     if h265:
@@ -813,22 +873,38 @@ def Transcode_H26x(
     else:
         quality_preset = "superfast"
 
-    video_filter = [
-        "-vf",
-        f"scale={width}x{height}",
-    ]
+    black_border_size = 12
 
     if interlaced:
-        video_filter = video_filter + [
-            f"fieldorder={'bff' if bottom_field_first else 'tff' }",
+        # black_box_filter, most likely dealing with analogue video, head switching noise best removed, and edges
+        # are best covered for optimal compression
+        filter_commands = [
+            f"drawbox=x=0:y=0:w=iw:h={black_border_size}:color=black:t=fill",
+            f"drawbox=x=0:y=ih-{black_border_size}:w=iw:h={black_border_size}:color=black:t=fill",
+            f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size*2}:color=black:t=fill",
+            f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size*2}:color=black:t=fill",
+        ]
+        black_box_filter = ",".join(filter_commands)
+
+        field_order = f"fieldorder={'bff' if bottom_field_first else 'tff' }"
+        video_filter = [
+            "-vf",
+            f"{black_box_filter},scale={width}x{height},{field_order}",
             "-flags:v:0",  # video flags for the first video stream
             "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
             "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
-            "1",  # alternate scan value is 1
+            "1",  # alternate scan value is 1,
+        ]
+    else:
+        video_filter = [
+            "-vf",
+            f"scale={width}x{height}",
         ]
 
     command = [
         sys_consts.FFMPG,
+        "-threads",
+        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
         "-i",
         input_file,
         *video_filter,
@@ -836,14 +912,30 @@ def Transcode_H26x(
         str(frame_rate),
         "-c:v",
         encoder,
+        "-pix_fmt",
+        "yuv420p",  # Ensure the pixel format is compatible with Blu-ray
         "-crf",
         "18",
         "-preset",
         quality_preset,
         "-c:a",
-        "pcm_s16le",
-        "-threads",
-        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        "ac3",
+        "-b:a",
+        "48k",
+        "-b:v",
+        (
+            "5M" if height <= 576 else "15M"
+        ),  # SD Get low-bit rate everything else gets Blu-ray rate. Black Choice for now
+        "-muxrate",
+        "10080000",  # Maximum Blu-ray mux rate in bits per second
+        "-bufsize",
+        "1835008",  # Blu-ray maximum buffer size in bytes
+        "-g",
+        "15",  # Set the GOP size to match the DVD standard
+        "-keyint_min",
+        "15",  # Set the minimum key frame interval to Match DVD (same as GOP size for closed GOP)
+        "-sc_threshold",
+        "0",  # Set the scene change threshold to 0 for frequent key frames
         "-y",
         output_file,
     ]
@@ -1002,114 +1094,567 @@ def Get_Codec(input_file: str) -> tuple[int, str]:
     return 1, output.strip()
 
 
-def Get_File_Cut_Command(
-    input_file: str, output_file, start_frame: int, end_frame: int, frame_rate: float
-) -> tuple[list, str]:
+def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
     """
-    Generates an FFmpeg command to cut a segment from the input video file based on frame numbers. The start and end
-    frames are specified, along with the frame rate of the video. The resulting FFmpeg command can be used to
-    extract the desired segment of the video file and save it to the specified output file.
+    Cut and join a video based on start and end cut frames.
 
     Args:
-        input_file (str): The path to the input video file.
-        output_file (str): The path to the output video file.
-        start_frame (int): The frame number to start the segment from.
-        end_frame (int): The frame number to end the segment at.
-        frame_rate (float): The frame rate of the video.
+        cut_video_def(Cut_Video_Def): Cut video definition file
+
 
     Returns:
-        tuple[list, str]:
-            - A list containing the FFmpeg command arguments or an empty list if an error occurs.
-            - An error message as a string, or an empty string if no error occurred.
+        tuple[int, str]:
+        - arg 1: Status code. Returns 1 if cut_video was successful, -1 otherwise.
+        - arg 2: Empty string if all good, otherwise error message
     """
-    assert (
-        isinstance(input_file, str) and input_file.strip() != ""
-    ), f"{input_file=}. Must be a non-empty str"
-    assert (
-        isinstance(output_file, str) and output_file.strip()
-    ), f"{output_file=}. Must be a non-empty str"
-    assert (
-        isinstance(start_frame, int) and start_frame >= 0
-    ), f"{start_frame=}. Must be an int >= 0"
-    assert (
-        isinstance(end_frame, int) and end_frame >= 0 and end_frame > start_frame
-    ), f"{end_frame=}. Must be an int >= 0 and > start"
-    assert (
-        isinstance(frame_rate, float) and frame_rate > 0
-    ), f"{frame_rate=}. Must be a float >= 0"
 
-    result, message = Get_Codec(input_file)
+    ##### Helper
+    def get_frame_dict(
+        input_file: str, start_frame: int, frame_rate: float, time_window: int = 60
+    ) -> tuple[int, dict]:
+        """
+        Uses FFMepg to get a GOP (Group Of Pictures) frame dictionary centered on the start time.
 
-    if result == -1:
-        return [], message
+        Args:
+            input_file (str): Path to input video file.
+            start_frame (int): The frame we want the GOP dict for
+            frame_rate (float): The frame rate of the video
+            time_window (int): The time window in seconds centred around the start_frame in which we do a GOP search
 
-    codec = message
+        Returns:
+            tuple[int, Optional[float]]: tuple containing result code and
+            - arg 1: Result code 1 indicates success and -1 indicates failure.
+            - arg 2: GOP Dict centered on the start time (has error entry when error occurs)
 
-    # Calculate the start and end times of the segment based on the frame numbers
-    start_time = start_frame / frame_rate
-    end_time = end_frame / frame_rate
+        """
+        assert (
+            isinstance(input_file, str) and input_file.strip() != ""
+        ), "Input file path must be a string."
+        assert (
+            isinstance(start_frame, int) and start_frame >= 0
+        ), f"{start_frame=} must be an int > 0"
+        assert (
+            isinstance(frame_rate, float) and frame_rate > 0
+        ), f"{frame_rate=}. Must be a float"
+        assert (
+            isinstance(time_window, int) and time_window > 0
+        ), f"{time_window=}. Must be int"
 
-    # Calculate the nearest key frames before and after the cut
-    result, before_key_frame = Get_Nearest_Key_Frame(input_file, start_time, "prev")
+        start_time = 0 if start_frame == 0 else start_frame / frame_rate
 
-    if result == -1:
-        return [], "Failed To Get Before Key Frame"
+        commands = [
+            sys_consts.FFMPG,
+            "-i",
+            input_file,
+            "-vf",
+            (
+                f"select=between(t\,{start_time - time_window//2}\,{start_time + time_window//2}),showinfo"
+            ),
+            "-f",
+            "null",
+            "-",
+        ]
 
-    result, after_key_frame = Get_Nearest_Key_Frame(input_file, end_time, "next")
+        result, output = Execute_Check_Output(
+            commands, debug=False, stderr_to_stdout=True
+        )
 
-    if result == -1:
-        return [], "Failed To Get After Key Frame"
+        if result == -1:
+            return -1, {"error": output}
 
-    # Set the start time and duration of the segment to re-encode
-    segment_start = before_key_frame if before_key_frame is not None else start_time
+        lines = output.strip().split("\n")
 
-    segment_duration = (
-        after_key_frame - segment_start
-        if after_key_frame is not None
-        else end_time - segment_start
-    )
+        line_list = []
 
-    # command = [sys_consts.FFMPG,"-v","debug", "-i", input_file] #DBG
-    command = [sys_consts.FFMPG, "-i", input_file]
+        for line in lines:
+            line_parts: list[str] = line.strip().split()
 
-    # Check if re-encoding is necessary
-    command += ["-map", "0:v", "-map", "0:a"]
+            line_dict: dict[str, str] = {
+                key.strip(): value.strip()
+                for part in line_parts
+                if ":" in part
+                for key, value in [part.split(":", 1)]
+                if key.strip() and value.strip()
+            }  # Ugly line parsing, delimits values of interest
 
-    if before_key_frame is not None and after_key_frame is not None:
-        # Re-encode the segment
-        if not utils.Is_Complied():
-            print(
-                "DBG Re-Encode Seg"
-                f" {start_frame=} {end_frame=} {segment_duration=} {before_key_frame=} {after_key_frame=}"
+            if line_dict:
+                if "iskey" not in line_dict:  # iskey determines frame type
+                    continue
+
+                line_list.append(line_dict)
+
+        start_gop = 0
+        end_gop = 0
+        gop_start = True
+        found_start_frame = False
+
+        # Build the GOP frame dict
+        frame_dict = {}
+
+        for line_dict in line_list:
+            pts_time = float(line_dict["pts_time"])
+            duration = float(line_dict["duration_time"])
+            calc_frame = round(pts_time / duration)
+            frame_dict[calc_frame] = (line_dict["type"], pts_time, duration)
+
+            if calc_frame == start_frame:  # In our gop
+                found_start_frame = True
+
+            if line_dict["type"] == "I":  # I frame
+                if gop_start:
+                    start_gop = calc_frame
+                    gop_start = False
+                else:
+                    end_gop = calc_frame
+                    gop_start = True
+
+                    if found_start_frame:
+                        break
+
+        gop_size = end_gop - start_gop
+
+        if gop_size <= 0 or not frame_dict:
+            return -1, {"error": "GOP Not Found"}
+
+        return 1, frame_dict
+
+    def stream_copy_segment(
+        input_file: str,
+        output_file: str,
+        start_cut: int,
+        duration: float,
+        frame_rate: float,
+    ) -> tuple[int, str]:
+        """
+        Extracts a segment from an input video file using stream copy.
+
+        Args:
+            input_file (str): The input video file to extract the segment from.
+            output_file (str): The output file where the segment will be saved.
+            start_cut (int): The start time (in frames) of the segment.
+            duration (float): The duration of the segment (in seconds).
+            frame_rate (float): The frame rate of the video.
+
+        Returns:
+            tuple[int, Optional[float]]: tuple containing result code and
+
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.
+
+        """
+
+        assert (
+            isinstance(input_file, str) and input_file.strip() != ""
+        ), f"{input_file=}. Must be a non-empty str"
+        assert (
+            isinstance(output_file, str) and output_file.strip() != ""
+        ), f"{output_file=}. Must be a non-empty str"
+        assert (
+            isinstance(start_cut, int) and start_cut >= 0
+        ), f"{start_cut=}. Must be int > 0"
+        assert (
+            isinstance(duration, float) and duration > 0
+        ), f"{duration=}. Must be float > 0"
+        assert (
+            isinstance(frame_rate, float) and frame_rate > 0
+        ), f"{frame_rate=}. Must be float > 0"
+
+        command = [
+            sys_consts.FFMPG,
+            "-i",
+            input_file,
+            "-ss",
+            str(start_cut / frame_rate),
+            "-t",
+            str(duration),
+            "-avoid_negative_ts",
+            "make_zero",
+            "-c",
+            "copy",
+            output_file,
+            "-y",
+        ]
+
+        result, output = Execute_Check_Output(commands=command, debug=False)
+
+        if result == -1:
+            return -1, output  # Output has error message
+
+        return 1, ""
+
+    def reencode_segment(
+        input_file: str,
+        output_file: str,
+        start_cut: int,
+        duration: float,
+        frame_rate: float,
+        gop_size: int,
+        codec: str,
+        encoding_details: Encoding_Details,
+    ) -> tuple[int, str]:
+        """
+        Reencodes a segment from an input video file with specific settings.
+
+        Args:
+            input_file (str): The input video file to extract the segment from.
+            output_file (str): The output file where the segment will be saved.
+            start_cut (int): The start frame of the segment.
+            duration (float): The duration of the segment (in seconds).
+            frame_rate (float): The frame rate of the video.
+            gop_size (int): The desired GOP (Group of Pictures) size.
+            codec (str): The codec to use for reencoding.
+            encoding_details (Encoding_Details): An instance containing encoding details.
+
+        Returns:
+            Tuple[int, str]: A tuple containing the status code and a message.
+
+            - If the status code is 1, the operation was successful.
+            - If the status code is -1, an error occurred, and the message provides details.
+        """
+
+        assert (
+            isinstance(input_file, str) and input_file.strip() != ""
+        ), f"{input_file=}. Must be a non-empty  str"
+        assert (
+            isinstance(output_file, str) and output_file.strip() != ""
+        ), f"{output_file=}. Must be a non-empty str"
+        assert (
+            isinstance(start_cut, int) and start_cut >= 0
+        ), f"{start_cut=}. Must be int > 0"
+        assert (
+            isinstance(duration, float) and duration > 0
+        ), f"{duration=}. Must be float > 0"
+        assert (
+            isinstance(frame_rate, float) and frame_rate > 0
+        ), f"{frame_rate=}. Must be float > 0"
+        assert (
+            isinstance(gop_size, int) and gop_size > 0
+        ), f"{gop_size=}. Must be int > 0"
+        assert (
+            isinstance(codec, str) and codec.strip() != ""
+        ), f"{codec=}. Must be a non-empty str"
+        assert isinstance(
+            encoding_details, Encoding_Details
+        ), f"{encoding_details=}. Must Encoding_Details instance"
+
+        video_filter_options = []
+        interlaced_flags = [
+            "-flags:v:0",  # video flags for the first video stream
+            "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
+            "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
+            "1",  # alternate scan value is 1
+        ]
+
+        if encoding_details.video_scan_type.lower() == "interlaced":
+            video_filter_options.append(
+                f"fieldorder={'bff' if encoding_details.video_scan_order.lower() == 'bff' else 'tff'}"
             )
 
-        command += ["-force_key_frames", f"{before_key_frame}+1"]
-        command += ["-tune", "fastdecode"]
-        command += ["-ss", str(segment_start)]
-        command += ["-t", str(segment_duration)]
-        command += ["-avoid_negative_ts", "make_zero"]
-        command += ["-c:v", codec]
-        command += ["-c:a", "copy"]
-        command += [
+            video_filter = ["-vf", ",".join(video_filter_options)]
+        else:
+            video_filter = []
+
+        command = [
+            sys_consts.FFMPG,
+            "-i",
+            input_file,
+            *interlaced_flags,
+            *video_filter,
+            "-tune",
+            "fastdecode",
+            "-ss",
+            str(start_cut / frame_rate),
+            "-t",
+            str(duration),
+            "-avoid_negative_ts",
+            "make_zero",
+            "-r",
+            str(frame_rate),  # Set the output frame rate
+            "-g",
+            str(gop_size),  # Set the GOP size to match the input file
+            "-keyint_min",
+            str(gop_size),  # Set the minimum key frame interval to match input file
+            "-sc_threshold",
+            "0",  # Set the scene change threshold to 0 for frequent key frames
+            "-c:v",
+            codec,
+            "-pix_fmt",
+            "yuv420p",  # Ensure the pixel format is compatible with Blu-ray
+            "-crf",
+            "18",
+            "-preset",
+            "slow",
+            "-b:v",
+            str(encoding_details.video_bitrate),
+            "-s",
+            f"{encoding_details.video_width}x{encoding_details.video_height}",
+            "-c:a",
+            "copy",
             "-threads",
             str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+            output_file,
+            "-y",
         ]
-        command += [output_file, "-y"]
+
+        result, message = Execute_Check_Output(
+            commands=command, debug=False, stderr_to_stdout=False
+        )
+
+        if result == -1:
+            return -1, f"Failed to Transcode ({message=}): {input_file=}"
+
+        return 1, ""
+
+    ##### Main
+    assert isinstance(
+        cut_video_def, Cut_Video_Def
+    ), f"{cut_video_def=}. Must be an instance of Cut_Video_Def"
+
+    file_handler = file_utils.File()
+
+    encoding_info: Encoding_Details = Get_File_Encoding_Info(cut_video_def.input_file)
+
+    if encoding_info.error:
+        return -1, encoding_info.error
+
+    result, codec = Get_Codec(cut_video_def.input_file)
+
+    if result == -1:  # codec carries error message
+        return -1, codec
+
+    input_dir, input_file_name, input_extension = file_handler.split_file_path(
+        cut_video_def.input_file
+    )
+    output_dir, output_file_name, output_extension = file_handler.split_file_path(
+        cut_video_def.output_file
+    )
+
+    for time_window in range(
+        10, 91, 10
+    ):  # Iterate with time_window values from 10 to 90 in steps of 10 to try and get a gop dict - long gops might
+        # need this
+        result, start_frame_dict = get_frame_dict(
+            input_file=cut_video_def.input_file,
+            start_frame=cut_video_def.start_cut,
+            frame_rate=cut_video_def.frame_rate,
+            time_window=time_window,
+        )
+
+        if result == 1:
+            break
     else:
-        # Copy the segment
-        if not utils.Is_Complied():
-            print(
-                "DBG Copy Segment"
-                f" {start_frame=} {end_frame=} {segment_duration=} {before_key_frame=} {after_key_frame=}"
+        start_frame_dict = {}
+
+    if result == -1:  # Going to Force a stream copy
+        pass
+        # return -1, "Failed To Get Start GOP"
+
+    for time_window in range(
+        10, 91, 10
+    ):  # Iterate with time_window values from 10 to 90 in steps of 10 to try and get a gop dict - long gops might
+        # need this
+        result, end_frame_dict = get_frame_dict(
+            input_file=cut_video_def.input_file,
+            start_frame=cut_video_def.end_cut,
+            frame_rate=cut_video_def.frame_rate,
+            time_window=time_window,
+        )
+
+        if result == 1:
+            break
+    else:
+        end_frame_dict = {}
+
+    if result == -1:  # Going to Force a stream copy
+        pass
+        # return -1, "Failed To Get End GOP"
+
+    # All iframes (e.g.: DV) means we can stream copy the video which is far more likely to process without issues
+    # and has no reencoded start/end GOP so no quality hit (mind you who is going to notice a gop size encode!)
+    stream_copy = False
+    i_frame_count = sum(
+        1
+        for value in {**start_frame_dict, **end_frame_dict}.values()
+        if value[0] == "I"
+    )
+    if i_frame_count == len({**start_frame_dict, **end_frame_dict}):
+        stream_copy = True
+
+    if (
+        not stream_copy and start_frame_dict and end_frame_dict
+    ):  # Got to have GOP blocks for frame accurate video cuts of compressed video
+        start_gop_block = []
+        end_gop_block = []
+        cut_frames = [cut_video_def.start_cut, cut_video_def.end_cut]
+
+        for index, frame_dict in enumerate((start_frame_dict, end_frame_dict)):
+            found = False
+            iframe = False
+
+            cut_frame = cut_frames[index]
+
+            for frame_no, frame_details in frame_dict.items():
+                if frame_no == cut_frame:
+                    found = True
+
+                if frame_details[0] == "I" and iframe:  # End of GOP
+                    if index == 0:
+                        start_gop_block.append((frame_no, frame_details))
+                    else:
+                        end_gop_block.append((frame_no, frame_details))
+
+                    iframe = False
+
+                    if found:
+                        break
+
+                if frame_details[0] == "I" and not iframe:  # Start of GOP
+                    iframe = True
+
+                    if index == 0:
+                        start_gop_block = []
+                    else:
+                        end_gop_block = []
+
+                if iframe:
+                    if index == 0:
+                        start_gop_block.append((frame_no, frame_details))
+                    else:
+                        end_gop_block.append((frame_no, frame_details))
+            else:  # Hope the last GOP is it
+                if index == 0:
+                    start_gop_block.append((frame_no, frame_details))
+
+                else:
+                    end_gop_block.append((frame_no, frame_details))
+
+        concat_files = []
+
+        # Calc start encode details
+        start_rencode_start_frame: int = cut_video_def.start_cut
+        start_rencode_end_frame: int = start_gop_block[-2][
+            0
+        ]  # -2 seems magic but it works
+        start_renecode_duration: float = (
+            start_rencode_end_frame - start_rencode_start_frame
+        ) / cut_video_def.frame_rate
+
+        # Calc end encode details
+        end_rencode_start_frame: int = end_gop_block[1][0]
+        end_rencode_end_frame: int = cut_video_def.end_cut
+        end_renecode_duration: float = (
+            end_rencode_end_frame - end_rencode_start_frame
+        ) / cut_video_def.frame_rate
+
+        if start_gop_block:  # # Reencode the start gop
+            reencode_start_seg_file = file_handler.file_join(
+                dir_path=output_dir,
+                file_name=f"reencode_start_segment_{cut_video_def.tag}",
+                ext=input_extension,
             )
 
-        command += ["-ss", str(segment_start)]
-        command += ["-t", str(segment_duration)]
-        command += ["-avoid_negative_ts", "make_zero"]
-        command += ["-c", "copy"]
-        command += [output_file, "-y"]
+            result, message = reencode_segment(
+                input_file=cut_video_def.input_file,
+                output_file=reencode_start_seg_file,
+                start_cut=start_rencode_start_frame,
+                duration=start_renecode_duration,
+                frame_rate=cut_video_def.frame_rate,
+                gop_size=1,  # Force all frames to I frame in the GOP block, so we can cut in and out where we want,
+                codec=codec,
+                encoding_details=encoding_info,
+            )
 
-    return command, ""
+            if result == -1:
+                return -1, message
+
+            concat_files.append(reencode_start_seg_file)
+
+        # Stream copies the video between start and end GOP
+        stream_copy_start_frame = (
+            start_rencode_end_frame - 2
+        )  # -2 seems magic but it works
+        stream_copy_end_frame = end_rencode_start_frame - 2
+        stream_copy_duration = (
+            (stream_copy_end_frame - stream_copy_start_frame)
+        ) / cut_video_def.frame_rate
+
+        stream_copy_seg_file = file_handler.file_join(
+            dir_path=output_dir,
+            file_name=f"stream_copy_segment_{cut_video_def.tag}",
+            ext=input_extension,
+        )
+
+        result, message = stream_copy_segment(
+            input_file=cut_video_def.input_file,
+            output_file=stream_copy_seg_file,
+            start_cut=stream_copy_start_frame,
+            duration=stream_copy_duration,
+            frame_rate=cut_video_def.frame_rate,
+        )
+
+        if result == -1:
+            return -1, message
+
+        concat_files.append(stream_copy_seg_file)
+
+        if end_gop_block:  # Reencode the end gop
+            reencode_end_seg_file = file_handler.file_join(
+                dir_path=output_dir,
+                file_name=f"reencode_end_segment_{cut_video_def.tag}",
+                ext=input_extension,
+            )
+
+            result, message = reencode_segment(
+                input_file=cut_video_def.input_file,
+                output_file=reencode_end_seg_file,
+                start_cut=end_rencode_start_frame,
+                duration=end_renecode_duration,
+                frame_rate=cut_video_def.frame_rate,
+                gop_size=1,  # gop_size,
+                codec=codec,
+                encoding_details=encoding_info,
+            )
+
+            if result == -1:
+                return -1, message
+
+            concat_files.append(reencode_end_seg_file)
+
+        if concat_files:
+            # Join reencoded_start segment, stream_copy segment and reencodeed end segment to make the final frame
+            # accurate cut file with nearly no loss
+            result, message = Concatenate_Videos(
+                temp_files=concat_files,
+                output_file=cut_video_def.output_file,
+                delete_temp_files=False,
+                debug=False,
+            )
+
+            if result == -1:
+                return -1, message
+
+            return 1, ""
+    else:
+        # If video comprised of all I frames it will cut accurately, but compressed video with no key frames is not
+        # going to cut accurately
+
+        try:
+            result, message = stream_copy_segment(
+                input_file=cut_video_def.input_file,
+                output_file=cut_video_def.output_file,
+                start_cut=cut_video_def.start_cut,
+                duration=(cut_video_def.end_cut - cut_video_def.start_cut)
+                / cut_video_def.frame_rate,
+                frame_rate=cut_video_def.frame_rate,
+            )
+
+            if result == -1:
+                return -1, message
+        except Exception as e:
+            pass
+            # print(f"DBG Doom Boom {e=}")
+
+    return 1, ""
 
 
 def Split_Large_Video(
@@ -1204,21 +1749,18 @@ def Split_Large_Video(
         )
         chunk_file_list.append(chunk_file)
 
-        command, error_message = Get_File_Cut_Command(
-            input_file=source,
-            output_file=chunk_file,
-            start_frame=start_frame,
-            end_frame=end_frame,
-            frame_rate=encoding_info.video_frame_rate,
+        result, message = Cut_Video(
+            Cut_Video_Def(
+                input_file=source,
+                output_file=chunk_file,
+                start_cut=start_frame,
+                end_cut=end_frame,
+            )
         )
 
-        if error_message:
-            return -1, error_message
-
-        result, output = Execute_Check_Output(commands=command)
-
         if result == -1:
-            return -1, output  # Output contains error message now
+            return -1, message
+
     return 1, "|".join(chunk_file_list)
 
 
@@ -1257,97 +1799,27 @@ def Stream_Optimise(output_file: str) -> tuple[int, str]:
     return 1, ""
 
 
-def Get_Nearest_Key_Frame(
-    input_file: str, time: float, direction: str
-) -> tuple[int, Optional[float]]:
-    """
-    Uses FFprobe to get the position of the nearest key frame before or after the given time.
-
-    Args:
-        input_file (str): Path to input video file.
-        time (float): Time in seconds for which the nearest key frame is to be found.
-        direction (str): Direction of search. "prev" for nearest key frame before time, "next" for after time.
-
-    Returns:
-        tuple[int, Optional[float]]: tuple containing result code and
-        - arg 1: Result code 1 indicates success and -1 indicates failure.
-        - arg 2: Position of nearest key frame if there is one or None if there is no key frame. If error None
-    """
-    assert (
-        isinstance(input_file, str) and input_file.strip() != ""
-    ), "Input file path must be a string."
-    assert isinstance(time, float), "Time must be a float."
-    assert isinstance(direction, str) and direction in [
-        "prev",
-        "next",
-    ], "Direction must be either 'prev' or 'next'."
-
-    # Use FFprobe to get the position of the nearest key frame before or after the given time
-    commands = [
-        sys_consts.FFPROBE,
-        "-v",
-        "error",
-        "-select_streams",
-        "v:0",
-        "-skip_frame",
-        "nokey",
-        "-show_entries",
-        "frame=pkt_pts_time",
-        "-of",
-        "csv=print_section=0",
-        "-read_intervals",
-        "%+#10",  # Specify 10 sec frane duration to analyze
-        "-threads",
-        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
-        input_file,
-    ]
-
-    result, output = Execute_Check_Output(commands, debug=False)
-
-    if result == -1:
-        return -1, None
-
-    lines = [line.strip().replace("\n", "") for line in output.split("\n")]
-
-    if lines:
-        if lines[0] == "":
-            return 1, None
-
-    output = output.strip()
-
-    key_frames = [float(t) for t in output.split("\n")]
-
-    if direction == "prev":
-        key_frames_before = [t for t in key_frames if t < time]
-        if key_frames_before:
-            return 1, max(key_frames_before)
-        else:
-            return -1, None
-
-    elif direction == "next":
-        key_frames_after = [t for t in key_frames if t > time]
-        if key_frames_after:
-            return 1, min(key_frames_after)
-        else:
-            return -1, None
-
-
 def Execute_Check_Output(
     commands: list[str],
     env: dict | None = None,
     execute_as_string: bool = False,
     debug: bool = False,
     shell: bool = False,
+    stderr_to_stdout: bool = False,
+    buffer_size: int = 100000,
 ) -> tuple[int, str]:
-    """Executes the given command(s)  with the subprocess.check_output method.
+    """Executes the given command(s) with the subprocess.run method.
+
     This wrapper provides better error and debug handling
 
     Args:
-        commands (list[str]): A non-empty list of commands and options to be executed.
-        env (dict, optional): A dictionary of environment variables to be set for the command. Defaults to an empty dictionary.
-        execute_as_string (bool, optional): If True, the commands will be executed as a single string. Defaults to False.
-        debug (bool, optional): If True, debug information will be printed. Defaults to False.
-        shell (bool, optional): If True, the command will be executed using the shell. Defaults to False.
+        commands (list[str]): non-empty list of commands and options to be executed.
+        env (dict | None): A dictionary of environment variables to be set for the command. Defaults to None
+        execute_as_string (bool): If True, the commands will be executed as a single string. Defaults to False
+        debug (bool): If True, debug information will be printed. Defaults to False
+        shell (bool): If True,  the command will be executed using the shell. Defaults to False
+        stderr_to_stdout (bool): If True, the command will feed the stderr to stdout. Defaults to False.
+        buffer_size (int): The size of the output buffer
 
     Returns:
         tuple[int, str]: A tuple containing the status code and the output of the command.
@@ -1360,63 +1832,78 @@ def Execute_Check_Output(
 
     assert (
         isinstance(commands, list) and len(commands) > 0
-    ), f"{commands=}. Must be non-empty list of commands and options"
-    assert isinstance(execute_as_string, bool), f"{execute_as_string=}. Must be bool"
-    assert isinstance(debug, bool), f"{debug=}. Must be bool"
-    assert isinstance(env, dict), f"{env=}. Must be dict"
-    assert isinstance(shell, bool), f"{shell=}. Must be bool"
+    ), f"{commands=} must be a non-empty list of commands and options"
+    assert isinstance(execute_as_string, bool), f"{execute_as_string=} must be bool"
+    assert isinstance(debug, bool), f"{debug=} must be bool"
+    assert isinstance(env, dict), f"{env=} must be dict"
+    assert isinstance(shell, bool), f"{shell=} must be bool"
+    assert isinstance(stderr_to_stdout, bool), f"{stderr_to_stdout=}. Must be bool"
+    assert (
+        isinstance(buffer_size, int) and buffer_size > 0
+    ), f"{buffer_size=}. Must be int > 0"
 
-    for option in commands:
-        assert isinstance(option, str), f"{option=}. Must be str"
+    if debug:
+        print(f'DBG Call command ***   {" ".join(commands)}')
+        print(f"DBG Call commands command list ***   {commands}")
+        print(f"DBG Call commands shlex split  ***   {shlex.split(' '.join(commands))}")
+        print("DBG Lets Do It!")
+
+    # Define subprocess arguments
+    subprocess_args = {
+        "args": commands if not execute_as_string else shlex.split(" ".join(commands)),
+        "shell": shell,
+        "universal_newlines": True,
+        "env": env,
+        "bufsize": buffer_size,
+    }
+
+    if stderr_to_stdout:  # A ffmpeg special - stderr output is sometimes good stuff
+        subprocess_args["stderr"] = subprocess.STDOUT
+    else:
+        # Redirect stderr to /dev/null (Unix-like) or nul (Windows)
+        subprocess_args["stderr"] = (
+            open("/dev/null", "w") if "posix" in os.name else open("nul", "w")
+        )
 
     try:
-        if debug:
-            print(f'DBG Call command ***   {" ".join(commands)}')
-            print(f"DBG Call commands command lisr ***   {commands}")
-            print(
-                "DBG Call commands shlex split  ***  "
-                f" {shlex.split(' '.join(commands))}"
-            )
-            print(f"DBG Lets Do It!")
-            output = subprocess.check_output(
-                commands if not execute_as_string else " ".join(commands),
-                universal_newlines=True,
-                shell=shell,
-                env=env,
-            )
-            print(f"DBG And Done {output=}")
-        else:
-            output = subprocess.check_output(
-                commands if not execute_as_string else " ".join(commands),
-                universal_newlines=True,
-                shell=shell,
-                # stderr=subprocess.STDOUT,
-                stderr=subprocess.DEVNULL,
-                env=env,
-            )
-    except (subprocess.CalledProcessError, FileNotFoundError) as call_error:
-        if debug:
-            print(f"DBG Call Error *** {call_error.returncode=} {call_error=}")
+        output = subprocess.check_output(**subprocess_args)
+        return 1, output
 
-        if call_error.returncode == 127:  # Should not happen
-            message = f"Program Not Found Or Exited Abnormally \n {' '.join(commands)}"
-        elif call_error.returncode <= 125:
-            message = f" {call_error.returncode} Command Failed!\n {' '.join(commands)}"
-        else:
-            message = (
-                f" {call_error.returncode} Command  Crashed!\n {' '.join(commands)}"
-            )
-        print(f"DBG {sys_consts.PROGRAM_NAME} Exception: {message=}")
-        return -1, message
+    except subprocess.CalledProcessError as e:
+        output = e.output
 
-    return 1, output
+        if e.returncode == 1:
+            return (
+                1,
+                output,
+            )  # ffmpeg is special..again..sometimes return code 1 is a good thing
+        else:
+            if e.returncode == 127:
+                message = (
+                    f"Program Not Found Or Exited Abnormally \n {' '.join(commands)} ::"
+                    f" {output}"
+                )
+            elif e.returncode <= 125:
+                message = (
+                    f"{e.returncode} Command Failed!\n {' '.join(commands)} :: {output}"
+                )
+            else:
+                message = (
+                    f"{e.returncode} Command Crashed!\n {' '.join(commands)} ::"
+                    f" {output}"
+                )
+
+            if debug:
+                print(f"DBG {message} {e.returncode=} :: {output}")
+
+            return -1, message  # Return -1 to indicate failure
 
 
 def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> Dvd_Dims:
-    """Returns the DVD image dimensions. The hard coded values are  mandated by the dvd_format and the
-    aspect ratio and must not be changed.  PAL is 720 x 576 and NTSC is 720 x 480 and is always stored
+    """Returns the DVD image dimensions. The hard-coded values are  mandated by the dvd_format and the
+    aspect ratio and must not be changed.  PAL is 720 x 576, and NTSC is 720 x 480 and is always stored
     that way on a DVD. But the display aspect ratio can be flagged on a DVD (PAL is 1024 x 576 and NTSC is
-    850x480) but it is not stored that way on the DVD
+    850x480), but it is not stored that way on the DVD
 
     Args:
         aspect_ratio (str): Must be AR43 | AR 169 from sys_consts
@@ -1438,33 +1925,33 @@ def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> Dvd_Dims:
     if dvd_format.upper() == sys_consts.NTSC:
         if aspect_ratio.upper() == sys_consts.AR169:
             return Dvd_Dims(
-                storage_width=720,
-                storage_height=480,
-                display_width=853,
-                display_height=480,
+                storage_width=sys_consts.NTSC_SPECS.width_43,
+                storage_height=sys_consts.NTSC_SPECS.height_43,
+                display_width=sys_consts.NTSC_SPECS.width_169,
+                display_height=sys_consts.NTSC_SPECS.height_169,
             )
 
         else:  # 4:3
             return Dvd_Dims(
-                storage_width=720,
-                storage_height=480,
-                display_width=720,
-                display_height=540,
+                storage_width=sys_consts.NTSC_SPECS.width_43,
+                storage_height=sys_consts.NTSC_SPECS.height_43,
+                display_width=sys_consts.NTSC_SPECS.width_43,
+                display_height=sys_consts.NTSC_SPECS.height_43,
             )
     else:  # PAL
         if aspect_ratio.upper() == sys_consts.AR169:
             return Dvd_Dims(
-                storage_width=720,
-                storage_height=576,
-                display_width=1024,
-                display_height=576,
+                storage_width=sys_consts.PAL_SPECS.width_43,
+                storage_height=sys_consts.PAL_SPECS.height_43,
+                display_width=sys_consts.PAL_SPECS.width_169,
+                display_height=sys_consts.PAL_SPECS.height_169,
             )
         else:  # 4:3
             return Dvd_Dims(
-                storage_width=720,
-                storage_height=576,
-                display_width=720,
-                display_height=576,
+                storage_width=sys_consts.PAL_SPECS.width_43,
+                storage_height=sys_consts.PAL_SPECS.width_43,
+                display_width=sys_consts.PAL_SPECS.width_43,
+                display_height=sys_consts.PAL_SPECS.width_43,
             )
 
 
@@ -1689,6 +2176,9 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
                 track_type = ""
 
                 for key, value in track_dict.items():
+                    if not isinstance(value, str) or not value.strip():
+                        continue
+
                     if key == "@type":
                         track_type = value
 
@@ -1700,6 +2190,8 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
                                 video_file_details.video_tracks = int(value)
                     if track_type == "Video":
                         match key:
+                            case "BitRate":
+                                video_file_details.video_bitrate = int(value)
                             case "Format":
                                 video_file_details.video_format = value
                             case "Width":
@@ -1715,16 +2207,41 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
                                     video_file_details.video_ar = sys_consts.AR43
                                 else:
                                     video_file_details.video_ar = sys_consts.AR169
+
                             case "Duration":
                                 video_file_details.video_duration = float(value)
-                            case "ScanOrder_Original" | "ScanOrder":
-                                video_file_details.video_scan_order = value
-                            case "ScanType_Original" | "ScanType":
-                                video_file_details.video_scan_type = value
-                            case "FrameRate":
+                            case "ScanType_Original" | "ScanOrder" | "ScanType" | "ScanOrder_Original":
+                                if (
+                                    value == "MBAFF"
+                                ):  # H264/H25 adative interlaced indication
+                                    video_file_details.video_scan_type = "Interlaced"
+                                else:
+                                    if key.lower() in (
+                                        "ScanOrder_Original",
+                                        "ScanOrder",
+                                        "ScanType",
+                                    ):
+                                        if (
+                                            video_file_details.video_scan_type.strip()
+                                            == ""
+                                        ):
+                                            video_file_details.video_scan_type = value
+
+                                if (
+                                    value.strip()
+                                    and "bff" in value.lower()
+                                    or "tff" in value.lower()
+                                ):
+                                    video_file_details.video_scan_order = value
+                                    video_file_details.video_scan_type = (  # Only TFF and BFF are interlaced
+                                        "Interlaced"
+                                    )
+
+                            case "FrameRate" | "FrameRate_Maximum":
                                 video_file_details.video_frame_rate = float(value)
                             case "Standard":
-                                video_file_details.video_standard = value
+                                if value.upper() in (sys_consts.PAL, sys_consts.NTSC):
+                                    video_file_details.video_standard = value
                             case "FrameCount":
                                 video_file_details.video_frame_count = int(value)
                     if track_type == "Audio":
@@ -1749,7 +2266,119 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
                 f" {call_error.returncode} {sys_consts.MEDIAINFO} Crashed!\n {fmt}"
             )
     except OSError as call_error:
-        video_file_details.error = f"{sys_consts.MEDIAINFO} Failed! To Run\n {fmt}"
+        video_file_details.error = f"{sys_consts.MEDIAINFO} Failed! To Run\n {fmt} \n {call_error}"
+
+    result, codec = Get_Codec(video_file)
+
+    if result == -1:
+        video_file_details.error = "Failed To Get Video Codec"
+        return video_file_details
+
+    video_file_details.video_format = (
+        codec  # Decided to use FFMP code extraction is it different from Mediainfo
+    )
+
+    # Emergency measures were key info is missing information try ffprobe
+    if video_file_details.video_scan_type.strip() == "":
+        video_file_details.video_scan_type = "Progressive"
+
+    if (
+        video_file_details.video_frame_rate == 0
+        or video_file_details.video_frame_count == 0
+    ):
+        ffprobe_command = [
+            sys_consts.FFPROBE,
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",  # Select only the video stream
+            "-show_entries",
+            "stream=duration,r_frame_rate,nb_frames",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            video_file,
+        ]
+
+        try:
+            result, output = Execute_Check_Output(commands=ffprobe_command, debug=False)
+
+            if result == -1 or output.strip() == "":
+                video_file_details.error = (
+                    f"Failed To Get Encoding Details : {video_file}"
+                )
+                return video_file_details
+
+            values = output.strip().split("\n")
+
+            # Comes out in this order - who knows why
+            frame_rate = values[0]
+            duration = values[1]
+            frame_count = values[2]
+
+        except subprocess.CalledProcessError as e:
+            # Handle any errors or exceptions here
+            print(f"Error: {e}")
+            video_file_details.error = (
+                f"Failed To Get Encoding Details : {video_file} : {e}"
+            )
+            return video_file_details
+
+        if video_file_details.video_duration == 0:
+            if duration != "N/A":
+                video_file_details.video_duration = float(duration)
+
+            if video_file_details.video_duration == 0:
+                video_file_details.error = (
+                    f"Failed To Get Video_Duration Encoding Details : {video_file} "
+                )
+                return video_file_details
+
+        if video_file_details.video_frame_rate == 0:
+            if "/" in frame_rate:
+                nominator = float(frame_rate.split("/")[0])
+                denominator = float(frame_rate.split("/")[1])
+                video_file_details._video_frame_rate = nominator / denominator
+            else:
+                video_file_details._video_frame_rate = float(frame_rate.strip())
+
+            if video_file_details.video_frame_rate == 0:
+                video_file_details.error = (
+                    f"Failed To Get Video_Frame_Rate Encoding Details : {video_file} "
+                )
+                return video_file_details
+
+        if video_file_details.video_frame_count == 0:
+            if frame_count == "N/A":
+                video_file_details.video_frame_count = int(
+                    video_file_details.video_duration
+                    * video_file_details.video_frame_rate
+                )
+            else:
+                video_file_details.video_frame_count = int(frame_count)
+
+            if video_file_details.video_frame_count == 0:
+                video_file_details.error = (
+                    f"Failed To Get Video_Frame_Count Encoding Details : {video_file} "
+                )
+                return video_file_details
+
+    if (
+        not video_file_details.video_standard
+    ):  # Emergency measures to try and determine if video is PAL or NTSC
+        if (
+            video_file_details.video_width == sys_consts.PAL_SPECS.width_43
+            and video_file_details.video_height == sys_consts.PAL_SPECS.height_43
+            and video_file_details.video_frame_rate == sys_consts.PAL_SPECS.frame_rate
+        ):
+            video_file_details.video_standard = sys_consts.PAL
+        elif (
+            video_file_details.video_width == sys_consts.NTSC_SPECS.width_43
+            and video_file_details.video_height == sys_consts.NTSC_SPECS.height_43
+            and video_file_details.video_frame_rate == sys_consts.NTSC_SPECS.frame_rate
+        ):
+            video_file_details.video_standard = sys_consts.NTSC
+        else:
+            video_file_details.video_standard = "N/A"
 
     if debug:
         print(f"=========== video_details Debug {video_file} ===========")

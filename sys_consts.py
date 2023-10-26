@@ -16,9 +16,11 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import datetime
+from collections import namedtuple
 from typing import Final
 
 import file_utils
@@ -70,6 +72,15 @@ SINGLE_SIDED_DVD_SIZE: Final[int] = 40258730  # kb ~ 4.7GB DVD5
 DOUBLE_SIDED_DVD_SIZE: Final[int] = 72453177  # kb ~ 8.5GB DVD9
 BLUERAY_ARCHIVE_SIZE: Final[str] = "25GB"
 DVD_ARCHIVE_SIZE: Final[str] = "4GB"
+TRANSCODE_NONE: Final[str] = "Original"
+TRANSCODE_H264: Final[str] = "H264"
+TRANSCODE_H265: Final[str] = "H265"
+PAL_SPECS = namedtuple(
+    "PAL_SPECS", ["width_43", "height_43", "width_169", "height_169", "frame_rate"]
+)(width_43=720, height_43=576, width_169=1024, height_169=576, frame_rate=PAL_FRAMERATE)
+NTSC_SPECS = namedtuple(
+    "NTSC_SPECS", ["width_43", "height_43", "width_169", "height_169", "frame_rate"]
+)(width_43=720, height_43=480, width_169=20, height_169=480, frame_rate=NTSC_FRAMERATE)
 
 SHELVE_FILE_EXTNS = ("dir", "dat", "bak")
 # fmt: off
@@ -89,9 +100,7 @@ FFMPG: Final[str] = f"{tool_app_folder}ffmpeg"
 FFPROBE: Final[str] = f"{tool_app_folder}ffprobe"
 IDENTIFY: Final[str] = f"{tool_app_folder}identify"
 MEDIAINFO: Final[str] = f"{tool_app_folder}mediainfo"
-MPEG2ENC: Final[str] = f"{tool_app_folder}mpeg2enc"
 MPLEX: Final[str] = f"{tool_app_folder}mplex"
-PPMTOY4M: Final[str] = f"{tool_app_folder}ppmtoy4m"
 SPUMUX: Final[str] = f"{tool_app_folder}spumux"
 XORRISO: Final[str] = f"{tool_app_folder}xorriso"
 

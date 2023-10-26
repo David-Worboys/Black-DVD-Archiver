@@ -21,9 +21,10 @@
 # fmt: off
 
 import dataclasses
-from time import sleep
+import functools
 from typing import Callable, cast
 
+import PySide6.QtCore as qtC
 import PySide6.QtGui as qtG
 
 import dvdarch_utils
@@ -35,7 +36,6 @@ import sys_consts
 import utils
 from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
-from dvdarch_utils import Execute_Check_Output
 from file_renamer_popup import File_Renamer_Popup
 from sys_config import (DVD_Archiver_Base, Encoding_Details, Video_Data,
                         Video_File_Settings)
@@ -57,7 +57,7 @@ gb_task_errored = False
 gi_tasks_completed = -1
 
 
-def Run_Video_Cuts(ffmpeg_cut_commands: list[str]) -> tuple[int, str]:
+def Run_Video_Cuts(cut_video_def: dvdarch_utils.Cut_Video_Def) -> tuple[int, str]:
     """This is a wrapper function used hy the multi-thread task_manager to run the Execute_Check_Output process
 
     Args:
@@ -72,10 +72,10 @@ def Run_Video_Cuts(ffmpeg_cut_commands: list[str]) -> tuple[int, str]:
     global gs_task_error_message
 
     if not utils.Is_Complied():
-        print(f"DBG {ffmpeg_cut_commands=}")
+        print(f"DBG {cut_video_def=}")
 
-    gi_task_error_code, gs_task_error_message = Execute_Check_Output(
-        commands=ffmpeg_cut_commands, debug=False
+    gi_task_error_code, gs_task_error_message = dvdarch_utils.Cut_Video(
+        cut_video_def=cut_video_def
     )
 
     if not utils.Is_Complied():
@@ -105,8 +105,8 @@ def Notification_Call_Back(status: int, message: str, output: str, name):
     global gb_task_errored
 
     gs_thread_status = status
-    gs_thread_message = message
-    gs_thread_output = output
+    gs_thread_message = "" if message is None else message
+    gs_thread_output = "" if gs_thread_output is None else gs_thread_output
     gs_thread_task_name = name
 
     if status == -1:
@@ -131,6 +131,7 @@ def Error_Callback(error_message: str):
     global gs_thread_error_message
 
     gs_thread_error_message = error_message
+
     if not utils.Is_Complied():
         print(f"DBG Error_Callback {gs_thread_error_message=}")
 
@@ -144,8 +145,8 @@ class Video_Editor(DVD_Archiver_Base):
 
     # Public instance variables
     processed_files_callback: Callable
-    display_height: int = 576  # // 2
-    display_width: int = 720  # // 2
+    display_height: int = sys_consts.PAL_SPECS.height_43  # // 2
+    display_width: int = sys_consts.PAL_SPECS.width_43  # // 2
 
     # Private instance variables
     _aspect_ratio: str = sys_consts.AR43
@@ -160,9 +161,9 @@ class Video_Editor(DVD_Archiver_Base):
     _edit_list_grid: qtg.Grid | None = None
     _file_system_init: bool = False
     _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
-    _frame_rate: float = 25  # Default to 25 frames per second
-    _frame_width: int = 720
-    _frame_height: int = 576
+    _frame_rate: float = sys_consts.PAL_SPECS.frame_rate
+    _frame_width: int = sys_consts.PAL_SPECS.width_43
+    _frame_height: int = sys_consts.PAL_SPECS.height_43
     _frame_count: int = -1
     _output_folder: str = ""
     _video_cutter_container: qtg.HBoxContainer | None = None
@@ -182,6 +183,7 @@ class Video_Editor(DVD_Archiver_Base):
     _edit_folder: str = sys_consts.EDIT_FOLDER
     _transcode_folder: str = sys_consts.TRANSCODE_FOLDER
     _video_file_input: list[Video_Data] = dataclasses.field(default_factory=list)
+    _user_lambda: bool = True
 
     def __post_init__(self) -> None:
         """Configures the instance"""
@@ -203,11 +205,27 @@ class Video_Editor(DVD_Archiver_Base):
         self._background_task_manager: Task_Manager = Task_Manager()
         self._background_task_manager.start()
 
-        self._video_handler.frame_changed_handler.connect(self._frame_handler)
-        self._video_handler.media_status_changed_handler.connect(
-            self._media_status_change
-        )
-        self._video_handler.position_changed_handler.connect(self._position_changed)
+        if (
+            self._user_lambda
+        ):  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and
+            # Nuitka < 1.8.4 == boom!
+            self._video_handler.frame_changed_handler.connect(self._frame_handler)
+            self._video_handler.media_status_changed_handler.connect(
+                self._media_status_change
+            )
+            self._video_handler.position_changed_handler.connect(self._position_changed)
+        else:  # This saves the day!
+            self._video_handler.frame_changed_handler.connect(
+                functools.partial(self._frame_handler)
+            )
+
+            self._video_handler.media_status_changed_handler.connect(
+                functools.partial(self._media_status_change)
+            )
+
+            self._video_handler.position_changed_handler.connect(
+                functools.partial(self._position_changed)
+            )
 
         archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
 
@@ -657,7 +675,6 @@ class Video_Editor(DVD_Archiver_Base):
             ):  # Should break first time if thread handling did its job!
                 return 1, encoding_info
 
-            sleep(3)
         else:
             blank_encoding_info.error = encoding_info.error
             popups.PopError(
@@ -860,7 +877,6 @@ class Video_Editor(DVD_Archiver_Base):
                                     ].video_file_settings,
                                 )
                             )
-
                             self.processed_files_callback(self._video_file_input)
                 case _:
                     popups.PopMessage(
@@ -944,7 +960,6 @@ class Video_Editor(DVD_Archiver_Base):
             assert all(
                 start_frame < end_frame for start_frame, end_frame, _ in edit_list
             ), "start_frame must be less than end_frame in every tuple of edit_list"
-
             prev_start = 0
             cut_out_list = []
 
@@ -1058,15 +1073,16 @@ class Video_Editor(DVD_Archiver_Base):
                         ),
                     )
 
-            command, message = dvdarch_utils.Get_File_Cut_Command(
+            cut_def = dvdarch_utils.Cut_Video_Def(
                 input_file=input_file,
                 output_file=temp_file,
-                start_frame=start_frame,
-                end_frame=end_frame,
+                start_cut=start_frame,
+                end_cut=end_frame,
                 frame_rate=self._frame_rate,
+                tag=str(cut_index),
             )
 
-            task_list.append((cut_index, command))
+            task_list.append((cut_index, cut_def))
 
         tasks_submitted = 0
 
@@ -1084,27 +1100,31 @@ class Video_Editor(DVD_Archiver_Base):
         while gi_tasks_completed < tasks_submitted:
             if bool(gb_task_errored):
                 self._progress_bar.reset()
-                return -1, str(gs_task_error_message)
+                error_str = (
+                    f" {gi_tasks_completed=}, {gi_task_error_code=},"
+                    f" {gi_thread_status=}, {gs_thread_message=}, {gs_thread_output=},"
+                    f" {gs_task_error_message=}, {gs_thread_task_name=}"
+                )
+                print(f"ZZ {error_str}=")
+
+                return -1, str(f"Cut Video Failed: {error_str}")
 
             if current_task != gi_tasks_completed:
                 current_task = gi_tasks_completed
                 self._progress_bar.value_set(tasks_submitted - current_task)
 
-            sleep(0.1)
-
         self._progress_bar.reset()
 
         if cut_out:  # Concat temp file for final file and remove the temp files
             result, message = dvdarch_utils.Concatenate_Videos(
-                temp_files=temp_files, output_file=output_file, delete_temp_files=False
+                temp_files=temp_files,
+                output_file=output_file,
+                delete_temp_files=False,
+                debug=False,
             )
 
             if result == -1:
                 return -1, message
-
-            for temp_file in temp_files:
-                if file_handler.remove_file(temp_file) == -1:
-                    return -1, f"Failed To Remove File <{temp_file}>"
 
         else:
             # We keep the temp files, as they are the new videos, and build an output file str where each video is
@@ -1206,18 +1226,20 @@ class Video_Editor(DVD_Archiver_Base):
             event (qtg.Action): The event that triggered this method.
 
         """
-        value: qtg.Grid_Col_Value = event.value
+        grid_col_value: qtg.Grid_Col_Value = event.value
 
         assert isinstance(
-            value, qtg.Grid_Col_Value
-        ), f"{value=} must be a qtg.Grid_Col_Value"
+            grid_col_value, qtg.Grid_Col_Value
+        ), f"{grid_col_value=} must be a qtg.Grid_Col_Value"
 
-        if value.value < 0:
+        clicked_frame = int(grid_col_value.value)
+
+        if clicked_frame < 0:
             self._video_handler.seek(0)
-        elif value.value >= self._frame_count:
+        elif clicked_frame >= self._frame_count:
             self._video_handler.seek(self._frame_count - 1)  # frame count is zero based
         else:
-            self._video_handler.seek(value.value)
+            self._video_handler.seek(clicked_frame)
 
     def _remove_edit_points(self, event: qtg.Action) -> None:
         """
@@ -1338,7 +1360,10 @@ class Video_Editor(DVD_Archiver_Base):
             frame (qtG.QPixmap): THe video frame to be displayed
         """
         self._video_display.guiwidget_get.setPixmap(
-            frame.scaledToWidth(self.display_width)
+            frame.scaled(
+                self.display_width, self.display_height, qtC.Qt.KeepAspectRatio
+            )
+            # frame.scaledToWidth(self.display_width)
         )
 
     def _position_changed(self, frame: int) -> None:
@@ -1894,7 +1919,9 @@ class Video_Editor(DVD_Archiver_Base):
                 ),
             )
 
-            self._progress_bar = qtg.ProgressBar(tag="file_progress")
+            self._progress_bar = qtg.ProgressBar(
+                tag="file_progress", buddy_control=qtg.Label(text="To Cut", width=6)
+            )
 
             edit_file_list = qtg.VBoxContainer(align=qtg.Align.TOPLEFT).add_row(
                 qtg.HBoxContainer(margin_left=4).add_row(
@@ -1905,7 +1932,7 @@ class Video_Editor(DVD_Archiver_Base):
                         tooltip="Select All Edit Points",
                         width=11,
                     ),
-                    qtg.Spacer(width=12, tune_hsize=-13),
+                    qtg.Spacer(width=5, tune_hsize=-14),
                     self._progress_bar,
                 ),
                 qtg.VBoxContainer(align=qtg.Align.BOTTOMRIGHT).add_row(

@@ -45,6 +45,7 @@ class Archive_Manager:
 
     archive_folder: str
     archive_size: str = sys_consts.DVD_ARCHIVE_SIZE
+    transcode_type: str = sys_consts.TRANSCODE_NONE
 
     # Private instance variables
     _error_message: str = ""
@@ -59,7 +60,16 @@ class Archive_Manager:
         assert isinstance(self.archive_size, str) and self.archive_size in (
             sys_consts.BLUERAY_ARCHIVE_SIZE,
             sys_consts.DVD_ARCHIVE_SIZE,
-        ), f"{self.archive_size=}, Must be BLUERAY_ARCHIVE_SIZE or DVD_ARCHIVE_SIZE"
+        ), f"{self.archive_size=}, Must be BLUERAY_ARCHIVE_SIZE | DVD_ARCHIVE_SIZE"
+
+        assert isinstance(self.transcode_type, str) and self.transcode_type in (
+            sys_consts.TRANSCODE_NONE,
+            sys_consts.TRANSCODE_H264,
+            sys_consts.TRANSCODE_H265,
+        ), (
+            f"{self.transcode_type=}, Must be Be TRANSCODE_NONE | TRANSCODE_H264 |"
+            " TRANSCODE_H265"
+        )
 
         self._error_message = self._make_folder_structure()
 
@@ -304,12 +314,79 @@ class Archive_Manager:
                             ext=menu_video_data.video_extension,
                         )
 
-                        self._error_code, self._error_message = file_handler.copy_file(
-                            menu_video_data.video_path, backup_path
-                        )
+                        if (
+                            self.transcode_type == sys_consts.TRANSCODE_NONE
+                        ):  # Smile, no quality loss
+                            (
+                                self._error_code,
+                                self._error_message,
+                            ) = file_handler.copy_file(
+                                menu_video_data.video_path, backup_path
+                            )
 
-                        if self._error_code == -1:
-                            return -1, self._error_message
+                            if self._error_code == -1:
+                                return -1, self._error_message
+                        else:  # Grit teeth, have to lower quality with a transcode
+                            if self.transcode_type == sys_consts.TRANSCODE_H264:
+                                transcoding = "h264"
+                            else:
+                                transcoding = "h265"
+
+                            if (
+                                transcoding
+                                not in menu_video_data.encoding_info.video_format.lower()
+                            ):
+                                print(
+                                    "DBG Transcoding"
+                                    f" {transcoding=} {menu_video_data.encoding_info.video_format.lower()=}"
+                                )
+                                print(
+                                    f"DBG {menu_video_data.video_path=} {backup_path=}"
+                                )
+                                (
+                                    self._error_code,
+                                    output_file,
+                                ) = dvdarch_utils.Transcode_H26x(
+                                    input_file=menu_video_data.video_path,
+                                    output_folder=menu_dir_temp,
+                                    width=menu_video_data.encoding_info.video_width,
+                                    height=menu_video_data.encoding_info.video_height,
+                                    frame_rate=menu_video_data.encoding_info.video_frame_rate,
+                                    interlaced=(
+                                        True
+                                        if menu_video_data.encoding_info.video_scan_type.lower()
+                                        == "interlaced"
+                                        else False
+                                    ),
+                                    bottom_field_first=(
+                                        True
+                                        if menu_video_data.encoding_info.video_scan_order.lower()
+                                        == "bff"
+                                        else False
+                                    ),
+                                    h265=True if transcoding == "h265" else False,
+                                    high_quality=True,
+                                )
+
+                                if (
+                                    self._error_code == -1
+                                ):  # output_file container error message
+                                    self._error_message = output_file
+                                    return -1, self._error_message
+                            else:
+                                print(
+                                    f"DBG Copy As  {transcoding=} =="
+                                    f" {menu_video_data.encoding_info.video_format.lower()=} "
+                                )
+                                (
+                                    self._error_code,
+                                    self._error_message,
+                                ) = file_handler.copy_file(
+                                    menu_video_data.video_path, backup_path
+                                )
+
+                                if self._error_code == -1:
+                                    return -1, self._error_message
 
         if video_folders:
             for video_folder_tuple in video_folders:

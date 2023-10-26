@@ -16,6 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
@@ -58,7 +59,7 @@ class DVD_Config:
     _button_font_color: str = "white"
     _button_font_point_size: int = 12
     _button_font: str = ""
-    _menu_aspect_ratio: str = sys_consts.AR43
+    _menu_aspect_ratio: str = sys_consts.AR169
     _menu_buttons_across: int = 2
     _menu_buttons_per_page: int = 4
     _page_pointer_left_file: str = ""
@@ -69,6 +70,7 @@ class DVD_Config:
     _timestamp_font_point_size: int = 11
     _timestamp_prefix: str = "DVD Build Date:"
     _timestamp: str = ""
+    _transcode_type: str = sys_consts.TRANSCODE_NONE
     _video_standard: str = sys_consts.PAL
 
     def __post_init__(self):
@@ -108,7 +110,7 @@ class DVD_Config:
         assert isinstance(value, str) and value in (
             sys_consts.BLUERAY_ARCHIVE_SIZE,
             sys_consts.DVD_ARCHIVE_SIZE,
-        ), f"{value=}, Must be BLUERAY_ARCHIVE_SIZE or DVD_ARCHIVE_SIZE"
+        ), f"{value=}, Must be BLUERAY_ARCHIVE_SIZE | DVD_ARCHIVE_SIZE"
         self._archive_size = value
 
     @property
@@ -475,6 +477,19 @@ class DVD_Config:
         self._timestamp = value
 
     @property
+    def transcode_type(self) -> str:
+        return self._transcode_type
+
+    @transcode_type.setter
+    def transcode_type(self, value: str):
+        assert isinstance(value, str) and value in (
+            sys_consts.TRANSCODE_NONE,
+            sys_consts.TRANSCODE_H264,
+            sys_consts.TRANSCODE_H265,
+        ), f"{value=}, Must be Be TRANSCODE_NONE | TRANSCODE_H264 | TRANSCODE_H265"
+        self._transcode_type = value
+
+    @property
     def video_standard(self):
         return self._video_standard
 
@@ -499,7 +514,7 @@ class _Cell_Coords:
     width: int = 0
     height: int = 0
     page: int = 0
-    video_file: Video_Data = dataclasses.field(default_factory=Video_Data)
+    video_data: Video_Data = dataclasses.field(default_factory=Video_Data)
 
     def get_mask_filenames(self, alternate_file_path: str = "") -> tuple[str, ...]:
         """Generate the file names for overlay, highlight, select, and text masks.
@@ -524,7 +539,7 @@ class _Cell_Coords:
             )
         else:
             path_name, file_name, file_extn = file_handler.split_file_path(
-                self.video_file.menu_image_file_path
+                self.video_data.menu_image_file_path
             )
 
         suffixes = ["_overlay", "_highlight", "_select", "_text"]
@@ -671,6 +686,7 @@ class DVD:
             archive_manager = Archive_Manager(
                 archive_folder=self.dvd_setup.archive_folder,
                 archive_size=self.dvd_setup.archive_size,
+                transcode_type=self.dvd_setup.transcode_type,
             )
             menu_layout: list[tuple[str, list[Video_Data]]] = []
             video_list: list[Video_Data] = []
@@ -693,7 +709,7 @@ class DVD:
                         )
                     page_index = cell_coord.page
                     video_list = []
-                video_list.append(cell_coord.video_file)
+                video_list.append(cell_coord.video_data)
             else:
                 if video_list:
                     menu_layout.append(
@@ -717,15 +733,16 @@ class DVD:
 
             if result == -1:
                 return -1, message
-            else:
-                file_handler = file_utils.File()
 
+            file_handler = file_utils.File()
+
+            if utils.Is_Complied():
                 result, message = file_handler.remove_dir_contents(
                     self.dvd_working_folder
                 )
 
-                if result == -1:
-                    return -1, message
+            if result == -1:
+                return -1, message
 
         return 1, ""
 
@@ -920,9 +937,15 @@ class DVD:
             video_width = video_file.encoding_info.video_width
             video_height = video_file.encoding_info.video_height
 
+            # Do not forget-widescreen stretches the file on display, so wide screen and standard screen are the
+            # same size here
             if self.dvd_setup.video_standard == sys_consts.PAL:
                 frame_rate = f"{sys_consts.PAL_FRAMERATE}"
-                if video_width == 720 and video_height == 576:
+
+                if (
+                    video_width == sys_consts.PAL_SPECS.width_43
+                    and video_height == sys_consts.PAL_SPECS.height_43
+                ):
                     video_size = f"{video_width}x{video_height}"
                 else:
                     # TODO Add Resize Filter
@@ -934,9 +957,13 @@ class DVD:
                         ),
                     )
             else:  # NTSC
-                frame_rate = f"{sys_consts.NTSC_FRAMERATE}"
+                frame_rate = f"{sys_consts.NTSC_SPECS.frame_rate}"
+
                 # TODO Add Resize Filter
-                if video_width == 720 and video_height == 480:
+                if (
+                    video_width == sys_consts.NTSC_SPECS.width_43
+                    and video_height == sys_consts.NTSC_SPECS.height_43
+                ):
                     video_size = f"{video_width}x{video_height}"
                 else:
                     return (
@@ -971,8 +998,8 @@ class DVD:
                 + [
                     "-fflags",  # set ffmpeg flags
                     "+genpts",  # generate presentation timestamps
-                    "-threads",  # set number of threads to use
-                    f"{psutil.cpu_count(logical=False) - 1}",  # To be responsive use 1 core less than is in the system
+                    "-threads",  # set the number of threads to use
+                    f"{psutil.cpu_count() - 1}",  # To be responsive, use 1 core less than is in the system
                     "-i",  # input flag
                     video_file.video_path,  # path to video file
                 ]
@@ -1051,10 +1078,13 @@ class DVD:
         dvd_dims = dvdarch_utils.Get_DVD_Dims(
             self.dvd_setup.menu_aspect_ratio, self.dvd_setup.video_standard
         )
+
         if dvd_dims.display_height == -1:
             return -1, "Failed To Get DVD Dimensions"
 
-        if all(file_def.dvd_page >= 0 for file_def in self.dvd_setup.input_videos):
+        if all(
+            file_def.dvd_page >= 0 for file_def in self.dvd_setup.input_videos
+        ):  # Manual Layout
             cell_coords, message = self._dvd_page_calc_layout(
                 buttons_per_page=buttons_per_page,
                 buttons_across=buttons_across,
@@ -1070,7 +1100,8 @@ class DVD:
                 num_buttons=len(self.dvd_setup.input_videos),
                 buttons_per_page=buttons_per_page,
                 buttons_across=buttons_across,
-                button_aspect_ratio=4 / 3,
+                button_aspect_ratio=4
+                / 3,  # Actually does not matter because a 16/9 menu will stretch button
                 dvd_dims=dvd_dims,
                 border_top=10,
                 border_bottom=10 + timestamp_height,
@@ -1082,7 +1113,7 @@ class DVD:
             return -1, message
 
         result, message = self._create_canvas_image(
-            width=dvd_dims.display_width, height=dvd_dims.display_height
+            width=dvd_dims.storage_width, height=dvd_dims.storage_height
         )
         if result == -1:
             return result, message
@@ -1190,7 +1221,7 @@ class DVD:
 
         for cell_cord in cell_coords:
             path_name, file_name, file_extn = file_handler.split_file_path(
-                cell_cord.video_file.menu_image_file_path
+                cell_cord.video_data.menu_image_file_path
             )
 
             # Setup required files
@@ -1202,7 +1233,7 @@ class DVD:
             if not file_handler.file_exists(menu_button_file):
                 return -1, f"Video File Does Not Exist : {menu_button_file}"
 
-            menu_text = cell_cord.video_file.video_file_settings.button_title
+            menu_text = cell_cord.video_data.video_file_settings.button_title
 
             result, message = dvdarch_utils.Overlay_Text(
                 in_file=menu_button_file,
@@ -1359,8 +1390,8 @@ class DVD:
             header_pad = 0
 
         # Compute the canvas size and ratio
-        canvas_width = dvd_dims.display_width - (border_left + border_right)
-        canvas_height = dvd_dims.display_height - (
+        canvas_width = dvd_dims.storage_width - (border_left + border_right)
+        canvas_height = dvd_dims.storage_height - (
             border_top + border_bottom + header_pad
         )
 
@@ -1468,7 +1499,7 @@ class DVD:
                             height=rect_height
                             - button_padding,  # Provide space between buttons
                             page=page_index,
-                            video_file=self.dvd_setup.input_videos[file_index],
+                            video_data=self.dvd_setup.input_videos[file_index],
                         )
                     )
                     file_index += 1
@@ -1489,7 +1520,7 @@ class DVD:
     ) -> tuple[list[_Cell_Coords], str]:
         """
         Generates a layout of rectangles with fixed size borders on each edge,
-        arranged to fit according to assigned dvd pages.
+        arranged to fit, according to assigned dvd pages.
 
         Args:
             buttons_per_page (int): The number of buttons on the DVD menu page
@@ -1521,8 +1552,8 @@ class DVD:
             header_pad = 0
 
         # Compute the canvas size and ratio
-        canvas_width = dvd_dims.display_width - (border_left + border_right)
-        canvas_height = dvd_dims.display_height - (
+        canvas_width = dvd_dims.storage_width - (border_left + border_right)
+        canvas_height = dvd_dims.storage_height - (
             border_top + border_bottom + header_pad
         )
 
@@ -1656,7 +1687,7 @@ class DVD:
                             height=rect_height
                             - button_padding,  # Provide space between buttons
                             page=page_index,
-                            video_file=self.dvd_setup.input_videos[file_index],
+                            video_data=self.dvd_setup.input_videos[file_index],
                         )
                     )
                     file_index += 1
@@ -2320,7 +2351,7 @@ class DVD:
 
             if max_page_no > 1:  # Need pointers to access pages
                 path_name, _, _ = file_handler.split_file_path(
-                    cell_coord.video_file.menu_image_file_path
+                    cell_coord.video_data.menu_image_file_path
                 )
                 left_pointer_path = file_handler.file_join(
                     path_name,
@@ -2428,12 +2459,12 @@ class DVD:
         ), f"{cell_coords=}. Must be a list of _Cell_Coords"
 
         for cell_coord in cell_coords:
-            if cell_coord.video_file.menu_image_file_path == "":
+            if cell_coord.video_data.menu_image_file_path == "":
                 continue
 
             result, message = dvdarch_utils.Resize_Image(
-                input_file=cell_coord.video_file.menu_image_file_path,
-                out_file=cell_coord.video_file.menu_image_file_path,
+                input_file=cell_coord.video_data.menu_image_file_path,
+                out_file=cell_coord.video_data.menu_image_file_path,
                 width=cell_coord.width,
                 height=cell_coord.height,
                 ignore_aspect=True,
@@ -2452,25 +2483,25 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        for video_file in self.dvd_setup.input_videos:
-            if video_file.encoding_info.video_frame_count <= 0:
-                return -1, f"No video frame count found for {video_file.video_path}"
+        for video_data in self.dvd_setup.input_videos:
+            if video_data.encoding_info.video_frame_count <= 0:
+                return -1, f"No video frame count found for {video_data.video_path}"
 
             if (
-                video_file.video_file_settings.menu_button_frame == -1
+                video_data.video_file_settings.menu_button_frame == -1
             ):  # No frame number provided, pick a random frame
                 menu_image_frame = randint(
-                    1, video_file.encoding_info.video_frame_count
+                    1, video_data.encoding_info.video_frame_count
                 )
             else:
-                menu_image_frame = video_file.video_file_settings.menu_button_frame
+                menu_image_frame = video_data.video_file_settings.menu_button_frame
 
-            if menu_image_frame > video_file.encoding_info.video_frame_count:
+            if menu_image_frame > video_data.encoding_info.video_frame_count:
                 return (
                     -1,
                     (
                         f"{menu_image_frame=} is greater than video frame count"
-                        f" {video_file.encoding_info.video_frame_count}"
+                        f" {video_data.encoding_info.video_frame_count}"
                     ),
                 )
 
@@ -2478,7 +2509,7 @@ class DVD:
                 result,
                 image_file,
             ) = dvdarch_utils.Generate_Menu_Image_From_File(
-                video_file=video_file.video_path,
+                video_file=video_data.video_path,
                 frame_number=menu_image_frame,
                 out_folder=self._menu_image_folder,
             )
@@ -2486,18 +2517,18 @@ class DVD:
             if result == -1:
                 return result, image_file
             else:
-                video_file.menu_image_file_path = image_file
+                video_data.menu_image_file_path = image_file
 
         return 1, ""
 
     def _convert_to_m2v(
-        self, cell_coords: list[_Cell_Coords], frames: int = 360
+        self, cell_coords: list[_Cell_Coords], frames: int = 300
     ) -> tuple[int, str]:
-        """Converts the background_canvas_images_file into a short video stream
+        """Converts the background_canvas_images_file into a short video stream for the DVD menu
 
         Args:
             cell_coords (list[_Cell_Coords]): The calculated grid layout
-            frames (int, optional): Number of video frames in stream. Defaults to 360.
+            frames (int, optional): Number of video frames in stream. Defaults to 300
 
         Returns:
             tuple[int,str]:
@@ -2526,6 +2557,11 @@ class DVD:
                 background_canvas_images_file = file_handler.file_join(
                     path_name, f"{file_name}_images_{coord.page}", file_extn
                 )
+
+                jpg_file = file_handler.file_join(
+                    path_name, f"{file_name}_jpgcvrt_{coord.page}", "jpg"
+                )
+
                 m2v_file = file_handler.file_join(
                     path_name, f"{file_name}_menu_video_{coord.page}", "m2v"
                 )
@@ -2537,75 +2573,61 @@ class DVD:
                     )
 
                 if self._dvd_setup.video_standard == sys_consts.PAL:
-                    framerate = "25:1"
-                    pixel_aspect = "59:54"
-                    fmt = "p"
+                    frame_rate = sys_consts.PAL_SPECS.frame_rate
                 else:  # NTSC
-                    framerate = "30000:1001"
-                    pixel_aspect = "10:11"
-                    fmt = "n"
-                if self._dvd_setup.menu_aspect_ratio == sys_consts.AR169:
-                    aspect = "3"
-                else:
-                    aspect = "2"
+                    frame_rate = sys_consts.NTSC_SPECS.frame_rate
 
-                result = subprocess.run(
-                    [sys_consts.CONVERT, background_canvas_images_file, "ppm:-"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                # In theory FFMPEG should take png and make this step unnecessary TODO look into how ffmeg was compiled
+                result, message = dvdarch_utils.Execute_Check_Output(
+                    [sys_consts.CONVERT, background_canvas_images_file, jpg_file],
+                    debug=False,
+                    # stderr_to_stdout=True,
                 )
 
-                # Chained pipes here so be cognisant of that when modifying
-                if result.returncode == 0:
-                    result = subprocess.run(
-                        [
-                            sys_consts.PPMTOY4M,
-                            "-n",
-                            f"{frames}",
-                            "-F",
-                            f"{framerate}",
-                            "-A",
-                            f"{pixel_aspect}",
-                            "-I",
-                            "p",
-                            "-r",
-                            "-S",
-                            "420mpeg2",
-                        ],
-                        input=result.stdout,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                    )
+                if result == -1:
+                    return -1, message
 
-                    if result.returncode == 0:
-                        result: subprocess.CompletedProcess[bytes] = subprocess.run(
-                            [
-                                sys_consts.MPEG2ENC,
-                                "-n",
-                                fmt,
-                                "-f",
-                                "8",
-                                "-b",
-                                "5000",
-                                "-a",
-                                aspect,
-                                "-o",
-                                m2v_file,
-                            ],
-                            input=result.stdout,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                        )
+                command = [
+                    sys_consts.FFMPG,
+                    "-loop",
+                    "1",
+                    "-t",
+                    f"{frames}",
+                    "-i",
+                    jpg_file,
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "anullsrc=r=48000:cl=stereo",
+                    "-t",
+                    "10",
+                    "-c:v",
+                    "mpeg2video",
+                    "-q:v",
+                    "2",
+                    "-r",
+                    f"{frame_rate}",
+                    "-c:a",
+                    "mp2",
+                    "-b:a",
+                    "192k",
+                    "-y",
+                    m2v_file,
+                ]
 
-                    if result.returncode != 0:
-                        return -1, f"Sys Error: Failed To Produce Menu Video {m2v_file}"
+                result, message = dvdarch_utils.Execute_Check_Output(
+                    command, debug=False
+                )
+
+                if result == -1:
+                    return -1, message
 
         return 1, ""
 
     def _convert_audio(
         self, cell_coords: list[_Cell_Coords], frames: int = 300
     ) -> tuple[int, str]:
-        """Generates the audio for the menu. By default it is a empty soundtrack
+        """Generates the audio for the DVD menu. By default it is a empty soundtrack
         TODO Allow user selection of an audio file
 
         Args:
@@ -2652,17 +2674,6 @@ class DVD:
                 # Generate an empty audio file
                 commands = [
                     sys_consts.FFMPG,
-                    "-t",
-                    f"{duration}",
-                    "-f lavfi",
-                    "-i anullsrc=channel_layout=5.1:sample_rate=48000",
-                    "-c:a ac3",
-                    "-b:a 224000",
-                    ac3_file,
-                ]
-
-                commands = [
-                    sys_consts.FFMPG,
                     "-f",
                     "lavfi",
                     "-i",
@@ -2686,7 +2697,7 @@ class DVD:
     def _multiplex_audio_video(
         self, cell_coords: list[_Cell_Coords]
     ) -> tuple[int, str]:
-        """Multiplexes the menu m2v file and the menu ac3 file to peoduce the menu mgp file
+        """Multiplexes the menu m2v file and the menu ac3 file to produce the menu mgp file
 
         Args:
             cell_coords (list[_Cell_Coords]): The calculated grid layout
@@ -2837,11 +2848,6 @@ class DVD:
             self._background_canvas_file
         )
 
-        video_dict = {
-            "@format": self.dvd_setup.video_standard,
-            "@aspect": self.dvd_setup.menu_aspect_ratio,
-        }
-
         # Create the main DVD author structure
         dvd_author_dict = {
             "dvdauthor": {
@@ -2862,6 +2868,8 @@ class DVD:
 
         # Build menu pass
         for menu_index, coord in enumerate(cell_coords):
+            coord: _Cell_Coords
+
             button_index += 1
             # TODO Specifically use buttons indices rather than relying on the auto feature of spumux
             # pgc["button"].append({"@name":f"btn-{button_index}","#text":f"jump title {menu_index + 1};"})
@@ -2900,22 +2908,33 @@ class DVD:
             button_count += 1
 
         dvd_author_dict["dvdauthor"]["vmgm"]["menus"] = {
-            "video": video_dict,
+            "video": {
+                "@format": self.dvd_setup.video_standard,
+                "@aspect": self.dvd_setup.menu_aspect_ratio,
+            },
             "pgc": pgcs,
         }
 
         # Build titleset pass
         for coord in cell_coords:
             vob_file = file_handler.file_join(
-                self._vob_folder, coord.video_file.video_file, "vob"
+                self._vob_folder, coord.video_data.video_file, "vob"
             )
 
-            pgc = {"vob": {"@file": vob_file}}
+            pgc: dict[str, dict[str, str]] = {"vob": {"@file": vob_file}}
 
             pgc["vob"]["@pause"] = "inf"
 
             dvd_author_dict["dvdauthor"]["titleset"].append(
-                {"titles": {"video": video_dict, "pgc": pgc}}
+                {
+                    "titles": {
+                        "video": {
+                            "@format": self.dvd_setup.video_standard,
+                            "@aspect": coord.video_data.encoding_info.video_ar,
+                        },
+                        "pgc": pgc,
+                    }
+                }
             )
 
         dvd_author_file = file_handler.file_join(path_name, "dvd_author", "xml")
