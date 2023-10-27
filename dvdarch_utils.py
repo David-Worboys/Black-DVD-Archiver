@@ -1626,7 +1626,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             result, message = Concatenate_Videos(
                 temp_files=concat_files,
                 output_file=cut_video_def.output_file,
-                delete_temp_files=False,
+                delete_temp_files=True,
                 debug=False,
             )
 
@@ -2266,7 +2266,9 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
                 f" {call_error.returncode} {sys_consts.MEDIAINFO} Crashed!\n {fmt}"
             )
     except OSError as call_error:
-        video_file_details.error = f"{sys_consts.MEDIAINFO} Failed! To Run\n {fmt} \n {call_error}"
+        video_file_details.error = (
+            f"{sys_consts.MEDIAINFO} Failed! To Run\n {fmt} \n {call_error}"
+        )
 
     result, codec = Get_Codec(video_file)
 

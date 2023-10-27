@@ -151,9 +151,6 @@ class Video_Editor(DVD_Archiver_Base):
     # Private instance variables
     _aspect_ratio: str = sys_consts.AR43
     _archive_manager: Archive_Manager | None = None
-    # _background_task_manager: Task_Manager = dataclasses.field(
-    #    default_factory=Task_Manager
-    # )
     _background_task_manager: Task_Manager | None = None
     _current_frame: int = -1
     _display_height: int = -1
@@ -356,8 +353,7 @@ class Video_Editor(DVD_Archiver_Base):
             case qtg.Sys_Events.TRIGGERED:
                 match event.tag:
                     case "video_slider":
-                        pass
-                        # self._seek(event.value)
+                        self._seek(event.value)
 
     @property
     def get_task_manager(self) -> Task_Manager:
@@ -420,7 +416,13 @@ class Video_Editor(DVD_Archiver_Base):
                 return None
 
         self._video_slider.value_set(0)
-        self._video_slider.range_max_set(self._frame_count)
+        self._video_slider.range_max_set(
+            round(
+                self._video_file_input[0].encoding_info.video_duration
+                * self._video_file_input[0].encoding_info.video_frame_rate
+            )
+            - 1
+        )  # Interesting, video_frame_count was not quite accurate on some video files, this seems to be better
 
         self._set_dvd_settings()
 
@@ -1363,7 +1365,6 @@ class Video_Editor(DVD_Archiver_Base):
             frame.scaled(
                 self.display_width, self.display_height, qtC.Qt.KeepAspectRatio
             )
-            # frame.scaledToWidth(self.display_width)
         )
 
     def _position_changed(self, frame: int) -> None:
@@ -1378,6 +1379,7 @@ class Video_Editor(DVD_Archiver_Base):
 
         if self._sliding and self._video_slider is not None:
             self._video_slider.value_set(frame)
+
         self._frame_display.value_set(frame)
 
     def _seek(self, frame: int) -> None:
