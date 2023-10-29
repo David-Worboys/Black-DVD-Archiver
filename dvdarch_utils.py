@@ -1949,9 +1949,9 @@ def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> Dvd_Dims:
         else:  # 4:3
             return Dvd_Dims(
                 storage_width=sys_consts.PAL_SPECS.width_43,
-                storage_height=sys_consts.PAL_SPECS.width_43,
+                storage_height=sys_consts.PAL_SPECS.height_43,
                 display_width=sys_consts.PAL_SPECS.width_43,
-                display_height=sys_consts.PAL_SPECS.width_43,
+                display_height=sys_consts.PAL_SPECS.height_43,
             )
 
 
