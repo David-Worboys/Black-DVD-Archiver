@@ -906,6 +906,10 @@ class DVD_Archiver(DVD_Archiver_Base):
         if video_files:
             dvd_config = DVD_Config()
 
+            dvd_config.menu_aspect_ratio = self._db_settings.setting_get(
+                "menu_aspect_ratio"
+            )
+
             dvd_config.project_name = self._file_control.project_name
 
             if self._db_settings.setting_exist(sys_consts.ARCHIVE_FOLDER):

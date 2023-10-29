@@ -1107,7 +1107,6 @@ class Video_Editor(DVD_Archiver_Base):
                     f" {gi_thread_status=}, {gs_thread_message=}, {gs_thread_output=},"
                     f" {gs_task_error_message=}, {gs_thread_task_name=}"
                 )
-                print(f"ZZ {error_str}=")
 
                 return -1, str(f"Cut Video Failed: {error_str}")
 

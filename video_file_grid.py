@@ -1103,6 +1103,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         grouped = []
         ungrouped = []
         group_id = -1
+        group_aspect_ratio = ""  # All group members must be the same aspect ratio
         max_group_val = self._get_max_group_num(file_grid)
 
         for item in checked_items:
@@ -1115,6 +1116,9 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         if grouped:
             for video_item in grouped:
+                if not group_aspect_ratio:
+                    group_aspect_ratio = video_item.encoding_info.video_ar
+
                 if video_item.video_file_settings.menu_group >= 0:
                     if (
                         group_id >= 0
@@ -1130,8 +1134,25 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         group_value = group_id if group_id >= 0 else max_group_val + 1
 
+        # Add ungrouped to grouped
         for item in ungrouped:
             video_item: Video_Data = item.user_data
+            if (
+                group_aspect_ratio
+                and video_item.encoding_info.video_ar != group_aspect_ratio
+            ):  # All group members must be the same aspect ratio
+                popups.PopError(
+                    title="Aspect Ratio Error..",
+                    message=(
+                        "Group Aspect ratio"
+                        f" {sys_consts.SDELIM}{group_aspect_ratio}{sys_consts.SDELIM} Does"
+                        " Not Match"
+                        f"{sys_consts.SDELIM}{video_item.video_file} {video_item.encoding_info.video_ar}{sys_consts.SDELIM}"
+                    ),
+                ).show()
+
+                continue
+
             video_item.video_file_settings.menu_group = group_value
             file_grid.value_set(
                 row=item.row_index,

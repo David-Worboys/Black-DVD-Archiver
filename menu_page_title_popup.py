@@ -21,6 +21,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
+import pprint
 from typing import Optional, cast
 
 import platformdirs
@@ -108,6 +109,14 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                         self._delete_menu_page(event)
                     case "delete_video_title":
                         self._remove_video_title(self._current_button_grid)
+                    case "menu_43":
+                        self._db_settings.setting_set(
+                            "menu_aspect_ratio", sys_consts.AR43
+                        )
+                    case "menu_169":
+                        self._db_settings.setting_set(
+                            "menu_aspect_ratio", sys_consts.AR169
+                        )
                     case "move_menu_up":
                         menu_grid: qtg.Grid = cast(
                             qtg.Grid,
@@ -181,7 +190,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             event (qtg.Action): The triggering event.
         """
 
-        temp_video_list: list[Video_Data] = self.video_data_list
+        temp_video_list: list[Video_Data] = self.video_data_list.copy()
 
         menu_title_grid: qtg.Grid = cast(
             qtg.Grid,
@@ -196,7 +205,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             event
         )
 
-        if dvd_menu_layout and not temp_video_list:  # Build from shelf stored menu list
+        if (
+            dvd_menu_layout and not temp_video_list
+        ):  # Build from the shelf-stored menu list
             menu_pages: list[list[Video_Data]] = []
 
             for row_index, menu_item in enumerate(dvd_menu_layout):
@@ -214,10 +225,10 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
                 for video_item in menu_item[1]:
                     for video in video_item:
-                        if len(videos) >= buttons_per_page:  # Should not happen!
+                        if len(videos) >= buttons_per_page:  # Add page
                             menu_pages.append(videos)
                             videos = []
-                            break
+
                         videos.append(video)
                 menu_pages.append(videos)
 
@@ -231,6 +242,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             grouped_video_items: list[Video_Data] = []
             non_grouped_video_items: list[Video_Data] = []
 
+            # Load from the shelf-stored menu list
             for row_index, menu_item in enumerate(dvd_menu_layout):
                 menu_title_grid.value_set(
                     row=row_index,
@@ -250,37 +262,19 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             temp_group = []
             temp_non_group = []
 
+            # Process the passed in list of video items
             for temp_video_item in temp_video_list:
-                # Check if in saved DVD menu layout and ignore if so
-                used = False
-                for grouped_item in grouped_video_items:
-                    if temp_video_item.video_path == grouped_item.video_path:
-                        used = True
-                        break
-
-                if used:
-                    continue
-
-                for non_grouped_item in non_grouped_video_items:
-                    if temp_video_item.video_path == non_grouped_item.video_path:
-                        used = True
-                        break
-
-                if used:
-                    continue
-
                 # Sort out the groupings of the files that are not in the saved DVD layout
-                if temp_video_item.video_file_settings.menu_group >= 0:
+                if temp_video_item.video_file_settings.menu_group >= 0:  # Grouped
                     is_grouped = False
                     for group_video_item in grouped_video_items:
                         if temp_video_item.video_path == group_video_item.video_path:
                             is_grouped = True
-                            # break
 
                     if not is_grouped:
                         temp_group.append(temp_video_item)
 
-                if temp_video_item.video_file_settings.menu_group == -1:
+                if temp_video_item.video_file_settings.menu_group == -1:  # Not grouped
                     is_non_grouped = False
                     for non_group_video_item in non_grouped_video_items:
                         if (
@@ -321,17 +315,42 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             if videos:
                 menu_pages.append(videos)
 
-            videos: list[Video_Data] = []
+            videos_169: list[Video_Data] = []
+            videos_43: list[Video_Data] = []
 
+            # DVD title sets can only have one aspect ratio - 4/3 or 16/9, so we must group them appropriately.
+            # Note: at this point grouped items have already been checked for aspect ratio consistency
             for video in non_grouped_video_items:
-                if len(videos) >= buttons_per_page:  # Should not happen!
+                if video.encoding_info.video_ar == sys_consts.AR43:
+                    videos_43.append(video)
+                else:
+                    videos_169.append(video)
+
+            if videos_43:
+                videos = []
+
+                for video in videos_43:
+                    if len(videos) >= buttons_per_page:  # Add page
+                        menu_pages.append(videos)
+                        videos = []
+
+                    videos.append(video)
+
+                if videos:
                     menu_pages.append(videos)
-                    videos = []
 
-                videos.append(video)
+            if videos_169:
+                videos = []
 
-            if videos:
-                menu_pages.append(videos)
+                for video in videos_169:
+                    if len(videos) >= buttons_per_page:  # Add page
+                        menu_pages.append(videos)
+                        videos = []
+
+                    videos.append(video)
+
+                if videos:
+                    menu_pages.append(videos)
 
             self._insert_video_title_control(
                 menu_title_grid=menu_title_grid, menu_pages=menu_pages
@@ -611,7 +630,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         deactivate_switch: qtg.Switch = cast(
             qtg.Switch,
-            event.widget_get(container_tag="menu_move", tag="deactivate_filters"),
+            event.widget_get(container_tag="menu_controls", tag="deactivate_filters"),
         )
 
         menu_title_col_index = menu_title_grid.colindex_get("menu_title")
@@ -840,6 +859,14 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
     def layout(self) -> qtg.VBoxContainer:
         """Generate the form UI layout"""
+
+        menu_aspect_ratio = sys_consts.AR43
+
+        if self._db_settings.setting_exist("menu_aspect_ratio"):
+            menu_aspect_ratio = self._db_settings.setting_get("menu_aspect_ratio")
+        else:
+            self._db_settings.setting_set("menu_aspect_ratio", menu_aspect_ratio)
+
         menu_page_control_container = qtg.VBoxContainer(
             tag="menu_page_controls", align=qtg.Align.TOPLEFT
         )
@@ -879,6 +906,38 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         control_container.add_row(
             menu_page_control_container,
+            qtg.HBoxContainer(tag="menu_controls", align=qtg.Align.BOTTOMLEFT).add_row(
+                qtg.HBoxContainer(
+                    tag="menu_aspect_ratio", text="Menu Aspect Ratio", width=29
+                ).add_row(
+                    qtg.RadioButton(
+                        text="16:9",
+                        tag="menu_169",
+                        callback=self.event_handler,
+                        checked=(
+                            True if menu_aspect_ratio == sys_consts.AR169 else False
+                        ),
+                    ),
+                    qtg.RadioButton(
+                        text="4:3",
+                        tag="menu_43",
+                        callback=self.event_handler,
+                        checked=True if menu_aspect_ratio == sys_consts.AR43 else False,
+                    ),
+                ),
+                qtg.Spacer(width=2),
+                qtg.Switch(
+                    tag="deactivate_filters",
+                    buddy_control=qtg.Label(
+                        tag="switch_label", text="Deactivate Filters", width=17
+                    ),
+                    tooltip=(
+                        "Switch Video Filters Off - Good For Testing Because It"
+                        " Increases Speed"
+                    ),
+                ),
+                qtg.Spacer(width=26),
+            ),
             qtg.HBoxContainer(tag="menu_move", margin_right=5).add_row(
                 qtg.HBoxContainer().add_row(
                     qtg.Button(
@@ -910,18 +969,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                         tooltip="Saves The DVD Menu Layout",
                         width=2,
                     ),
-                    qtg.Spacer(width=1),
-                    qtg.Switch(
-                        tag="deactivate_filters",
-                        buddy_control=qtg.Label(
-                            tag="switch_label", text="Deactivate Filters", width=17
-                        ),
-                        tooltip=(
-                            "Switch Video Filters Off - Good For Testing Because It"
-                            " Increases Speed"
-                        ),
-                    ),
-                    qtg.Spacer(width=1),
+                    qtg.Spacer(width=27),
                 ),
                 qtg.Command_Button_Container(
                     ok_callback=self.event_handler,

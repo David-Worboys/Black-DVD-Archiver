@@ -59,7 +59,7 @@ class DVD_Config:
     _button_font_color: str = "white"
     _button_font_point_size: int = 12
     _button_font: str = ""
-    _menu_aspect_ratio: str = sys_consts.AR169
+    _menu_aspect_ratio: str = sys_consts.AR43  #
     _menu_buttons_across: int = 2
     _menu_buttons_per_page: int = 4
     _page_pointer_left_file: str = ""
@@ -1088,7 +1088,8 @@ class DVD:
             cell_coords, message = self._dvd_page_calc_layout(
                 buttons_per_page=buttons_per_page,
                 buttons_across=buttons_across,
-                button_aspect_ratio=4 / 3,
+                button_aspect_ratio=4
+                / 3,  # Actually does not matter because a 16/9 menu will stretch button
                 dvd_dims=dvd_dims,
                 border_top=10,
                 border_bottom=10 + timestamp_height,
