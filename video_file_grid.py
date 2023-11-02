@@ -1330,10 +1330,49 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 toolbox = self._get_toolbox(file_video_data)
 
+                if file_video_data.encoding_info.video_standard not in (
+                    sys_consts.PAL,
+                    sys_consts.NTSC,
+                ):
+                    rejected += (
+                        f"{sys_consts.SDELIM}{file_video_data.video_path} :"
+                        f" {sys_consts.SDELIM} Is Not PAL or NTSC \n"
+                    )
+                    continue
+
                 if file_video_data.encoding_info.video_tracks == 0:
                     rejected += (
                         f"{sys_consts.SDELIM}{file_video_data.video_path} :"
                         f" {sys_consts.SDELIM}No Video Track \n"
+                    )
+                    continue
+
+                if (
+                    file_video_data.encoding_info.video_standard == sys_consts.PAL
+                    and file_video_data.encoding_info.video_height
+                    > sys_consts.PAL_SPECS.height_43
+                    or file_video_data.encoding_info.video_standard == sys_consts.NTSC
+                    and file_video_data.encoding_info.video_height
+                    > sys_consts.NTSC_SPECS.height_43
+                ):
+                    rejected += (
+                        f"{sys_consts.SDELIM}{file_video_data.video_path} :"
+                        f" {sys_consts.SDELIM} Height Is Larger Than Standard Allows \n"
+                    )
+                    continue
+
+                if (
+                    file_video_data.encoding_info.video_standard == sys_consts.PAL
+                    and file_video_data.encoding_info.video_width
+                    > sys_consts.PAL_SPECS.width_43
+                    or file_video_data.encoding_info.video_standard == sys_consts.NTSC
+                    and file_video_data.encoding_info.video_width
+                    > sys_consts.NTSC_SPECS.width_43
+                ):
+                    rejected += (
+                        f"{sys_consts.SDELIM}{file_video_data.video_path} :"
+                        f" {sys_consts.SDELIM} Width Is Larger Than Video Standard"
+                        " Allows \n"
                     )
                     continue
 
