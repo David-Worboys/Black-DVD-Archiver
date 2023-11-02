@@ -1141,7 +1141,7 @@ class DVD:
         if result == -1:
             return -1, message
 
-        if debug:
+        if debug and not utils.Is_Complied():
             print("=============================")
             print(f"DBG  {canvas_height=} {canvas_width=} ")
             print(f"DBG {dvd_dims=}")

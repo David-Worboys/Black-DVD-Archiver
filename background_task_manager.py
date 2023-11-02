@@ -144,10 +144,9 @@ class Task_Manager:
 
             # Write data to shared memory
             try:
-                with self._lock:
-                    shared_mem: SharedMemory = SharedMemory(name=shared_mem_name)
-                    shared_mem.buf[: len(data_bytes)] = data_bytes
-                    shared_mem.close()
+                shared_mem: SharedMemory = SharedMemory(name=shared_mem_name)
+                shared_mem.buf[: len(data_bytes)] = data_bytes
+                shared_mem.close()
             except Exception as write_error:
                 print(f"DBG Error writing to shared memory A: {write_error}")
 

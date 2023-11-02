@@ -197,7 +197,7 @@ def Concatenate_Videos(
     assert isinstance(audio_codec, str), f"{audio_codec=}. Must be a str"
     assert isinstance(delete_temp_files, bool), f"{delete_temp_files=}. Must be a bool"
 
-    if debug:
+    if debug and not utils.Is_Complied():
         print(f"DBG CV {temp_files=} {output_file=} {audio_codec=} {delete_temp_files}")
 
     file_handler = file_utils.File()
@@ -1142,6 +1142,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
 
         start_time = 0 if start_frame == 0 else start_frame / frame_rate
 
+        # TODO Find a faster less resource intensive way of doing this as the Dev computer redlines doing this task!
         commands = [
             sys_consts.FFMPG,
             "-i",
@@ -1806,7 +1807,7 @@ def Execute_Check_Output(
     debug: bool = False,
     shell: bool = False,
     stderr_to_stdout: bool = False,
-    buffer_size: int = 100000,
+    buffer_size: int = 1000000,
 ) -> tuple[int, str]:
     """Executes the given command(s) with the subprocess.run method.
 
@@ -1842,7 +1843,7 @@ def Execute_Check_Output(
         isinstance(buffer_size, int) and buffer_size > 0
     ), f"{buffer_size=}. Must be int > 0"
 
-    if debug:
+    if debug and not utils.Is_Complied():
         print(f'DBG Call command ***   {" ".join(commands)}')
         print(f"DBG Call commands command list ***   {commands}")
         print(f"DBG Call commands shlex split  ***   {shlex.split(' '.join(commands))}")
@@ -1893,7 +1894,7 @@ def Execute_Check_Output(
                     f" {output}"
                 )
 
-            if debug:
+            if debug and not utils.Is_Complied():
                 print(f"DBG {message} {e.returncode=} :: {output}")
 
             return -1, message  # Return -1 to indicate failure

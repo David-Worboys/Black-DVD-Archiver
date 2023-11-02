@@ -52,6 +52,7 @@ import PySide6.QtWidgets as qtW
 import shiboken6  # type: ignore
 from attrs import define
 
+import popups
 import utils
 from file_utils import App_Path
 from langtran import Lang_Tran
@@ -66,6 +67,7 @@ g_application: Union["QtPyApp", None] = None
 DEFAULT_FONT_SIZE = 10
 MAX_CHARS = 32767
 MENU_SEPERATOR = "---"
+USE_LAMBDA = False
 
 
 def Command_Button_Container(
@@ -2225,12 +2227,12 @@ class _qtpyBase_Control(_qtpyBase):
         self._widget = widget
 
     def _install_event(
-        self, event: Sys_Events, signal: str, use_lambda: bool = False
+        self, event: Sys_Events, signal: str, use_lambda: bool = USE_LAMBDA
     ) -> None:
         """Installs the event handler for the given event on the widget.
 
         Note: Pyside6 6.5.1 broke lambda connects - TODO test later releases
-              Nuitka 1.8.4  Seems to have addressed the issue
+              Nuitka 1.8.4  Seems to have addressed the issue (And nope after a long session finally locked)
 
         Args:
             event (Sys_Events): Event to install
@@ -2257,7 +2259,7 @@ class _qtpyBase_Control(_qtpyBase):
         except AttributeError:
             pass
 
-    def _install_event_handlers(self, use_lambda: bool = False):
+    def _install_event_handlers(self, use_lambda: bool = USE_LAMBDA):
         """Attaches events to the low-level GUI object created in _Create_Widger"""
 
         if callable(self.callback) and hasattr(self._widget, "connect"):
@@ -4315,7 +4317,7 @@ class _Container(_qtpyBase_Control):
         None  # = qtW.QScrollArea(parent) #None
     )
     _scroll_current_widget: Optional[_qtpyBase_Control] = None
-    _use_lambda: bool = False
+    _use_lambda: bool = USE_LAMBDA
 
     def __post_init__(self) -> None:
         """Sets up the class variables and makes sure that the variables are of the correct type"""
@@ -7487,7 +7489,7 @@ class _Custom_Dateedit(qtW.QWidget):
 
     min_date = qtC.QDate(1, 1, 100)  # qtC.QDate(100, 1, 1)
 
-    def __init__(self, parent: qtW.QWidget = None, use_lambda=False) -> None:
+    def __init__(self, parent: qtW.QWidget = None, use_lambda=USE_LAMBDA) -> None:
         """Constructor for the custom date edit widget that validates arguments and sets instance variables.
             Sets the input mask for the lineEdit widget to the mask returned by the get_mask() function
 
@@ -12337,7 +12339,7 @@ class Menu(_qtpyBase_Control):
         container_tag: str,
         _menu: Union[dict[str, _Menu_Entry], None] = None,
         _depth: int = 0,
-        _use_lambda: bool = False,
+        _use_lambda: bool = USE_LAMBDA,
     ) -> qtW.QMenuBar:
         """Creates a menu bar widget
 
@@ -15171,7 +15173,7 @@ class Video_Player(qtC.QObject):
         self._display_height = display_height
         self._frame_rate: float = -1.0
         self._input_file = ""
-        self._use_lambda = False
+        self._use_lambda = USE_LAMBDA
 
         self._setup_media_player()
 
@@ -15254,7 +15256,7 @@ class Video_Player(qtC.QObject):
         """
         self._media_player.play()
 
-    @qtC.Slot()
+    # @qtC.Slot()
     def seek(self, frame: int) -> None:
         """
         Seeks to a position
@@ -15301,22 +15303,28 @@ class Video_Player(qtC.QObject):
             isinstance(input_file, str) and input_file.strip() != ""
         ), f"{input_file =} must be a non-empty str"
 
-        self._input_file = input_file
-        self._frame_rate = frame_rate
+        with sys_cursor(Cursor.hourglass):
+            self._input_file = input_file
+            self._frame_rate = frame_rate
 
-        self._media_player.stop()
+            self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
 
-        # Heavy-handed but under certain circumstance the app would lock
-        self._setup_media_player()
+            count = 0
 
-        self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
+            while not self.available():
+                time.sleep(0.1)
+                count += 1
 
-        # Following loads the first frame into the viewer
-        self._media_player.setPosition(1)
-        self._media_player.setPosition(0)
-        self._media_player.pause()
+                if count > 10:
+                    popups.PopError(
+                        title="Video File Error...",
+                        message="Video File Is Not Supported!",
+                    ).show()
+                    break
 
-    @qtC.Slot()
+            # Following loads the first frame into the viewer
+            self._media_player.pause()
+
     def _duration_changed(self, duration: int) -> None:
         """Handles a video duration change
 
@@ -15325,7 +15333,6 @@ class Video_Player(qtC.QObject):
         """
         self.duration_changed_handler.emit(duration)
 
-    @qtC.Slot()
     def _frame_handler(self, frame: qtM.QVideoFrame) -> None:
         """Handles the video frame changing signal
 
@@ -15342,7 +15349,6 @@ class Video_Player(qtC.QObject):
 
             self.frame_changed_handler.emit(pixmap)
 
-    @qtC.Slot()
     def _position_changed(self, position_milliseconds: int) -> None:
         """
         Handles the position changing signal
@@ -15354,12 +15360,10 @@ class Video_Player(qtC.QObject):
             int(position_milliseconds * self._frame_rate // 1000)
         )
 
-    @qtC.Slot(qtM.QMediaPlayer.Error, str)
     def _player_error(self, error, error_string):
         """Called when the media player encounters an error."""
         print(f"Error: {error} - {error_string}")
 
-    @qtC.Slot()
     def _media_status_change(self, media_status: qtM.QMediaPlayer.mediaStatus) -> None:
         """Signals the state of the media has changed
 
@@ -15388,7 +15392,6 @@ class Video_Player(qtC.QObject):
 
         self.media_status_changed_handler.emit(self.source_state)
 
-    @qtC.Slot()
     def _seekable_changed(self, seekable: bool) -> None:
         """
         Signals the seekable status has changed

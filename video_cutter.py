@@ -180,7 +180,7 @@ class Video_Editor(DVD_Archiver_Base):
     _edit_folder: str = sys_consts.EDIT_FOLDER
     _transcode_folder: str = sys_consts.TRANSCODE_FOLDER
     _video_file_input: list[Video_Data] = dataclasses.field(default_factory=list)
-    _user_lambda: bool = True
+    _user_lambda: bool = False
 
     def __post_init__(self) -> None:
         """Configures the instance"""
@@ -205,7 +205,7 @@ class Video_Editor(DVD_Archiver_Base):
         if (
             self._user_lambda
         ):  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and
-            # Nuitka < 1.8.4 == boom!
+            # Nuitka < 1.8.4 == boom! (And nope after a long session finally locked)
             self._video_handler.frame_changed_handler.connect(self._frame_handler)
             self._video_handler.media_status_changed_handler.connect(
                 self._media_status_change
@@ -1087,32 +1087,53 @@ class Video_Editor(DVD_Archiver_Base):
             task_list.append((cut_index, cut_def))
 
         tasks_submitted = 0
+        run_in_background = False
 
-        for task_tuple in task_list:
-            self._background_task_manager.add_task(
-                name=f"cut_video_{task_tuple[0]}",
-                method=Run_Video_Cuts,
-                arguments=(task_tuple[1],),
-                callback=Notification_Call_Back,
-            )
-            tasks_submitted += 1
+        # Cut_Video is a resource hog and running in the background actually yields worse performance on my dev computer
+        # TODO revist when Cut_Video adresses the resource issue
+        if run_in_background:
+            for task_tuple in task_list:
+                self._background_task_manager.add_task(
+                    name=f"cut_video_{task_tuple[0]}",
+                    method=Run_Video_Cuts,
+                    arguments=(task_tuple[1],),
+                    callback=Notification_Call_Back,
+                )
+                tasks_submitted += 1
 
-        current_task = 0
-        gi_tasks_completed = 0
-        while gi_tasks_completed < tasks_submitted:
-            if bool(gb_task_errored):
-                self._progress_bar.reset()
-                error_str = (
-                    f" {gi_tasks_completed=}, {gi_task_error_code=},"
-                    f" {gi_thread_status=}, {gs_thread_message=}, {gs_thread_output=},"
-                    f" {gs_task_error_message=}, {gs_thread_task_name=}"
+            current_task = 0
+            gi_tasks_completed = 0
+            while gi_tasks_completed < tasks_submitted:
+                if bool(gb_task_errored):
+                    self._progress_bar.reset()
+                    error_str = (
+                        f" {gi_tasks_completed=}, {gi_task_error_code=},"
+                        f" {gi_thread_status=}, {gs_thread_message=},"
+                        f" {gs_thread_output=}, {gs_task_error_message=},"
+                        f" {gs_thread_task_name=}"
+                    )
+
+                    return -1, str(f"Cut Video Failed: {error_str}")
+
+                if current_task != gi_tasks_completed:
+                    current_task = gi_tasks_completed
+                    self._progress_bar.value_set(tasks_submitted - current_task)
+        else:
+            self._progress_bar.value_set(tasks_submitted)
+            tasks_submitted = len(task_list)
+            task_index = tasks_submitted
+
+            for task_tuple in task_list:
+                self._progress_bar.value_set(task_index)
+                task_index -= 1
+
+                task_error_code, task_error_message = dvdarch_utils.Cut_Video(
+                    cut_video_def=task_tuple[1]
                 )
 
-                return -1, str(f"Cut Video Failed: {error_str}")
-
-            if current_task != gi_tasks_completed:
-                current_task = gi_tasks_completed
-                self._progress_bar.value_set(tasks_submitted - current_task)
+                if task_error_code == -1:
+                    self._progress_bar.reset()
+                    return -1, task_error_message
 
         self._progress_bar.reset()
 
@@ -1120,7 +1141,7 @@ class Video_Editor(DVD_Archiver_Base):
             result, message = dvdarch_utils.Concatenate_Videos(
                 temp_files=temp_files,
                 output_file=output_file,
-                delete_temp_files=False,
+                delete_temp_files=True,
                 debug=False,
             )
 

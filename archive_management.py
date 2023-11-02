@@ -28,7 +28,7 @@ import dvdarch_utils
 import file_utils
 import sys_consts
 from sys_config import Video_Data
-from utils import Text_To_File_Name
+from utils import Is_Complied, Text_To_File_Name
 
 # fmt: on
 
@@ -336,13 +336,15 @@ class Archive_Manager:
                                 transcoding
                                 not in menu_video_data.encoding_info.video_format.lower()
                             ):
-                                print(
-                                    "DBG Transcoding"
-                                    f" {transcoding=} {menu_video_data.encoding_info.video_format.lower()=}"
-                                )
-                                print(
-                                    f"DBG {menu_video_data.video_path=} {backup_path=}"
-                                )
+                                if not Is_Complied():
+                                    print(
+                                        "DBG Transcoding"
+                                        f" {transcoding=} {menu_video_data.encoding_info.video_format.lower()=}"
+                                    )
+                                    print(
+                                        f"DBG {menu_video_data.video_path=} {backup_path=}"
+                                    )
+
                                 (
                                     self._error_code,
                                     output_file,
@@ -374,10 +376,12 @@ class Archive_Manager:
                                     self._error_message = output_file
                                     return -1, self._error_message
                             else:
-                                print(
-                                    f"DBG Copy As  {transcoding=} =="
-                                    f" {menu_video_data.encoding_info.video_format.lower()=} "
-                                )
+                                if not Is_Complied():
+                                    print(
+                                        f"DBG Copy As  {transcoding=} =="
+                                        f" {menu_video_data.encoding_info.video_format.lower()=} "
+                                    )
+
                                 (
                                     self._error_code,
                                     self._error_message,

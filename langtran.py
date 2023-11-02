@@ -27,7 +27,7 @@ import platformdirs
 import sqldb
 from file_utils import File
 from sys_consts import PROGRAM_NAME, SDELIM
-from utils import Singleton
+from utils import Is_Complied, Singleton
 
 # fmt: on
 
@@ -262,7 +262,8 @@ class Lang_Tran(metaclass=Singleton):
                             trans_string = (
                                 f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
                             )
-        if debug:
+
+        if debug and not Is_Complied():
             print(f"DBG Trans {trans_word=} {trans_string=}")
 
         return trans_string

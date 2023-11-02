@@ -1158,7 +1158,7 @@ class SQLDB:
         sql_statement = sql_statement.strip()
 
         if sql_statement.upper().startswith(SQL.SELECT):
-            if debug:
+            if debug and not Is_Complied():
                 print("DBG @@@================>", sql_statement)
 
             try:
@@ -1179,7 +1179,7 @@ class SQLDB:
 
                 raise ValueError(f"{error=}\n{sql_statement}")
         else:
-            if debug:
+            if debug and not Is_Complied():
                 print("DBG ***================>", sql_statement)
             try:
                 if transactional:  # Could be multiple sql statements in transaction

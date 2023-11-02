@@ -1229,7 +1229,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         assert all(
             isinstance(video_file, Video_Data) for video_file in video_file_input
         ), f"{video_file_input=}. Must be list of Video_Data"
-        print(f"DBG HEH 1 {video_file_input=}")
+
         # Note when changing tabpages I call process_edited_video_files and that makes this call
         # redundant - worse it would fire twice!. TODO Consider This Unintended Consequence!
         # self._file_control.process_edited_video_files(video_file_input=video_file_input)
