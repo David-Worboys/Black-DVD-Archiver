@@ -513,7 +513,7 @@ same quality. It is also likely to take much longer to transcode the source vide
 Choosing to transcode the source video into H264 or H265 will result in a greatly extended [Make DVD Process](#dvd-layout-window) and 
 the user will have to leave the "Black DVD Arciver" open to allow this process to complete. 
  * To check if the [Make DVD Process](#dvd-layout-window) is complete, the user opens the ["Task Manager"](#file-command-buttons) popup 
-window.
+window
  * As of Beta 3 the source video is not checked to see if it is already H264/H265 and will recompress these files.
    * There is a benefit to this, all GOPs are closed.
  * The H264/H356 transcode process closes all GOPs (Group of Pictures) to make then suitable for editing. GOP size is
