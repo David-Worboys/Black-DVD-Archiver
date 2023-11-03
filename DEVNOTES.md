@@ -1,5 +1,8 @@
 # The Black DVD Archiver—Developer Notes (Preliminary)
-### Author: David Worboys 2023-09-01
+### Author: David Worboys 
+* Original 2023-09-01 
+* Update 2023=10-22 (Removed apps that are no longer used)
+
 ## Introduction
 The Black DVD Archiver comprises source code written in python (3.11) and a number of open source applications used for 
 specific tasks during the preparation of a DVD image [refer Tool Apps](#tool-apps).
@@ -30,10 +33,8 @@ starting point to find the relevant licensing details):
 * ffmpeg  (https://ffmpeg.org/download.html)
 * ffprobe (https://ffmpeg.org/download.html)
 * identify (https://imagemagick.org/script/download.php)
-* mediainfo (https://mediaarea.net/en/MediaInfo/Download) 
-* mpeg2enc (https://gstreamer.freedesktop.org/documentation/mpeg2enc/index.html)
+* mediainfo (https://mediaarea.net/en/MediaInfo/Download)
 * mplex (https://www.linuxtv.org/wiki/index.php/Mplex)
-* ppmtoy4m (https://sourceforge.net/projects/mjpeg/)
 * spumux (https://sourceforge.net/projects/dvdauthor/files/)
 * xorriso (https://www.gnu.org/software/xorriso/)
 
@@ -66,10 +67,8 @@ project folder
    │ ffmpeg 
    │ ffprobe
    │ identify   
-   │ mediainfo
-   │ mpeg2enc
+   │ mediainfo   
    │ mplex
-   │ ppmtoy4m
    │ spumux
    │ xorriso
    │
@@ -79,12 +78,14 @@ project folder
 The following command will now be run in the tools folder, and this will populate the tool_apps folder with the linux 
 binaries and associated shared object libraries in its own file system.
 
+**Note**: Remove the tool_apps folder before running this command 
+
 The tool_apps folder can now be copied into the root of the Black DVD Archiver source tree.
 
 **Note:**
 The paths will need to be changed to reflect the actual tools folder structure above:
 ```
-~/Programs/linuxdeploy-x86_64.AppImage --appdir /home/david/PycharmProjects/dvdarch/tools/tool_apps --executable /home/david/PycharmProjects/dvdarch/tools/composite   --executable /home/david/PycharmProjects/dvdarch/tools/dvdauthor   --executable /home/david/PycharmProjects/dvdarch/tools/ffmpeg --executable /home/david/PycharmProjects/dvdarch/tools/ffprobe --executable /home/david/PycharmProjects/dvdarch/tools/identify  --executable /home/david/PycharmProjects/dvdarch/tools/magick --executable /home/david/PycharmProjects/dvdarch/tools/mediainfo --executable /home/david/PycharmProjects/dvdarch/tools/mp2enc --executable /home/david/PycharmProjects/dvdarch/tools/mp2enc --executable /home/david/PycharmProjects/dvdarch/tools/mpeg2enc --executable /home/david/PycharmProjects/dvdarch/tools/mplex --executable /home/david/PycharmProjects/dvdarch/tools/ppmtoy4m --executable /home/david/PycharmProjects/dvdarch/tools/spumux   --executable /home/david/PycharmProjects/dvdarch/tools/xorriso
+~/Programs/linuxdeploy-x86_64.AppImage --appdir /home/david/PycharmProjects/dvdarch/tools/tool_apps --executable /home/david/PycharmProjects/dvdarch/tools/composite   --executable /home/david/PycharmProjects/dvdarch/tools/dvdauthor   --executable /home/david/PycharmProjects/dvdarch/tools/ffmpeg --executable /home/david/PycharmProjects/dvdarch/tools/ffprobe --executable /home/david/PycharmProjects/dvdarch/tools/identify  --executable /home/david/PycharmProjects/dvdarch/tools/magick --executable /home/david/PycharmProjects/dvdarch/tools/mediainfo --executable /home/david/PycharmProjects/dvdarch/tools/mplex  --executable /home/david/PycharmProjects/dvdarch/tools/spumux   --executable /home/david/PycharmProjects/dvdarch/tools/xorriso
 ```
 
 

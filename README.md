@@ -1,5 +1,7 @@
-# The Black DVD Archiver — βeta 2.0 Release
-### Author: David Worboys 2023-10-01
+# The Black DVD Archiver — βeta 3.0 Release
+### Author: David Worboys 
+##### 2023-10-01 - Initial Draft
+##### Update 2023-11-03
 The Black DVD Archiver is an application that will place user selected video files on a DVD and the source files in an 
 archive location specified by the user. 
 
@@ -14,18 +16,20 @@ any DVD/Video settings you want in The Black DVD Archiver as long as they are th
 These settings are optimised at getting VHS, Beta and 8mm analogue video onto a DVD at the best possible quality that 
 allows 2 hours to fit on a 4.7 GB disk.
 
-The Black DVD Archiver is designed to do this task with the least amount of work by the user and to produce DVD with 
+The Black DVD Archiver is designed to do this task with the least amount of work by the user and to produce a DVD with 
 a consistent menu layout suitable for a collection.
 
 Can the author be persuaded to be more flexible and add additional features? Possibly...with a very good reason.
 
 ## Features
 * Selection Of Input Files In A Variety Of Container Formats — As Long As They Conform To PAL/NTSC standards
-* A Simple Video Editor
+* A Simple Video Editor with frame accurate editing on compressed video files with closed GOPs (Group of Pictures)
+  * Only the GOP containing the edit cut is re-encoded the rest of the file is copied so there is no visible quality 
+  loss and the video edit is faster
 * Limited Video Filters With Fixed Settings
 * DVDs Have A Simplified Menu Structure
 * Saves The Input/Output Files Into A User-Selected [Archive Folder Structure](#archive-folder-structure). 
-  * This Can Be Placed On A NAS And Accessed By A Media Player.
+  * This Can Be Placed On A [NAS](#transcode-source) and Accessed By A Media Player.
   * An ISO image of the DVD is produced so that DVD burning software can produce the physical DVD. 
     * Brasero is a good choice, choose the "Burn Image" option (https://wiki.gnome.org/Apps/Brasero)
   * The archive files are split into 25 GB or 4 GB folders, so that they can be burnt off to optical disk for backup. 
@@ -90,7 +94,7 @@ Source: https://ia801503.us.archive.org/7/items/nist-ir-8387/NIST.IR.8387.pdf
 * 16:9 Aspect ratio, usually from camcorders, uses the same resolution just remaps pixels from square to rectangular
 * Interlaced videos are kept as interlaced. Resizing and deinterlacing are best left to the display device
 * Only 4 GB Single Layer DVDs are supported as they are assumed to have the best archival qualities
-* The Archive folders are split into 25 GB (Blu-ray) or 4 GB (DVD) folders as chosen by the user
+* The Archive folders are split into 25 GB (Single Layer Blu-ray) or 4 GB (Single Layer DVD) folders as chosen by the user
   * Each video file has an associated sha256 checksum file to allow users to verify the integrity of the video file 
   contents
 * Supported Container Formats 
@@ -103,9 +107,11 @@ Source: https://ia801503.us.archive.org/7/items/nist-ir-8387/NIST.IR.8387.pdf
 ## System Requirements
 The Black DVD Archiver is a Linux program licensed under the terms of the GNU General Public License v3.0.
 * A Linux operating system — Debian based
-* Developed and tested on Linux Mint and tested on MX Linux
+* Developed and tested on Linux Mint and tested on a minimal MX Linux install
 * 16+ GB RAM
-* 50+ GB of free disk space
+* 50+ GB of free disk space 
+*  1+ TB Video file work drive as video requires a great deal of disk space to store and process
+* A DVD/Blu-ray burner drive to write the optical disk images
 
 ## Installation
 
@@ -181,7 +187,7 @@ At the bottom of the video file grid is the _Default Video Filters_ and control 
   * _Auto Levels_ - Attempts to brighten a video. If you need this then the video is likely to be of poor quality and 
   good results cannot be expected.
 
-#### Command Buttons
+#### File Command Buttons
 The operation of these buttons is as follows:
   * ![](./userguide_images/file_select_button.png) — Opens [The Choose Video Files Window](#the-choose-video-files-window)
   * ![](./userguide_images/delete_button.png) — Delete the checked (selected) video files from the file grid
@@ -207,12 +213,12 @@ At the bottom of the _Main Window_ are the following buttons:
     *  Select "Select All" or check (select) the task that needs to be killed.
     * Click "Kill Task" to kill the selected tasks.
     * Clik "Ok" to close the "Task Manager" popup.
-      * If this is done without killing taks then the tasks are left running and the window closes
+      * If this is done without killing tasks, then the tasks are left running and the window closes
    
 
 * ![](./userguide_images/exit_button.png) — Exit the "Black DVD Archiver"
     * Save's the current view which is then loaded when the "Black DVD Archiver" is started again
-    * Prompts to kill running background tasks if the user wishes to exit immediatly
+    * Prompts to kill running background tasks if the user wishes to exit immediately
 * ![](./userguide_images/dvd_layout.png) — Manages project DVD layouts. 
   * The DVD layout combo box allows users to select the desired DVD layout by clicking on it.
   * If a project has more than 2 hours of video, then more than one DVD layout will be needed
@@ -310,6 +316,7 @@ these settings in greater detail.
 
 ### Video Cutter Panel
 ![](./userguide_images/video_cutter.png)
+
 The video cutter panel is where a video is displayed, edit points are set and where a DVD image button image is 
 selected. 
 
@@ -354,8 +361,11 @@ The edit list panel displays the list of edit points for the selected video clip
 
 * _Select All_ - Checking this selects all the edit points in the grid. Unchecking deselects all the edit points in te 
 grid
-* _Bar Graph_ -  On the top right a bar graph indicates the percentage of files remaining to be completed during the 
-file cutting process
+* _'To Cut' Bar Graph_ -  On the top right a bar graph indicates the percentage of files 'To Cut' during the 
+file cutting process. The cutting process starts at 100% abd counts down to 0%
+  * The cutting process can be slow on lower end machines, as frame accurate cutting of compressed video files, like
+  H265, H264 and MPEG2, requires additional file analysis. 
+  * Compressed video files must have closed GOPS (Group of Pictures) for a frame accurate cut.
 * _Clip Name_ - Double-clicking in this field allows the user to enter a clip name
   * This is of most use if the video is to be cut into multiple clips
   * If the edit point is to be cut out, then there is no need to enter a clip name
@@ -366,8 +376,9 @@ file cutting process
 * ![](./userguide_images/join_button.png) — Opens a pop-up window to allow the user to choose how the selected edit 
 points are assembled.
 
-  The file cuts are performed as simultaneous background tasks to speed the cutting process, but it can still take time 
-if the video source files are large and the user will have to wait.
+  The file cuts will take time, particularly if the video source files are large and the computer is a lower end machine, 
+  due to the preliminary file analysis and large amounts of data involved. The user will just have to wait for the 
+  process to complete.
 
   * ![](./userguide_images/clip_assembley_method.png)
     * The following two methods are available to assemble the edit 
@@ -384,7 +395,7 @@ if the video source files are large and the user will have to wait.
 The DVD layout window allows the user to modify the DVD layout before proceeding to generate the DVD.
 
 This window opens in response to clicking on ![](./userguide_images/make_dvd_button.png)in the [Main Window](#the-main-window). Further information is found under 
-[Command Buttons](#command-buttons)
+[Command Buttons](#file-command-buttons)
 
 The layout displayed in this example reflects the use of grouping displayed in the main window and visible in the 
 background
@@ -392,6 +403,11 @@ background
 * Each row in the grid is a DVD menu page
   * By double-clicking in the _Menu Title_ field a title can be entered for a DVD menu page
 * The videos on each DVD page are displayed in the _Videos On Menu_ column
+* _Menu Aspect Ratio_ - Select 16:9 for wide screen menus and 4:3 for the traditional squarish menus.
+    *  Each DVD menu page is either all 4:3 videos or all 16:9 videos as per the DVD spec. THe 'Black DVD Archiver' 
+  automatically enforces this, and it is not possible to produce a mixed aspect ratio menu page.
+    * If a 16:9 wide screen menu is chosen and there are 4:3 videos on the DVD then the 4:3 image buttons will be 
+  stretched to 16:9 and will look 'wrong'.
 * _Deactivate Filters_ - Select this to test the layout generation of the DVD. Filters are slow and this makes the DVD 
 generation process as fast as possible
 * ![](./userguide_images/up_arrow.png) — Moves the checked (selected) DVD menu page(s) up
@@ -416,14 +432,14 @@ This tab:
   * Provides access to the "System Settings" panel.
 
 ### System Settings
-"System Settings" contains the "Archive Disk Size" and the "Black DVD Archiver Language" control panels
+"System Settings" contains the "Archive Disks" and the "Black DVD Archiver Language" control panels
 
 ![](./userguide_images/system_settings.png)
-#### Archive Disk Size
-
+### Archive Disks
+#### Disk Size  
 ![](./userguide_images/archive_disk_size.png)
 
-The "Archive Disk Size" panel allows the user to select the archive video optical disk size. This allows the user to 
+The "Disk Size" panel allows the user to select the archive video optical disk size. This allows the user to 
 burn off the **_video_source_** folder **_Disk_xx_** sub-folders onto backup optical discs for offline long-term archival 
 storage of the source video files.
 
@@ -480,6 +496,28 @@ conclusion of the [Make DVD Process](#dvd-layout-window) initiated by the user w
   * Brasero is a good choice, choose the "Burn Image" option (https://wiki.gnome.org/Apps/Brasero)
 * Folder **_dvd_image_** stores the DVD files in a folder structure that mirrors the DVD. This allows media players to 
 play the DVD which an iso file does not permit.  
+#### Transcode Source
+![](./userguide_images/transcode_source.png)
+
+The "Trancode Source" panel allows the user to archive the source video in a more compressed file format. Currently, 
+there are the following three options:
+
+* _No Transcode_ — This is the preferred option as the source video is archived in its original, untouched, format. 
+This is also the fastest option as the source video is copied into the appropriate archive folders and will not slow 
+down the [Make DVD Process](#dvd-layout-window). 
+* _H264 (AVC)_ — This is the same format Blu-ray uses and is very widely supported.  This is the best choice for DLNA 
+network media players like Serviio. The transcode process will take some time to complete. 
+* _H265 (HEVC)_ — This newer video format supports higher compression and, thus, smaller file sizes than H264 at the 
+same quality. It is also likely to take much longer to transcode the source video than H264
+
+Choosing to transcode the source video into H264 or H265 will result in a greatly extended [Make DVD Process](#dvd-layout-window) and 
+the user will have to leave the "Black DVD Arciver" open to allow this process to complete. 
+ * To check if the [Make DVD Process](#dvd-layout-window) is complete, the user opens the ["Task Manager"](#file-command-buttons) popup 
+window.
+ * As of Beta 3 the source video is not checked to see if it is already H264/H265 and will recompress these files.
+   * There is a benefit to this, all GOPs are closed.
+ * The H264/H356 transcode process closes all GOPs (Group of Pictures) to make then suitable for editing. GOP size is
+currently 15 which matches the DVD spec but will result in larger compressed files.
 
 #### Black DVD Archiver Language
 ![](./userguide_images/archiver_language.png)
@@ -506,7 +544,7 @@ phrase to avoid control layout issues in the "Black DVD Archiver"**
 
 ![](./userguide_images/language_translation_popup.png)
 
-##### Command Buttons
+##### Language Translation Command Buttons
 The operation of the command buttons is as follows:
 
 ![](./userguide_images/langtran_country_combo.png) — This combo box allows the user to select the country they are 
@@ -549,7 +587,7 @@ too long will mess up the layout of the user interface graphical elements.
       * To help prevent this, the user will be warned when a translated prharse is too long
         * First, a red warning message will be displayed at the top of the screen
         * Second, the offending translated phrase will display a "check" mark when "Saved"
-            * ![](./userguide_images/trans_phase_too_long..png)
+          ![](./userguide_images/trans_phase_too_long..png)
 
 
 
