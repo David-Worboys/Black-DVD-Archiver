@@ -36,6 +36,10 @@ from utils import Is_Complied, Text_To_File_Name
 DVD_IMAGE: Final[str] = "dvd_image"
 ISO_IMAGE: Final[str] = "iso_image"
 VIDEO_SOURCE: Final[str] = "video_source"
+STREAMING: Final[str] = "streaming"  # Used in archival mode only
+PRESERVATION_MASTER: Final[str] = (
+    "preservation_master_ffv1"  # Used in archival mode only
+)
 MISC: Final[str] = "misc"
 
 
@@ -64,11 +68,12 @@ class Archive_Manager:
 
         assert isinstance(self.transcode_type, str) and self.transcode_type in (
             sys_consts.TRANSCODE_NONE,
+            sys_consts.TRANSCODE_FFV1ARCHIVAL,
             sys_consts.TRANSCODE_H264,
             sys_consts.TRANSCODE_H265,
         ), (
-            f"{self.transcode_type=}, Must be Be TRANSCODE_NONE | TRANSCODE_H264 |"
-            " TRANSCODE_H265"
+            f"{self.transcode_type=}, Must be Be TRANSCODE_NONE |"
+            " TRANSCODE_FFV1ARCHIVAL | TRANSCODE_H264 | TRANSCODE_H265"
         )
 
         self._error_message = self._make_folder_structure()
@@ -258,6 +263,38 @@ class Archive_Manager:
                             f" {sys_consts.SDELIM}{backup_item_folder}{sys_consts.SDELIM}"
                         ),
                     )
+
+                if self.transcode_type == sys_consts.TRANSCODE_FFV1ARCHIVAL:
+                    preservation_master_folder = file_handler.file_join(
+                        backup_item_folder, PRESERVATION_MASTER
+                    )
+
+                    if file_handler.make_dir(preservation_master_folder) == -1:
+                        self._error_code = -1
+                        return (
+                            -1,
+                            (
+                                "Failed To Create Preservation Master Folder :"
+                                f" {sys_consts.SDELIM}{preservation_master_folder}{sys_consts.SDELIM}"
+                            ),
+                        )
+
+                    backup_item_folder = file_handler.file_join(
+                        backup_item_folder, STREAMING
+                    )
+
+                    if file_handler.make_dir(backup_item_folder) == -1:
+                        self._error_code = -1
+                        return (
+                            -1,
+                            (
+                                "Failed To Create Backup Folder :"
+                                f" {sys_consts.SDELIM}{backup_item_folder}{sys_consts.SDELIM}"
+                            ),
+                        )
+                else:
+                    preservation_master_folder = ""
+
                 for menu_index, menu in enumerate(menu_layout):
                     menu_index: int
                     menu: tuple[str, list[Video_Data]]
@@ -266,6 +303,42 @@ class Archive_Manager:
 
                     if menu_title.strip():
                         menu_title = Text_To_File_Name(menu_title)
+
+                        if preservation_master_folder:
+                            preservation_master_menu_dir = file_handler.file_join(
+                                dir_path=preservation_master_folder,
+                                file_name=Text_To_File_Name(menu_title),
+                            )
+                            preservation_master_menu_dir_temp = file_handler.file_join(
+                                dir_path=preservation_master_folder,
+                                file_name=f"{Text_To_File_Name(menu_title)}_temp",
+                            )
+
+                            video_folders.append(
+                                (
+                                    preservation_master_menu_dir_temp,
+                                    preservation_master_menu_dir,
+                                    menu_title,
+                                )
+                            )
+
+                            if not file_handler.path_exists(
+                                preservation_master_menu_dir_temp
+                            ):
+                                if (
+                                    file_handler.make_dir(
+                                        preservation_master_menu_dir_temp
+                                    )
+                                    == -1
+                                ):
+                                    self._error_code = -1
+                                    return (
+                                        -1,
+                                        (
+                                            "Failed To Create Backup Folder"
+                                            f" :{sys_consts.SDELIM}{preservation_master_menu_dir_temp}{sys_consts.SDELIM}"
+                                        ),
+                                    )
 
                         menu_dir = file_handler.file_join(
                             dir_path=backup_item_folder,
@@ -277,6 +350,43 @@ class Archive_Manager:
                         )
                     else:  # If no menu title, then use the menu number
                         menu_title = f"menu_{menu_index + 1:02}"
+
+                        if preservation_master_folder:
+                            preservation_master_menu_dir = file_handler.file_join(
+                                dir_path=preservation_master_folder,
+                                file_name=menu_title,
+                            )
+                            preservation_master_menu_dir_temp = file_handler.file_join(
+                                dir_path=preservation_master_folder,
+                                file_name=menu_title,
+                            )
+
+                            video_folders.append(
+                                (
+                                    preservation_master_menu_dir_temp,
+                                    preservation_master_menu_dir,
+                                    menu_title,
+                                )
+                            )
+
+                            if not file_handler.path_exists(
+                                preservation_master_menu_dir_temp
+                            ):
+                                if (
+                                    file_handler.make_dir(
+                                        preservation_master_menu_dir_temp
+                                    )
+                                    == -1
+                                ):
+                                    self._error_code = -1
+                                    return (
+                                        -1,
+                                        (
+                                            "Failed To Create Backup Folder"
+                                            f" :{sys_consts.SDELIM}{preservation_master_menu_dir_temp}{sys_consts.SDELIM}"
+                                        ),
+                                    )
+
                         menu_dir = file_handler.file_join(
                             dir_path=backup_item_folder,
                             file_name=menu_title,
@@ -308,6 +418,16 @@ class Archive_Manager:
                             else menu_video_data.video_file
                         )
 
+                        if (
+                            preservation_master_folder
+                            and preservation_master_menu_dir_temp
+                        ):
+                            preservation_master_backup_path = file_handler.file_join(
+                                dir_path=preservation_master_menu_dir_temp,
+                                file_name=backup_file_name,
+                                ext=menu_video_data.video_extension,
+                            )
+
                         backup_path = file_handler.file_join(
                             dir_path=menu_dir_temp,
                             file_name=backup_file_name,
@@ -326,6 +446,84 @@ class Archive_Manager:
 
                             if self._error_code == -1:
                                 return -1, self._error_message
+                        elif (
+                            self.transcode_type == sys_consts.TRANSCODE_FFV1ARCHIVAL
+                            and preservation_master_folder
+                        ):
+                            # Make a streaming copy
+                            if (
+                                "h264"
+                                not in menu_video_data.encoding_info.video_format.lower()
+                            ):  # Check if we need to transcode
+                                (
+                                    self._error_code,
+                                    self._error_message,
+                                ) = dvdarch_utils.Transcode_H26x(
+                                    input_file=menu_video_data.video_path,
+                                    output_folder=menu_dir_temp,
+                                    width=menu_video_data.encoding_info.video_width,
+                                    height=menu_video_data.encoding_info.video_height,
+                                    frame_rate=menu_video_data.encoding_info.video_frame_rate,
+                                    interlaced=(
+                                        True
+                                        if menu_video_data.encoding_info.video_scan_type.lower()
+                                        == "interlaced"
+                                        else False
+                                    ),
+                                    bottom_field_first=(
+                                        True
+                                        if menu_video_data.encoding_info.video_scan_order.lower()
+                                        == "bff"
+                                        else False
+                                    ),
+                                    h265=False,
+                                    high_quality=True,
+                                )
+
+                                if (
+                                    self._error_code == -1
+                                ):  # output_file container error message
+                                    return -1, self._error_message
+                            else:  # We copy
+                                (
+                                    self._error_code,
+                                    self._error_message,
+                                ) = file_handler.copy_file(
+                                    menu_video_data.video_path, backup_path
+                                )
+
+                                if self._error_code == -1:
+                                    return -1, self._error_message
+
+                            # Make preservation master copy
+                            if (
+                                "ffv1"
+                                not in menu_video_data.encoding_info.video_format.lower()
+                            ):  # Chck if we need to transcode
+                                (
+                                    self._error_code,
+                                    self._error_message,
+                                ) = dvdarch_utils.Transcode_ffv1_archival(
+                                    input_file=menu_video_data.video_path,
+                                    output_folder=preservation_master_menu_dir_temp,
+                                    width=menu_video_data.encoding_info.video_width,
+                                    height=menu_video_data.encoding_info.video_height,
+                                    frame_rate=menu_video_data.encoding_info.video_frame_rate,
+                                )
+
+                                if self._error_code == -1:
+                                    return -1, self._error_message
+                            else:  # Just Copy
+                                (
+                                    self._error_code,
+                                    self._error_message,
+                                ) = file_handler.copy_file(
+                                    menu_video_data.video_path,
+                                    preservation_master_backup_path,
+                                )
+
+                                if self._error_code == -1:
+                                    return -1, self._error_message
                         else:  # Grit teeth, have to lower quality with a transcode
                             if self.transcode_type == sys_consts.TRANSCODE_H264:
                                 transcoding = "h264"
@@ -335,7 +533,7 @@ class Archive_Manager:
                             if (
                                 transcoding
                                 not in menu_video_data.encoding_info.video_format.lower()
-                            ):
+                            ):  # Check if we need to transcode
                                 if not Is_Complied():
                                     print(
                                         "DBG Transcoding"
@@ -375,7 +573,7 @@ class Archive_Manager:
                                 ):  # output_file container error message
                                     self._error_message = output_file
                                     return -1, self._error_message
-                            else:
+                            else:  # we copy
                                 if not Is_Complied():
                                     print(
                                         f"DBG Copy As  {transcoding=} =="

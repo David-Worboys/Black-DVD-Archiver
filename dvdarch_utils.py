@@ -127,8 +127,8 @@ class Dvd_Dims:
 class Cut_Video_Def:
     input_file: str = ""
     output_file: str = ""
-    start_cut: int = 0.0  # Frame
-    end_cut: int = 0.0  # Frame
+    start_cut: int = 0  # Frame
+    end_cut: int = 0  # Frame
     frame_rate: float = 0.0
     tag: str = ""
 
@@ -802,6 +802,148 @@ def Overlay_Text(
     return Execute_Check_Output(commands=command)
 
 
+def Transcode_ffv1_archival(
+    input_file: str,
+    output_folder: str,
+    frame_rate: float,
+    width: int,
+    height: int,
+) -> tuple[int, str]:
+    """
+    Converts an input vile file into a ffv1 compressed video suitable for permanent archival storage.
+
+    ffv1 is a permanent archival format widely accepted by archival institutions world wode
+
+    Args:
+        input_file (str): The path to the input video file.
+        output_folder (str): The path to the output folder.
+        frame_rate (float): The frame rate to use for the output video.
+        width (int) : The width of the video
+        height (int) : The height of the video
+
+    Returns:
+        tuple[int, str]:
+            arg 1: 1 if ok, -1 if error
+            arg 2: error message if error else ""
+
+    """
+    assert (
+        isinstance(input_file, str) and input_file.strip() != ""
+    ), f"{input_file=}. Must be a non-empty str"
+
+    assert (
+        isinstance(output_folder, str) and output_folder.strip() != ""
+    ), f"{output_folder=}. Must be a non-empty str"
+    assert (
+        isinstance(frame_rate, float) and frame_rate > 0
+    ), f"{frame_rate=}. Must be float > 0"
+    assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
+    assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
+
+    file_handler = file_utils.File()
+
+    if not file_handler.path_exists(output_folder):
+        return -1, f"{output_folder} Does not exist"
+
+    if not file_handler.path_writeable(output_folder):
+        return -1, f"{output_folder} Cannot Be Written To"
+
+    if not file_handler.file_exists(input_file):
+        return -1, f"File Does Not Exist {input_file}"
+
+    _, input_file_name, input_file_extn = file_handler.split_file_path(input_file)
+
+    output_file = file_handler.file_join(output_folder, f"{input_file_name}.mkv")
+    passlog_file = file_handler.file_join(output_folder, f"{input_file_name}")
+    passlog_del_file = file_handler.file_join(
+        output_folder, f"{input_file_name}-0.log"
+    )  # FFMPEG tacks on video stream
+
+    # Command 1
+    pass_1 = [
+        sys_consts.FFMPG,
+        "-threads",
+        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        "-i",
+        input_file,
+        "-pass",
+        "1",
+        "-passlogfile",
+        passlog_file,
+        "-c:v",
+        "ffv1",
+        "-level",
+        "3",
+        "-coder",
+        "1",
+        "-context",
+        "1",
+        "-g",
+        "1",
+        "-slices",
+        "16",
+        "-slicecrc",
+        "1",
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        "-c:a",
+        "flac",
+        output_file,
+        "-y",
+    ]
+
+    # Command 2
+    pass_2 = [
+        sys_consts.FFMPG,
+        "-threads",
+        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        "-i",
+        input_file,
+        "-pass",
+        "1",
+        "-passlogfile",
+        passlog_file,
+        "-c:v",
+        "ffv1",
+        "-level",
+        "3",
+        "-coder",
+        "1",
+        "-context",
+        "1",
+        "-g",
+        "1",
+        "-slices",
+        "16",
+        "-slicecrc",
+        "1",
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        f"{frame_rate}",
+        "-c:a",
+        "flac",
+        output_file,
+        "-y",
+    ]
+
+    result, message = Execute_Check_Output(commands=pass_1, debug=False)
+
+    if result == -1:
+        return -1, message
+
+    result, message = Execute_Check_Output(commands=pass_2, debug=False)
+
+    if result == -1:
+        return -1, message
+
+    if file_handler.remove_file(passlog_del_file) == -1:
+        return -1, f"Failed To Delete {passlog_del_file}"
+
+    return 1, ""
+
+
 def Transcode_H26x(
     input_file: str,
     output_folder: str,
@@ -839,6 +981,15 @@ def Transcode_H26x(
     assert (
         isinstance(output_folder, str) and output_folder.strip() != ""
     ), f"{output_folder=}. Must be a non-empty str"
+    assert (
+        isinstance(frame_rate, float) and frame_rate > 0
+    ), f"{frame_rate=}. Must be float > 0"
+    assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
+    assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
+    assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
+    assert isinstance(bottom_field_first, bool), f"{bottom_field_first=}. Must be bool"
+    assert isinstance(h265, bool), f"{h265=}. Must be bool"
+    assert isinstance(high_quality, bool), f"{high_quality=}. Must be bool"
 
     file_handler = file_utils.File()
 
@@ -1339,20 +1490,22 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         ), f"{encoding_details=}. Must Encoding_Details instance"
 
         video_filter_options = []
-        interlaced_flags = [
-            "-flags:v:0",  # video flags for the first video stream
-            "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
-            "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
-            "1",  # alternate scan value is 1
-        ]
 
         if encoding_details.video_scan_type.lower() == "interlaced":
+            interlaced_flags = [
+                "-flags:v:0",  # video flags for the first video stream
+                "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
+                "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
+                "1",  # alternate scan value is 1
+            ]
+
             video_filter_options.append(
                 f"fieldorder={'bff' if encoding_details.video_scan_order.lower() == 'bff' else 'tff'}"
             )
 
             video_filter = ["-vf", ",".join(video_filter_options)]
         else:
+            interlaced_flags = []
             video_filter = []
 
         command = [
@@ -2214,7 +2367,7 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
                             case "ScanType_Original" | "ScanOrder" | "ScanType" | "ScanOrder_Original":
                                 if (
                                     value == "MBAFF"
-                                ):  # H264/H25 adative interlaced indication
+                                ):  # H264/H25 adaptive interlaced indication
                                     video_file_details.video_scan_type = "Interlaced"
                                 else:
                                     if key.lower() in (
@@ -2277,9 +2430,7 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         video_file_details.error = "Failed To Get Video Codec"
         return video_file_details
 
-    video_file_details.video_format = (
-        codec  # Decided to use FFMP code extraction is it different from Mediainfo
-    )
+    video_file_details.video_format = codec  # Decided to use FFMPEG codec extraction as it is different from Mediainfo
 
     # Emergency measures were key info is missing information try ffprobe
     if video_file_details.video_scan_type.strip() == "":
@@ -2656,7 +2807,7 @@ class Video_File_Copier:
                         current_subfolder_size_bytes = 0
                         destination_folder = os.path.join(
                             destination_root_folder,
-                            f"Disk_{subfolder_index:02} - {menu_title}",
+                            f"{menu_title} - Disk_{subfolder_index:02}",
                         )
 
                         if file_handler.make_dir(destination_folder) == -1:

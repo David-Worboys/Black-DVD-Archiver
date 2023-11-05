@@ -484,9 +484,13 @@ class DVD_Config:
     def transcode_type(self, value: str):
         assert isinstance(value, str) and value in (
             sys_consts.TRANSCODE_NONE,
+            sys_consts.TRANSCODE_FFV1ARCHIVAL,
             sys_consts.TRANSCODE_H264,
             sys_consts.TRANSCODE_H265,
-        ), f"{value=}, Must be Be TRANSCODE_NONE | TRANSCODE_H264 | TRANSCODE_H265"
+        ), (
+            f"{value=}, Must be Be TRANSCODE_NONE | sys_consts.TRANSCODE_FFV1ARCHIVAL |"
+            " TRANSCODE_H264 | TRANSCODE_H265"
+        )
         self._transcode_type = value
 
     @property

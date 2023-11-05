@@ -383,6 +383,10 @@ class DVD_Archiver(DVD_Archiver_Base):
                         self._db_settings.setting_set(
                             "archive_disk_transcode", sys_consts.TRANSCODE_NONE
                         )
+                    case "transcode_archival":
+                        self._db_settings.setting_set(
+                            "archive_disk_transcode", sys_consts.TRANSCODE_FFV1ARCHIVAL
+                        )
                     case "transcode_h264":
                         self._db_settings.setting_set(
                             "archive_disk_transcode", sys_consts.TRANSCODE_H264
@@ -1502,6 +1506,22 @@ class DVD_Archiver(DVD_Archiver_Base):
                     callback=self.event_handler,
                     checked=(
                         True if transcode_type == sys_consts.TRANSCODE_NONE else False
+                    ),
+                ),
+                qtg.RadioButton(
+                    text="FFV1 (Archival)",
+                    tag="transcode_archival",
+                    tooltip=(
+                        "Creates A FFV1 Preservation Master And A Streaming H264 Copy."
+                        " This option uses a lot of disk space but is the best option"
+                        " for long term storage as it uses leading archive institution"
+                        " preferred formats ( Library Of Congress etc.)"
+                    ),
+                    callback=self.event_handler,
+                    checked=(
+                        True
+                        if transcode_type == sys_consts.TRANSCODE_FFV1ARCHIVAL
+                        else False
                     ),
                 ),
                 qtg.RadioButton(

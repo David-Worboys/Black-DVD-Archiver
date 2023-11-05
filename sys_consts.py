@@ -73,6 +73,7 @@ DOUBLE_SIDED_DVD_SIZE: Final[int] = 72453177  # kb ~ 8.5GB DVD9
 BLUERAY_ARCHIVE_SIZE: Final[str] = "25GB"
 DVD_ARCHIVE_SIZE: Final[str] = "4GB"
 TRANSCODE_NONE: Final[str] = "Original"
+TRANSCODE_FFV1ARCHIVAL: Final[str] = "ffv1"
 TRANSCODE_H264: Final[str] = "H264"
 TRANSCODE_H265: Final[str] = "H265"
 PAL_SPECS = namedtuple(
