@@ -426,7 +426,7 @@ class File:
         ), f"{extensions=}. Must be a list or tuple of str"
         assert all(
             isinstance(extension, str) for extension in extensions
-        ), f"All elements must be str"
+        ), f"{extension=}.All elements must be str"
 
         file_extensions = [extension.lower() for extension in extensions]
 

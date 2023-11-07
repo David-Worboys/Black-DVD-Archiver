@@ -669,7 +669,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
 
         folder = popups.PopFolderGet(
-            title=f"Select An Archive Folder....",
+            title="Select An Archive Folder....",
             root_dir=folder,
             create_folder=True,
             folder_edit=False,
@@ -1489,6 +1489,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                         else False
                     ),
                 ),
+                qtg.Spacer(),  # Future radio buttons
+                qtg.Spacer(),
             )
         )
 
@@ -1515,7 +1517,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                         "Creates A FFV1 Preservation Master And A Streaming H264 Copy."
                         " This option uses a lot of disk space but is the best option"
                         " for long term storage as it uses leading archive institution"
-                        " preferred formats ( Library Of Congress etc.)"
+                        " preferred formats (Library Of Congress etc.)"
                     ),
                     callback=self.event_handler,
                     checked=(
@@ -1559,7 +1561,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             control=qtg.VBoxContainer(align=qtg.Align.CENTER).add_row(
                 qtg.Label(
                     width=135,
-                    height=32,
+                    height=31,
                     editable=False,
                     text=about_text,
                     translate=False,

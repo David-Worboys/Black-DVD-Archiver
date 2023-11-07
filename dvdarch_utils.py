@@ -1892,6 +1892,7 @@ def Split_Large_Video(
 
     for i in range(num_chunks):
         start_frame = int(i * chunk_frames)
+
         end_frame = int(
             (i + 1) * chunk_frames
             if i < num_chunks - 1
@@ -1909,6 +1910,8 @@ def Split_Large_Video(
                 output_file=chunk_file,
                 start_cut=start_frame,
                 end_cut=end_frame,
+                frame_rate=encoding_info.video_frame_rate,
+                tag=f"chunk_{i}",
             )
         )
 
@@ -2706,7 +2709,8 @@ class Video_File_Copier:
         hash_algorithm="sha256",
     ) -> tuple[int, str]:
         """
-        Copy the contents of a source folder into subfolders of a specified size (in GB), verify checksum, and check disk space.
+        Copy the contents of a source folder into subfolders of a specified size (in GB), verify checksum,
+        and check disk space.
 
         Args:
             source_folder (str): The source folder whose contents will be copied.
@@ -2780,14 +2784,16 @@ class Video_File_Copier:
 
                 # Check if the file is larger than max_chunk_size_gb and split it if needed
                 if os.path.getsize(file_path) > folder_size_gb * 1024**3:
-                    result, result = Split_Large_Video(
+                    result, message = Split_Large_Video(
                         file_path, destination_root_folder, folder_size_gb
                     )
 
                     if result == -1:
-                        return -1, result
+                        return -1, message  # message is error
 
-                    chunked_files = result.split("|")
+                    chunked_files = message.split(
+                        "|"
+                    )  # message is a list off chunked files delimitered by |
                     delete_chunked = True
                 else:
                     chunked_files.append(file_path)
