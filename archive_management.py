@@ -123,38 +123,6 @@ class Archive_Manager:
 
         return ""
 
-    def archive_dvd_build_new(
-        self,
-        dvd_name: str,
-        dvd_folder: str,
-        iso_folder: str,
-        menu_layout: list[tuple[str, list[Video_Data]]],
-        overwrite_existing: bool = True,
-    ) -> tuple[int, str]:
-        assert (
-            isinstance(dvd_name, str) and dvd_name.strip() != ""
-        ), f"{dvd_name=}. Must be a non-empty str"
-        assert (
-            isinstance(dvd_folder, str) and dvd_folder.strip() != ""
-        ), f"{dvd_folder=}. Must be a non-empty str"
-        assert (
-            isinstance(iso_folder, str) and iso_folder.strip() != ""
-        ), f"{iso_folder=}. Must be a non-empty str"
-        assert isinstance(
-            menu_layout, list
-        ), f"{menu_layout=} must be a list of tuples of str,Video_Data"
-
-        for menu in menu_layout:
-            assert isinstance(menu[0], str), f"{menu[0]=} must be a str"
-            assert isinstance(menu[1], list), f"{menu[1]=} must be a list"
-            assert all(
-                isinstance(video_item, Video_Data) for video_item in menu[1]
-            ), f"All elements in {menu[1]=} must be Video_Data"
-
-        self._error_code = 1
-
-        file_handler = file_utils.File()
-
     def archive_dvd_build(
         self,
         dvd_name: str,

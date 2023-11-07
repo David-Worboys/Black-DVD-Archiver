@@ -21,7 +21,6 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
-
 from typing import Optional, cast
 
 import platformdirs
