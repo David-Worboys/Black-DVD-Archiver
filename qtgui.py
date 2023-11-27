@@ -60,6 +60,9 @@ from sys_consts import SDELIM
 from utils import Coords, Is_Complied, amper_length, country_date_formatmask
 
 # fmt: on
+sys.setrecursionlimit(
+    2**20
+)  # Set to a really hih number as in very rare circumstances, a reasonable recursion limit was not sufficient
 
 g_application: Union["QtPyApp", None] = None
 
@@ -1657,13 +1660,9 @@ class _Widget_Registry:
         if container_tag not in self._widget_dict:
             self._widget_dict[container_tag] = {}
 
-        self._widget_dict[container_tag].update(
-            {
-                tag: self._widget_entry(
-                    container_tag=container_tag, tag=tag, widget=widget
-                )
-            }
-        )
+        self._widget_dict[container_tag].update({
+            tag: self._widget_entry(container_tag=container_tag, tag=tag, widget=widget)
+        })
 
     def widget_del(
         self, window_id: int, container_tag: str, tag: str, level: int = 0
@@ -2197,6 +2196,11 @@ class _qtpyBase_Control(_qtpyBase):
                     )
 
         return 1
+
+    def block_signals(self, block_signals: bool = True):
+        assert isinstance(block_signals, bool), f"{block_signals=}. Must be a bool"
+
+        self._widget.blockSignals(block_signals)
 
     @property
     def guiwidget_get(self) -> qtW.QWidget:
@@ -3427,7 +3431,7 @@ class QtPyApp(_qtpyBase):
         self.font_set(self.app_font_def)
 
         self._app.setApplicationDisplayName(self.display_name)
-        self._fire_appost_init = True  # Post App start event
+        self._fire_appost_init = True  # Post-App start event
 
         screen_dim = qtG.QScreen.availableGeometry(self._app.primaryScreen())
         self.available_width = screen_dim.width()
@@ -3437,10 +3441,10 @@ class QtPyApp(_qtpyBase):
             self._main_frame = _qtpyBaseFrame()  # TODO Place holder Need _qtpyMDI_Frame
 
         else:
-            if 0 < self.available_height < height:
+            if height < 0 or height > self.available_height:
                 height = self.available_height - 10
 
-            if 0 < self.available_width < width:
+            if width < 0 or width > self.available_width:
                 width = self.available_width - 10
 
             if not self.frozen:
@@ -6112,6 +6116,7 @@ class Button(_qtpyBase_Control):
     """Instantiates a Button widget and associated properties"""
 
     txt_align: Align = Align.CENTER
+    auto_repeat_interval: int = 0  # Milliseconds
 
     def __post_init__(self) -> None:
         """Initializes the button object."""
@@ -6130,6 +6135,15 @@ class Button(_qtpyBase_Control):
         Returns:
             qtW.QWidget : The button widget
         """
+        assert isinstance(
+            self.txt_align, Align
+        ), f"{self.txt_align=}. Must be an instance of Align"
+
+        assert (
+            isinstance(self.auto_repeat_interval, int)
+            and self.auto_repeat_interval >= 0
+        ), "f{self.auto_repeat_interval=}. Must be an int >= 0"
+
         button_amper_length = amper_length(self.trans_str(self.text))
 
         if self.height <= 0:
@@ -6143,6 +6157,13 @@ class Button(_qtpyBase_Control):
         widget = super()._create_widget(
             parent_app=parent_app, parent=parent, container_tag=container_tag
         )
+
+        if self.auto_repeat_interval > 0:
+            self._widget: qtG.QPushbutton
+            self._widget.setAutoRepeat(True)
+            self._widget.setAutoRepeatInterval(
+                self.auto_repeat_interval
+            )  # Set the interval in milliseconds
 
         # TODO Resizing Stuff
         # self._widget.setMinimumHeight(pixel_size.height + self.tune_vsize)
@@ -7677,7 +7698,7 @@ class _Custom_Dateedit(qtW.QWidget):
             return False
         date = qtC.QDate.fromString(text, self.format())
         if date.isValid():
-            self.setDate(date)
+            self.setDate(date, "clicked")
             return True
         try:
             year = int(text)
@@ -8100,7 +8121,7 @@ class Dateedit(_qtpyBase_Control):
                 f" <{actual_date}>"
             )
 
-            self._widget.setDate(actual_date)
+            self._widget.setDate(actual_date, "clicked")
 
     def date_valid(self, date: str, date_format: str) -> bool:
         """Checks if a date is valid
@@ -8825,7 +8846,7 @@ class Grid(_qtpyBase_Control):
             first_time: Optional[bool] = None,
             widget: Optional[qtW.QWidget] = None,
             orig_row: Optional[int] = None,
-        ) -> "_Item_Data":
+        ) -> "_Item_Data":  # noqa: F821
             """Replaces the values of the item properties if the corresponding argument is not None.
 
             Args:
@@ -9249,7 +9270,7 @@ class Grid(_qtpyBase_Control):
             for col_index in range(self._widget.columnCount()):
                 item = self._widget.item(row_index, col_index)
 
-                if item.checkState() == qtC.Qt.Checked:
+                if item is not None and item.checkState() == qtC.Qt.Checked:
                     checked_items.append(self.checkitemrow_get(row_index, col_index))
 
         if checked_items:
@@ -12358,7 +12379,7 @@ class Menu(_qtpyBase_Control):
             self._widget.setMinimumWidth(parent.width())
             _menu = self._menu_items
 
-        window_id = Get_Window_ID(self.parent_app, self.parent, self)
+        window_id = Get_Window_ID(parent_app, parent, self)
 
         for key in _menu.keys():
             if _depth == 0:  # Top Level
@@ -14920,6 +14941,7 @@ class Slider(_qtpyBase_Control):
     page_step: int = 10
     single_step: int = 1
     orientation: str = "horizontal"
+    scale_factor_percent: float = 0.0
 
     def __post_init__(self) -> None:
         """Initializes the slider object."""
@@ -14941,6 +14963,15 @@ class Slider(_qtpyBase_Control):
             "horizontal",
             "vertical",
         ], f"{self.orientation=}. Must be 'horizontal' or'vertical'"
+
+        assert (
+            isinstance(self.scale_factor_percent, float)
+            and 0 <= self.scale_factor_percent <= 100
+        ), f"{self.scale_factor_percent=}. Must be float between 0 and 100"
+
+        self.scale_factor_percent = (
+            100 if self.scale_factor_percent == 0 else self.scale_factor_percent
+        )
 
         super().__post_init__()
 
@@ -14981,6 +15012,21 @@ class Slider(_qtpyBase_Control):
 
         return widget
 
+    @property
+    def scale_factor(self) -> float:
+        """Calculates the scale factor from the percentage."""
+        return self.scale_factor_percent / 100.0
+
+    @scale_factor.setter
+    def scale_factor(self, value: float) -> None:
+        """Sets the scale factor as a percentage."""
+        assert (
+            isinstance(self.scale_factor_percent, float)
+            and 0 <= self.scale_factor_percent <= 100
+        ), f"{self.scale_factor_percent=}. Must be float between 0 and 100"
+
+        self.scale_factor_percent = value * 100.0
+
     def range_min_set(self, range_min: int) -> None:
         """Sets the minimum value of the slider.
 
@@ -15007,11 +15053,13 @@ class Slider(_qtpyBase_Control):
             isinstance(range_max, int) and range_max > 0 and range_max > self.range_min
         ), f"{range_max=}. Must be an int > 0 and < {self.range_min=}."
 
-        self.range_max = range_max
+        scaled_range_max = int(range_max * self.scale_factor_percent / 100)
+
+        self.range_max = scaled_range_max
 
         self._widget: qtW.QSlider
 
-        self._widget.setMaximum(range_max)
+        self._widget.setMaximum(scaled_range_max)
 
     def value_get(self) -> int:
         """Gets the value of the slider.
@@ -15021,20 +15069,35 @@ class Slider(_qtpyBase_Control):
         """
         self._widget: qtW.QSlider
 
-        return self._widget.value()
+        return int(self._widget.value() * self.scale_factor)
 
-    def value_set(self, value: int) -> None:
+    def value_set(self, value: int, block_signals: bool = False) -> None:
         """Sets the value of the slider.
 
         Args:
             value (int): The value to set the slider to.
         """
+
+        # Scale the value back to the internal range
+        internal_value = int(value / self.scale_factor)
+
         assert (
-            isinstance(value, int) and self.range_min <= value <= self.range_max + 1
-        ), f"{value=}. Must be an int >= {self.range_min} and < {self.range_max}."
+            isinstance(internal_value, int)
+            and self.range_min <= internal_value <= self.range_max + 1
+        ), (
+            f"{value=} Scaled To {internal_value=}. Must be an int >="
+            f" {self.range_min} and < {self.range_max + 1}."
+        )
+
         self._widget: qtW.QSlider
 
-        self._widget.setValue(value)
+        if block_signals:
+            self._widget.blockSignals(True)
+
+        self._widget.setValue(internal_value)
+
+        if block_signals:
+            self._widget.blockSignals(False)
 
 
 @dataclasses.dataclass
@@ -15265,7 +15328,7 @@ class Video_Player(qtC.QObject):
             frame (int): The frame to seek to
         """
 
-        time_offset = int((1000 / self._frame_rate) * frame)
+        time_offset = math.ceil((1000 / self._frame_rate) * frame)
 
         if (
             self._media_player.isSeekable()
@@ -15343,7 +15406,12 @@ class Video_Player(qtC.QObject):
             image: qtG.QImage = (
                 frame.toImage()
                 .convertToFormat(qtG.QImage.Format.Format_RGB32)
-                .scaled(self._display_width, self._display_height)
+                .scaled(
+                    self._display_width,
+                    self._display_height,
+                    qtC.Qt.KeepAspectRatio,
+                    qtC.Qt.FastTransformation,  # Video rates makes sense although it might show some artefacting
+                )
             )
             pixmap: qtG.QPixmap = qtG.QPixmap.fromImage(image)
 
