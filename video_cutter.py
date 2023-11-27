@@ -338,7 +338,9 @@ class Video_Editor(DVD_Archiver_Base):
             case qtg.Sys_Events.MOVED:
                 match event.tag:
                     case "video_slider":
+                        self._video_handler.blockSignals(True)
                         self._seek(event.value)
+                        self._video_handler.blockSignals(False)
             case qtg.Sys_Events.PRESSED:
                 match event.tag:
                     case "video_slider":
@@ -1397,8 +1399,9 @@ class Video_Editor(DVD_Archiver_Base):
         """
         self._sliding = True
 
-        if self._sliding and self._video_slider is not None:
-            self._video_slider.value_set(frame)
+        if self._video_slider is not None:
+            # Want slider to update position without telling the world - so block signals.
+            self._video_slider.value_set(frame, block_signals=True)
 
         self._frame_display.value_set(frame)
 
@@ -1775,6 +1778,7 @@ class Video_Editor(DVD_Archiver_Base):
                         callback=self.event_handler,
                         width=2,
                         height=1,
+                        auto_repeat_interval=200,
                     ),
                     qtg.Button(
                         tag="play",
@@ -1791,6 +1795,7 @@ class Video_Editor(DVD_Archiver_Base):
                         callback=self.event_handler,
                         width=2,
                         height=1,
+                        auto_repeat_interval=200,
                     ),
                     # qtg.Spacer(width=1),
                     qtg.Button(
