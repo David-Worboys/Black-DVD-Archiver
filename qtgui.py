@@ -1058,7 +1058,7 @@ class Colors:
                 assert (
                     isinstance(int(arg[: len(arg) - 1]), int)
                     and 0 <= int(arg[: len(arg) - 1]) <= 100
-                ), (arg + " must be between 0% and 100%")
+                ), arg + " must be between 0% and 100%"
             else:
                 assert all(char in string.digits for char in arg), (
                     arg + " : is not a number"
@@ -1128,8 +1128,7 @@ class Colors:
         assert color_function_string != "", (
             color_function_string
             + " : Only functions rgb ,rgba, hsv, hsva are supported and"
-            " color_function_string names: "
-            + self.legal_colour_string
+            " color_function_string names: " + self.legal_colour_string
         )
 
         self._process_colour_args(color_function_string, args, hcheck)
@@ -5179,7 +5178,9 @@ class _Container(_qtpyBase_Control):
         )
 
     # TODO Keep return type uptodate
-    def widget_get(self, container_tag: str, tag: str) -> Union[
+    def widget_get(
+        self, container_tag: str, tag: str
+    ) -> Union[
         _qtpyBase_Control,
         "Button",
         "Checkbox",
@@ -5378,9 +5379,9 @@ class _Container(_qtpyBase_Control):
                         widget.enable_get(item.tag)
                     )
                 else:
-                    self._current_enable_settings[item.container_tag][
-                        item.tag
-                    ] = widget.enable_get
+                    self._current_enable_settings[item.container_tag][item.tag] = (
+                        widget.enable_get
+                    )
 
     def controls_enable_state_restore(self) -> None:
         """Restores the enable state of all controls in the container"""
@@ -6422,9 +6423,7 @@ class PopContainer(_qtpyBase_Control):
     title: str = ""
     container: Optional[_Container] = None
     dialog: _Dialog = None
-    parent_app: QtPyApp = (
-        None  # Changed to public 2023/03/05 because of a very occasional focus_out error
-    )
+    parent_app: QtPyApp = None  # Changed to public 2023/03/05 because of a very occasional focus_out error
 
     # private instance variables
     _allow_close: bool = False
@@ -8163,9 +8162,7 @@ class Dateedit(_qtpyBase_Control):
 
         return self.date_get(date_format, date_tuple)
 
-    def value_set(
-        self, date: str, date_format: str = ""
-    ) -> None:  # noqa LISKOV != good
+    def value_set(self, date: str, date_format: str = "") -> None:  # noqa LISKOV != good
         """Sets the date
 
         Args:
@@ -8436,9 +8433,7 @@ class FolderView(_qtpyBase_Control):
             file = []
 
             if event == Sys_Events.EXPANDED or event == Sys_Events.COLLAPSED:
-                date_modified = (
-                    f"{selected_index.model().lastModified(selected_index).toPython():%Y-%m-%d %H:%M:%S%z}"
-                )
+                date_modified = f"{selected_index.model().lastModified(selected_index).toPython():%Y-%m-%d %H:%M:%S%z}"
 
                 file.append(
                     selected_node(
@@ -8458,9 +8453,7 @@ class FolderView(_qtpyBase_Control):
                     selected_index: qtC.QModelIndex
 
                     if selected_index.column() == 0:
-                        date_modified = (
-                            f"{selected_index.model().lastModified(selected_index).toPython():%Y-%m-%d %H:%M:%S%z}"
-                        )
+                        date_modified = f"{selected_index.model().lastModified(selected_index).toPython():%Y-%m-%d %H:%M:%S%z}"
 
                         file.append(
                             selected_node(
@@ -8960,9 +8953,8 @@ class Grid(_qtpyBase_Control):
 
         self._widget.setColumnCount(len(labels))
 
-        char_pixel_size = self.pixel_char_size(char_height=1, char_width=1)
-
-        grid_width = 0
+        char_pixel_size = self.pixel_char_size(char_height=1, char_width=1)        
+        grid_width = sum(self._col_widths.values())
 
         for col_index, definition in enumerate(self.col_def):
             item_data = self._Item_Data(
@@ -8976,21 +8968,15 @@ class Grid(_qtpyBase_Control):
                 widget=None,
                 orig_row=None,
             )
-
-            grid_width += self._col_widths[col_index]
-
+            
             item = _Grid_TableWidget_Item(
                 definition.label, qtW.QListWidgetItem.ItemType.Type
             )
             item.setData(qtC.Qt.UserRole, item_data)
 
-            self._widget.setHorizontalHeaderItem(col_index, item)
-
-            self._widget.setColumnWidth(
-                col_index, (self._col_widths[col_index] * char_pixel_size.width)
-            )
+            self._widget.setHorizontalHeaderItem(col_index, item)                                                
             self._widget.horizontalHeaderItem(col_index).tag = definition.label
-
+                
         if self.pixel_unit:
             height = self.height
         else:
@@ -9028,11 +9014,17 @@ class Grid(_qtpyBase_Control):
 
         self._widget.setMinimumWidth(
             (self.width * char_pixel_size.width) + self.tune_hsize
-        )  # Allow for scroll-bar
+        )  # Allow for scroll-bar        
         self._widget.setMaximumWidth(
             (self.width * char_pixel_size.width) + self.tune_hsize
         )
         self._widget.setMinimumHeight(height + self.tune_vsize)
+
+        # 2023-12-15 DAW Pyside 6.6.1 Did not size column width correctly unless done as the last step
+        for col_index, definition in enumerate(self.col_def):
+            self._widget.setColumnWidth(
+                    col_index, (self._col_widths[col_index] * char_pixel_size.width)
+                )
 
         return widget
 
@@ -10456,7 +10448,7 @@ class Grid(_qtpyBase_Control):
 
         assert (
             isinstance(row, int) and row == -1 or (0 <= row <= self._widget.rowCount())
-        ), f"row must be an int == -1 or between 0 and {self._widget.rowCount()}"
+        ), f"{row=} must be an int == -1 or between 0 and {self._widget.rowCount()}"
 
         if isinstance(col, int):
             col_index = col
@@ -11932,9 +11924,7 @@ class LCD(_qtpyBase_Control):
         self._widget: qtW.QLCDNumber
 
         if isinstance(value, str):  # Check if a valid number (0..9 or .)
-            assert re.match(
-                "^[0-9\.]*$", value.strip()
-            ), f"{value=}. Must be a number"  # pylint: disable=W1401
+            assert re.match("^[0-9\.]*$", value.strip()), f"{value=}. Must be a number"  # pylint: disable=W1401
 
         if shiboken6.isValid(self._widget):
             self._widget.display(value)
@@ -12194,7 +12184,7 @@ class LineEdit(_qtpyBase_Control):
         for index, char in enumerate(input_mask):
             assert (
                 char in "*@" + valid_mask_chars if index == 0 else valid_mask_chars
-            ), ("Input mask are these valid mask characters " + valid_mask_chars)
+            ), "Input mask are these valid mask characters " + valid_mask_chars
 
         if input_mask != "":
             self.mask = input_mask
@@ -13237,9 +13227,7 @@ class _Switch(qtW.QAbstractButton):
 
         self.write_offset(self._end_offset[self.isChecked()]())
 
-    def paintEvent(
-        self, event: qtC.QEvent
-    ) -> None:  # pylint: disable=invalid-name, unused-argument
+    def paintEvent(self, event: qtC.QEvent) -> None:  # pylint: disable=invalid-name, unused-argument
         """Handles the paint event to paint the switch widget
 
         Args:
@@ -13297,9 +13285,7 @@ class _Switch(qtW.QAbstractButton):
             self._thumb_text[self.isChecked()],
         )
 
-    def mouseReleaseEvent(
-        self, event: qtG.QMouseEvent
-    ) -> None:  # pylint: disable=invalid-name
+    def mouseReleaseEvent(self, event: qtG.QMouseEvent) -> None:  # pylint: disable=invalid-name
         """Handles mouse release event and performs a switch animation when the left button is released.
 
         Args:
@@ -13315,9 +13301,7 @@ class _Switch(qtW.QAbstractButton):
             self.anim.setEndValue(self._end_offset[self.isChecked()]())
             self.anim.start()
 
-    def enterEvent(
-        self, event: qtG.QEnterEvent
-    ) -> None:  # pylint: disable=invalid-name
+    def enterEvent(self, event: qtG.QEnterEvent) -> None:  # pylint: disable=invalid-name
         """Handles the mouse enter event.
 
         Changes the cursor to a pointing hand when the mouse enters the widget.
@@ -15083,10 +15067,10 @@ class Slider(_qtpyBase_Control):
 
         assert (
             isinstance(internal_value, int)
-            and self.range_min <= internal_value <= self.range_max + 1
+            and self.range_min <= internal_value <= self.range_max + 2
         ), (
             f"{value=} Scaled To {internal_value=}. Must be an int >="
-            f" {self.range_min} and < {self.range_max + 1}."
+            f" {self.range_min} and < {self.range_max + 2}."
         )
 
         self._widget: qtW.QSlider
@@ -15214,7 +15198,9 @@ class Video_Player(qtC.QObject):
         """
         super().__init__(parent)
 
-        # os.environ["QT_MEDIA_BACKEND"] = "gstreamer" # Nice to know how to use gstreamer if you have to!
+        # os.environ[
+        #   "QT_MEDIA_BACKEND"
+        # ] = "gstreamer"  # Nice to know how to use gstreamer if you have to!
 
         assert parent is None or isinstance(
             parent, qtC.QObject
@@ -15251,9 +15237,7 @@ class Video_Player(qtC.QObject):
         self._audio_output.setVolume(1)
 
         # Hook up signals
-        if (
-            self._use_lambda
-        ):  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and Nuitka < 1.8.4 == boom!
+        if self._use_lambda:  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and Nuitka < 1.8.4 == boom!
             self._video_sink.videoFrameChanged.connect(self._frame_handler)
             self._media_player.durationChanged.connect(self._duration_changed)
             self._media_player.positionChanged.connect(self._position_changed)
