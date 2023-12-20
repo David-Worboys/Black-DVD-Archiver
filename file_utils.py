@@ -173,7 +173,7 @@ class File:
             name (str): The file name to extract the title from.
             excluded_words (list[str]) : The words to exclude
         Returns:
-            str: The extracted title.
+            str: The extracted title or the name if a title could not be extracted.
         """
 
         if excluded_words is None:
@@ -203,13 +203,17 @@ class File:
 
             if number:
                 numbers.append("".join(number))
-        return " ".join(
-            [
-                titlecase.titlecase(text)
-                for text in words
-                if text.upper() not in [excluded.upper() for excluded in excluded_words]
-            ]
-        )
+
+        title = " ".join([
+            titlecase.titlecase(text)
+            for text in words
+            if text.upper() not in [excluded.upper() for excluded in excluded_words]
+        ])
+
+        if not title.strip():
+            title = name
+
+        return title
 
     def copy_file(self, source: str, destination_path: str) -> tuple[int, str]:
         """
