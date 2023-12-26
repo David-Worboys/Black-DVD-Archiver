@@ -30,7 +30,7 @@ import pprint
 import shlex
 import shutil
 import subprocess
-from typing import Generator, Optional
+from typing import Generator
 
 import psutil
 import xmltodict
@@ -165,12 +165,146 @@ class Cut_Video_Def:
         return self.end_cut / self.frame_rate
 
 
+def Mux_Demux_Video(
+    input_file: str = "",
+    output_file: str = "",
+    audio_file_demuxed: str = "",
+    video_file_demuxed: str = "",
+    demux: bool = True,
+    debug: bool = False,
+) -> tuple[int, str, str, str]:
+    """
+    Performs demuxing or muxing of a video file using ffmpeg.
+
+    Args:
+        input_file (str): Path to the input video file.
+        output_file (str): Path to the output video file.
+        audio_file_demuxed (str): Path to the demuxed audio file (used for demuxing).
+        video_file_demuxed (str): Path to the demuxed video file (used for demuxing).
+        demux (bool): Flag indicating whether to demux (True) or mux (False).
+        debug (bool): Flag for enabling debug output.
+
+    Returns:
+        A tuple of:
+            - Result code (1 for success, -1 for error)
+            - Error message ("" if none)
+            - Path to the demuxed audio file (if demuxing)
+            - Path to the demuxed video file (if demuxing)
+
+    """
+    assert isinstance(input_file, str), f"{input_file=}. Must be str"
+    assert isinstance(output_file, str), f"{output_file=}. Must be str"
+    assert isinstance(audio_file_demuxed, str), f"{audio_file_demuxed=}. Must be str"
+    assert isinstance(video_file_demuxed, str), f"{video_file_demuxed=}. Must be str"
+    assert isinstance(demux, bool), f"{demux=}. Must be bool"
+    assert isinstance(debug, bool), f"{debug=}. Must be bool"
+
+    file_handler = file_utils.File()
+
+    if demux:
+        out_path, _, _ = file_handler.split_file_path(input_file)
+
+        if not file_handler.path_exists(input_file):
+            return -1, f"File Does Not Exist: {input_file}", "", ""
+
+        audio_file_demuxed = file_handler.file_join(
+            out_path, f"{utils.Get_Unique_Id()}.ac3"
+        )
+        video_file_demuxed = file_handler.file_join(
+            out_path, f"{utils.Get_Unique_Id()}.ts"
+        )
+
+        commands = [
+            sys_consts.FFMPG,
+            "-i",
+            input_file,
+            "-map",
+            "0:a",
+            "-c",
+            "copy",
+            audio_file_demuxed,
+        ]
+        result, message = Execute_Check_Output(commands=commands)
+
+        if result == -1:
+            return -1, message, "", ""
+
+        commands = [
+            sys_consts.FFMPG,
+            "-i",
+            input_file,
+            "-map",
+            "0:v",
+            "-c",
+            "copy",
+            video_file_demuxed,
+        ]
+        result, message = Execute_Check_Output(commands=commands)
+
+        if result == -1:
+            return -1, message, "", ""
+
+        return 1, "", audio_file_demuxed, video_file_demuxed
+    else:  # Mux
+        if not file_handler.path_exists(audio_file_demuxed):
+            return -1, f"File Does Not Exist: {audio_file_demuxed}", "", ""
+
+        if not file_handler.path_exists(video_file_demuxed):
+            return -1, f"File Does Not Exist: {video_file_demuxed}", "", ""
+
+        commands = [
+            sys_consts.FFMPG,
+            "-fflags",
+            "+genpts",  # generate presentation timestamps
+            "-i",
+            video_file_demuxed,
+            "-i",
+            audio_file_demuxed,
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            output_file,
+            "-threads",
+            str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+            "-y",
+        ]
+
+        result, message = Execute_Check_Output(commands=commands, debug=debug)
+
+        if result == -1:
+            return -1, message, "", ""
+
+        if not debug and file_handler.remove_file(audio_file_demuxed) == -1:
+            return (
+                -1,
+                f"Failed to delete demuxed audio file: {audio_file_demuxed}",
+                "",
+                "",
+            )
+
+        if not debug and file_handler.remove_file(video_file_demuxed) == -1:
+            return (
+                -1,
+                f"Failed to delete demuxed video file: {video_file_demuxed}",
+                "",
+                "",
+            )
+
+        return 1, "", "", ""
+
+
 def Concatenate_Videos(
     temp_files: list[str],
     output_file: str,
     audio_codec: str = "",
     delete_temp_files: bool = False,
-    debug: bool = False,
+    transcode_concat: str = "",
+    debug: bool = True,
 ) -> tuple[int, str]:
     """
     Concatenates video files using ffmpeg.
@@ -178,8 +312,10 @@ def Concatenate_Videos(
     Args:
         temp_files (list[str]): List of input video files to be concatenated
         output_file (str): The output file name
-        audio_codec (str, optional): The audio codec to checked against (aac is special)
-        delete_temp_files (bool, optional): Whether to delete the temp files, defaults to False
+        audio_codec (str): The audio codec to checked against (aac is special)
+        delete_temp_files (bool): Whether to delete the temp files, defaults to False
+        transcode_concat (str): Transcode temp_files as per format and then join files - Use only for problem files,
+            as slow, defaults to False
         debug (bool): True, print debug info, otherwise do not
 
     Returns:
@@ -196,6 +332,12 @@ def Concatenate_Videos(
     assert isinstance(output_file, str), f"{output_file=}. Must be str"
     assert isinstance(audio_codec, str), f"{audio_codec=}. Must be a str"
     assert isinstance(delete_temp_files, bool), f"{delete_temp_files=}. Must be a bool"
+    assert isinstance(transcode_concat, str) and transcode_concat in (
+        "",
+        "h264",
+        "h265" "mpg",
+        "mjpeg",
+    ), f"{transcode_concat=}. Must be str - h264 | h265 | mpg | mjpeg"
 
     if debug and not utils.Is_Complied():
         print(f"DBG CV {temp_files=} {output_file=} {audio_codec=} {delete_temp_files}")
@@ -212,6 +354,194 @@ def Concatenate_Videos(
     for video_file in temp_files:
         if not file_handler.file_exists(video_file):
             return -1, f"File {video_file} Does Not Exist!"
+
+    transcode_file_list = []
+
+    if transcode_concat:  # Very slow on a AMD2400G with 1GB of RAM :-)
+        if transcode_concat in ("h264", "h265"):
+            container_format = "mp4"
+        elif transcode_concat == "mpg":
+            container_format = "mpg"
+        elif transcode_concat == "mjpeg":
+            container_format = "avi"
+        else:
+            raise RuntimeError(f"Unknown transcode_concat {transcode_concat=}")
+
+        out_path, out_name, _ = file_handler.split_file_path(output_file)
+        output_file = file_handler.file_join(out_path, out_name, container_format)
+        # audio_codec = "aac"  # H26x Transcode uses aac
+
+        temp_path, temp_name, _ = file_handler.split_file_path(
+            temp_files[0]
+        )  # Must exist
+        transcode_path = file_handler.file_join(temp_path, "transcode_temp_files")
+
+        if file_handler.path_exists(transcode_path):
+            result, message = file_handler.remove_dir_contents(
+                file_path=transcode_path, keep_parent=False
+            )
+
+            if result == -1:
+                return -1, message
+
+        if file_handler.make_dir(transcode_path) == -1:
+            return -1, f"Failed To Create {transcode_path}"
+
+        for video_file in temp_files:
+            temp_path, temp_name, _ = file_handler.split_file_path(video_file)
+            transcode_path = file_handler.file_join(temp_path, "transcode_temp_files")
+            transcode_file = file_handler.file_join(
+                transcode_path, temp_name, container_format
+            )
+
+            encoding_info: Encoding_Details = Get_File_Encoding_Info(video_file)
+
+            if encoding_info.error.strip():
+                return (
+                    -1,
+                    (
+                        "Failed To Get Encoding Details :"
+                        f" {sys_consts.SDELIM}{video_file}{sys_consts.SDELIM}"
+                    ),
+                )
+            else:
+                match transcode_concat:
+                    case "h264":
+                        transcode_file = file_handler.file_join(
+                            transcode_path, temp_name, "mp4"
+                        )
+
+                        result, message = Transcode_H26x(
+                            input_file=video_file,
+                            output_folder=transcode_path,
+                            frame_rate=encoding_info.video_frame_rate,
+                            width=encoding_info.video_width,
+                            height=encoding_info.video_height,
+                            interlaced=(
+                                True
+                                if encoding_info.video_scan_type.lower() == "interlaced"
+                                else False
+                            ),
+                            bottom_field_first=(
+                                True
+                                if encoding_info.video_scan_order.lower() == "bff"
+                                else False
+                            ),
+                            h265=False,
+                            high_quality=True,
+                        )
+
+                        if result == -1:
+                            return -1, message
+                    case "h265":
+                        transcode_file = file_handler.file_join(
+                            transcode_path, temp_name, "mp4"
+                        )
+
+                        result, message = Transcode_H26x(
+                            input_file=video_file,
+                            output_folder=transcode_path,
+                            frame_rate=encoding_info.video_frame_rate,
+                            width=encoding_info.video_width,
+                            height=encoding_info.video_height,
+                            interlaced=(
+                                True
+                                if encoding_info.video_scan_type.lower() == "interlaced"
+                                else False
+                            ),
+                            bottom_field_first=(
+                                True
+                                if encoding_info.video_scan_order.lower() == "bff"
+                                else False
+                            ),
+                            h265=True,
+                            high_quality=True,
+                        )
+
+                        if result == -1:
+                            return -1, message
+                    case "mpg":
+                        transcode_file = file_handler.file_join(
+                            transcode_path, temp_name, "mpg"
+                        )
+
+                        result, message = Transcode_MPEG2_High_Bitrate(
+                            input_file=video_file,
+                            output_folder=transcode_path,
+                            frame_rate=encoding_info.video_frame_rate,
+                            width=encoding_info.video_width,
+                            height=encoding_info.video_height,
+                            interlaced=(
+                                True
+                                if encoding_info.video_scan_type.lower() == "interlaced"
+                                else False
+                            ),
+                            bottom_field_first=(
+                                True
+                                if encoding_info.video_scan_order.lower() == "bff"
+                                else False
+                            ),
+                        )
+
+                        if result == -1:
+                            return -1, message
+
+                    case "mjpeg":
+                        transcode_file = file_handler.file_join(
+                            transcode_path, temp_name, "avi"
+                        )
+                        result, message = Transcode_MJPEG(
+                            input_file=video_file,
+                            output_folder=transcode_path,
+                            frame_rate=encoding_info.video_frame_rate,
+                            width=encoding_info.video_width,
+                            height=encoding_info.video_height,
+                            interlaced=(
+                                True
+                                if encoding_info.video_scan_type.lower() == "interlaced"
+                                else False
+                            ),
+                            bottom_field_first=(
+                                True
+                                if encoding_info.video_scan_order.lower() == "bff"
+                                else False
+                            ),
+                        )
+
+                        if result == -1:
+                            return -1, message
+
+                    case _:  # Stream Copy
+                        transcode_file = file_handler.file_join(
+                            transcode_path, temp_name, container_format
+                        )
+
+                        commands = [
+                            sys_consts.FFMPG,
+                            "-fflags",
+                            "+genpts",  # generate presentation timestamps
+                            "-i",
+                            video_file,
+                            "-map",
+                            "0",
+                            "-c",
+                            "copy",
+                            "-sn",  # Remove titles
+                            "-movflags",
+                            "+faststart",
+                            transcode_file,
+                        ]
+
+                        result, message = Execute_Check_Output(
+                            commands=commands, stderr_to_stdout=True
+                        )
+
+                        if result == -1:
+                            return -1, message
+
+                transcode_file_list.append(transcode_file)
+
+        temp_files = transcode_file_list
 
     # Generate a file list for ffmpeg
     result, message = file_handler.write_list_to_txt_file(
@@ -238,10 +568,15 @@ def Concatenate_Videos(
     result, message = Execute_Check_Output(
         commands=[
             sys_consts.FFMPG,
+            "-fflags",
+            "+genpts",  # generate presentation timestamps
+            # "+igndts",
             "-f",
             "concat",
             "-safe",
             "0",
+            "-auto_convert",
+            "1",
             "-i",
             file_list_txt,
             "-c",
@@ -270,16 +605,34 @@ def Concatenate_Videos(
         return -1, message
 
     # Remove the file list and temp files
-    if file_handler.remove_file(file_list_txt) == -1:
+    if not debug and file_handler.remove_file(file_list_txt) == -1:
         return -1, f"Failed to delete text file: {file_list_txt}"
 
-    if delete_temp_files:
+    if not debug and delete_temp_files:
         for file in temp_files:
             if file_handler.file_exists(file):
                 if file_handler.remove_file(file) == -1:
                     return -1, f"Failed to delete temp file: {file}"
 
-    return 1, ""
+    if transcode_file_list:  # always delete these
+        transcode_path, _, _ = file_handler.split_file_path(
+            transcode_file_list[0]
+        )  # Must have at least 1
+
+        result, message = file_handler.remove_dir_contents(
+            file_path=transcode_path, keep_parent=False
+        )
+
+        if result == -1:
+            return (
+                -1,
+                (
+                    "Failed To Delete Transcode Temp Files And/Or Folder :"
+                    f" {sys_consts.SDELIM}{transcode_path}{sys_consts.SDELIM}"
+                ),
+            )
+
+    return 1, output_file
 
 
 def Create_DVD_Iso(input_dir: str, output_file: str) -> tuple[int, str]:
@@ -401,7 +754,7 @@ def Get_Colored_Rectangle_Example(width: int, height: int, color: str) -> bytes:
 
     try:
         return subprocess.check_output(command, stderr=subprocess.DEVNULL)
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         return b""
 
 
@@ -509,7 +862,7 @@ def Get_Font_Example(
 
         return pointsize, subprocess.check_output(command, stderr=subprocess.DEVNULL)
 
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         return -1, b""
 
 
@@ -851,7 +1204,7 @@ def Transcode_ffv1_archival(
     if not file_handler.file_exists(input_file):
         return -1, f"File Does Not Exist {input_file}"
 
-    _, input_file_name, input_file_extn = file_handler.split_file_path(input_file)
+    _, input_file_name, _ = file_handler.split_file_path(input_file)
 
     output_file = file_handler.file_join(output_folder, f"{input_file_name}.mkv")
     passlog_file = file_handler.file_join(output_folder, f"{input_file_name}")
@@ -866,6 +1219,8 @@ def Transcode_ffv1_archival(
         str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
         "-i",
         input_file,
+        "-max_muxing_queue_size",
+        "9999",
         "-pass",
         "1",
         "-passlogfile",
@@ -887,6 +1242,7 @@ def Transcode_ffv1_archival(
         "-s",
         f"{width}x{height}",
         "-r",
+        str(frame_rate),
         "-c:a",
         "flac",
         output_file,
@@ -900,8 +1256,10 @@ def Transcode_ffv1_archival(
         str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
         "-i",
         input_file,
+        "-max_muxing_queue_size",
+        "9999",
         "-pass",
-        "1",
+        "2",
         "-passlogfile",
         passlog_file,
         "-c:v",
@@ -941,7 +1299,361 @@ def Transcode_ffv1_archival(
     if file_handler.remove_file(passlog_del_file) == -1:
         return -1, f"Failed To Delete {passlog_del_file}"
 
-    return 1, ""
+    return 1, output_file
+
+
+def Create_SD_Intermediate_Copy(input_file: str, output_folder: str) -> tuple[int, str]:
+    """Creates an intermediate edit copy in SD resolution.
+
+    Args:
+        input_file (str): The path to the input video file.
+        output_folder (str): The path to the output folder.
+
+    Returns:
+        tuple[int, str]:
+            arg 1: 1 if successful, -1 if an error occurred
+            arg 2: error message if an error occurred, else an empty string
+    """
+    assert (
+        isinstance(input_file, str) and input_file.strip() != ""
+    ), f"{input_file=}. Must be a non-empty str"
+
+    assert (
+        isinstance(output_folder, str) and output_folder.strip() != ""
+    ), f"{output_folder=}. Must be a non-empty str"
+
+    file_handler = file_utils.File()
+
+    if not file_handler.path_exists(output_folder):
+        return -1, f"{output_folder} Does not exist"
+
+    if not file_handler.path_writeable(output_folder):
+        return -1, f"{output_folder} Cannot Be Written To"
+
+    if not file_handler.file_exists(input_file):
+        return -1, f"File Does Not Exist {input_file}"
+
+    _, input_file_name, _ = file_handler.split_file_path(input_file)
+    output_file = file_handler.file_join(
+        output_folder, f"{input_file_name}_sd_intermediate.mpg"
+    )
+
+    command = [
+        sys_consts.FFMPG,
+        "-i",
+        input_file,
+        "-max_muxing_queue_size",
+        "9999",
+        "-vf",
+        "scale=720:-1",  # Change 720 to your desired width for SD
+        "-c:v",
+        "mpeg2video",
+        # "-r",
+        # str(frame_rate),  # set frame rate
+        "-b:v",
+        f"{sys_consts.AVERAGE_BITRATE}k",  # average video bitrate is kilobits/sec
+        "-maxrate:v",
+        "9000k",  # maximum video rate is 9000 kilobits/sec
+        "-minrate:v",
+        "0",  # minimum video rate is 0
+        "-bufsize:v",
+        "1835008",  # video buffer size is 1835008 bits
+        "-packetsize",
+        "2048",  # packet size is 2048 bits
+        "-muxrate",
+        "10080000",  # mux rate is 10080000 bits/sec
+        "-g",
+        "15",
+        "-force_key_frames",
+        "expr:if(isnan(prev_forced_n),1,eq(n,prev_forced_n+15))",
+        # set key frame expression (Closes each GOP)
+        "-pix_fmt",
+        "yuv420p",  # use YUV 420p pixel format
+        "-c:a",
+        "pcm_s16le",
+        "-y",
+        output_file,
+    ]
+
+    if not file_handler.file_exists(output_file):
+        result, message = Execute_Check_Output(commands=command, debug=False)
+
+        if result == -1:
+            return -1, message
+
+    return 1, output_file
+
+
+def Transcode_MJPEG(
+    input_file: str,
+    output_folder: str,
+    frame_rate: float,
+    width: int,
+    height: int,
+    interlaced: bool = True,
+    bottom_field_first: bool = True,
+) -> tuple[int, str]:
+    """Converts an input video to MPEG2 at supplied resolution and frame rate at a really high bit rate to make an edit
+    copy that minimises generational losses. The video is transcoded to a file in the output folder.
+
+        Args:
+            input_file (str): The path to the input video file.
+            output_folder (str): The path to the output folder.
+            frame_rate (float): The frame rate to use for the output video.
+            width (int) : The width of the video
+            height (int) : The height of the video
+            interlaced (bool, optional): Whether to use interlaced video. Defaults to True.
+            bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
+
+        Returns:
+            tuple[int, str]:
+                arg 1: 1 if ok, -1 if error
+                arg 2: error message if error else ""
+    """
+    assert (
+        isinstance(input_file, str) and input_file.strip() != ""
+    ), f"{input_file=}. Must be a non-empty str"
+
+    assert (
+        isinstance(output_folder, str) and output_folder.strip() != ""
+    ), f"{output_folder=}. Must be a non-empty str"
+    assert (
+        isinstance(frame_rate, float) and frame_rate > 0
+    ), f"{frame_rate=}. Must be float > 0"
+    assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
+    assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
+    assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
+    assert isinstance(bottom_field_first, bool), f"{bottom_field_first=}. Must be bool"
+
+    file_handler = file_utils.File()
+
+    if not file_handler.path_exists(output_folder):
+        return -1, f"{output_folder} Does not exist"
+
+    if not file_handler.path_writeable(output_folder):
+        return -1, f"{output_folder} Cannot Be Written To"
+
+    if not file_handler.file_exists(input_file):
+        return -1, f"File Does Not Exist {input_file}"
+
+    _, input_file_name, _ = file_handler.split_file_path(input_file)
+
+    output_file = file_handler.file_join(output_folder, f"{input_file_name}.avi")
+
+    black_border_size = 12
+    field_order = []
+
+    if interlaced:
+        # black_box_filter, most likely dealing with analogue video, head switching noise best removed, and edges
+        # are best covered for optimal compression
+        filter_commands = [
+            f"drawbox=x=0:y=0:w=iw:h={black_border_size}:color=black:t=fill",
+            f"drawbox=x=0:y=ih-{black_border_size}:w=iw:h={black_border_size}:color=black:t=fill",
+            (
+                f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill"
+            ),
+            (
+                f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill"
+            ),
+        ]
+        black_box_filter = ",".join(filter_commands)
+
+        field_order = ["-top"]
+        field_order.extend(f"{'0' if bottom_field_first else '1'}")
+        video_filter = [
+            "-vf",
+            f"{black_box_filter},scale={width}x{height}",
+        ]
+    else:
+        video_filter = []
+
+    # Set bit rate based on video height
+    if height <= 576:
+        bit_rate = 9  # Set a lower bit rate for SD
+    else:
+        bit_rate = 25  # Set a higher bit rate for HD ~ 50
+
+    command = [
+        sys_consts.FFMPG,
+        "-fflags",  # set ffmpeg flags
+        "+genpts",  # generate presentation timestamps
+        "-threads",
+        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        "-i",
+        input_file,
+        "-max_muxing_queue_size",
+        "9999",
+        *video_filter,
+        "-c:v",
+        "mjpeg",
+        *field_order,
+        "-q:v",
+        "3",  # Adjust quality (lower is higher quality)
+        "-b:v",
+        f"{bit_rate}M",  # Set a high bit rate suitable for an edit master
+        "-maxrate",
+        f"{int(float(bit_rate) * 4)}M",
+        "-bufsize",
+        f"{int(float(bit_rate) * 2)}M",
+        "-sn",  # Remove titles, causes problems sometimes
+        "-r",
+        str(frame_rate),  # set frame rate
+        "-pix_fmt",
+        "yuvj420p",  # use YUV 420p pixel format
+        "-c:a",
+        "mp3",
+        output_file,
+        "-y",
+    ]
+
+    result, message = Execute_Check_Output(
+        commands=command, debug=False, stderr_to_stdout=False
+    )
+
+    if result == -1:
+        return -1, message
+    return 1, output_file
+
+
+def Transcode_MPEG2_High_Bitrate(
+    input_file: str,
+    output_folder: str,
+    frame_rate: float,
+    width: int,
+    height: int,
+    interlaced: bool = True,
+    bottom_field_first: bool = True,
+    iframe_only: bool = False,
+) -> tuple[int, str]:
+    """Converts an input video to MPEG2 at supplied resolution and frame rate at a really high bit rate to make an edit
+    copy that minimises generational losses. The video is transcoded to a file in the output folder.
+
+        Args:
+            input_file (str): The path to the input video file.
+            output_folder (str): The path to the output folder.
+            frame_rate (float): The frame rate to use for the output video.
+            width (int) : The width of the video
+            height (int) : The height of the video
+            interlaced (bool, optional): Whether to use interlaced video. Defaults to True.
+            bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
+
+        Returns:
+            tuple[int, str]:
+                arg 1: 1 if ok, -1 if error
+                arg 2: error message if error else ""
+    """
+    assert (
+        isinstance(input_file, str) and input_file.strip() != ""
+    ), f"{input_file=}. Must be a non-empty str"
+
+    assert (
+        isinstance(output_folder, str) and output_folder.strip() != ""
+    ), f"{output_folder=}. Must be a non-empty str"
+    assert (
+        isinstance(frame_rate, float) and frame_rate > 0
+    ), f"{frame_rate=}. Must be float > 0"
+    assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
+    assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
+    assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
+    assert isinstance(bottom_field_first, bool), f"{bottom_field_first=}. Must be bool"
+
+    file_handler = file_utils.File()
+
+    if not file_handler.path_exists(output_folder):
+        return -1, f"{output_folder} Does not exist"
+
+    if not file_handler.path_writeable(output_folder):
+        return -1, f"{output_folder} Cannot Be Written To"
+
+    if not file_handler.file_exists(input_file):
+        return -1, f"File Does Not Exist {input_file}"
+
+    _, input_file_name, _ = file_handler.split_file_path(input_file)
+
+    output_file = file_handler.file_join(output_folder, f"{input_file_name}.mpg")
+
+    black_border_size = 12
+
+    if interlaced:
+        # black_box_filter, most likely dealing with analogue video, head switching noise best removed, and edges
+        # are best covered for optimal compression
+        filter_commands = [
+            f"drawbox=x=0:y=0:w=iw:h={black_border_size}:color=black:t=fill",
+            f"drawbox=x=0:y=ih-{black_border_size}:w=iw:h={black_border_size}:color=black:t=fill",
+            (
+                f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill"
+            ),
+            (
+                f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill"
+            ),
+        ]
+        black_box_filter = ",".join(filter_commands)
+
+        field_order = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
+        video_filter = [
+            "-vf",
+            f"{black_box_filter},scale={width}x{height},{field_order}",
+            "-flags:v:0",  # video flags for the first video stream
+            "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
+            "-alternate_scan:v:0",  # set alternate scan for the first video stream (interlace)
+            "1",  # alternate scan value is 1,
+        ]
+    else:
+        video_filter = []
+
+    gop_size = 1 if iframe_only else 15
+
+    # Set bit rate based on video height
+    if height <= 576:
+        bit_rate = 9  # Set a lower bit rate for SD
+    else:
+        bit_rate = 50  # Set a higher bit rate for HD
+
+    command = [
+        sys_consts.FFMPG,
+        "-fflags",  # set ffmpeg flags
+        "+genpts",  # generate presentation timestamps
+        # "+igndts",
+        "-threads",
+        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        "-i",
+        input_file,
+        "-max_muxing_queue_size",
+        "9999",
+        "mpeg2video",
+        *video_filter,
+        "-c:v",
+        "-b:v",
+        f"{bit_rate}M",  # Set a high bit rate suitable for an edit master
+        "-maxrate",
+        f"{int(float(bit_rate) * 2)}M",
+        "-bufsize",
+        f"{int(float(bit_rate) * 10)}M",
+        "-sn",  # Remove titles
+        "-r",
+        str(frame_rate),  # set frame rate
+        "-g",
+        f"{gop_size}",
+        "-force_key_frames",
+        f"expr:if(isnan(prev_forced_n),1,eq(n,prev_forced_n+{gop_size}))",  # set key frame expression (Closes each GOP)
+        "-pix_fmt",
+        "yuv420p",  # use YUV 420p pixel format
+        "-bf",
+        "2",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        output_file,
+    ]
+
+    if not file_handler.file_exists(output_file):
+        result, message = Execute_Check_Output(commands=command, debug=False)
+
+        if result == -1:
+            return -1, message
+
+    return 1, output_file
 
 
 def Transcode_H26x(
@@ -954,6 +1666,7 @@ def Transcode_H26x(
     bottom_field_first: bool = True,
     h265: bool = False,
     high_quality: bool = True,
+    iframe_only: bool = False,
 ) -> tuple[int, str]:
     """Converts an input video to H.264/5 at supplied resolution and frame rate.
     The video is transcoded to a file in the output folder.
@@ -964,10 +1677,11 @@ def Transcode_H26x(
         frame_rate (float): The frame rate to use for the output video.
         width (int) : The width of the video
         height (int) : The height of the video
-        interlaced (bool, optional): Whether to use interlaced video. Defaults to True.
-        bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
-        h265 (bool, optional): Whether to use H.265. Defaults to False.
-        high_quality (bool, optional): Use a high quality encode. Defaults to True.
+        interlaced (bool): Whether to use interlaced video. Defaults to True.
+        bottom_field_first (bool): Whether to use bottom field first. Defaults to True.
+        h265 (bool): Whether to use H.265. Defaults to False.
+        high_quality (bool): Use a high quality encode. Defaults to True.
+        iframe_only (bool): True id no GOP and all iframe desired else False. Defaults to False
 
     Returns:
         tuple[int, str]:
@@ -1002,7 +1716,7 @@ def Transcode_H26x(
     if not file_handler.file_exists(input_file):
         return -1, f"File Does Not Exist {input_file}"
 
-    _, input_file_name, input_file_extn = file_handler.split_file_path(input_file)
+    _, input_file_name, _ = file_handler.split_file_path(input_file)
 
     output_file = file_handler.file_join(output_folder, f"{input_file_name}.mp4")
 
@@ -1010,8 +1724,10 @@ def Transcode_H26x(
         print(
             "DBG Trans_H26x"
             f" {input_file=} {frame_rate=} {width=} {height=} {interlaced=} {bottom_field_first=} ER"
-            f" {'5M' if height <= 576 else '15M'=}"
+            f" {'5M' if height <= 576 else '35M'=}"
         )
+
+    gop_size = 1 if iframe_only else 15
 
     # Construct the FFmpeg command
     if h265:
@@ -1047,48 +1763,52 @@ def Transcode_H26x(
             "1",  # alternate scan value is 1,
         ]
     else:
-        video_filter = [
-            "-vf",
-            f"scale={width}x{height}",
-        ]
+        video_filter = []
 
     command = [
         sys_consts.FFMPG,
+        "-fflags",
+        "+genpts",  # generate presentation timestamps
         "-threads",
         str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
         "-i",
         input_file,
+        "-vsync",
+        "cfr",
+        "-max_muxing_queue_size",
+        "9999",
         *video_filter,
         "-r",
         str(frame_rate),
         "-c:v",
         encoder,
+        "-sn",  # Remove titles
         "-pix_fmt",
         "yuv420p",  # Ensure the pixel format is compatible with Blu-ray
         "-crf",
-        "18",
+        "17",
         "-preset",
         quality_preset,
         "-c:a",
-        "ac3",
+        "aac",
         "-b:a",
-        "48k",
+        "128k",
         "-b:v",
         (
-            "5M" if height <= 576 else "15M"
+            "5M" if height <= 576 else "25M"
         ),  # SD Get low-bit rate everything else gets Blu-ray rate. Black Choice for now
         "-muxrate",
-        "10080000",  # Maximum Blu-ray mux rate in bits per second
+        "25M",  # Maximum Blu-ray mux rate in bits per second
         "-bufsize",
-        "1835008",  # Blu-ray maximum buffer size in bytes
+        "30M",
         "-g",
-        "15",  # Set the GOP size to match the DVD standard
+        f"{gop_size}",  # Set the GOP size to match the DVD standard
         "-keyint_min",
-        "15",  # Set the minimum key frame interval to Match DVD (same as GOP size for closed GOP)
+        f"{gop_size}",  # Set the minimum key frame interval to Match DVD (same as GOP size for closed GOP)
         "-sc_threshold",
         "0",  # Set the scene change threshold to 0 for frequent key frames
-        "-y",
         output_file,
+        "-y",
     ]
 
     if not file_handler.file_exists(output_file):
@@ -1264,7 +1984,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         input_file: str, start_frame: int, frame_rate: float, time_window: int = 60
     ) -> tuple[int, dict]:
         """
-        Uses FFMepg to get a GOP (Group Of Pictures) frame dictionary centered on the start time.
+        Uses FFProbe to get a GOP (Group Of Pictures) frame dictionary centered on the start time.
 
         Args:
             input_file (str): Path to input video file.
@@ -1293,87 +2013,167 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
 
         start_time = 0 if start_frame == 0 else start_frame / frame_rate
 
-        # TODO Find a faster less resource intensive way of doing this as the Dev computer redlines doing this task!
+        # Centre start time in the time window (start a bit before in case we are in the middle of a GO0!P)
+        if start_time > time_window // 2:
+            start_time -= time_window // 2
+
         commands = [
-            sys_consts.FFMPG,
-            "-i",
+            sys_consts.FFPROBE,
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "frame=pkt_pts_time,pkt_duration_time,coded_picture_number,pict_type,best_effort_timestamp_time",
+            "-of",
+            "csv=print_section=0",
+            "-read_intervals",
+            f"{start_time}%+{time_window}",
             input_file,
-            "-vf",
-            (
-                f"select=between(t\,{start_time - time_window//2}\,{start_time + time_window//2}),showinfo"
-            ),
-            "-f",
-            "null",
-            "-",
         ]
 
         result, output = Execute_Check_Output(
-            commands, debug=False, stderr_to_stdout=True
+            commands, debug=True, stderr_to_stdout=True
         )
 
         if result == -1:
             return -1, {"error": output}
 
         lines = output.strip().split("\n")
-
-        line_list = []
-
-        for line in lines:
-            line_parts: list[str] = line.strip().split()
-
-            line_dict: dict[str, str] = {
-                key.strip(): value.strip()
-                for part in line_parts
-                if ":" in part
-                for key, value in [part.split(":", 1)]
-                if key.strip() and value.strip()
-            }  # Ugly line parsing, delimits values of interest
-
-            if line_dict:
-                if "iskey" not in line_dict:  # iskey determines frame type
-                    continue
-
-                line_list.append(line_dict)
-
-        start_gop = 0
-        end_gop = 0
-        gop_start = True
-        found_start_frame = False
-
-        # Build the GOP frame dict
         frame_dict = {}
+        start_frame_offset = int(start_time * frame_rate)
+        absolute_frame_number = -1
 
-        for line_dict in line_list:
-            pts_time = float(line_dict["pts_time"])
-            duration = float(line_dict["duration_time"])
-            calc_frame = round(pts_time / duration)
-            frame_dict[calc_frame] = (line_dict["type"], pts_time, duration)
+        # Parse lines to get the frame info needed loaded into the frame_dict
+        for line in lines:
+            if line.strip() == "":
+                continue
 
-            if calc_frame == start_frame:  # In our gop
-                found_start_frame = True
+            line_items = line.split(",")
 
-            if line_dict["type"] == "I":  # I frame
-                if gop_start:
-                    start_gop = calc_frame
-                    gop_start = False
-                else:
-                    end_gop = calc_frame
-                    gop_start = True
+            if len(line_items) < 3:
+                continue
 
-                    if found_start_frame:
+            if absolute_frame_number == -1:
+                absolute_frame_number = int(float(line_items[0]) * frame_rate) + 1
+
+            computed_frame = float(line_items[0]) * frame_rate
+            pts_time = line_items[1]
+            pict_type = line_items[2]
+            coded_picture_number = line_items[3]
+
+            duration = float(pts_time) / frame_rate
+            offset_frame = int(coded_picture_number) + start_frame_offset
+
+            frame_dict[absolute_frame_number] = (
+                pict_type,
+                pts_time,
+                duration,
+                computed_frame,
+                offset_frame,
+                coded_picture_number,
+                absolute_frame_number,
+                float(line_items[0]),
+            )
+
+            absolute_frame_number += 1
+
+        frame_list = sorted(frame_dict.items(), key=lambda x: x[0])
+
+        for index in range(0, len(frame_list)):
+            (
+                frame_no,
+                (
+                    pict_type,
+                    pts_time,
+                    duration,
+                    computed_frame,
+                    offset_frame,
+                    coded_picture_number,
+                    frame_offset,
+                    time_offset,
+                ),
+            ) = frame_list[index]
+
+            if start_frame == frame_no or frame_no > start_frame:
+                # Initialize frame_dict
+                frame_dict = {}
+                start_index = index
+                if (
+                    index > 0 and pict_type == "I" and frame_no > start_frame
+                ):  # Have to use previous GOP, possible dropped frame issue
+                    start_index = index - 1
+
+                # Iterate backward to find the previous I-frame
+                for backward_index in range(start_index, -1, -1):
+                    (
+                        backward_frame_no,
+                        (
+                            backward_pict_type,
+                            backward_pts_time,
+                            backward_duration,
+                            backward_computed_frame,
+                            backward_offset_frame,
+                            backward_coded_picture_number,
+                            backward_frame_offset,
+                            backward_time_offset,
+                        ),
+                    ) = frame_list[backward_index]
+
+                    frame_dict[backward_frame_no] = (
+                        backward_pict_type,
+                        backward_pts_time,
+                        backward_duration,
+                        backward_computed_frame,
+                        backward_offset_frame,
+                        backward_coded_picture_number,
+                        backward_frame_offset,
+                        backward_time_offset,
+                    )
+
+                    # Break if an I-frame is found
+                    if backward_pict_type == "I":
                         break
 
-        gop_size = end_gop - start_gop
+                # Iterate forward to find frames until the next I-frame
+                for forward_index in range(start_index + 1, len(frame_list)):
+                    (
+                        forward_frame_no,
+                        (
+                            forward_pict_type,
+                            forward_pts_time,
+                            forward_duration,
+                            forward_computed_frame,
+                            forward_offset_frame,
+                            forward_coded_picture_number,
+                            forward_frame_offset,
+                            forward_time_offset,
+                        ),
+                    ) = frame_list[forward_index]
 
-        if gop_size <= 0 or not frame_dict:
-            return -1, {"error": "GOP Not Found"}
+                    frame_dict[forward_frame_no] = (
+                        forward_pict_type,
+                        forward_pts_time,
+                        forward_duration,
+                        forward_computed_frame,
+                        forward_offset_frame,
+                        forward_coded_picture_number,
+                        forward_frame_offset,
+                        forward_time_offset,
+                    )
 
-        return 1, frame_dict
+                    # Break if an I-frame is found
+                    if forward_pict_type == "I":
+                        break
+
+                return 1, frame_dict
+
+        return -1, {"error ": "GOP Not Found"}
 
     def stream_copy_segment(
         input_file: str,
         output_file: str,
-        start_cut: int,
+        start_frame: int,
         duration: float,
         frame_rate: float,
     ) -> tuple[int, str]:
@@ -1383,7 +2183,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         Args:
             input_file (str): The input video file to extract the segment from.
             output_file (str): The output file where the segment will be saved.
-            start_cut (int): The start time (in frames) of the segment.
+            start_frame (inr): The start frame of the segment.
             duration (float): The duration of the segment (in seconds).
             frame_rate (float): The frame rate of the video.
 
@@ -1402,8 +2202,8 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             isinstance(output_file, str) and output_file.strip() != ""
         ), f"{output_file=}. Must be a non-empty str"
         assert (
-            isinstance(start_cut, int) and start_cut >= 0
-        ), f"{start_cut=}. Must be int > 0"
+            isinstance(start_frame, int) and start_frame >= 0
+        ), f"{start_frame=}. Must be int >= 0"
         assert (
             isinstance(duration, float) and duration > 0
         ), f"{duration=}. Must be float > 0"
@@ -1413,10 +2213,14 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
 
         command = [
             sys_consts.FFMPG,
+            "-fflags",
+            "+genpts",  # generate presentation timestamps
             "-i",
             input_file,
+            "-max_muxing_queue_size", # Attempt to stop buffer issues on playback
+            "9999",
             "-ss",
-            str(start_cut / frame_rate),
+            Frame_Num_To_FFMPEG_Time(frame_num=start_frame, frame_rate=frame_rate),
             "-t",
             str(duration),
             "-avoid_negative_ts",
@@ -1437,7 +2241,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
     def reencode_segment(
         input_file: str,
         output_file: str,
-        start_cut: int,
+        start_frame: int,
         duration: float,
         frame_rate: float,
         gop_size: int,
@@ -1450,7 +2254,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         Args:
             input_file (str): The input video file to extract the segment from.
             output_file (str): The output file where the segment will be saved.
-            start_cut (int): The start frame of the segment.
+            start_frame (int): The start frame of the segment.
             duration (float): The duration of the segment (in seconds).
             frame_rate (float): The frame rate of the video.
             gop_size (int): The desired GOP (Group of Pictures) size.
@@ -1471,8 +2275,8 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             isinstance(output_file, str) and output_file.strip() != ""
         ), f"{output_file=}. Must be a non-empty str"
         assert (
-            isinstance(start_cut, int) and start_cut >= 0
-        ), f"{start_cut=}. Must be int > 0"
+            isinstance(start_frame, int) and start_frame >= 0
+        ), f"{start_frame=}. Must be int > 0"
         assert (
             isinstance(duration, float) and duration > 0
         ), f"{duration=}. Must be float > 0"
@@ -1489,35 +2293,21 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             encoding_details, Encoding_Details
         ), f"{encoding_details=}. Must Encoding_Details instance"
 
-        video_filter_options = []
-
-        if encoding_details.video_scan_type.lower() == "interlaced":
-            interlaced_flags = [
-                "-flags:v:0",  # video flags for the first video stream
-                "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
-                "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
-                "1",  # alternate scan value is 1
-            ]
-
-            video_filter_options.append(
-                f"fieldorder={'bff' if encoding_details.video_scan_order.lower() == 'bff' else 'tff'}"
-            )
-
-            video_filter = ["-vf", ",".join(video_filter_options)]
-        else:
-            interlaced_flags = []
-            video_filter = []
-
+        video_filter = [] # Might be needed later
         command = [
             sys_consts.FFMPG,
+            "-fflags",
+            "+genpts",  # generate presentation timestamps
+            # "+igndts",
             "-i",
             input_file,
-            *interlaced_flags,
+            "-vsync",
+            "cfr",
             *video_filter,
             "-tune",
             "fastdecode",
             "-ss",
-            str(start_cut / frame_rate),
+            Frame_Num_To_FFMPEG_Time(frame_num=start_frame, frame_rate=frame_rate),
             "-t",
             str(duration),
             "-avoid_negative_ts",
@@ -1532,8 +2322,6 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             "0",  # Set the scene change threshold to 0 for frequent key frames
             "-c:v",
             codec,
-            "-pix_fmt",
-            "yuv420p",  # Ensure the pixel format is compatible with Blu-ray
             "-crf",
             "18",
             "-preset",
@@ -1551,7 +2339,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         ]
 
         result, message = Execute_Check_Output(
-            commands=command, debug=False, stderr_to_stdout=False
+            commands=command, debug=False, stderr_to_stdout=True
         )
 
         if result == -1:
@@ -1576,12 +2364,8 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
     if result == -1:  # codec carries error message
         return -1, codec
 
-    input_dir, input_file_name, input_extension = file_handler.split_file_path(
-        cut_video_def.input_file
-    )
-    output_dir, output_file_name, output_extension = file_handler.split_file_path(
-        cut_video_def.output_file
-    )
+    _, _, input_extension = file_handler.split_file_path(cut_video_def.input_file)
+    output_dir, _, _ = file_handler.split_file_path(cut_video_def.output_file)
 
     for time_window in range(
         10, 91, 10
@@ -1637,70 +2421,60 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
     if (
         not stream_copy and start_frame_dict and end_frame_dict
     ):  # Got to have GOP blocks for frame accurate video cuts of compressed video
+        # Note: sorting is required because sometimes the dicts unpacked unsorted!
         start_gop_block = []
+        for key, item in start_frame_dict.items():
+            if key >= cut_video_def.start_cut:
+                # break
+                start_gop_block.append((key, item))
+
+        start_gop_block = sorted(start_gop_block, key=lambda x: x[0])
+
         end_gop_block = []
-        cut_frames = [cut_video_def.start_cut, cut_video_def.end_cut]
 
-        for index, frame_dict in enumerate((start_frame_dict, end_frame_dict)):
-            found = False
-            iframe = False
+        for key, item in end_frame_dict.items():
+            if key > cut_video_def.end_cut:
+                break
 
-            cut_frame = cut_frames[index]
+            end_gop_block.append((key, item))
 
-            for frame_no, frame_details in frame_dict.items():
-                if frame_no == cut_frame:
-                    found = True
+        end_gop_block = sorted(end_gop_block, key=lambda x: x[0])
 
-                if frame_details[0] == "I" and iframe:  # End of GOP
-                    if index == 0:
-                        start_gop_block.append((frame_no, frame_details))
-                    else:
-                        end_gop_block.append((frame_no, frame_details))
+        start_gop_block_start_frame = 0
+        start_gop_block_end_frame = 0
+        start_gop_block_duration = 0.0
 
-                    iframe = False
+        stream_start_frame = 0
+        stream_end_frame = 0
 
-                    if found:
-                        break
+        end_gop_block_start_frame = 0
+        end_gop_block_end_frame = 0
+        end_gop_block_duration = 0.0
 
-                if frame_details[0] == "I" and not iframe:  # Start of GOP
-                    iframe = True
+        if start_gop_block:
+            start_gop_block_start_frame = start_gop_block[0][0] + 1
+            start_gop_block_end_frame = start_gop_block[-1][0]
+            start_gop_block_duration = (
+                start_gop_block_end_frame / cut_video_def.frame_rate
+            ) - (start_gop_block_start_frame / cut_video_def.frame_rate)
 
-                    if index == 0:
-                        start_gop_block = []
-                    else:
-                        end_gop_block = []
+            stream_start_frame = start_gop_block_end_frame - 3
 
-                if iframe:
-                    if index == 0:
-                        start_gop_block.append((frame_no, frame_details))
-                    else:
-                        end_gop_block.append((frame_no, frame_details))
-            else:  # Hope the last GOP is it
-                if index == 0:
-                    start_gop_block.append((frame_no, frame_details))
+        if end_gop_block:
+            end_gop_block_start_frame = end_gop_block[0][0]
+            end_gop_block_end_frame = end_gop_block[-1][0]
+            end_gop_block_duration = (
+                end_gop_block_end_frame / cut_video_def.frame_rate
+            ) - (end_gop_block_start_frame / cut_video_def.frame_rate)
+            stream_end_frame = end_gop_block_start_frame - 3
 
-                else:
-                    end_gop_block.append((frame_no, frame_details))
+        stream_duration = (
+            stream_end_frame - stream_start_frame
+        ) / cut_video_def.frame_rate
 
         concat_files = []
 
-        # Calc start encode details
-        start_rencode_start_frame: int = cut_video_def.start_cut
-        start_rencode_end_frame: int = start_gop_block[-2][
-            0
-        ]  # -2 seems magic but it works
-        start_renecode_duration: float = (
-            start_rencode_end_frame - start_rencode_start_frame
-        ) / cut_video_def.frame_rate
-
-        # Calc end encode details
-        end_rencode_start_frame: int = end_gop_block[1][0]
-        end_rencode_end_frame: int = cut_video_def.end_cut
-        end_renecode_duration: float = (
-            end_rencode_end_frame - end_rencode_start_frame
-        ) / cut_video_def.frame_rate
-
-        if start_gop_block:  # # Reencode the start gop
+        if start_gop_block_duration > 0:
             reencode_start_seg_file = file_handler.file_join(
                 dir_path=output_dir,
                 file_name=f"reencode_start_segment_{cut_video_def.tag}",
@@ -1710,8 +2484,8 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             result, message = reencode_segment(
                 input_file=cut_video_def.input_file,
                 output_file=reencode_start_seg_file,
-                start_cut=start_rencode_start_frame,
-                duration=start_renecode_duration,
+                start_frame=start_gop_block_start_frame,
+                duration=start_gop_block_duration,
                 frame_rate=cut_video_def.frame_rate,
                 gop_size=1,  # Force all frames to I frame in the GOP block, so we can cut in and out where we want,
                 codec=codec,
@@ -1723,35 +2497,27 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
 
             concat_files.append(reencode_start_seg_file)
 
-        # Stream copies the video between start and end GOP
-        stream_copy_start_frame = (
-            start_rencode_end_frame - 2
-        )  # -2 seems magic but it works
-        stream_copy_end_frame = end_rencode_start_frame - 2
-        stream_copy_duration = (
-            (stream_copy_end_frame - stream_copy_start_frame)
-        ) / cut_video_def.frame_rate
+        if stream_duration > 0:
+            streamcopy_seg_file = file_handler.file_join(
+                dir_path=output_dir,
+                file_name=f"stream_copy_segment_{cut_video_def.tag}",
+                ext=input_extension,
+            )
 
-        stream_copy_seg_file = file_handler.file_join(
-            dir_path=output_dir,
-            file_name=f"stream_copy_segment_{cut_video_def.tag}",
-            ext=input_extension,
-        )
+            result, message = stream_copy_segment(
+                input_file=cut_video_def.input_file,
+                output_file=streamcopy_seg_file,
+                start_frame=stream_start_frame,
+                duration=stream_duration,
+                frame_rate=cut_video_def.frame_rate,
+            )
 
-        result, message = stream_copy_segment(
-            input_file=cut_video_def.input_file,
-            output_file=stream_copy_seg_file,
-            start_cut=stream_copy_start_frame,
-            duration=stream_copy_duration,
-            frame_rate=cut_video_def.frame_rate,
-        )
+            if result == -1:
+                return -1, message
 
-        if result == -1:
-            return -1, message
+            concat_files.append(streamcopy_seg_file)
 
-        concat_files.append(stream_copy_seg_file)
-
-        if end_gop_block:  # Reencode the end gop
+        if end_gop_block_duration > 0:
             reencode_end_seg_file = file_handler.file_join(
                 dir_path=output_dir,
                 file_name=f"reencode_end_segment_{cut_video_def.tag}",
@@ -1761,54 +2527,81 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             result, message = reencode_segment(
                 input_file=cut_video_def.input_file,
                 output_file=reencode_end_seg_file,
-                start_cut=end_rencode_start_frame,
-                duration=end_renecode_duration,
+                start_frame=end_gop_block_start_frame,
+                duration=end_gop_block_duration,
                 frame_rate=cut_video_def.frame_rate,
-                gop_size=1,  # gop_size,
+                gop_size=1,  # Force all frames to I frame in the GOP block, so we can cut in and out where we want,
                 codec=codec,
                 encoding_details=encoding_info,
             )
 
             if result == -1:
                 return -1, message
-
             concat_files.append(reencode_end_seg_file)
 
         if concat_files:
-            # Join reencoded_start segment, stream_copy segment and reencodeed end segment to make the final frame
+            # Join re-encoded_start segment, stream_copy segment and re-encoded end segment to make the final frame
             # accurate cut file with nearly no loss
             result, message = Concatenate_Videos(
                 temp_files=concat_files,
                 output_file=cut_video_def.output_file,
-                delete_temp_files=True,
+                delete_temp_files=False,
                 debug=False,
             )
 
             if result == -1:
                 return -1, message
 
-            return 1, ""
     else:
         # If video comprised of all I frames it will cut accurately, but compressed video with no key frames is not
         # going to cut accurately
+        stream_duration = (
+            cut_video_def.end_cut - cut_video_def.start_cut - 1
+        ) / cut_video_def.frame_rate
 
         try:
             result, message = stream_copy_segment(
                 input_file=cut_video_def.input_file,
                 output_file=cut_video_def.output_file,
-                start_cut=cut_video_def.start_cut,
-                duration=(cut_video_def.end_cut - cut_video_def.start_cut)
-                / cut_video_def.frame_rate,
+                start_frame=cut_video_def.start_cut + 1,
+                duration=stream_duration,
                 frame_rate=cut_video_def.frame_rate,
             )
 
             if result == -1:
                 return -1, message
-        except Exception as e:
+        except Exception:
             pass
-            # print(f"DBG Doom Boom {e=}")
 
     return 1, ""
+
+
+def Frame_Num_To_FFMPEG_Time(frame_num: int, frame_rate: float) -> str:
+    """
+    Converts a frame number to an FFmpeg offset time string in the format "hh:mm:ss.mmm".
+
+    Args:
+        frame_num: An integer representing the frame number to convert.
+        frame_rate: The video frame rate t
+
+    Returns:
+        A string representing the FFmpeg offset time in the format "hh:mm:ss.mmm".
+
+    """
+    assert (
+        isinstance(frame_num, int) and frame_num >= 0
+    ), f"{frame_num=}. Must be int > 0"
+    assert (
+        isinstance(frame_rate, float) and frame_rate > 0
+    ), f"{frame_rate=}. Must be float > 0"
+
+    offset_time = frame_num / frame_rate
+    hours = int(offset_time / 3600)
+    minutes = int((offset_time % 3600) / 60)
+    seconds = int(offset_time % 60)
+    milliseconds = int((offset_time % 1) * 1000)
+
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
 
 def Split_Large_Video(
@@ -1841,7 +2634,6 @@ def Split_Large_Video(
         return -1, f"Video file not found: {source}"
 
     if os.path.isdir(source):
-        print(f"Source path is a directory: {source}")
         return -1, "Source path is a directory: {source}"
 
     if not os.path.exists(output_folder):
@@ -1853,7 +2645,7 @@ def Split_Large_Video(
 
     file_handler = file_utils.File()
 
-    source_dir, source_name, source_extn = file_handler.split_file_path(source)
+    _, source_name, source_extn = file_handler.split_file_path(source)
 
     encoding_info = Get_File_Encoding_Info(source)
 
@@ -1872,12 +2664,12 @@ def Split_Large_Video(
     chunk_adjust = True
 
     while chunk_adjust:  # Need to make sure our last chunk is a good size
-        for i in range(num_chunks):
-            if i == num_chunks - 1:  # Last chunk
-                start_frame = int(i * chunk_frames)
+        for chunk_index in range(num_chunks):
+            if chunk_index == num_chunks - 1:  # Last chunk
+                start_frame = int(chunk_index * chunk_frames)
                 end_frame = int(
-                    (i + 1) * chunk_frames
-                    if i < num_chunks - 1
+                    (chunk_index + 1) * chunk_frames
+                    if chunk_index < num_chunks - 1
                     else encoding_info.video_frame_count
                 )
 
@@ -1890,17 +2682,17 @@ def Split_Large_Video(
         else:
             chunk_adjust = False
 
-    for i in range(num_chunks):
-        start_frame = int(i * chunk_frames)
+    for chunk_index in range(num_chunks):
+        start_frame = int(chunk_index * chunk_frames)
 
         end_frame = int(
-            (i + 1) * chunk_frames
-            if i < num_chunks - 1
+            (chunk_index + 1) * chunk_frames
+            if chunk_index < num_chunks - 1
             else encoding_info.video_frame_count
         )
 
         chunk_file = file_handler.file_join(
-            output_folder, f"{source_name}_{i + 1}", source_extn
+            output_folder, f"{source_name}_{chunk_index + 1}", source_extn
         )
         chunk_file_list.append(chunk_file)
 
@@ -1911,7 +2703,7 @@ def Split_Large_Video(
                 start_cut=start_frame,
                 end_cut=end_frame,
                 frame_rate=encoding_info.video_frame_rate,
-                tag=f"chunk_{i}",
+                tag=f"chunk_{chunk_index}",
             )
         )
 
@@ -2283,15 +3075,16 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
             Generator:
         """
         if isinstance(node, list):
-            for i in node:
-                for x in _find_keys(i, key_value):
-                    yield x
+            for node_list in node:
+                for xml_key in _find_keys(node_list, key_value):
+                    yield xml_key
         elif isinstance(node, dict):
             if key_value in node:
                 yield node[key_value]
-            for j in node.values():
-                for x in _find_keys(j, key_value):
-                    yield x
+
+            for node_dict in node.values():
+                for xml_key in _find_keys(node_dict, key_value):
+                    yield xml_key
 
     assert (
         isinstance(video_file, str) and video_file.strip() != ""
@@ -2307,13 +3100,13 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
     video_file_details = Encoding_Details()
 
     try:
-        mi = subprocess.check_output(
+        media_xml = subprocess.check_output(
             [sys_consts.MEDIAINFO, fmt, video_file],
             universal_newlines=True,
             stderr=subprocess.STDOUT if debug else subprocess.DEVNULL,
         ).strip()
 
-        video_info = xmltodict.parse(mi)
+        video_info = xmltodict.parse(media_xml)
 
         if debug:
             print(f"=========== Video Info Debug {video_file} ===========")
@@ -2321,6 +3114,7 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
             print("=========== Video Info Debug ===========")
 
         track_info = list(_find_keys(video_info, "track"))
+
         for tracks in track_info:
             for track_dict in tracks:
                 if not isinstance(track_dict, dict):
@@ -2367,7 +3161,12 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
 
                             case "Duration":
                                 video_file_details.video_duration = float(value)
-                            case "ScanType_Original" | "ScanOrder" | "ScanType" | "ScanOrder_Original":
+                            case (
+                                "ScanType_Original"
+                                | "ScanOrder"
+                                | "ScanType"
+                                | "ScanOrder_Original"
+                            ):
                                 if (
                                     value == "MBAFF"
                                 ):  # H264/H25 adaptive interlaced indication
@@ -2394,7 +3193,11 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
                                         "Interlaced"
                                     )
 
-                            case "FrameRate" | "FrameRate_Maximum":
+                            case (
+                                "FrameRate"
+                                | "FrameRate_Maximum"
+                                | "FrameRate_Original"
+                            ):
                                 video_file_details.video_frame_rate = float(value)
                             case "Standard":
                                 if value.upper() in (sys_consts.PAL, sys_consts.NTSC):
@@ -2534,7 +3337,13 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
             and video_file_details.video_frame_rate == sys_consts.NTSC_SPECS.frame_rate
         ):
             video_file_details.video_standard = sys_consts.NTSC
-        else:
+        # At this point it is the wild wild west, se take a punt on field rates to determine DVD standard
+        # Most likely dealing with HD def video
+        elif video_file_details.video_frame_rate == sys_consts.PAL_SPECS.field_rate:
+            video_file_details.video_standard = sys_consts.PAL
+        elif video_file_details.video_frame_rate == sys_consts.NTSC_SPECS.field_rate:
+            video_file_details.video_standard = sys_consts.NTSC
+        else:  # At this point, I will need to think of something better!
             video_file_details.video_standard = "N/A"
 
     if debug:
@@ -2591,16 +3400,14 @@ def Resize_Image(
         cmd += ["-colors", colors]
 
     if remap:
-        result, colors = Execute_Check_Output(
-            [
-                sys_consts.CONVERT,
-                input_file,
-                "-unique-colors",
-                out_file,
-            ]
-        )
+        result, colors = Execute_Check_Output([
+            sys_consts.CONVERT,
+            input_file,
+            "-unique-colors",
+            out_file,
+        ])
 
-        if result == -1:  # colors contains the error message in this case
+        if result == -1:  # colors contain the error message in this case
             return result, colors
 
         cmd += ["-remap", colors]

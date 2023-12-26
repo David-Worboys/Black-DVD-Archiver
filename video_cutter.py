@@ -61,7 +61,7 @@ def Run_Video_Cuts(cut_video_def: dvdarch_utils.Cut_Video_Def) -> tuple[int, str
     """This is a wrapper function used hy the multi-thread task_manager to run the Execute_Check_Output process
 
     Args:
-        ffmpeg_cut_commands (list[str]): The FFMPEG video cut commands as
+        cut_video_def (dvdarch_utils.Cut_Video_Def): Defines video cut parameters
 
     Returns:
         tuple[int, str]:
@@ -202,9 +202,7 @@ class Video_Editor(DVD_Archiver_Base):
         self._background_task_manager: Task_Manager = Task_Manager()
         self._background_task_manager.start()
 
-        if (
-            self._user_lambda
-        ):  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and
+        if self._user_lambda:  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and
             # Nuitka < 1.8.4 == boom! (And nope after a long session finally locked)
             self._video_handler.frame_changed_handler.connect(self._frame_handler)
             self._video_handler.media_status_changed_handler.connect(
@@ -458,49 +456,51 @@ class Video_Editor(DVD_Archiver_Base):
         """Populates DVD settings with values sourced from self.video_file_input"""
         if self._video_file_input:
             if self._menu_title.modified:
-                self._video_file_input[0].video_file_settings.button_title = (
-                    self._menu_title.value_get()
-                )
+                self._video_file_input[
+                    0
+                ].video_file_settings.button_title = self._menu_title.value_get()
 
             if self._menu_frame.modified:
                 self._video_file_input[0].video_file_settings.menu_button_frame = int(
                     self._menu_frame.value_get()
                 )
 
-            self._video_file_input[0].video_file_settings.normalise = (
-                self._video_filter_container.widget_get(
-                    container_tag="video_filters",
-                    tag="normalise",
-                ).value_get()
-            )
+            self._video_file_input[
+                0
+            ].video_file_settings.normalise = self._video_filter_container.widget_get(
+                container_tag="video_filters",
+                tag="normalise",
+            ).value_get()
 
-            self._video_file_input[0].video_file_settings.denoise = (
-                self._video_filter_container.widget_get(
-                    container_tag="video_filters",
-                    tag="denoise",
-                ).value_get()
-            )
+            self._video_file_input[
+                0
+            ].video_file_settings.denoise = self._video_filter_container.widget_get(
+                container_tag="video_filters",
+                tag="denoise",
+            ).value_get()
 
-            self._video_file_input[0].video_file_settings.white_balance = (
+            self._video_file_input[
+                0
+            ].video_file_settings.white_balance = (
                 self._video_filter_container.widget_get(
                     container_tag="video_filters",
                     tag="white_balance",
                 ).value_get()
             )
 
-            self._video_file_input[0].video_file_settings.auto_bright = (
-                self._video_filter_container.widget_get(
-                    container_tag="video_filters",
-                    tag="auto_levels",
-                ).value_get()
-            )
+            self._video_file_input[
+                0
+            ].video_file_settings.auto_bright = self._video_filter_container.widget_get(
+                container_tag="video_filters",
+                tag="auto_levels",
+            ).value_get()
 
-            self._video_file_input[0].video_file_settings.sharpen = (
-                self._video_filter_container.widget_get(
-                    container_tag="video_filters",
-                    tag="sharpen",
-                ).value_get()
-            )
+            self._video_file_input[
+                0
+            ].video_file_settings.sharpen = self._video_filter_container.widget_get(
+                container_tag="video_filters",
+                tag="sharpen",
+            ).value_get()
 
     def video_pause(self):
         """Pause video playback"""
@@ -1143,8 +1143,8 @@ class Video_Editor(DVD_Archiver_Base):
             result, message = dvdarch_utils.Concatenate_Videos(
                 temp_files=temp_files,
                 output_file=output_file,
-                delete_temp_files=True,
-                debug=False,
+                delete_temp_files=False,
+                debug=True,
             )
 
             if result == -1:
@@ -1255,6 +1255,10 @@ class Video_Editor(DVD_Archiver_Base):
         assert isinstance(
             grid_col_value, qtg.Grid_Col_Value
         ), f"{grid_col_value=} must be a qtg.Grid_Col_Value"
+
+        assert isinstance(
+            grid_col_value.value, int
+        ), f"Coder goof {grid_col_value.value=} must be int"
 
         clicked_frame = int(grid_col_value.value)
 
@@ -1434,7 +1438,7 @@ class Video_Editor(DVD_Archiver_Base):
         assert hasattr(self, "_video_handler"), "Media source not set"
 
         frame = self._video_handler.current_frame()
-        end_time = self._frame_num_to_ffmpeg_time(frame)
+        end_time = dvdarch_utils.Frame_Num_To_FFMPEG_Time(frame, self._frame_rate)
 
         if self._edit_list_grid.row_count <= 0:
             return None
@@ -1468,7 +1472,7 @@ class Video_Editor(DVD_Archiver_Base):
 
         frame = self._video_handler.current_frame()
 
-        start_time = self._frame_num_to_ffmpeg_time(frame)
+        start_time = dvdarch_utils.Frame_Num_To_FFMPEG_Time(frame, self._frame_rate)
 
         new_row = self._edit_list_grid.row_count + 1
 
@@ -1510,25 +1514,6 @@ class Video_Editor(DVD_Archiver_Base):
             else:
                 select_start.enable_set(True)
                 select_end.enable_set(False)
-
-    def _frame_num_to_ffmpeg_time(self, frame_num: int) -> str:
-        """
-        Converts a frame number to an FFmpeg offset time string in the format "hh:mm:ss.mmm".
-
-        Args:
-            frame_num: An integer representing the frame number to convert.
-
-        Returns:
-            A string representing the FFmpeg offset time in the format "hh:mm:ss.mmm".
-
-        """
-        offset_time = frame_num / self._frame_rate
-        hours = int(offset_time / 3600)
-        minutes = int((offset_time % 3600) / 60)
-        seconds = int(offset_time % 60)
-        milliseconds = int((offset_time % 1) * 1000)
-
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
     def _step_backward(self) -> None:
         """
