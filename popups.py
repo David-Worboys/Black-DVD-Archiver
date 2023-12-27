@@ -770,7 +770,10 @@ class PopOKCancelApply(PopOKCancel):
 @dataclasses.dataclass
 class PopOptions(PopContainer):
     """Pop-up Options dialogue that displays a list of options in a radio button format and returns the
-    selected option"""
+    selected option.
+
+    If the option needs a tooltip, then separate the option from the tooltip with a :: i.e., Test Option :: Test Tooltip
+    """
 
     message: str = ""
     options: Optional[dict[str, str]] = field(default_factory=dict)
@@ -802,6 +805,12 @@ class PopOptions(PopContainer):
         # for index, option in enumerate(self.options):
         index = 0
         for option, tag in self.options.items():
+
+            tooltip = ""
+
+            if "::" in option:
+                option,tooltip, = option.split("::")
+
             if index == 0:
                 self.original_option = option
 
@@ -810,6 +819,8 @@ class PopOptions(PopContainer):
             if len(option) > max_width:
                 max_width = len(option) + 5
 
+
+
             option_container.add_row(
                 RadioButton(
                     text=f"{SDELIM}{option}{SDELIM}",
@@ -817,6 +828,7 @@ class PopOptions(PopContainer):
                     tag=tag,
                     checked=True if index == 0 else False,
                     translate=self.translate,
+                    tooltip=tooltip
                 )
             )
 
