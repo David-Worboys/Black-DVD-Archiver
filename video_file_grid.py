@@ -124,7 +124,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             # TODO Make user configurable perhaps
             self._delete_file_from_grid(self._file_grid, video_file_input[0].vd_id)
 
-            # Insert Assembled Children  Files
+            # Insert Assembled Children Files
             self._insert_files_into_grid(
                 [video_file_data for video_file_data in video_file_input[1:]],
             )
@@ -374,7 +374,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                     case "select_files":
                         dvd_folder = Get_DVD_Build_Folder()
 
-                        if dvd_folder is None or dvd_folder.strip() == "":
+                        if dvd_folder.strip() == "":
                             return None
 
                         self.load_video_input_files(event)
@@ -554,12 +554,12 @@ class Video_File_Grid(DVD_Archiver_Base):
         file_handler = file_utils.File()
         dvd_folder = Get_DVD_Build_Folder()
 
-        if not dvd_folder:
+        if dvd_folder.strip() == "":
             return None
 
         edit_folder = file_handler.file_join(dvd_folder, sys_consts.EDIT_FOLDER)
 
-        if not file_handler.file_exists(edit_folder):
+        if not file_handler.path_exists(edit_folder):
             if file_handler.make_dir(edit_folder) == -1:
                 popups.PopError(
                     title="Error Creating Edit Folder",
@@ -578,15 +578,71 @@ class Video_File_Grid(DVD_Archiver_Base):
             ).show()
             return None
 
-        if (
-            popups.PopYesNo(title="Join Files", message="Join Selected Files?").show()
-            == "yes"
-        ):
+        copy_method = ""
+
+        if len(checked_items) == 1:  # Only one file selected, so transcode only
+            copy_title = "Re-Encode File..."
+            copy_message = "Re-Encode Selected File"
+            copy_option = {
+                "Make Edit File - Slow   :: Transcode File Into An Intermedite Edit File Format Suitable For Editing": "rencode_edit",
+                "Re-Encode H264 - Slower :: Transcode File Into The Common H264 Format": "reencode_h264",
+                "Re-Encode H265 - Slowest ::Transcode File Into The Common H264 Format": "reencode_h265",
+            }
+        else:  # Join files
+            copy_title = "Join Files..."
+            copy_message = "Join Selected Files"
+
+            file_extension = checked_items[0].user_data.video_extension.lower()
+
+            # HD Camcorder MTS files gave me no end of trouble, so have to reencode to mezzanine
+            if all(
+                item.user_data.video_path.lower().endswith("mts")
+                for item in checked_items
+            ):
+                copy_option = {}
+                copy_method = "rencode_edit"  # Makes a mezzanine edit master
+            elif all(
+                item.user_data.video_path.lower().endswith("mod")
+                for item in checked_items
+            ):
+                copy_option = {}
+                copy_method = "stream_copy"  # At least until tested
+            elif all(
+                item.user_data.video_path.lower().endswith(file_extension)
+                for item in checked_items
+            ):  # All files of the same type can stream copy
+                copy_option = {
+                    "Stream Copy - Fast       :: Use Where There Is No Problem Joining Files ": (
+                        "stream_copy"
+                    ),
+                    "Make Edit File - Slow    :: Use Where There Is A Problem Joining Files & The Joined File Needs To Be Edited": "transjoin_edit",
+                    "Re-Encode H264 - Slower  ::  Use To Join Files Into The Common H264 Format": "transjoin_h264",
+                    "Re-Encode H265 - Slowest ::  Use To Join Files Into The Newer H265 Format": "transjoin_h265",
+                }
+            else:  # Differnt file extensions, need a transcode copy
+                copy_option = {
+                    "Make Edit File - Slow   :: Use Where The Joined Files Needs To Be Edited   ": "transjoin_edit",
+                    "Re-Encode H264 - Slower :: Use To Join Files Into The Common H264 Format ": "transjoin_h264",
+                    "Re-Encode H265 - Slowest:: Use To Join Files Into The Newer H265 Format": "transjoin_h265",
+                }
+
+        if copy_option:
+            copy_method = popups.PopOptions(
+                title=copy_title,
+                message=copy_message,
+                options=copy_option,
+            ).show()
+
+        if copy_method.strip() == "" or copy_method == "cancel":
+            return None
+        else:
             concatenating_files = []
+            video_file_data = []
             removed_files = []
             output_file = ""
             vd_id = -1
             button_title = ""
+            container_format = "mp4"  # TODO Make user selectable - mpg, mp4
 
             for item in checked_items:
                 item: qtg.Grid_Item
@@ -595,22 +651,123 @@ class Video_File_Grid(DVD_Archiver_Base):
                 if not output_file:  # Happens on first iteration
                     vd_id = video_data.vd_id
                     button_title = video_data.video_file_settings.button_title
-
                     output_file = file_handler.file_join(
                         dir_path=video_data.video_folder,
                         file_name=f"{video_data.video_file}_joined",
-                        ext=video_data.video_extension,
+                        ext=(
+                            container_format
+                            if copy_method == "transcode_copy"
+                            else video_data.video_extension
+                        ),
                     )
                 else:
                     removed_files.append(video_data)
 
                 concatenating_files.append(video_data.video_path)
+                video_file_data.append(video_data)
 
             if concatenating_files and output_file:
+                result = -1
+                message = ""
+                dvd_folder = Get_DVD_Build_Folder()
+
+                if dvd_folder.strip() == "":
+                    return None
+
+                transcode_folder = file_handler.file_join(
+                    dvd_folder,
+                    sys_consts.TRANSCODE_FOLDER,
+                )
+
+                if not file_handler.path_exists(transcode_folder):
+                    if file_handler.make_dir(transcode_folder) == -1:
+                        popups.PopError(
+                            title="Error Creating Transcode Folder",
+                            message=(
+                                "Error Creating Transcode Folder!\n"
+                                f"{sys_consts.SDELIM}{transcode_folder}{sys_consts.SDELIM}"
+                            ),
+                        ).show()
+                        return None
+
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
-                    result, message = dvdarch_utils.Concatenate_Videos(
-                        temp_files=concatenating_files, output_file=output_file
-                    )
+                    match copy_method:
+                        case "rencode_edit":  # Only one File with this option
+                            video_data = video_file_data[0]
+
+                            result, message = dvdarch_utils.Transcode_MJPEG(
+                                input_file=video_data.video_path,
+                                frame_rate=video_data.encoding_info.video_frame_rate,
+                                output_folder=transcode_folder,
+                                width=video_data.encoding_info.video_width,
+                                height=video_data.encoding_info.video_height,
+                                interlaced=True
+                                if video_data.encoding_info.video_scan_type.lower()
+                                == "interlaced"
+                                else False,
+                                bottom_field_first=True
+                                if video_data.encoding_info.video_scan_order.lower()
+                                == "bff"
+                                else False,
+                            )
+                        case "reencode_h264":  # Om;y one File with this option
+                            video_data = video_file_data[0]
+                            result, message = dvdarch_utils.Transcode_H26x(
+                                input_file=video_data.video_path,
+                                frame_rate=video_data.encoding_info.video_frame_rate,
+                                output_folder=transcode_folder,
+                                width=video_data.encoding_info.video_width,
+                                height=video_data.encoding_info.video_height,
+                                interlaced=True
+                                if video_data.encoding_info.video_scan_type.lower()
+                                == "interlaced"
+                                else False,
+                                bottom_field_first=True
+                                if video_data.encoding_info.video_scan_order.lower()
+                                == "bff"
+                                else False,
+                                h265=False,
+                            )
+                        case "reencode_h265":  # Om;y one File with this option
+                            video_data = video_file_data[0]
+                            result, message = dvdarch_utils.Transcode_H26x(
+                                input_file=video_data.video_path,
+                                frame_rate=video_data.encoding_info.video_frame_rate,
+                                output_folder=transcode_folder,
+                                width=video_data.encoding_info.video_width,
+                                height=video_data.encoding_info.video_height,
+                                interlaced=True
+                                if video_data.encoding_info.video_scan_type.lower()
+                                == "interlaced"
+                                else False,
+                                bottom_field_first=True
+                                if video_data.encoding_info.video_scan_order.lower()
+                                == "bff"
+                                else False,
+                                h265=True,
+                            )
+                        case "stream_copy":  # Multiple files
+                            result, message = dvdarch_utils.Concatenate_Videos(
+                                temp_files=concatenating_files, output_file=output_file
+                            )
+                        case "transjoin_edit":
+                            result, message = dvdarch_utils.Concatenate_Videos(
+                                temp_files=concatenating_files,
+                                output_file=output_file,
+                                transcode_format="mjpeg",
+                            )
+                        case "transjoin_h264":
+                            result, message = dvdarch_utils.Concatenate_Videos(
+                                temp_files=concatenating_files,
+                                output_file=output_file,
+                                transcode_format="h264",
+                            )
+                        case "transjoin_h265":
+                            result, message = dvdarch_utils.Concatenate_Videos(
+                                temp_files=concatenating_files,
+                                output_file=output_file,
+                                transcode_format="h265",
+                            )
 
                 if result == -1:
                     popups.PopError(
@@ -622,6 +779,10 @@ class Video_File_Grid(DVD_Archiver_Base):
                     ).show()
 
                     return None
+                else:
+                    # If all good message has the output file name. A reencode concat will have a different extension. A
+                    # stream concat will have the same extension as the inpt file. This will be the only delta
+                    output_file = message
 
                 self._processed_trimmed(
                     file_grid,
@@ -947,6 +1108,25 @@ class Video_File_Grid(DVD_Archiver_Base):
                             f"{sys_consts.SDELIM}{removed_file_list}{sys_consts.SDELIM}"
                         ),
                     ).show()
+
+                # Cleanup pass to ensure correctness of grid
+                for check_row_index in reversed(range(self._file_grid.row_count)):
+                    grid_video_data: Video_Data = self._file_grid.userdata_get(
+                        row=check_row_index, col=self._file_grid.colindex_get("video_file")
+                    )
+
+                    # If grid_video_data is None, something went off the rails badly
+                    if grid_video_data is None:
+                        self._file_grid.row_delete(check_row_index)
+                        continue
+
+                    if check_row_index > 0:
+                        prior_grid_video_data: Video_Data = self._file_grid.userdata_get(
+                            row=check_row_index - 1, col=self._file_grid.colindex_get("video_file")
+                        )
+
+                        if grid_video_data.video_path == prior_grid_video_data.video_path:
+                            self._file_grid.row_delete(check_row_index)
         except Exception as e:
             popups.PopError(title="File Grid Load Error...", message=str(e)).show()
 
@@ -1019,6 +1199,9 @@ class Video_File_Grid(DVD_Archiver_Base):
             grid_video_data: Video_Data = file_grid.userdata_get(
                 row=row_index, col=file_grid.colindex_get("video_file")
             )
+
+            if grid_video_data is None:  # Error loading grid
+                continue
 
             if grid_video_data.video_file_settings.button_title.strip() == "":
                 grid_video_data.video_file_settings.button_title = (
@@ -1243,6 +1426,10 @@ class Video_File_Grid(DVD_Archiver_Base):
                 grid_video_data: Video_Data = file_grid.userdata_get(
                     row=0, col=file_grid.colindex_get("settings")
                 )
+
+                if grid_video_data is None:  # Not expected to happen
+                    return None
+
                 project_video_standard = grid_video_data.encoding_info.video_standard
 
                 loaded_files = []
@@ -1250,6 +1437,9 @@ class Video_File_Grid(DVD_Archiver_Base):
                     grid_video_data: Video_Data = file_grid.userdata_get(
                         row=row_index, col=file_grid.colindex_get("settings")
                     )
+
+                    if grid_video_data is None:
+                        continue
 
                     file_name = grid_video_data.video_path
 
@@ -1344,35 +1534,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                     rejected += (
                         f"{sys_consts.SDELIM}{file_video_data.video_path} :"
                         f" {sys_consts.SDELIM}No Video Track \n"
-                    )
-                    continue
-
-                if (
-                    file_video_data.encoding_info.video_standard == sys_consts.PAL
-                    and file_video_data.encoding_info.video_height
-                    > sys_consts.PAL_SPECS.height_43
-                    or file_video_data.encoding_info.video_standard == sys_consts.NTSC
-                    and file_video_data.encoding_info.video_height
-                    > sys_consts.NTSC_SPECS.height_43
-                ):
-                    rejected += (
-                        f"{sys_consts.SDELIM}{file_video_data.video_path} :"
-                        f" {sys_consts.SDELIM} Height Is Larger Than Standard Allows \n"
-                    )
-                    continue
-
-                if (
-                    file_video_data.encoding_info.video_standard == sys_consts.PAL
-                    and file_video_data.encoding_info.video_width
-                    > sys_consts.PAL_SPECS.width_43
-                    or file_video_data.encoding_info.video_standard == sys_consts.NTSC
-                    and file_video_data.encoding_info.video_width
-                    > sys_consts.NTSC_SPECS.width_43
-                ):
-                    rejected += (
-                        f"{sys_consts.SDELIM}{file_video_data.video_path} :"
-                        f" {sys_consts.SDELIM} Width Is Larger Than Video Standard"
-                        " Allows \n"
                     )
                     continue
 
@@ -1554,6 +1715,11 @@ class Video_File_Grid(DVD_Archiver_Base):
                 checked_item: qtg.Grid_Item
                 video_data: Video_Data = checked_item.user_data
 
+                if (
+                    video_data is None
+                ):  # Most likely something broke on grid load and grid data is corrupt
+                    continue
+
                 encoding_info = video_data.encoding_info
 
                 total_duration += encoding_info.video_duration
@@ -1674,7 +1840,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 icon=file_utils.App_Path("film.svg"),
                 tag="join_files",
                 callback=self.event_handler,
-                tooltip="Join The Selected Files",
+                tooltip="Join/Transcode The Selected Files",
                 width=2,
             ),
             qtg.Button(

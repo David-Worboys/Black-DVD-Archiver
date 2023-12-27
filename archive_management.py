@@ -136,7 +136,7 @@ class Archive_Manager:
 
         Args:
             dvd_name (str): The name of the DVD.
-            iso_folder (str) : The file path of the folder where the ISO build was created.
+            iso_folder (str): The file path of the folder where the ISO build was created.
             dvd_folder (str): The file path of the folder where the DVD build was created.
             menu_layout (list[tuple[str, list[Video_Data]]]): A list of tuples (menu title,Video_Data) representing the
             DVD folder/file names
@@ -314,13 +314,11 @@ class Archive_Manager:
                                 file_name=f"{Text_To_File_Name(menu_title)}_temp",
                             )
 
-                            video_folders.append(
-                                (
-                                    preservation_master_menu_dir_temp,
-                                    preservation_master_menu_dir,
-                                    menu_title,
-                                )
-                            )
+                            video_folders.append((
+                                preservation_master_menu_dir_temp,
+                                preservation_master_menu_dir,
+                                menu_title,
+                            ))
 
                             if not file_handler.path_exists(
                                 preservation_master_menu_dir_temp
@@ -361,13 +359,11 @@ class Archive_Manager:
                                 file_name=menu_title,
                             )
 
-                            video_folders.append(
-                                (
-                                    preservation_master_menu_dir_temp,
-                                    preservation_master_menu_dir,
-                                    menu_title,
-                                )
-                            )
+                            video_folders.append((
+                                preservation_master_menu_dir_temp,
+                                preservation_master_menu_dir,
+                                menu_title,
+                            ))
 
                             if not file_handler.path_exists(
                                 preservation_master_menu_dir_temp
@@ -847,7 +843,7 @@ class Archive_Manager:
                 PermissionError,
                 IOError,
                 json.decoder.JSONDecodeError,
-            ) as e:
+            ):
                 # Ignore errors as the file might be empty or corrupt. The write statement below will catch
                 # real file OS errors.
                 pass

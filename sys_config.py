@@ -38,7 +38,7 @@ def Get_DVD_Build_Folder() -> str:
     """Gets the DVD build folder
 
     Returns:
-        str: The DVD build folder
+        str: The DVD build folder or an empty sting if an error occurs - in this case, an error message also pops-up.
     """
     file_handler = file_utils.File()
     db = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
@@ -47,8 +47,9 @@ def Get_DVD_Build_Folder() -> str:
     if dvd_folder is None or dvd_folder.strip() == "":
         popups.PopError(
             title="DVD Build Folder Error...",
-            message="A DVD Build Folder Must Be Entered Before Making A Video Edit!",
+            message="A DVD Build Folder Must Be Entered Before Making A Video Edit/Transcode Or Join!",
         ).show()
+
         return ""
 
     dvd_folder = file_handler.file_join(dvd_folder, sys_consts.VIDEO_EDITOR_FOLDER_NAME)
@@ -1035,7 +1036,7 @@ class Encoding_Details:
             ):
                 value = sys_consts.NTSC
 
-            self._video_standard = value.upper()
+        self._video_standard = value.upper()
 
     @property
     def video_frame_count(self) -> int:

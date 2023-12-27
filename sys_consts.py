@@ -47,9 +47,7 @@ def COPYRIGHT_YEAR() -> str:
         str: The current year, or the current year and the next if it's 2022
 
     """
-    return (
-        f"{'2022' if str(datetime.date.today().year) == '2022' else '2022-' + str(datetime.date.today().year)}"
-    )
+    return f"{'2022' if str(datetime.date.today().year) == '2022' else '2022-' + str(datetime.date.today().year)}"
 
 
 VERSION_TAG = (
@@ -66,7 +64,9 @@ NTSC: Final[str] = "NTSC"
 AR169: Final[str] = "16:9"
 AR43: Final[str] = "4:3"
 PAL_FRAMERATE: Final[int] = 25
+PAL_FIELDRATE: Final[int] = 50
 NTSC_FRAMERATE: Final[float] = 29.97
+NTSC_FIELD_RATE: Final[float] = 59.94
 AVERAGE_BITRATE: Final[int] = 5500  # kilobits/sec
 SINGLE_SIDED_DVD_SIZE: Final[int] = 40258730  # kb ~ 4.7GB DVD5
 DOUBLE_SIDED_DVD_SIZE: Final[int] = 72453177  # kb ~ 8.5GB DVD9
@@ -77,11 +77,27 @@ TRANSCODE_FFV1ARCHIVAL: Final[str] = "ffv1"
 TRANSCODE_H264: Final[str] = "H264"
 TRANSCODE_H265: Final[str] = "H265"
 PAL_SPECS = namedtuple(
-    "PAL_SPECS", ["width_43", "height_43", "width_169", "height_169", "frame_rate"]
-)(width_43=720, height_43=576, width_169=1024, height_169=576, frame_rate=PAL_FRAMERATE)
+    "PAL_SPECS",
+    ["width_43", "height_43", "width_169", "height_169", "frame_rate", "field_rate"],
+)(
+    width_43=720,
+    height_43=576,
+    width_169=1024,
+    height_169=576,
+    frame_rate=PAL_FRAMERATE,
+    field_rate=PAL_FIELDRATE,
+)
 NTSC_SPECS = namedtuple(
-    "NTSC_SPECS", ["width_43", "height_43", "width_169", "height_169", "frame_rate"]
-)(width_43=720, height_43=480, width_169=20, height_169=480, frame_rate=NTSC_FRAMERATE)
+    "NTSC_SPECS",
+    ["width_43", "height_43", "width_169", "height_169", "frame_rate", "field_rate"],
+)(
+    width_43=720,
+    height_43=480,
+    width_169=20,
+    height_169=480,
+    frame_rate=NTSC_FRAMERATE,
+    field_rate=NTSC_FIELD_RATE,
+)
 
 SHELVE_FILE_EXTNS = ("dir", "dat", "bak")
 # fmt: off

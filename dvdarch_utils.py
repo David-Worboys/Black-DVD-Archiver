@@ -303,7 +303,7 @@ def Concatenate_Videos(
     output_file: str,
     audio_codec: str = "",
     delete_temp_files: bool = False,
-    transcode_concat: str = "",
+    transcode_format: str = "",
     debug: bool = True,
 ) -> tuple[int, str]:
     """
@@ -311,11 +311,12 @@ def Concatenate_Videos(
 
     Args:
         temp_files (list[str]): List of input video files to be concatenated
-        output_file (str): The output file name
+        output_file (str): The joined (concatenated) output file name.
+            Note Transcode concats will use the folder and file name but will have the transcode_format extension
         audio_codec (str): The audio codec to checked against (aac is special)
         delete_temp_files (bool): Whether to delete the temp files, defaults to False
-        transcode_concat (str): Transcode temp_files as per format and then join files - Use only for problem files,
-            as slow, defaults to False
+        transcode_format (str): Transcode files as per the transcode_format and then joins (concatenats) the files.
+            Note: Transcodes are slow, defaults to "". legal values are h264 | h265 | mpg | mjpeg
         debug (bool): True, print debug info, otherwise do not
 
     Returns:
@@ -332,12 +333,13 @@ def Concatenate_Videos(
     assert isinstance(output_file, str), f"{output_file=}. Must be str"
     assert isinstance(audio_codec, str), f"{audio_codec=}. Must be a str"
     assert isinstance(delete_temp_files, bool), f"{delete_temp_files=}. Must be a bool"
-    assert isinstance(transcode_concat, str) and transcode_concat in (
+    assert isinstance(transcode_format, str) and transcode_format in (
         "",
         "h264",
-        "h265" "mpg",
+        "h265",
+        "mpg",
         "mjpeg",
-    ), f"{transcode_concat=}. Must be str - h264 | h265 | mpg | mjpeg"
+    ), f"{transcode_format=}. Must be str - h264 | h265 | mpg | mjpeg"
 
     if debug and not utils.Is_Complied():
         print(f"DBG CV {temp_files=} {output_file=} {audio_codec=} {delete_temp_files}")
@@ -357,15 +359,15 @@ def Concatenate_Videos(
 
     transcode_file_list = []
 
-    if transcode_concat:  # Very slow on a AMD2400G with 1GB of RAM :-)
-        if transcode_concat in ("h264", "h265"):
+    if transcode_format:  # Very slow on a AMD2400G with 1GB of RAM :-)
+        if transcode_format in ("h264", "h265"):
             container_format = "mp4"
-        elif transcode_concat == "mpg":
+        elif transcode_format == "mpg":
             container_format = "mpg"
-        elif transcode_concat == "mjpeg":
+        elif transcode_format == "mjpeg":
             container_format = "avi"
         else:
-            raise RuntimeError(f"Unknown transcode_concat {transcode_concat=}")
+            raise RuntimeError(f"Unknown transcode_concat {transcode_format=}")
 
         out_path, out_name, _ = file_handler.split_file_path(output_file)
         output_file = file_handler.file_join(out_path, out_name, container_format)
@@ -390,10 +392,6 @@ def Concatenate_Videos(
         for video_file in temp_files:
             temp_path, temp_name, _ = file_handler.split_file_path(video_file)
             transcode_path = file_handler.file_join(temp_path, "transcode_temp_files")
-            transcode_file = file_handler.file_join(
-                transcode_path, temp_name, container_format
-            )
-
             encoding_info: Encoding_Details = Get_File_Encoding_Info(video_file)
 
             if encoding_info.error.strip():
@@ -405,7 +403,7 @@ def Concatenate_Videos(
                     ),
                 )
             else:
-                match transcode_concat:
+                match transcode_format:
                     case "h264":
                         transcode_file = file_handler.file_join(
                             transcode_path, temp_name, "mp4"
@@ -692,7 +690,7 @@ def Get_Space_Available(path: str) -> tuple[int, str]:
         usage = psutil.disk_usage(path)
         return usage.free, ""
     except Exception as e:
-        return -1, str(e)
+        return -1, f"Failed To Get Space Available - {sys_consts.SDELIM}{e}{sys_consts.SDELIM}"
 
 
 def Get_Color_Names() -> list:
@@ -2441,14 +2439,14 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         end_gop_block = sorted(end_gop_block, key=lambda x: x[0])
 
         start_gop_block_start_frame = 0
-        start_gop_block_end_frame = 0
+        #start_gop_block_end_frame = 0
         start_gop_block_duration = 0.0
 
         stream_start_frame = 0
         stream_end_frame = 0
 
         end_gop_block_start_frame = 0
-        end_gop_block_end_frame = 0
+        #end_gop_block_end_frame = 0
         end_gop_block_duration = 0.0
 
         if start_gop_block:
@@ -2556,7 +2554,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         # If video comprised of all I frames it will cut accurately, but compressed video with no key frames is not
         # going to cut accurately
         stream_duration = (
-            cut_video_def.end_cut - cut_video_def.start_cut - 1
+            cut_video_def.end_cut - cut_video_def.start_cut # -1
         ) / cut_video_def.frame_rate
 
         try:
@@ -2570,8 +2568,8 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
 
             if result == -1:
                 return -1, message
-        except Exception:
-            pass
+        except Exception as e:
+            return -1, f"Cut Video Failed - {sys_consts.SDELIM}{e}{sys_consts.SDELIM}"
 
     return 1, ""
 

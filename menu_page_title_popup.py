@@ -831,13 +831,12 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                                     row_grid_user_data.video_file_settings.button_title.strip()
                                     != row_grid_value.strip()
                                 ):
-                                    row_grid_user_data.video_file_settings.button_title = (
-                                        row_grid_value
-                                    )
+                                    row_grid_user_data.video_file_settings.button_title = row_grid_value
 
-                                row_grid_data.append(
-                                    (row_grid_value, row_grid_user_data)
-                                )
+                                row_grid_data.append((
+                                    row_grid_value,
+                                    row_grid_user_data,
+                                ))
 
                     grid_col_values.append((grid_value, grid_user_data, row_grid_data))
 

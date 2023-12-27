@@ -700,32 +700,27 @@ class DVD:
             for cell_coord in cell_coords:
                 if page_index != cell_coord.page:  # page break
                     if video_list:
-                        menu_layout.append(
-                            (
-                                (
-                                    f"menu_{page_index}"
-                                    if self.dvd_setup.menu_title[page_index].strip()
-                                    == ""
-                                    else self.dvd_setup.menu_title[page_index]
-                                ),
-                                video_list,
-                            )
-                        )
-                    page_index = cell_coord.page
-                    video_list = []
-                video_list.append(cell_coord.video_data)
-            else:
-                if video_list:
-                    menu_layout.append(
-                        (
+                        menu_layout.append((
                             (
                                 f"menu_{page_index}"
                                 if self.dvd_setup.menu_title[page_index].strip() == ""
                                 else self.dvd_setup.menu_title[page_index]
                             ),
                             video_list,
-                        )
-                    )
+                        ))
+                    page_index = cell_coord.page
+                    video_list = []
+                video_list.append(cell_coord.video_data)
+            else:
+                if video_list:
+                    menu_layout.append((
+                        (
+                            f"menu_{page_index}"
+                            if self.dvd_setup.menu_title[page_index].strip() == ""
+                            else self.dvd_setup.menu_title[page_index]
+                        ),
+                        video_list,
+                    ))
             result, message = archive_manager.archive_dvd_build(
                 dvd_name=(
                     f"{self.dvd_setup.serial_number} - {self._dvd_setup.project_name}"
@@ -2930,17 +2925,15 @@ class DVD:
 
             pgc["vob"]["@pause"] = "inf"
 
-            dvd_author_dict["dvdauthor"]["titleset"].append(
-                {
-                    "titles": {
-                        "video": {
-                            "@format": self.dvd_setup.video_standard,
-                            "@aspect": coord.video_data.encoding_info.video_ar,
-                        },
-                        "pgc": pgc,
-                    }
+            dvd_author_dict["dvdauthor"]["titleset"].append({
+                "titles": {
+                    "video": {
+                        "@format": self.dvd_setup.video_standard,
+                        "@aspect": coord.video_data.encoding_info.video_ar,
+                    },
+                    "pgc": pgc,
                 }
-            )
+            })
 
         dvd_author_file = file_handler.file_join(path_name, "dvd_author", "xml")
 

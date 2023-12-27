@@ -522,7 +522,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 app_country = self._db_settings.setting_get(setting_name="app_country")
 
                 if app_country:
-                    result = country_combo.select_text(
+                    country_combo.select_text(
                         select_text=app_country,
                         case_sensitive=False,
                         partial_match=False,

@@ -573,8 +573,7 @@ class App_Settings:
                             case _:
                                 raise ValueError(
                                     f"setting_name <{setting_name}>, setting_value"
-                                    f" <{setting_value}> "
-                                    + "has an unsupported_type"
+                                    f" <{setting_value}> " + "has an unsupported_type"
                                     f" <{type(setting_value)}> "
                                 )
 
@@ -1477,9 +1476,7 @@ class SQLDB:
                 f" {SQL.VALUES} ({value_clause})"
             )
         else:  # Update statement
-            sql_statement = (
-                f"{SQL.UPDATE} {table_str} {SQL.SET} {value_clause} {SQL.WHERE} {where_str}"
-            )
+            sql_statement = f"{SQL.UPDATE} {table_str} {SQL.SET} {value_clause} {SQL.WHERE} {where_str}"
 
         if debug and not Is_Complied():
             print(f">>>>>>>>>>>>>>>>>>>>>>>>> {sql_statement} <<<<<<<<<<<<<<<<")

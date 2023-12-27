@@ -187,8 +187,10 @@ class File_Renamer_Popup(qtg.PopContainer):
 
             if user_entered_file_name.strip() != "":
                 self.video_data_list[row_index].video_file = user_entered_file_name
-                self.video_data_list[row_index].video_file_settings.button_title = (
-                    file_handler.extract_title(user_entered_file_name)
+                self.video_data_list[
+                    row_index
+                ].video_file_settings.button_title = file_handler.extract_title(
+                    user_entered_file_name
                 )
 
         return None
