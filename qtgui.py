@@ -8953,7 +8953,7 @@ class Grid(_qtpyBase_Control):
 
         self._widget.setColumnCount(len(labels))
 
-        char_pixel_size = self.pixel_char_size(char_height=1, char_width=1)        
+        char_pixel_size = self.pixel_char_size(char_height=1, char_width=1)
         grid_width = sum(self._col_widths.values())
 
         for col_index, definition in enumerate(self.col_def):
@@ -8968,15 +8968,15 @@ class Grid(_qtpyBase_Control):
                 widget=None,
                 orig_row=None,
             )
-            
+
             item = _Grid_TableWidget_Item(
                 definition.label, qtW.QListWidgetItem.ItemType.Type
             )
             item.setData(qtC.Qt.UserRole, item_data)
 
-            self._widget.setHorizontalHeaderItem(col_index, item)                                                
+            self._widget.setHorizontalHeaderItem(col_index, item)
             self._widget.horizontalHeaderItem(col_index).tag = definition.label
-                
+
         if self.pixel_unit:
             height = self.height
         else:
@@ -9014,7 +9014,7 @@ class Grid(_qtpyBase_Control):
 
         self._widget.setMinimumWidth(
             (self.width * char_pixel_size.width) + self.tune_hsize
-        )  # Allow for scroll-bar        
+        )  # Allow for scroll-bar
         self._widget.setMaximumWidth(
             (self.width * char_pixel_size.width) + self.tune_hsize
         )
@@ -9023,8 +9023,10 @@ class Grid(_qtpyBase_Control):
         # 2023-12-15 DAW Pyside 6.6.1 Did not size column width correctly unless done as the last step
         for col_index, definition in enumerate(self.col_def):
             self._widget.setColumnWidth(
-                    col_index, (self._col_widths[col_index] * char_pixel_size.width)
-                )
+                col_index, self._col_widths[col_index] * char_pixel_size.width
+            )
+        # And I seem to need this fo co complete the above fix
+        self._widget.horizontalHeader().setStretchLastSection(True)
 
         return widget
 
@@ -9285,10 +9287,10 @@ class Grid(_qtpyBase_Control):
 
     @property
     def col_count(self) -> int:
-        """Gets number of colunns in the grid
+        """Gets number of columns in the grid
 
         Returns:
-            int: The number of colunns in the grid
+            int: The number of columns in the grid
 
         """
 
