@@ -274,7 +274,9 @@ def Data_Type_Decode(data_type: int, value: str) -> any:  # TODO Remove QT depen
             locale = QtCore.QLocale()
             date_format: Type[QtCore.QLocale.FormatType] = QtCore.QLocale.ShortFormat  # type: ignore
 
-            return QtCore.QDateTime.fromString(str(value), locale.dateTimeFormat(date_format))  # type: ignore
+            return QtCore.QDateTime.fromString(
+                str(value), locale.dateTimeFormat(date_format)
+            )  # type: ignore
         case DATA_TYPE.FLOAT:
             return float(value)
         case DATA_TYPE.INT:
@@ -352,7 +354,7 @@ def Dump_Object(py_object: object):
         py_object (object): The object to dump
     """
     for attr in dir(py_object):
-        if type(attr) == object:
+        if isinstance(type(attr), object):
             Dump_Object(py_object)
         else:
             print("obj.%s = %r" % (attr, getattr(py_object, attr)))
@@ -745,12 +747,10 @@ class Crypt:
         )
 
         temp_key = salt + mixer[str_key_len:]
-        temp_key = "".join(
-            [
-                hex(ord(temp_key[i % len(temp_key)]) ^ ord(mixer[i % (len(mixer))]))[2:]
-                for i in range(max(len(temp_key), len(mixer)))
-            ]
-        )
+        temp_key = "".join([
+            hex(ord(temp_key[i % len(temp_key)]) ^ ord(mixer[i % (len(mixer))]))[2:]
+            for i in range(max(len(temp_key), len(mixer)))
+        ])
         str_key_list = list(temp_key)
         random.shuffle(str_key_list)
 
@@ -791,12 +791,10 @@ class Crypt:
         )
 
         temp_key = str_key + mixer[str_key_len:]
-        temp_key = "".join(
-            [
-                hex(ord(temp_key[i % len(temp_key)]) ^ ord(mixer[i % (len(mixer))]))[2:]
-                for i in range(max(len(temp_key), len(mixer)))
-            ]
-        )
+        temp_key = "".join([
+            hex(ord(temp_key[i % len(temp_key)]) ^ ord(mixer[i % (len(mixer))]))[2:]
+            for i in range(max(len(temp_key), len(mixer)))
+        ])
         str_key_list = list(temp_key)
         random.shuffle(str_key_list)
 
@@ -852,12 +850,10 @@ class Crypt:
         )
 
         temp_key = str_key + mixer[str_key_len:]
-        temp_key = "".join(
-            [
-                hex(ord(temp_key[i % len(temp_key)]) ^ ord(mixer[i % (len(mixer))]))[2:]
-                for i in range(max(len(temp_key), len(mixer)))
-            ]
-        )
+        temp_key = "".join([
+            hex(ord(temp_key[i % len(temp_key)]) ^ ord(mixer[i % (len(mixer))]))[2:]
+            for i in range(max(len(temp_key), len(mixer)))
+        ])
         str_key_list = list(temp_key)
         random.shuffle(str_key_list)
 

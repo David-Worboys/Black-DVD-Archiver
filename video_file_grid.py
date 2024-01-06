@@ -1112,7 +1112,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                 # Cleanup pass to ensure correctness of grid
                 for check_row_index in reversed(range(self._file_grid.row_count)):
                     grid_video_data: Video_Data = self._file_grid.userdata_get(
-                        row=check_row_index, col=self._file_grid.colindex_get("video_file")
+                        row=check_row_index,
+                        col=self._file_grid.colindex_get("video_file"),
                     )
 
                     # If grid_video_data is None, something went off the rails badly
@@ -1121,11 +1122,17 @@ class Video_File_Grid(DVD_Archiver_Base):
                         continue
 
                     if check_row_index > 0:
-                        prior_grid_video_data: Video_Data = self._file_grid.userdata_get(
-                            row=check_row_index - 1, col=self._file_grid.colindex_get("video_file")
+                        prior_grid_video_data: Video_Data = (
+                            self._file_grid.userdata_get(
+                                row=check_row_index - 1,
+                                col=self._file_grid.colindex_get("video_file"),
+                            )
                         )
 
-                        if grid_video_data.video_path == prior_grid_video_data.video_path:
+                        if (
+                            grid_video_data.video_path
+                            == prior_grid_video_data.video_path
+                        ):
                             self._file_grid.row_delete(check_row_index)
         except Exception as e:
             popups.PopError(title="File Grid Load Error...", message=str(e)).show()

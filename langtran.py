@@ -193,9 +193,7 @@ class Lang_Tran(metaclass=Singleton):
                 notrans_word = deleted_wordlist.pop()
 
                 if notrans_word != "":
-                    trans_string = (
-                        f"{'' if trans_string == '' else trans_string + ' '}{notrans_word}"
-                    )
+                    trans_string = f"{'' if trans_string == '' else trans_string + ' '}{notrans_word}"
             else:
                 if word_token != "":
                     word_token = word_token.replace("'", "''")
@@ -235,13 +233,9 @@ class Lang_Tran(metaclass=Singleton):
                             if error.code == 1:
                                 if self.DB.sql_commit == -1:
                                     print(f"SQL Error {error.code=} {error.message=}")
-                            trans_string = (
-                                f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
-                            )
+                            trans_string = f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
                         else:
-                            trans_string = (
-                                f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
-                            )
+                            trans_string = f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
                     else:
                         trans_sql = (
                             f"{sqldb.SQL.SELECT} id, word {sqldb.SQL.FROM} lang_tran"
@@ -255,13 +249,9 @@ class Lang_Tran(metaclass=Singleton):
                         if error.code == 1 and result:  # Have a foreign word
                             foreign_word = result[0][1]
 
-                            trans_string = (
-                                f"{'' if trans_string == '' else trans_string + ' '}{foreign_word}"
-                            )
+                            trans_string = f"{'' if trans_string == '' else trans_string + ' '}{foreign_word}"
                         else:
-                            trans_string = (
-                                f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
-                            )
+                            trans_string = f"{'' if trans_string == '' else trans_string + ' '}{word_token}"
 
         if debug and not Is_Complied():
             print(f"DBG Trans {trans_word=} {trans_string=}")
