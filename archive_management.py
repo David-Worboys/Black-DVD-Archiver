@@ -37,9 +37,7 @@ DVD_IMAGE: Final[str] = "dvd_image"
 ISO_IMAGE: Final[str] = "iso_image"
 VIDEO_SOURCE: Final[str] = "video_source"
 STREAMING: Final[str] = "streaming"  # Used in archival mode only
-PRESERVATION_MASTER: Final[str] = (
-    "preservation_master_ffv1"  # Used in archival mode only
-)
+PRESERVATION_MASTER: Final[str] = "preservation_master"  # Used in archival mode only
 MISC: Final[str] = "misc"
 
 
@@ -166,6 +164,7 @@ class Archive_Manager:
             ), f"All elements in {menu[1]=} must be Video_Data"
 
         self._error_code = 1
+        self._error_message = ""
 
         file_handler = file_utils.File()
         video_file_copier = dvdarch_utils.Video_File_Copier()
@@ -264,45 +263,45 @@ class Archive_Manager:
                         ),
                     )
 
-                if self.transcode_type == sys_consts.TRANSCODE_FFV1ARCHIVAL:
-                    preservation_master_folder = file_handler.file_join(
-                        backup_item_folder, PRESERVATION_MASTER
+                preservation_master_folder = file_handler.file_join(
+                    backup_item_folder,
+                    f"{PRESERVATION_MASTER}_{self.transcode_type.lower()}",
+                )
+
+                if file_handler.make_dir(preservation_master_folder) == -1:
+                    self._error_code = -1
+                    return (
+                        -1,
+                        (
+                            "Failed To Create Preservation Master Folder :"
+                            f" {sys_consts.SDELIM}{preservation_master_folder}{sys_consts.SDELIM}"
+                        ),
                     )
 
-                    if file_handler.make_dir(preservation_master_folder) == -1:
-                        self._error_code = -1
-                        return (
-                            -1,
-                            (
-                                "Failed To Create Preservation Master Folder :"
-                                f" {sys_consts.SDELIM}{preservation_master_folder}{sys_consts.SDELIM}"
-                            ),
-                        )
+                backup_item_folder = file_handler.file_join(
+                    backup_item_folder, STREAMING
+                )
 
-                    backup_item_folder = file_handler.file_join(
-                        backup_item_folder, STREAMING
+                if file_handler.make_dir(backup_item_folder) == -1:
+                    self._error_code = -1
+                    return (
+                        -1,
+                        (
+                            "Failed To Create Backup Folder :"
+                            f" {sys_consts.SDELIM}{backup_item_folder}{sys_consts.SDELIM}"
+                        ),
                     )
-
-                    if file_handler.make_dir(backup_item_folder) == -1:
-                        self._error_code = -1
-                        return (
-                            -1,
-                            (
-                                "Failed To Create Backup Folder :"
-                                f" {sys_consts.SDELIM}{backup_item_folder}{sys_consts.SDELIM}"
-                            ),
-                        )
-                else:
-                    preservation_master_folder = ""
 
                 for menu_index, menu in enumerate(menu_layout):
-                    menu_index: int
+                    menu_index: int  # Type Hint
                     menu: tuple[str, list[Video_Data]]
 
                     menu_title = menu[0]
 
                     if menu_title.strip():
-                        menu_title = Text_To_File_Name(menu_title)
+                        menu_title = (
+                            f"{menu_index + 1:02}_{Text_To_File_Name(menu_title)}"
+                        )
 
                         if preservation_master_folder:
                             preservation_master_menu_dir = file_handler.file_join(
@@ -347,7 +346,7 @@ class Archive_Manager:
                             file_name=f"{Text_To_File_Name(menu_title)}_temp",
                         )
                     else:  # If no menu title, then use the menu number
-                        menu_title = f"menu_{menu_index + 1:02}"
+                        menu_title = f"{menu_index + 1:02}_Untitled_Menu"
 
                         if preservation_master_folder:
                             preservation_master_menu_dir = file_handler.file_join(
@@ -405,12 +404,13 @@ class Archive_Manager:
                                 ),
                             )
 
-                    for menu_video_data in menu[1]:
+                    for menu_index, menu_video_data in enumerate(menu[1]):
                         backup_file_name = (
                             Text_To_File_Name(
                                 menu_video_data.video_file_settings.button_title
                             )
                             if menu_video_data.video_file_settings.button_title.strip()
+                            != ""
                             else menu_video_data.video_file
                         )
 
@@ -434,10 +434,21 @@ class Archive_Manager:
                             self.transcode_type == sys_consts.TRANSCODE_NONE
                         ):  # Smile, no quality loss
                             (
+                                _,
+                                _,
+                                file_extension,
+                            ) = file_handler.split_file_path(menu_video_data.video_path)
+                            new_output_file_path = file_handler.file_join(
+                                menu_dir_temp,
+                                f"{menu_index + 1:02}_{backup_file_name}",
+                                file_extension,
+                            )
+
+                            (
                                 self._error_code,
                                 self._error_message,
                             ) = file_handler.copy_file(
-                                menu_video_data.video_path, backup_path
+                                menu_video_data.video_path, new_output_file_path
                             )
 
                             if self._error_code == -1:
@@ -453,7 +464,7 @@ class Archive_Manager:
                             ):  # Check if we need to transcode
                                 (
                                     self._error_code,
-                                    self._error_message,
+                                    message,
                                 ) = dvdarch_utils.Transcode_H26x(
                                     input_file=menu_video_data.video_path,
                                     output_folder=menu_dir_temp,
@@ -476,16 +487,53 @@ class Archive_Manager:
                                     high_quality=True,
                                 )
 
+                                if self._error_code == -1:
+                                    self._error_message = message
+                                    return -1, self._error_message
+
+                                # message has ouput file name
+                                output_file_path = message
+                                (
+                                    _,
+                                    _,
+                                    file_extension,
+                                ) = file_handler.split_file_path(output_file_path)
+                                new_output_file_path = file_handler.file_join(
+                                    menu_dir_temp,
+                                    f"{menu_index + 1:02}_{backup_file_name}",
+                                    file_extension,
+                                )
+
                                 if (
-                                    self._error_code == -1
-                                ):  # output_file container error message
+                                    file_handler.rename_file(
+                                        output_file_path, new_output_file_path
+                                    )
+                                    == -1
+                                ):
+                                    self._error_message = (
+                                        f"Failed To Rename {sys_consts.SDELIM}{output_file_path}{sys_consts.SDELIM} To "
+                                        f"{sys_consts.SDELIM}{new_output_file_path}{sys_consts.SDELIM}"
+                                    )
                                     return -1, self._error_message
                             else:  # We copy
+                                (
+                                    _,
+                                    _,
+                                    file_extension,
+                                ) = file_handler.split_file_path(
+                                    menu_video_data.video_path
+                                )
+                                new_output_file_path = file_handler.file_join(
+                                    menu_dir_temp,
+                                    f"{menu_index + 1:02}_{backup_file_name}",
+                                    file_extension,
+                                )
+
                                 (
                                     self._error_code,
                                     self._error_message,
                                 ) = file_handler.copy_file(
-                                    menu_video_data.video_path, backup_path
+                                    menu_video_data.video_path, new_output_file_path
                                 )
 
                                 if self._error_code == -1:
@@ -498,7 +546,7 @@ class Archive_Manager:
                             ):  # Chck if we need to transcode
                                 (
                                     self._error_code,
-                                    self._error_message,
+                                    message,
                                 ) = dvdarch_utils.Transcode_ffv1_archival(
                                     input_file=menu_video_data.video_path,
                                     output_folder=preservation_master_menu_dir_temp,
@@ -508,14 +556,53 @@ class Archive_Manager:
                                 )
 
                                 if self._error_code == -1:
+                                    self._error_message = message
+                                    return -1, self._error_message
+
+                                # message has ouput file name
+                                output_file_path = message
+                                (
+                                    _,
+                                    _,
+                                    file_extension,
+                                ) = file_handler.split_file_path(output_file_path)
+                                new_output_file_path = file_handler.file_join(
+                                    preservation_master_menu_dir_temp,
+                                    f"{menu_index +  1:02}_{backup_file_name}",
+                                    file_extension,
+                                )
+
+                                if (
+                                    file_handler.rename_file(
+                                        output_file_path,
+                                        new_output_file_path,
+                                    )
+                                    == -1
+                                ):
+                                    self._error_message = (
+                                        f"Failed To Rename {sys_consts.SDELIM}{output_file_path}{sys_consts.SDELIM} To "
+                                        f"{sys_consts.SDELIM}{new_output_file_path}{sys_consts.SDELIM}"
+                                    )
                                     return -1, self._error_message
                             else:  # Just Copy
+                                (
+                                    _,
+                                    _,
+                                    file_extension,
+                                ) = file_handler.split_file_path(
+                                    menu_video_data.video_path
+                                )
+                                new_output_file_path = file_handler.file_join(
+                                    preservation_master_menu_dir_temp,
+                                    f"{menu_index + 1:02}_{backup_file_name}",
+                                    file_extension,
+                                )
+
                                 (
                                     self._error_code,
                                     self._error_message,
                                 ) = file_handler.copy_file(
-                                    menu_video_data.video_path,
-                                    preservation_master_backup_path,
+                                    menu_video_data.video_path, new_output_file_path
                                 )
 
                                 if self._error_code == -1:
@@ -541,7 +628,7 @@ class Archive_Manager:
 
                                 (
                                     self._error_code,
-                                    output_file,
+                                    message,
                                 ) = dvdarch_utils.Transcode_H26x(
                                     input_file=menu_video_data.video_path,
                                     output_folder=menu_dir_temp,
@@ -564,10 +651,21 @@ class Archive_Manager:
                                     high_quality=True,
                                 )
 
+                                if self._error_code == -1:
+                                    self._error_message = message
+                                    return -1, self._error_message
+
+                                # message has ouput file name
+                                output_file_path = message
+
                                 if (
-                                    self._error_code == -1
-                                ):  # output_file container error message
-                                    self._error_message = output_file
+                                    file_handler.rename_file(
+                                        output_file_path,
+                                        preservation_master_backup_path,
+                                    )
+                                    == -1
+                                ):
+                                    self._error_message = f"Failed To Rename {sys_consts.SDELIM}{output_file_path}{sys_consts.SDELIM} To {sys_consts.SDELIM}{preservation_master_backup_path}{sys_consts.SDELIM}"
                                     return -1, self._error_message
                             else:  # we copy
                                 if not Is_Complied():
@@ -577,10 +675,23 @@ class Archive_Manager:
                                     )
 
                                 (
+                                    _,
+                                    _,
+                                    file_extension,
+                                ) = file_handler.split_file_path(
+                                    menu_video_data.video_path
+                                )
+                                new_output_file_path = file_handler.file_join(
+                                    preservation_master_backup_path,
+                                    f"{menu_index + 1:02}_{backup_file_name}",
+                                    file_extension,
+                                )
+
+                                (
                                     self._error_code,
                                     self._error_message,
                                 ) = file_handler.copy_file(
-                                    menu_video_data.video_path, backup_path
+                                    menu_video_data.video_path, new_output_file_path
                                 )
 
                                 if self._error_code == -1:

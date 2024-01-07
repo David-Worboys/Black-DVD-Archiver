@@ -690,7 +690,10 @@ def Get_Space_Available(path: str) -> tuple[int, str]:
         usage = psutil.disk_usage(path)
         return usage.free, ""
     except Exception as e:
-        return -1, f"Failed To Get Space Available - {sys_consts.SDELIM}{e}{sys_consts.SDELIM}"
+        return (
+            -1,
+            f"Failed To Get Space Available - {sys_consts.SDELIM}{e}{sys_consts.SDELIM}",
+        )
 
 
 def Get_Color_Names() -> list:
@@ -1174,14 +1177,13 @@ def Transcode_ffv1_archival(
 
     Returns:
         tuple[int, str]:
-            arg 1: 1 if ok, -1 if error
-            arg 2: error message if error else ""
+            - arg 1: 1 if ok, -1 if error
+            - arg 2: error message if error (-1) else output file path (1)
 
     """
     assert (
         isinstance(input_file, str) and input_file.strip() != ""
     ), f"{input_file=}. Must be a non-empty str"
-
     assert (
         isinstance(output_folder, str) and output_folder.strip() != ""
     ), f"{output_folder=}. Must be a non-empty str"
@@ -1309,8 +1311,8 @@ def Create_SD_Intermediate_Copy(input_file: str, output_folder: str) -> tuple[in
 
     Returns:
         tuple[int, str]:
-            arg 1: 1 if successful, -1 if an error occurred
-            arg 2: error message if an error occurred, else an empty string
+            - arg 1: 1 if successful, -1 if an error occurred
+            - arg 2: error message if error (-1) else output file path (1)
     """
     assert (
         isinstance(input_file, str) and input_file.strip() != ""
@@ -1391,7 +1393,7 @@ def Transcode_MJPEG(
     interlaced: bool = True,
     bottom_field_first: bool = True,
 ) -> tuple[int, str]:
-    """Converts an input video to MPEG2 at supplied resolution and frame rate at a really high bit rate to make an edit
+    """Converts an input video to MJPEG at supplied resolution and frame rate at a high bit rate to make an edit
     copy that minimises generational losses. The video is transcoded to a file in the output folder.
 
         Args:
@@ -1405,8 +1407,8 @@ def Transcode_MJPEG(
 
         Returns:
             tuple[int, str]:
-                arg 1: 1 if ok, -1 if error
-                arg 2: error message if error else ""
+                - arg 1: 1 if ok, -1 if error
+                - arg 2: error message if error (-1) else output file path (1)
     """
     assert (
         isinstance(input_file, str) and input_file.strip() != ""
@@ -1523,7 +1525,7 @@ def Transcode_MPEG2_High_Bitrate(
     bottom_field_first: bool = True,
     iframe_only: bool = False,
 ) -> tuple[int, str]:
-    """Converts an input video to MPEG2 at supplied resolution and frame rate at a really high bit rate to make an edit
+    """Converts an input video to MPEG2 at supplied resolution and frame rate at a high bit rate to make an edit
     copy that minimises generational losses. The video is transcoded to a file in the output folder.
 
         Args:
@@ -1537,8 +1539,8 @@ def Transcode_MPEG2_High_Bitrate(
 
         Returns:
             tuple[int, str]:
-                arg 1: 1 if ok, -1 if error
-                arg 2: error message if error else ""
+                - arg 1: 1 if ok, -1 if error
+                - arg 2: error message if error (-1) else output file path (1)
     """
     assert (
         isinstance(input_file, str) and input_file.strip() != ""
@@ -1683,8 +1685,8 @@ def Transcode_H26x(
 
     Returns:
         tuple[int, str]:
-            arg 1: 1 if ok, -1 if error
-            arg 2: error message if error else ""
+            - arg 1: 1 if ok, -1 if error
+            - arg 2: error message if error (-1) else output file path (1)
     """
     assert (
         isinstance(input_file, str) and input_file.strip() != ""
@@ -2215,7 +2217,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             "+genpts",  # generate presentation timestamps
             "-i",
             input_file,
-            "-max_muxing_queue_size", # Attempt to stop buffer issues on playback
+            "-max_muxing_queue_size",  # Attempt to stop buffer issues on playback
             "9999",
             "-ss",
             Frame_Num_To_FFMPEG_Time(frame_num=start_frame, frame_rate=frame_rate),
@@ -2291,7 +2293,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             encoding_details, Encoding_Details
         ), f"{encoding_details=}. Must Encoding_Details instance"
 
-        video_filter = [] # Might be needed later
+        video_filter = []  # Might be needed later
         command = [
             sys_consts.FFMPG,
             "-fflags",
@@ -2439,14 +2441,14 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         end_gop_block = sorted(end_gop_block, key=lambda x: x[0])
 
         start_gop_block_start_frame = 0
-        #start_gop_block_end_frame = 0
+        # start_gop_block_end_frame = 0
         start_gop_block_duration = 0.0
 
         stream_start_frame = 0
         stream_end_frame = 0
 
         end_gop_block_start_frame = 0
-        #end_gop_block_end_frame = 0
+        # end_gop_block_end_frame = 0
         end_gop_block_duration = 0.0
 
         if start_gop_block:
@@ -2554,7 +2556,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         # If video comprised of all I frames it will cut accurately, but compressed video with no key frames is not
         # going to cut accurately
         stream_duration = (
-            cut_video_def.end_cut - cut_video_def.start_cut # -1
+            cut_video_def.end_cut - cut_video_def.start_cut  # -1
         ) / cut_video_def.frame_rate
 
         try:

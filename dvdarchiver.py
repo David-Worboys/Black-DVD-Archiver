@@ -896,6 +896,7 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         video_files: list[Video_Data] = []
         menu_title: list[str] = []
+        disk_title = ""
         dvd_menu_settings = DVD_Menu_Settings()
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
@@ -903,6 +904,11 @@ class DVD_Archiver(DVD_Archiver_Base):
             for menu_item in menu_layout:
                 menu_title.append(menu_item[0])
                 video_data_items: list[Video_Data] = menu_item[1]
+
+                if (
+                    len(menu_item) >= 3 and disk_title.strip() == ""
+                ):  # Disk title is a later add-on so need this to set it
+                    disk_title = menu_item[2]["disk_title"]
 
                 for video_item in video_data_items:
                     video_files.append(video_item)
@@ -914,7 +920,11 @@ class DVD_Archiver(DVD_Archiver_Base):
                 "menu_aspect_ratio"
             )
 
-            dvd_config.project_name = self._file_control.project_name
+            dvd_config.project_name = (
+                self._file_control.project_name
+                if disk_title.strip() == ""
+                else Text_To_File_Name(disk_title)
+            )
 
             if self._db_settings.setting_exist(sys_consts.ARCHIVE_FOLDER):
                 dvd_config.archive_folder = self._db_settings.setting_get(
@@ -994,8 +1004,9 @@ class DVD_Archiver(DVD_Archiver_Base):
                             ),
                         ).show()
             else:
-                task_name = dvd_config.menu_title[0]
-                if dvd_config.menu_title[0].strip() == "":
+                task_name = dvd_config.project_name
+
+                if task_name.strip() == "": # Should not happen!
                     task_name = dvd_config.serial_number
 
                 if task_name in self._task_stack:

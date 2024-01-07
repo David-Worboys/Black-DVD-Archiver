@@ -64,7 +64,7 @@ def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str]]:
         project_name (str): The project name
 
     Returns:
-        tuple[list[str],list[str]] : A tuple of a list of all project names and a tuple of a list of DVD layouts for the
+        tuple[list[str],list[str]]: A tuple of a list of all project names and a tuple of a list of DVD layouts for the
         project name
 
 
@@ -107,14 +107,14 @@ def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str]]:
 
 def Get_Shelved_DVD_Layout(
     dvd_layout_name: str,
-) -> tuple[list[tuple[str, list[list["Video_Data"]]]], str]:
+) -> tuple[list[str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]], str]:
     """Gets the DVD menu layout from the shelved project file.
 
     Args:
         dvd_layout_name (str): The name of the shelved project file.
 
     Returns:
-        tuple[list[tuple[str, list["Video_Data"]]],str]:
+        tuple[list[str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]],str]:
             The DVD menu layout and no error message if no issue.
             Empty DVD menu layout and error message if there is an issue
     """
@@ -131,34 +131,44 @@ def Get_Shelved_DVD_Layout(
         ext="dvdmenu",
     )
 
-    dvd_menu_layout: list[tuple[str, list[list[Video_Data]]]] = []
+    dvd_menu_layout: list[
+        str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]
+    ] = []
 
     try:
         with shelve.open(project_file_name) as db:
             db_data = db.get("dvd_menu_grid")
-            menu_pages: list[list[Video_Data]] = []
-
             if db_data:
-                for grid_row in db_data:
-                    menu_title = ""
+                for grid_index, grid_row in enumerate(db_data):
+                    if (
+                        len(grid_row) == 2
+                    ):  # old layouts where I made an implementation error:
+                        if grid_index == 0:
+                            disk_title: str = grid_row[0][0]
 
-                    for col_index, grid_col_item in enumerate(grid_row):
-                        grid_value: str = grid_col_item[0]
-                        # grid_user_data = grid_col_item[1]
-                        menu_pages: list[list[Video_Data]] = []
+                        grid_data: list[
+                            str, tuple[tuple[str, Video_Data], ...], dict[str, str]
+                        ] = []
 
-                        if menu_title.strip() == "" and grid_value.strip() != "":
-                            menu_title = grid_value
+                        for grid__item_index, grid_item in enumerate(grid_row[1]):
+                            if grid__item_index == 0:
+                                grid_data.append(grid_row[0][0])
+                            elif grid__item_index == 2:
+                                grid_data.append(grid_item)
 
-                        if col_index == 1:  # 2nd Col houses button menu titles
-                            menu_page: list[Video_Data] = []
-                            for row_grid_item in grid_col_item[2]:
-                                # row_grid_item_value = row_grid_item[0]
-                                row_grid_item_user_data: Video_Data = row_grid_item[1]
-                                menu_page.append(row_grid_item_user_data)
+                        grid_data.append({
+                            "disk_title": disk_title
+                            if disk_title.strip()
+                            else dvd_layout_name
+                        })
+                        dvd_menu_layout.append(tuple(grid_data))
+                    else:  # New layouts
+                        dvd_menu_layout.append((
+                            grid_row[0][0],
+                            grid_row[0][1],
+                            grid_row[0][2],
+                        ))
 
-                            menu_pages.append(menu_page)
-                    dvd_menu_layout.append((menu_title, menu_pages))
     except Exception as e:
         return [], str(e)
 
@@ -166,13 +176,16 @@ def Get_Shelved_DVD_Layout(
 
 
 def Set_Shelved_DVD_Layout(
-    dvd_layout_name: str, dvd_menu_layout: list[tuple[str, list[list["Video_Data"]]]]
+    dvd_layout_name: str,
+    dvd_menu_layout: list[
+        tuple[str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]]
+    ],
 ) -> str:
     """Saves the DVD menu layout to the shelved project file.
 
     Args:
         dvd_layout_name (str): The name of the shelved project.
-        dvd_menu_layout (list[tuple[str, list[list[Video_Data]]]]): The DVD menu layout to save.
+        dvd_menu_layout (list[tuple[str, tuple[tuple[str, Video_Data], ...], dict[str, str]]]): The DVD menu layout to save.
 
     Returns:
         str: Empty string if successful, or an error message if there is an issue.
