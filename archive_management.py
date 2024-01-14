@@ -453,6 +453,28 @@ class Archive_Manager:
 
                             if self._error_code == -1:
                                 return -1, self._error_message
+
+                            # Make a preservstion master copy
+                            (
+                                _,
+                                _,
+                                file_extension,
+                            ) = file_handler.split_file_path(menu_video_data.video_path)
+                            new_output_file_path = file_handler.file_join(
+                                preservation_master_menu_dir_temp,
+                                f"{menu_index + 1:02}_{backup_file_name}",
+                                file_extension,
+                            )
+
+                            (
+                                self._error_code,
+                                self._error_message,
+                            ) = file_handler.copy_file(
+                                menu_video_data.video_path, new_output_file_path
+                            )
+
+                            if self._error_code == -1:
+                                return -1, self._error_message
                         elif (
                             self.transcode_type == sys_consts.TRANSCODE_FFV1ARCHIVAL
                             and preservation_master_folder
@@ -543,7 +565,7 @@ class Archive_Manager:
                             if (
                                 "ffv1"
                                 not in menu_video_data.encoding_info.video_format.lower()
-                            ):  # Chck if we need to transcode
+                            ):  # Check if we need to transcode
                                 (
                                     self._error_code,
                                     message,
