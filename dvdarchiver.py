@@ -1006,7 +1006,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             else:
                 task_name = dvd_config.project_name
 
-                if task_name.strip() == "": # Should not happen!
+                if task_name.strip() == "":  # Should not happen!
                     task_name = dvd_config.serial_number
 
                 if task_name in self._task_stack:

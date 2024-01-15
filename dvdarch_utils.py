@@ -3200,7 +3200,10 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
                             ):
                                 video_file_details.video_frame_rate = float(value)
                             case "Standard":
-                                if value.upper() in (sys_consts.PAL, sys_consts.NTSC):
+                                if (
+                                    value.upper() in (sys_consts.PAL, sys_consts.NTSC)
+                                    and video_file_details.video_standard.strip() == ""
+                                ):
                                     video_file_details.video_standard = value
                             case "FrameCount":
                                 video_file_details.video_frame_count = int(value)
@@ -3337,11 +3340,15 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
             and video_file_details.video_frame_rate == sys_consts.NTSC_SPECS.frame_rate
         ):
             video_file_details.video_standard = sys_consts.NTSC
-        # At this point it is the wild wild west, se take a punt on field rates to determine DVD standard
+        # At this point it is the wild wild west, so take a punt on field rates to determine DVD standard
         # Most likely dealing with HD def video
         elif video_file_details.video_frame_rate == sys_consts.PAL_SPECS.field_rate:
             video_file_details.video_standard = sys_consts.PAL
+        elif video_file_details.video_frame_rate == sys_consts.PAL_FRAME_RATE:
+            video_file_details.video_standard = sys_consts.PAL
         elif video_file_details.video_frame_rate == sys_consts.NTSC_SPECS.field_rate:
+            video_file_details.video_standard = sys_consts.NTSC
+        elif video_file_details.video_frame_rate in (sys_consts.NTSC_FRAME_RATE, 30):
             video_file_details.video_standard = sys_consts.NTSC
         else:  # At this point, I will need to think of something better!
             video_file_details.video_standard = "N/A"

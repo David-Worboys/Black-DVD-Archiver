@@ -1034,7 +1034,6 @@ class Encoding_Details:
             sys_consts.NTSC,
             "N/A",
         ), f"{value=}. Must be PAL or NTSC"
-
         if value.upper() == "N/A":
             if (
                 self.video_width == sys_consts.PAL_SPECS.width_43
@@ -1045,7 +1044,7 @@ class Encoding_Details:
             elif (
                 self.video_width == sys_consts.NTSC_SPECS.width_43
                 and self.video_height == sys_consts.NTSC_SPECS.height_43
-                and self.video_frame_rate == sys_consts.NTSC_SPECS.frame_rate
+                and self.video_frame_rate in (sys_consts.NTSC_SPECS.frame_rate, 30)
             ):
                 value = sys_consts.NTSC
 

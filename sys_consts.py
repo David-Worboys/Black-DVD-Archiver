@@ -63,9 +63,9 @@ PAL: Final[str] = "PAL"
 NTSC: Final[str] = "NTSC"
 AR169: Final[str] = "16:9"
 AR43: Final[str] = "4:3"
-PAL_FRAMERATE: Final[int] = 25
-PAL_FIELDRATE: Final[int] = 50
-NTSC_FRAMERATE: Final[float] = 29.97
+PAL_FRAME_RATE: Final[int] = 25
+PAL_FIELD_RATE: Final[int] = 50
+NTSC_FRAME_RATE: Final[float] = 29.97
 NTSC_FIELD_RATE: Final[float] = 59.94
 AVERAGE_BITRATE: Final[int] = 5500  # kilobits/sec
 SINGLE_SIDED_DVD_SIZE: Final[int] = 40258730  # kb ~ 4.7GB DVD5
@@ -84,8 +84,8 @@ PAL_SPECS = namedtuple(
     height_43=576,
     width_169=1024,
     height_169=576,
-    frame_rate=PAL_FRAMERATE,
-    field_rate=PAL_FIELDRATE,
+    frame_rate=PAL_FRAME_RATE,
+    field_rate=PAL_FIELD_RATE,
 )
 NTSC_SPECS = namedtuple(
     "NTSC_SPECS",
@@ -93,9 +93,9 @@ NTSC_SPECS = namedtuple(
 )(
     width_43=720,
     height_43=480,
-    width_169=20,
+    width_169=1024,
     height_169=480,
-    frame_rate=NTSC_FRAMERATE,
+    frame_rate=NTSC_FRAME_RATE,
     field_rate=NTSC_FIELD_RATE,
 )
 

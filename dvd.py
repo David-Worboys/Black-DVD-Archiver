@@ -935,11 +935,18 @@ class DVD:
 
             video_width = video_file.encoding_info.video_width
             video_height = video_file.encoding_info.video_height
+            video_interlaced = (
+                True
+                if video_file.encoding_info.video_scan_type.lower().startswith(
+                    "interlaced"
+                )
+                else False
+            )
 
             # Do not forget-widescreen stretches the file on display, so wide screen and standard screen are the
             # same size here
             if self.dvd_setup.video_standard == sys_consts.PAL:
-                frame_rate = f"{sys_consts.PAL_FRAMERATE}"
+                frame_rate = f"{sys_consts.PAL_FRAME_RATE}"
 
                 if (
                     video_width == sys_consts.PAL_SPECS.width_43
@@ -947,29 +954,83 @@ class DVD:
                 ):
                     video_size = f"{video_width}x{video_height}"
                 else:
-                    # TODO Add Resize Filter
-                    return (
-                        -1,
-                        (
-                            f"Video {video_width=}x{video_height} does not conform to"
-                            " PAL standard size 720x576"
-                        ),
-                    )
+                    if video_height > sys_consts.PAL_SPECS.height_43:
+                        video_size = f"{-1}x{sys_consts.PAL_SPECS.height_43}"
+
+                    elif video_height > sys_consts.PAL_SPECS.height_43:
+                        if not video_interlaced:
+                            video_size = f"{sys_consts.PAL_SPECS.width_43}x{sys_consts.PAL_SPECS.height_43}"
+
+                            if (
+                                video_file.encoding_info.video_frame_rate
+                                == sys_consts.PAL_FIELD_RATE
+                            ):  # We interlace
+                                video_filter_options.append(
+                                    "tinterlace=interleave_bottom"
+                                )
+                                video_filters = ["-vf", ",".join(video_filter_options)]
+                            elif (
+                                video_file.encoding_info.video_frame_rate
+                                == sys_consts.PAL_FRAME_RATE
+                            ):
+                                video_size = f"{sys_consts.PAL_SPECS.width_43}x{sys_consts.PAL_SPECS.height_43}"
+                                frame_rate = str(
+                                    video_file.encoding_info.video_frame_rate
+                                )
+                        elif video_interlaced:
+                            video_size = f"{sys_consts.PAL_SPECS.width_43}x{sys_consts.PAL_SPECS.height_43}"
+                        else:
+                            return (
+                                -1,
+                                (
+                                    "Video can not be made to conform with DVD PAL specifications"
+                                ),
+                            )
+                    else:
+                        return (
+                            -1,
+                            (
+                                f"Video {video_width=}x{video_height} does not conform to PAL specifications"
+                            ),
+                        )
             else:  # NTSC
                 frame_rate = f"{sys_consts.NTSC_SPECS.frame_rate}"
 
-                # TODO Add Resize Filter
                 if (
                     video_width == sys_consts.NTSC_SPECS.width_43
                     and video_height == sys_consts.NTSC_SPECS.height_43
                 ):
                     video_size = f"{video_width}x{video_height}"
+                elif video_height > sys_consts.NTSC_SPECS.height_43:
+                    if not video_interlaced:
+                        video_size = f"{sys_consts.NTSC_SPECS.width_43}x{sys_consts.NTSC_SPECS.height_43}"
+
+                        if (
+                            video_file.encoding_info.video_frame_rate
+                            == sys_consts.NTSC_FIELD_RATE
+                        ):  # We interlace
+                            video_filter_options.append("tinterlace=interleave_bottom")
+                            video_filters = ["-vf", ",".join(video_filter_options)]
+                        elif video_file.encoding_info.video_frame_rate in (
+                            sys_consts.NTSC_FRAME_RATE,
+                            30,
+                        ):
+                            video_size = f"{sys_consts.NTSC_SPECS.width_43}x{sys_consts.NTSC_SPECS.height_43}"
+                            frame_rate = str(video_file.encoding_info.video_frame_rate)
+                    elif video_interlaced:
+                        video_size = f"{sys_consts.NTSC_SPECS.width_43}x{sys_consts.NTSC_SPECS.height_43}"
+                    else:
+                        return (
+                            -1,
+                            (
+                                "Video can not be made to conform with DVD NTSC specifications"
+                            ),
+                        )
                 else:
                     return (
                         -1,
                         (
-                            f"Video {video_width=}x{video_height} does not conform to"
-                            " NTSC standard size 720x480"
+                            f"Video {video_width=}x{video_height} does not conform to NTSC specifications"
                         ),
                     )
 
@@ -982,9 +1043,7 @@ class DVD:
                 command_header = [sys_consts.FFMPG]
 
             interlaced_flags = []
-            if video_file.encoding_info.video_scan_type.lower().startswith(
-                "interlaced"
-            ):
+            if video_interlaced:
                 interlaced_flags = [
                     "-flags:v:0",  # video flags for the first video stream
                     "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
@@ -1053,7 +1112,9 @@ class DVD:
                 ]
             )
 
-            result, message = dvdarch_utils.Execute_Check_Output(commands=command)
+            result, message = dvdarch_utils.Execute_Check_Output(
+                commands=command, debug=False
+            )
 
             if result == -1:
                 return -1, message

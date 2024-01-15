@@ -4316,9 +4316,9 @@ class _Container(_qtpyBase_Control):
     _container: Optional[_qtpyBase_Control] = None
     _current_enable_settings: dict = field(default_factory=dict)  # {}
 
-    _scroll_container: Optional[
-        qtW.QScrollArea
-    ] = None  # = qtW.QScrollArea(parent) #None
+    _scroll_container: Optional[qtW.QScrollArea] = (
+        None  # = qtW.QScrollArea(parent) #None
+    )
     _scroll_current_widget: Optional[_qtpyBase_Control] = None
     _use_lambda: bool = USE_LAMBDA
 
@@ -5375,13 +5375,13 @@ class _Container(_qtpyBase_Control):
                     self._current_enable_settings[item.container_tag] = {}
 
                 if isinstance(widget, Tab):
-                    self._current_enable_settings[item.container_tag][
-                        item.tag
-                    ] = widget.enable_get(item.tag)
+                    self._current_enable_settings[item.container_tag][item.tag] = (
+                        widget.enable_get(item.tag)
+                    )
                 else:
-                    self._current_enable_settings[item.container_tag][
-                        item.tag
-                    ] = widget.enable_get
+                    self._current_enable_settings[item.container_tag][item.tag] = (
+                        widget.enable_get
+                    )
 
     def controls_enable_state_restore(self) -> None:
         """Restores the enable state of all controls in the container"""
