@@ -33,7 +33,7 @@ executable_folder = file_utils.App_Path()
 file_sep = file_utils.File().ossep
 
 PROGRAM_NAME: Final[str] = "Black DVD Archiver"
-PROGRAM_VERSION: Final[str] = "β3.0.0"
+PROGRAM_VERSION: Final[str] = "β4.0.0"
 AUTHOR: Final[str] = "David Worboys"
 LICENCE: Final[str] = "GNU V3 GPL"
 
@@ -106,9 +106,9 @@ VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp",
                     "wmv", "asf","flv","f4v","ogg","ogv","rm", "rmvb","divx","mxf",
                     "dv","mts")
 # fmt: on
-tool_app_folder: Final[str] = (
-    f"{executable_folder}{file_sep}tool_apps{file_sep}usr{file_sep}bin{file_sep}"
-)
+tool_app_folder: Final[
+    str
+] = f"{executable_folder}{file_sep}tool_apps{file_sep}usr{file_sep}bin{file_sep}"
 
 COMPOSITE: Final[str] = f"{tool_app_folder}composite"
 CONVERT: Final[str] = f"{tool_app_folder}magick"
@@ -128,6 +128,7 @@ PRODUCT_LINE: Final[str] = "product_line"
 
 # Database Setting Keys
 ARCHIVE_FOLDER: Final[str] = "archive_folder"
+STREAMING_FOLDER: Final[str] = "streaming_folder"
 DVD_BUILD_FOLDER: Final[str] = "dvd_build_folder"
 DEFAULT_PROJECT_NAME: Final[str] = "Default"
 DEFAULT_DVD_LAYOUT_NAME: Final[str] = "DVD 1"
@@ -136,9 +137,9 @@ TRANSCODE_FOLDER: Final[str] = "transcodes"
 DVD_BUILD_FOLDER_NAME: Final[str] = f"{PROGRAM_NAME} DVD Builder"
 VIDEO_EDITOR_FOLDER_NAME = f"{PROGRAM_NAME} Video Editor"
 
-PERCENT_SAFTEY_BUFFER: Final[int] = (
-    1  # Used to limit DVD size so that it never exceeds 100%
-)
+PERCENT_SAFTEY_BUFFER: Final[
+    int
+] = 1  # Used to limit DVD size so that it never exceeds 100%
 DEFAULT_FONT: Final[str] = "IBMPlexMono-SemiBold.ttf"  # Packaged with DVD Archiver
 
 

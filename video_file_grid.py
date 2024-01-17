@@ -1955,7 +1955,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         self._file_grid = qtg.Grid(
             tag="video_input_files",
             noselection=True,
-            height=18,
+            height=17,
             col_def=file_col_def,
             callback=self.grid_events,
         )

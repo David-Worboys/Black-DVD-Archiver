@@ -22,7 +22,6 @@
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
-import hashlib
 from typing import cast
 
 import platformdirs
@@ -373,6 +372,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                         self._new_dvd_layout(event)
                     case "new_project":
                         self._new_project(event)
+                    case "streaming_folder_select":
+                        self._streaming_folder_select(event)
                     case "task_manager":
                         if self._video_editor.get_task_manager:
                             Task_Manager_Popup(
@@ -684,6 +685,39 @@ class DVD_Archiver(DVD_Archiver_Base):
                 value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
             )
 
+    def _streaming_folder_select(self, event: qtg.Action) -> None:
+        """Select a streaming folder and updates the settings in the database with the selected folder.
+
+        Args:
+            event (qtg.Action): The triggering event
+
+        Note:
+            The selected folder is saved in the database settings for future use.
+
+        """
+        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
+        folder = self._db_settings.setting_get(sys_consts.STREAMING_FOLDER)
+
+        if folder is None or folder.strip() == "":
+            folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+
+        folder = popups.PopFolderGet(
+            title="Select A Streaming Folder....",
+            root_dir=folder,
+            create_folder=True,
+            folder_edit=False,
+        ).show()
+
+        if folder.strip() != "":
+            self._db_settings.setting_set(sys_consts.STREAMING_FOLDER, folder)
+
+            event.value_set(
+                container_tag="dvd_properties",
+                tag="streaming_path",
+                value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
+            )
+
     def _delete_dvd_layout(self, event: qtg.Action) -> None:
         """Deletes a dvd layout by removing the corresponding python shelf files
 
@@ -816,10 +850,15 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         # Generate the serial number string
         serial_number_str = "{:06d}".format(serial_number)
-        serial_number_checksum = hashlib.md5(serial_number_str.encode()).hexdigest()[0]
-        serial_number_str = (
-            f"DVD-{product_code}-{serial_number_str}-{serial_number_checksum}"
-        )
+
+        # TODO: Remove this code, and associated variables, in the future if it proves unnecessary
+        # 17/01/2024 DAW On consideration this seems unnecessary and complicates things
+        # serial_number_checksum = hashlib.md5(serial_number_str.encode()).hexdigest()[0]
+        # serial_number_str = (
+        #     f"DVD-{product_code}-{serial_number_str}-{serial_number_checksum}"
+        # )
+
+        serial_number_str = f"DVD-{serial_number_str}"
 
         return serial_number_str
 
@@ -930,6 +969,10 @@ class DVD_Archiver(DVD_Archiver_Base):
                 dvd_config.archive_folder = self._db_settings.setting_get(
                     sys_consts.ARCHIVE_FOLDER
                 )
+            if self._db_settings.setting_exist(sys_consts.STREAMING_FOLDER):
+                dvd_config.streaming_folder = self._db_settings.setting_get(
+                    sys_consts.STREAMING_FOLDER
+                )
             if self._db_settings.setting_exist("archive_disk_size"):
                 dvd_config.archive_size = self._db_settings.setting_get(
                     "archive_disk_size"
@@ -944,21 +987,23 @@ class DVD_Archiver(DVD_Archiver_Base):
             else:
                 dvd_config.transcode_type = sys_consts.TRANSCODE_NONE
 
-            sql_result = self._app_db.sql_select(
-                col_str="code,description",
-                table_str=sys_consts.PRODUCT_LINE,
-                where_str="code='HV'",
+            # TODO: Remove this code, and associated variables, in the future if it proves unnecessary
+            # 17/01/2024 DAW On consideration this seems unnecessary and complicates things
+            # sql_result = self._app_db.sql_select(
+            #     col_str="code,description",
+            #     table_str=sys_consts.PRODUCT_LINE,
+            #     where_str="code='HV'",
+            # )
+
+            # if sql_result:  # Expect only one result
+            #     product_code = sql_result[0][0]
+            #     product_description = sql_result[0][1]
+
+            dvd_serial_number = self._generate_dvd_serial_number(
+                # product_code=product_code,
+                # product_description=product_description,
             )
-
-            if sql_result:  # Expect only one result
-                product_code = sql_result[0][0]
-                product_description = sql_result[0][1]
-
-                dvd_serial_number = self._generate_dvd_serial_number(
-                    product_code=product_code,
-                    product_description=product_description,
-                )
-                dvd_config.serial_number = dvd_serial_number
+            dvd_config.serial_number = dvd_serial_number
 
             dvd_config.input_videos = video_files
 
@@ -1273,7 +1318,12 @@ class DVD_Archiver(DVD_Archiver_Base):
             )
 
         archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
+        streaming_folder = self._db_settings.setting_get(sys_consts.STREAMING_FOLDER)
         dvd_build_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER)
+
+        if streaming_folder is None or streaming_folder.strip() == "":
+            streaming_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            self._db_settings.setting_set(sys_consts.STREAMING_FOLDER, streaming_folder)
 
         if archive_folder is None or archive_folder.strip() == "":
             archive_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
@@ -1365,7 +1415,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 tag="archive_path",
                 label="Archive Folder",
                 width=66,
-                tooltip="The Folder Where The DVD Archive Is Stored",
+                tooltip="The Folder Where The Video Archive Is Stored",
                 editable=False,
                 buddy_control=qtg.Button(
                     callback=self.event_handler,
@@ -1373,7 +1423,24 @@ class DVD_Archiver(DVD_Archiver_Base):
                     height=1,
                     width=1,
                     icon=qtg.Sys_Icon.dir.get(),
-                    tooltip="Select The  DVD Archive Folder",
+                    tooltip="Select The Video Archive Folder",
+                ),
+            ),
+            qtg.LineEdit(
+                text=f"{sys_consts.SDELIM}{streaming_folder}{sys_consts.SDELIM}",
+                action="edit_action",
+                tag="streaming_path",
+                label="Streaming Folder",
+                width=66,
+                tooltip="The Folder Where The Video Streaming Files Are Stored",
+                editable=False,
+                buddy_control=qtg.Button(
+                    callback=self.event_handler,
+                    tag="streaming_folder_select",
+                    height=1,
+                    width=1,
+                    icon=qtg.Sys_Icon.dir.get(),
+                    tooltip="Select The Video File Streaming Folder",
                 ),
             ),
             qtg.LineEdit(

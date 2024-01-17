@@ -66,6 +66,7 @@ class DVD_Config:
     _page_pointer_right_file: str = ""
     _project_name: str = ""
     _serial_number: str = ""
+    _streaming_folder: str = ""
     _timestamp_font: str = ""
     _timestamp_font_point_size: int = 11
     _timestamp_prefix: str = "DVD Build Date:"
@@ -407,6 +408,16 @@ class DVD_Config:
         self._serial_number = value
 
     @property
+    def streaming_folder(self) -> str:
+        return self._streaming_folder
+
+    @streaming_folder.setter
+    def streaming_folder(self, value: str):
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._streaming_folder = value
+
+    @property
     def timestamp_font(self) -> str:
         return self._timestamp_font
 
@@ -689,6 +700,7 @@ class DVD:
         ):  # Only archive if an archive folder is specified.
             archive_manager = Archive_Manager(
                 archive_folder=self.dvd_setup.archive_folder,
+                streaming_folder=self.dvd_setup.streaming_folder,
                 archive_size=self.dvd_setup.archive_size,
                 transcode_type=self.dvd_setup.transcode_type,
             )
