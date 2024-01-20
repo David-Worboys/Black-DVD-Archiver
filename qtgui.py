@@ -15356,6 +15356,9 @@ class Video_Player(qtC.QObject):
             self._input_file = input_file
             self._frame_rate = frame_rate
 
+            self._media_player.setSource(
+                qtC.QUrl.fromLocalFile("")
+            )  # Seems to stop a random app lockup
             self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
 
             count = 0

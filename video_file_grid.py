@@ -600,7 +600,16 @@ class Video_File_Grid(DVD_Archiver_Base):
                 for item in checked_items
             ):
                 copy_option = {}
-                copy_method = "rencode_edit"  # Makes a mezzanine edit master
+                copy_method = ""
+
+                if (
+                    popups.PopYesNo(
+                        title="MTS Files Selected...",
+                        message="MTS Joins Are Re-encoded As A High Quality Edit File - This Takes Some Time! Continue?",
+                    ).show()
+                    == "yes"
+                ):
+                    copy_method = "transjoin_edit"  # Makes a mezzanine edit master
             elif all(
                 item.user_data.video_path.lower().endswith("mod")
                 for item in checked_items
@@ -665,7 +674,9 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 concatenating_files.append(video_data.video_path)
                 video_file_data.append(video_data)
-
+            print(
+                f"DBG B {len(concatenating_files)=} {len(removed_files)=} {len(video_file_data)=} {output_file=}"
+            )
             if concatenating_files and output_file:
                 result = -1
                 message = ""
@@ -710,7 +721,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                                 == "bff"
                                 else False,
                             )
-                        case "reencode_h264":  # Om;y one File with this option
+                        case "reencode_h264":  # Only one File with this option
                             video_data = video_file_data[0]
                             result, message = dvdarch_utils.Transcode_H26x(
                                 input_file=video_data.video_path,
@@ -728,7 +739,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                                 else False,
                                 h265=False,
                             )
-                        case "reencode_h265":  # Om;y one File with this option
+                        case "reencode_h265":  # Only one File with this option
                             video_data = video_file_data[0]
                             result, message = dvdarch_utils.Transcode_H26x(
                                 input_file=video_data.video_path,

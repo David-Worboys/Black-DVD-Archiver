@@ -165,6 +165,45 @@ class Cut_Video_Def:
         return self.end_cut / self.frame_rate
 
 
+def Get_Thread_Count() -> str:
+    """
+    Returns the number of threads we can use for processing video. This is a bit of a performance killer because I
+    have been getting thermal related crashes
+
+    Returns:
+        str : Number of threads we can use for processing video
+    """
+    if (
+        psutil.cpu_count() is not None
+        and psutil.cpu_count(logical=False) > 1  # Number of cores not threads
+        and psutil.sensors_temperatures() is not None
+        and psutil.sensors_temperatures()
+    ):
+        max_temp = 0
+
+        for name, entries in psutil.sensors_temperatures().items():
+            for entry in entries:
+                if (
+                    entry is not None
+                    and entry.current is not None
+                    and entry.current > max_temp
+                ):
+                    max_temp = entry.current
+
+        if (
+            max_temp > 85  # Try and keep temp below 85C
+        ):  # Make usable thread count half the number of physical cores in the system (performance killer)
+            thread_count = str(psutil.cpu_count(logical=False) // 2)
+        else:
+            thread_count = str(
+                psutil.cpu_count(logical=True) // 2 + 1
+            )  # Half the available thread count + 1
+    else:
+        thread_count = "1"
+
+    return thread_count
+
+
 def Mux_Demux_Video(
     input_file: str = "",
     output_file: str = "",
@@ -258,6 +297,8 @@ def Mux_Demux_Video(
             "+genpts",  # generate presentation timestamps
             "-i",
             video_file_demuxed,
+            "-threads",
+            Get_Thread_Count(),
             "-i",
             audio_file_demuxed,
             "-map",
@@ -270,7 +311,7 @@ def Mux_Demux_Video(
             "+faststart",
             output_file,
             "-threads",
-            str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+            Get_Thread_Count(),
             "-y",
         ]
 
@@ -518,6 +559,8 @@ def Concatenate_Videos(
                             sys_consts.FFMPG,
                             "-fflags",
                             "+genpts",  # generate presentation timestamps
+                            "-threads",
+                            Get_Thread_Count(),
                             "-i",
                             video_file,
                             "-map",
@@ -588,7 +631,7 @@ def Concatenate_Videos(
             "+faststart",
             output_file,
             "-threads",
-            str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+            Get_Thread_Count(),
             "-y",
         ],
         debug=debug,
@@ -1216,7 +1259,7 @@ def Transcode_ffv1_archival(
     pass_1 = [
         sys_consts.FFMPG,
         "-threads",
-        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        Get_Thread_Count(),
         "-i",
         input_file,
         "-max_muxing_queue_size",
@@ -1245,6 +1288,8 @@ def Transcode_ffv1_archival(
         str(frame_rate),
         "-c:a",
         "flac",
+        "-threads",
+        Get_Thread_Count(),
         output_file,
         "-y",
     ]
@@ -1253,7 +1298,7 @@ def Transcode_ffv1_archival(
     pass_2 = [
         sys_consts.FFMPG,
         "-threads",
-        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        Get_Thread_Count(),
         "-i",
         input_file,
         "-max_muxing_queue_size",
@@ -1282,6 +1327,8 @@ def Transcode_ffv1_archival(
         f"{frame_rate}",
         "-c:a",
         "flac",
+        "-threads",
+        Get_Thread_Count(),
         output_file,
         "-y",
     ]
@@ -1478,7 +1525,7 @@ def Transcode_MJPEG(
         "-fflags",  # set ffmpeg flags
         "+genpts",  # generate presentation timestamps
         "-threads",
-        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        Get_Thread_Count(),
         "-i",
         input_file,
         "-max_muxing_queue_size",
@@ -1502,6 +1549,8 @@ def Transcode_MJPEG(
         "yuvj420p",  # use YUV 420p pixel format
         "-c:a",
         "mp3",
+        "-threads",
+        Get_Thread_Count(),
         output_file,
         "-y",
     ]
@@ -1615,7 +1664,7 @@ def Transcode_MPEG2_High_Bitrate(
         "+genpts",  # generate presentation timestamps
         # "+igndts",
         "-threads",
-        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        Get_Thread_Count(),
         "-i",
         input_file,
         "-max_muxing_queue_size",
@@ -1644,6 +1693,8 @@ def Transcode_MPEG2_High_Bitrate(
         "aac",
         "-b:a",
         "128k",
+        "-threads",
+        Get_Thread_Count(),
         output_file,
     ]
 
@@ -1770,7 +1821,7 @@ def Transcode_H26x(
         "-fflags",
         "+genpts",  # generate presentation timestamps
         "-threads",
-        str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+        Get_Thread_Count(),
         "-i",
         input_file,
         "-vsync",
@@ -1807,6 +1858,8 @@ def Transcode_H26x(
         f"{gop_size}",  # Set the minimum key frame interval to Match DVD (same as GOP size for closed GOP)
         "-sc_threshold",
         "0",  # Set the scene change threshold to 0 for frequent key frames
+        "-threads",
+        Get_Thread_Count(),
         output_file,
         "-y",
     ]
@@ -2299,6 +2352,8 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             "-fflags",
             "+genpts",  # generate presentation timestamps
             # "+igndts",
+            "-threads",
+            Get_Thread_Count(),
             "-i",
             input_file,
             "-vsync",
@@ -2333,7 +2388,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             "-c:a",
             "copy",
             "-threads",
-            str(psutil.cpu_count() - 1 if psutil.cpu_count() > 1 else 1),
+            Get_Thread_Count(),
             output_file,
             "-y",
         ]
@@ -3246,7 +3301,10 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         video_file_details.video_scan_type = "Progressive"
 
     if (
-        video_file_details.video_frame_rate == 0
+        video_file.lower().endswith(
+            "mts"
+        )  # MTS files, at least the Panasonic ones I have, are nothing but trouble
+        or video_file_details.video_frame_rate == 0
         or video_file_details.video_frame_count == 0
     ):
         ffprobe_command = [
@@ -3277,7 +3335,6 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
             frame_rate = values[0]
             duration = values[1]
             frame_count = values[2]
-
         except subprocess.CalledProcessError as e:
             # Handle any errors or exceptions here
             print(f"Error: {e}")
@@ -3286,7 +3343,9 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
             )
             return video_file_details
 
-        if video_file_details.video_duration == 0:
+        if video_file_details.video_duration == 0 or video_file.lower().endswith(
+            "mts"
+        ):  # MTS files, at least the Panasonic ones I have, are nothing but trouble
             if duration != "N/A":
                 video_file_details.video_duration = float(duration)
 
@@ -3296,11 +3355,13 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
                 )
                 return video_file_details
 
-        if video_file_details.video_frame_rate == 0:
+        if video_file_details.video_frame_rate == 0 or video_file.lower().endswith(
+            "mts"
+        ):  # MTS files, at least the Panasonic ones I have, are nothing but trouble
             if "/" in frame_rate:
                 nominator = float(frame_rate.split("/")[0])
                 denominator = float(frame_rate.split("/")[1])
-                video_file_details._video_frame_rate = nominator / denominator
+                video_file_details._video_frame_rate = round(nominator / denominator, 3)
             else:
                 video_file_details._video_frame_rate = float(frame_rate.strip())
 
@@ -3310,7 +3371,9 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
                 )
                 return video_file_details
 
-        if video_file_details.video_frame_count == 0:
+        if video_file_details.video_frame_count == 0 or video_file.lower().endswith(
+            "mts"
+        ):  # MTS files, at least the Panasonic ones I have, are nothing but trouble
             if frame_count == "N/A":
                 video_file_details.video_frame_count = int(
                     video_file_details.video_duration

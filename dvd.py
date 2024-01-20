@@ -27,7 +27,6 @@ import subprocess
 from random import randint
 from typing import Final
 
-import psutil
 import xmltodict
 
 import dvdarch_utils
@@ -1068,8 +1067,8 @@ class DVD:
                 + [
                     "-fflags",  # set ffmpeg flags
                     "+genpts",  # generate presentation timestamps
-                    "-threads",  # set the number of threads to use
-                    f"{psutil.cpu_count() - 1}",  # To be responsive, use 1 core less than is in the system
+                    "-threads",
+                    dvdarch_utils.Get_Thread_Count(),
                     "-i",  # input flag
                     video_file.video_path,  # path to video file
                 ]
@@ -1120,6 +1119,8 @@ class DVD:
                     "0:a",  # map first audio stream
                     "-map",  # set mapping
                     "-0:s",  # exclude first subtitle stream
+                    "-threads",
+                    dvdarch_utils.Get_Thread_Count(),
                     vob_file,  # Output encoded VOB file for inclusion in DVD
                 ]
             )

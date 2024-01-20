@@ -1143,7 +1143,7 @@ class Video_Editor(DVD_Archiver_Base):
             result, message = dvdarch_utils.Concatenate_Videos(
                 temp_files=temp_files,
                 output_file=output_file,
-                delete_temp_files=False,
+                delete_temp_files=True,
                 debug=True,
             )
 
