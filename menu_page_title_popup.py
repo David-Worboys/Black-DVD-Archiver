@@ -21,6 +21,7 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
+import pprint
 from typing import Optional, cast
 
 import platformdirs
@@ -30,6 +31,7 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
+from dvdarch_utils import DVD_Percent_Used
 from sys_config import (DVD_Menu_Settings, Get_Shelved_DVD_Layout,
                         Set_Shelved_DVD_Layout, Video_Data)
 
@@ -190,8 +192,58 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             event (qtg.Action): The triggering event.
         """
 
-        temp_video_list: list[Video_Data] = self.video_data_list.copy()
+        # #### Helper functions
+        def _load_menu_pages(
+            menu_title: str,
+            menu_dict: dict,
+            buttons_per_page: int,
+            video_data: list[Video_Data],
+            menu_pages: list[list[Video_Data]],
+            page_title: list[tuple[str, dict, list[Video_Data]]],
+        ):
+            """Loads the menu_pages list and page_title with the videos for the button titles and the page titles.
 
+            Args:
+                menu_title (str): The title of a DVD menu page
+                menu_dict (dict): Dictionary of settings
+                buttons_per_page (int): Number of buttons allowed on a DVD page
+                video_data (list[Video_Data]): THe video files on a DVD page
+                menu_pages (list[list[Video_Data]]): The DVD menu layout
+                page_title (list[tuple[str, dict, list[Video_Data]]]): Thr title of each DVD menu page and associated
+                    variables
+
+            Returns:
+
+            """
+            if len(video_data) >= buttons_per_page:
+                page_data_list: list[Video_Data] = []
+                title_count = 0
+                for video_index, video_item in enumerate(video_data):
+                    title_count += 1
+                    page_data_list.append(video_item)
+                    if (
+                        title_count == buttons_per_page
+                        or video_index == len(video_data) - 1
+                    ):
+                        menu_pages.append(page_data_list)
+                        page_title.append((
+                            menu_title,
+                            menu_dict,
+                            page_data_list,
+                        ))
+                        page_data_list = []
+                        title_count = 0
+            else:
+                menu_pages.append(video_data)
+                page_title.append((
+                    menu_title,
+                    menu_dict,
+                    video_data,
+                ))
+
+            return None
+
+        # #### Main
         menu_title_grid: qtg.Grid = cast(
             qtg.Grid,
             event.widget_get(
@@ -214,165 +266,123 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]
         ] = self._load_DVD_menu(event)
 
-        if (
-            dvd_menu_layout and not temp_video_list
-        ):  # Build from the shelf-stored menu list
-            menu_pages: list[list[Video_Data]] = []
-            for row_index, menu_item in enumerate(dvd_menu_layout):
-                menu_title_grid.value_set(
-                    row=row_index,
-                    col=0,
-                    value=menu_item[0],
-                    user_data=menu_item[2],
-                )
-                if row_index == 0:
-                    disk_title_lineedit.value_set(menu_item[2]["disk_title"])
+        files_in_dvd_layout: list[tuple[str, dict, list[Video_Data]]] = []
+        files_not_in_dvd_layout: list[tuple[str, dict, list[Video_Data]]] = []
 
-                videos: list[Video_Data] = []
+        # Load files details from the stored dvd layout
+        for row_index, menu_item in enumerate(dvd_menu_layout):
+            if row_index == 0:
+                disk_title_lineedit.value_set(menu_item[2]["disk_title"])
 
-                for button_item in menu_item[1]:
-                    videos.append(button_item[1])
+            button_videos: list[Video_Data] = []
 
-                menu_pages.append(videos)
+            for button_item in menu_item[1]:
+                button_item[1]: Video_Data
+                button_videos.append(button_item[1])
 
-            self._insert_video_title_control(
-                menu_title_grid=menu_title_grid, menu_pages=menu_pages
-            )
+            files_in_dvd_layout.append((menu_item[0], menu_item[2], button_videos))
 
-            menu_title_grid.changed = False
-
-        elif temp_video_list:  # got to try and match files
-            grouped_video_items: list[Video_Data] = []
-            non_grouped_video_items: list[Video_Data] = []
-
-            # Load from the shelf-stored menu list
-            for row_index, menu_item in enumerate(dvd_menu_layout):
-                menu_title_grid.value_set(
-                    row=row_index,
-                    col=0,
-                    value=menu_item[0],
-                    user_data=menu_item[2],
-                )
-
-                if row_index == 0:
-                    disk_title_lineedit.value_set(menu_item[2]["disk_title"])
-
-                menu_pages: list[list[Video_Data]] = menu_item[1]
-
-                # Group page_vieo_items
-                for menu_page_video_item in menu_pages:
-                    for page_video_item in menu_page_video_item:
-                        if isinstance(page_video_item, Video_Data):
-                            # Clean identical files from temp_video_list as the file is already in the DVD menu layout
-                            for temp_index, temp_item in enumerate(temp_video_list):
-                                if temp_item.video_path == page_video_item.video_path:
-                                    temp_video_list.pop(temp_index)
-                                    break
-
-                            if page_video_item.video_file_settings.menu_group >= 0:
-                                grouped_video_items.append(page_video_item)
-                            else:
-                                non_grouped_video_items.append(page_video_item)
-
-            temp_group = []
-            temp_non_group = []
-
-            # Process the passed in list of video items
-            for temp_video_item in temp_video_list:
-                # Sort out the groupings of the files that are not in the saved DVD layout
-                if temp_video_item.video_file_settings.menu_group >= 0:  # Grouped
-                    is_grouped = False
-                    for group_video_item in grouped_video_items:
-                        if temp_video_item.video_path == group_video_item.video_path:
-                            is_grouped = True
-
-                    if not is_grouped:
-                        temp_group.append(temp_video_item)
-
-                if temp_video_item.video_file_settings.menu_group == -1:  # Not grouped
-                    is_non_grouped = False
-                    for non_group_video_item in non_grouped_video_items:
-                        if (
-                            temp_video_item.video_path
-                            == non_group_video_item.video_path
-                        ):
-                            is_non_grouped = True
-
-                    if not is_non_grouped:
-                        temp_non_group.append(temp_video_item)
-
-            grouped_video_items += temp_group
-            non_grouped_video_items += temp_non_group
-
-            grouped_video_items.sort(
-                key=lambda item: item.video_file_settings.menu_group
-            )
-
-            menu_pages: list[list[Video_Data]] = []
-            videos: list[Video_Data] = []
-            old_group_id = -1
-
-            for video in grouped_video_items:
-                if old_group_id == -1:
-                    old_group_id = video.video_file_settings.menu_group
-
-                if (
-                    len(videos) >= buttons_per_page
-                    or old_group_id != video.video_file_settings.menu_group
-                ):
-                    menu_pages.append(videos)
-                    videos = []
-
-                videos.append(video)
-
-                old_group_id = video.video_file_settings.menu_group
-
-            if videos:
-                menu_pages.append(videos)
-
-            videos_169: list[Video_Data] = []
-            videos_43: list[Video_Data] = []
-
-            # DVD title sets can only have one aspect ratio - 4/3 or 16/9, so we must group them appropriately.
-            # Note: at this point grouped items have already been checked for aspect ratio consistency
-            for video in non_grouped_video_items:
-                if video.encoding_info.video_ar == sys_consts.AR43:
-                    videos_43.append(video)
+        # Find files selected in the file grid which are not in the stored dvd grid layout
+        file_grid_videos: list[Video_Data] = []
+        ungrouped_file_grid_videos: list[Video_Data] = []
+        for video_item in self.video_data_list:
+            if not [
+                item
+                for item in files_in_dvd_layout
+                if video_item.video_path
+                in [button_item.video_path for button_item in item[2]]
+            ]:
+                if video_item.video_file_settings.menu_group == -1:
+                    ungrouped_file_grid_videos.append(video_item)
                 else:
-                    videos_169.append(video)
+                    file_grid_videos.append(video_item)
 
-            if videos_43:
-                videos = []
+        file_grid_videos.sort(key=lambda item: item.video_file_settings.menu_group)
+        file_grid_videos.extend(ungrouped_file_grid_videos)
 
-                for video in videos_43:
-                    if len(videos) >= buttons_per_page:  # Add page
-                        menu_pages.append(videos)
-                        videos = []
+        if file_grid_videos:
+            files_not_in_dvd_layout.append((
+                "",
+                {},
+                file_grid_videos,
+            ))
 
-                    videos.append(video)
+        merged_files = []
 
-                if videos:
-                    menu_pages.append(videos)
+        # Load grid/dvd layout into merged_files
+        for file_in_grid in files_in_dvd_layout:
+            menu_title = file_in_grid[0]
+            menu_dict = file_in_grid[1]
 
-            if videos_169:
-                videos = []
+            merged_files.append((menu_title, menu_dict, file_in_grid[2]))
 
-                for video in videos_169:
-                    if len(videos) >= buttons_per_page:  # Add page
-                        menu_pages.append(videos)
-                        videos = []
+        # Insert files not in dvd layout into merged files
+        for file_not_in_dvd_layout in files_not_in_dvd_layout:
+            for video_item in file_not_in_dvd_layout[2]:
+                found = False
+                for file_in_grid in merged_files:
+                    for button_video in file_in_grid[2]:
+                        if (
+                            button_video.video_file_settings.menu_group
+                            == video_item.video_file_settings.menu_group
+                            and button_video.encoding_info.video_ar
+                            == video_item.encoding_info.video_ar
+                        ):
+                            file_in_grid[2].append(video_item)
 
-                    videos.append(video)
+                            found = True
+                            break
+                    if found:
+                        break
 
-                if videos:
-                    menu_pages.append(videos)
+                if not found:
+                    merged_files.append(("", {}, [video_item]))
 
-            self._insert_video_title_control(
-                menu_title_grid=menu_title_grid, menu_pages=menu_pages
+        menu_pages: list[list[Video_Data]] = []
+        page_title: list[tuple[str, dict, list[Video_Data]]] = []
+        item_index = 0
+        total_duration = 0
+        dvd_percent_used = 0.0
+
+        # Check if the files will fit on the DVD
+        for item_index, item in enumerate(merged_files):
+            for video_item in item[2]:
+                total_duration += video_item.encoding_info.video_duration
+                dvd_percent_used = DVD_Percent_Used(
+                    total_duration=total_duration,
+                    pop_error_message=True,
+                )
+
+                if dvd_percent_used > 100:
+                    break
+            if dvd_percent_used > 100:
+                break
+
+        if dvd_percent_used > 100:  # Trim merged files to fit on DVD - bit brutal!
+            merged_files = merged_files[:item_index]
+
+        for item in merged_files:
+            _load_menu_pages(
+                menu_title=item[0],
+                menu_dict=item[1],
+                buttons_per_page=buttons_per_page,
+                video_data=item[2],
+                menu_pages=menu_pages,
+                page_title=page_title,
             )
 
-            menu_title_grid.changed = True
+        self._insert_video_title_control(
+            menu_title_grid=menu_title_grid, menu_pages=menu_pages
+        )
 
+        for row_index, item in enumerate(page_title):
+            menu_title_grid.value_set(
+                row=row_index,
+                col=0,
+                value=item[0],
+                user_data=item[1],
+            )
+        print(f"DBG {dvd_percent_used=}")
         return None
 
     def _insert_video_title_control(
@@ -692,7 +702,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 row=row,
                 col=menu_title_col_index,
             )
-
+            print(f"DBG {menu_title=}")
             # Popup specific values can be stored here
             if menu_title_user_data is None:
                 menu_title_user_data = {"disk_title": disk_title_lineedit.value_get()}
@@ -705,13 +715,13 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 container_tag="control_box",
                 tag="row_grid",
             )
-
+            pprint.pprint(row_grid)
             menu_items = []
             for row_grid_row in range(row_grid.row_count):
                 button_title: str = row_grid.value_get(row=row_grid_row, col=0)
                 video_data: Video_Data = row_grid.userdata_get(row=row_grid_row, col=0)
                 video_data.dvd_page = row
-
+                print(f"DBG {button_title=}")
                 if (
                     video_data.video_file_settings.button_title.strip()
                     != button_title.strip()
@@ -729,7 +739,8 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 menu_items.copy(),
                 menu_title_user_data,
             ))
-
+        pprint.pprint(self.menu_layout)
+        return -1
         self._save_dvd_menu(event)
 
         return 1
@@ -852,11 +863,11 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                     # grid_user_data = menu_title_grid.userdata_get(row=row, col=col)
                     if col == menu_titles_col_index:
                         menu_title: str = menu_title_grid.value_get(row=row, col=col)
-                        menu_title_user_data: dict[str, str] = (
-                            menu_title_grid.userdata_get(
-                                row=row,
-                                col=menu_titles_col_index,
-                            )
+                        menu_title_user_data: dict[
+                            str, str
+                        ] = menu_title_grid.userdata_get(
+                            row=row,
+                            col=menu_titles_col_index,
                         )
 
                         # Popup specific values can be stored here
@@ -865,9 +876,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                                 "disk_title": disk_title_lineedit.value_get()
                             }
                         else:
-                            menu_title_user_data["disk_title"] = (
-                                disk_title_lineedit.value_get()
-                            )
+                            menu_title_user_data[
+                                "disk_title"
+                            ] = disk_title_lineedit.value_get()
 
                     elif col == video_titles_col_index:
                         row_grid: qtg.Grid | None = menu_title_grid.row_widget_get(

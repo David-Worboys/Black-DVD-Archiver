@@ -106,9 +106,9 @@ VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp",
                     "wmv", "asf","flv","f4v","ogg","ogv","rm", "rmvb","divx","mxf",
                     "dv","mts")
 # fmt: on
-tool_app_folder: Final[str] = (
-    f"{executable_folder}{file_sep}tool_apps{file_sep}usr{file_sep}bin{file_sep}"
-)
+tool_app_folder: Final[
+    str
+] = f"{executable_folder}{file_sep}tool_apps{file_sep}usr{file_sep}bin{file_sep}"
 
 COMPOSITE: Final[str] = f"{tool_app_folder}composite"
 CONVERT: Final[str] = f"{tool_app_folder}magick"
@@ -137,9 +137,9 @@ TRANSCODE_FOLDER: Final[str] = "transcodes"
 DVD_BUILD_FOLDER_NAME: Final[str] = f"{PROGRAM_NAME} DVD Builder"
 VIDEO_EDITOR_FOLDER_NAME = f"{PROGRAM_NAME} Video Editor"
 
-PERCENT_SAFTEY_BUFFER: Final[int] = (
-    1  # Used to limit DVD size so that it never exceeds 100%
-)
+PERCENT_SAFTEY_BUFFER: Final[
+    int
+] = 5  # Used to limit DVD size so that it never exceeds 100%
 DEFAULT_FONT: Final[str] = "IBMPlexMono-SemiBold.ttf"  # Packaged with DVD Archiver
 
 

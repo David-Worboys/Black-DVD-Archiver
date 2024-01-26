@@ -584,7 +584,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             copy_title = "Re-Encode File..."
             copy_message = "Re-Encode Selected File"
             copy_option = {
-                "Make Edit File - Slow   :: Transcode File Into An Intermedite Edit File Format Suitable For Editing": "rencode_edit",
+                "Make Edit File - Slow   :: Transcode File Into An Intermediate Edit File Format Suitable For Editing": "reencode_edit",
                 "Re-Encode H264 - Slower :: Transcode File Into The Common H264 Format": "reencode_h264",
                 "Re-Encode H265 - Slowest ::Transcode File Into The Common H264 Format": "reencode_h265",
             }
@@ -628,7 +628,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                     "Re-Encode H264 - Slower  ::  Use To Join Files Into The Common H264 Format": "transjoin_h264",
                     "Re-Encode H265 - Slowest ::  Use To Join Files Into The Newer H265 Format": "transjoin_h265",
                 }
-            else:  # Differnt file extensions, need a transcode copy
+            else:  # Different file extensions, need a transcode copy
                 copy_option = {
                     "Make Edit File - Slow   :: Use Where The Joined Files Needs To Be Edited   ": "transjoin_edit",
                     "Re-Encode H264 - Slower :: Use To Join Files Into The Common H264 Format ": "transjoin_h264",
@@ -674,9 +674,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 concatenating_files.append(video_data.video_path)
                 video_file_data.append(video_data)
-            print(
-                f"DBG B {len(concatenating_files)=} {len(removed_files)=} {len(video_file_data)=} {output_file=}"
-            )
+
             if concatenating_files and output_file:
                 result = -1
                 message = ""
@@ -703,7 +701,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
                     match copy_method:
-                        case "rencode_edit":  # Only one File with this option
+                        case "reencode_edit":  # Only one file selected  with this option
                             video_data = video_file_data[0]
 
                             result, message = dvdarch_utils.Transcode_MJPEG(
@@ -721,7 +719,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                                 == "bff"
                                 else False,
                             )
-                        case "reencode_h264":  # Only one File with this option
+                        case "reencode_h264":  # Only one file selected  with this option
                             video_data = video_file_data[0]
                             result, message = dvdarch_utils.Transcode_H26x(
                                 input_file=video_data.video_path,
@@ -739,7 +737,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                                 else False,
                                 h265=False,
                             )
-                        case "reencode_h265":  # Only one File with this option
+                        case "reencode_h265":  # Only one file selected  with this option
                             video_data = video_file_data[0]
                             result, message = dvdarch_utils.Transcode_H26x(
                                 input_file=video_data.video_path,
@@ -757,7 +755,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                                 else False,
                                 h265=True,
                             )
-                        case "stream_copy":  # Multiple files
+                        case "stream_copy":  # Multiple files selected from here on
                             result, message = dvdarch_utils.Concatenate_Videos(
                                 temp_files=concatenating_files, output_file=output_file
                             )
@@ -1080,6 +1078,11 @@ class Video_File_Grid(DVD_Archiver_Base):
                             for item in row:
                                 if item[1]:
                                     video_data: Video_Data = item[1]
+
+                                    if (
+                                        video_data is None
+                                    ):  # This is an error and should not happen
+                                        continue
 
                                     if not file_handler.file_exists(
                                         video_data.video_path
@@ -1440,24 +1443,23 @@ class Video_File_Grid(DVD_Archiver_Base):
                 rejected = self._insert_files_into_grid(video_file_list)
 
             if file_grid.row_count > 0:
-                # First file sets project encoding standard - Project files in toto Can be PAL or NTSC not both
-                grid_video_data: Video_Data = file_grid.userdata_get(
-                    row=0, col=file_grid.colindex_get("settings")
-                )
-
-                if grid_video_data is None:  # Not expected to happen
-                    return None
-
-                project_video_standard = grid_video_data.encoding_info.video_standard
-
+                project_video_standard = ""
                 loaded_files = []
+
                 for row_index in reversed(range(file_grid.row_count)):
                     grid_video_data: Video_Data = file_grid.userdata_get(
                         row=row_index, col=file_grid.colindex_get("settings")
                     )
 
-                    if grid_video_data is None:
-                        continue
+                    if (
+                        grid_video_data is None
+                    ):  # At this point something is very wrong with the grid
+                        self._file_grid.row_delete(row_index)
+
+                    if project_video_standard == "":
+                        project_video_standard = (
+                            grid_video_data.encoding_info.video_standard
+                        )
 
                     file_name = grid_video_data.video_path
 
@@ -1478,6 +1480,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 # Keep a list of words common to all file names
                 self.common_words = utils.Find_Common_Words(loaded_files)
+
             self._toggle_file_button_names(event)
             self.set_project_standard_duration(event)
 
@@ -1515,10 +1518,15 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         for file_video_data in selected_files:
             # Check if file already loaded in grid
-            for check_row_index in range(self._file_grid.row_count):
+            for check_row_index in reversed(range(self._file_grid.row_count)):
                 grid_video_data: Video_Data = self._file_grid.userdata_get(
                     row=check_row_index, col=self._file_grid.colindex_get("video_file")
                 )
+
+                if (
+                    grid_video_data is None
+                ):  # At this point something is very wrong with the grid
+                    self._file_grid.row_delete(row_index)
 
                 if grid_video_data.video_path == file_video_data.video_path:
                     break

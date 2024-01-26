@@ -36,6 +36,7 @@ import psutil
 import xmltodict
 
 import file_utils
+import popups
 import sys_consts
 import utils
 from sys_config import Encoding_Details
@@ -163,6 +164,42 @@ class Cut_Video_Def:
     @property
     def end_cut_secs(self) -> float:
         return self.end_cut / self.frame_rate
+
+
+def DVD_Percent_Used(total_duration: float, pop_error_message: bool = True):
+    """Calculates the percentage of the DVD used based on the total duration of the videos assigned to that DVD.
+    If the percentage used is > 100 then an error Popup is opened if pop_error_message is True
+
+    Args:
+        total_duration (float): total duration in seconds
+        pop_error_message (bool): if True popup an error message if the percentage used is > 100
+
+    Returns:
+        float: percentage of DVD used
+
+    """
+    assert (
+        isinstance(total_duration, float) and total_duration >= 0.0
+    ), f"{total_duration=}. Must be >= 0.0"
+    assert isinstance(pop_error_message, bool), f"{pop_error_message=}. Must be bool"
+
+    dvd_percent_used = (
+        round(
+            (
+                (sys_consts.AVERAGE_BITRATE * total_duration)
+                / sys_consts.SINGLE_SIDED_DVD_SIZE
+            )
+            * 100
+        )
+        + sys_consts.PERCENT_SAFTEY_BUFFER
+    )
+
+    if pop_error_message and dvd_percent_used > 100:
+        popups.PopError(
+            title="DVD Build Error...",
+            message="Selected Files Will Not Fit On A DVD!",
+        ).show()
+    return dvd_percent_used
 
 
 def Get_Thread_Count() -> str:
@@ -345,7 +382,7 @@ def Concatenate_Videos(
     audio_codec: str = "",
     delete_temp_files: bool = False,
     transcode_format: str = "",
-    debug: bool = True,
+    debug: bool = False,
 ) -> tuple[int, str]:
     """
     Concatenates video files using ffmpeg.
@@ -356,7 +393,7 @@ def Concatenate_Videos(
             Note Transcode concats will use the folder and file name but will have the transcode_format extension
         audio_codec (str): The audio codec to checked against (aac is special)
         delete_temp_files (bool): Whether to delete the temp files, defaults to False
-        transcode_format (str): Transcode files as per the transcode_format and then joins (concatenats) the files.
+        transcode_format (str): Transcode files as per the transcode_format and then joins (concatenates) the files.
             Note: Transcodes are slow, defaults to "". legal values are h264 | h265 | mpg | mjpeg
         debug (bool): True, print debug info, otherwise do not
 
@@ -380,7 +417,8 @@ def Concatenate_Videos(
         "h265",
         "mpg",
         "mjpeg",
-    ), f"{transcode_format=}. Must be str - h264 | h265 | mpg | mjpeg"
+        "ffv1",
+    ), f"{transcode_format=}. Must be str - h264 | h265 | mpg | mjpeg | ffv1"
 
     if debug and not utils.Is_Complied():
         print(f"DBG CV {temp_files=} {output_file=} {audio_codec=} {delete_temp_files}")
@@ -407,6 +445,8 @@ def Concatenate_Videos(
             container_format = "mpg"
         elif transcode_format == "mjpeg":
             container_format = "avi"
+        elif transcode_format == "ffv1":
+            container_format = "mkv"
         else:
             raise RuntimeError(f"Unknown transcode_concat {transcode_format=}")
 
@@ -445,6 +485,21 @@ def Concatenate_Videos(
                 )
             else:
                 match transcode_format:
+                    case "ffv1":
+                        transcode_file = file_handler.file_join(
+                            transcode_path, temp_name, "mkv"
+                        )
+                        result, message = Transcode_ffv1_archival(
+                            input_file=video_file,
+                            output_folder=transcode_path,
+                            frame_rate=encoding_info.video_frame_rate,
+                            width=encoding_info.video_width,
+                            height=encoding_info.video_height,
+                        )
+
+                        if result == -1:
+                            return -1, message
+
                     case "h264":
                         transcode_file = file_handler.file_join(
                             transcode_path, temp_name, "mp4"
@@ -570,6 +625,8 @@ def Concatenate_Videos(
                             "-sn",  # Remove titles
                             "-movflags",
                             "+faststart",
+                            "-threads",
+                            Get_Thread_Count(),
                             transcode_file,
                         ]
 
@@ -618,6 +675,8 @@ def Concatenate_Videos(
             "0",
             "-auto_convert",
             "1",
+            "-threads",
+            Get_Thread_Count(),
             "-i",
             file_list_txt,
             "-c",
@@ -637,7 +696,7 @@ def Concatenate_Videos(
         debug=debug,
     )
 
-    if debug:
+    if debug and not utils.Is_Complied():
         print(f"CONCAT {result=} {message=}")
 
     if result == -1:
@@ -1207,16 +1266,16 @@ def Transcode_ffv1_archival(
     height: int,
 ) -> tuple[int, str]:
     """
-    Converts an input vile file into a ffv1 compressed video suitable for permanent archival storage.
+    Converts an input vile file into a lossless ffv1 compressed video suitable for permanent archival storage.
 
-    ffv1 is a permanent archival format widely accepted by archival institutions world wode
+    ffv1 is a permanent archival format widely accepted by archival institutions worldwide
 
     Args:
         input_file (str): The path to the input video file.
         output_folder (str): The path to the output folder.
         frame_rate (float): The frame rate to use for the output video.
-        width (int) : The width of the video
-        height (int) : The height of the video
+        width (int): The width of the video
+        height (int): The height of the video
 
     Returns:
         tuple[int, str]:
@@ -1387,6 +1446,8 @@ def Create_SD_Intermediate_Copy(input_file: str, output_folder: str) -> tuple[in
 
     command = [
         sys_consts.FFMPG,
+        "-threads",
+        Get_Thread_Count(),
         "-i",
         input_file,
         "-max_muxing_queue_size",
@@ -1419,6 +1480,8 @@ def Create_SD_Intermediate_Copy(input_file: str, output_folder: str) -> tuple[in
         "-c:a",
         "pcm_s16le",
         "-y",
+        "-threads",
+        Get_Thread_Count(),
         output_file,
     ]
 
@@ -1837,7 +1900,7 @@ def Transcode_H26x(
         "-pix_fmt",
         "yuv420p",  # Ensure the pixel format is compatible with Blu-ray
         "-crf",
-        "17",
+        "17" if not h265 else "23",
         "-preset",
         quality_preset,
         "-c:a",

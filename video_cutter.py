@@ -1256,9 +1256,8 @@ class Video_Editor(DVD_Archiver_Base):
             grid_col_value, qtg.Grid_Col_Value
         ), f"{grid_col_value=} must be a qtg.Grid_Col_Value"
 
-        assert isinstance(
-            grid_col_value.value, int
-        ), f"Coder goof {grid_col_value.value=} must be int"
+        if grid_col_value.value is None or not isinstance(grid_col_value.value, int):
+            return None
 
         clicked_frame = int(grid_col_value.value)
 
