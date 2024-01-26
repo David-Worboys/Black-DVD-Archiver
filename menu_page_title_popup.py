@@ -21,7 +21,6 @@
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import dataclasses
-import pprint
 from typing import Optional, cast
 
 import platformdirs
@@ -382,7 +381,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 value=item[0],
                 user_data=item[1],
             )
-        print(f"DBG {dvd_percent_used=}")
+
         return None
 
     def _insert_video_title_control(
@@ -702,7 +701,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 row=row,
                 col=menu_title_col_index,
             )
-            print(f"DBG {menu_title=}")
+
             # Popup specific values can be stored here
             if menu_title_user_data is None:
                 menu_title_user_data = {"disk_title": disk_title_lineedit.value_get()}
@@ -715,13 +714,13 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 container_tag="control_box",
                 tag="row_grid",
             )
-            pprint.pprint(row_grid)
+
             menu_items = []
             for row_grid_row in range(row_grid.row_count):
                 button_title: str = row_grid.value_get(row=row_grid_row, col=0)
                 video_data: Video_Data = row_grid.userdata_get(row=row_grid_row, col=0)
                 video_data.dvd_page = row
-                print(f"DBG {button_title=}")
+
                 if (
                     video_data.video_file_settings.button_title.strip()
                     != button_title.strip()
@@ -739,8 +738,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 menu_items.copy(),
                 menu_title_user_data,
             ))
-        pprint.pprint(self.menu_layout)
-        return -1
+
         self._save_dvd_menu(event)
 
         return 1
