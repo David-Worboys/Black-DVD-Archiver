@@ -411,19 +411,21 @@ class Archive_Manager:
                         if self._error_code == -1:
                             return -1, self._error_message
 
-                case sys_consts.TRANSCODE_H264, sys_consts.TRANSCODE_H265:
+                case sys_consts.TRANSCODE_H264 | sys_consts.TRANSCODE_H265:
+                    encoding_method = (
+                        "h264"
+                        if transcode_type == sys_consts.TRANSCODE_H264
+                        else "h265"
+                    )
+
                     if (
-                        (
-                            "h264"
-                            if transcode_type == sys_consts.TRANSCODE_H264
-                            else "h265"
-                        )
+                        encoding_method
                         not in video_data.encoding_info.video_format.lower()
                     ):  # Check if we need to transcode
                         if not Is_Complied():
                             print(
                                 "DBG Transcoding"
-                                f" {('h264' if transcode_type == sys_consts.TRANSCODE_H264 else 'h265')=} {video_data.encoding_info.video_format.lower()=}"
+                                f" {encoding_method=} {video_data.encoding_info.video_format.lower()=}"
                             )
                             print(f"DBG {video_data.video_path=} {button_file_name=}")
 
@@ -458,19 +460,29 @@ class Archive_Manager:
                             self._error_message = message
                             return -1, self._error_message
 
-                        # message has ouput file name
+                        # message has output file name
                         output_file_path = message
+                        (
+                            _,
+                            _,
+                            file_extension,
+                        ) = file_handler.split_file_path(output_file_path)
+                        new_output_file_path = file_handler.file_join(
+                            preservation_master_path,
+                            f"{button_index + 1:02}_{button_file_name}",
+                            file_extension,
+                        )
 
                         if (
                             file_handler.rename_file(
                                 output_file_path,
-                                preservation_master_path,
+                                new_output_file_path,
                             )
                             == -1
                         ):
                             self._error_message = (
                                 f"Failed To Rename {sys_consts.SDELIM}{output_file_path}{sys_consts.SDELIM} To "
-                                "{sys_consts.SDELIM}{preservation_master_path}{sys_consts.SDELIM}"
+                                f"{sys_consts.SDELIM}{new_output_file_path}{sys_consts.SDELIM}"
                             )
                             return -1, self._error_message
                     else:  # we copy
@@ -797,7 +809,7 @@ class Archive_Manager:
                         if self._error_code == -1:
                             return -1, self._error_message
 
-                # Copy the the transcoded video files to their final location
+                # Copy the transcoded video files to their final location
                 for menu_path_tuple in menu_paths:
                     preservation_master_tuple = menu_path_tuple[0]
                     preservation_master_menu_path_temp = preservation_master_tuple[0]
@@ -820,7 +832,7 @@ class Archive_Manager:
                     if result == -1:
                         return -1, message
 
-                    # Remove temporary folders and associated sub-folders/files
+                    # Remove temporary folders and associated sub folders/files
                     if file_handler.path_exists(preservation_master_menu_path_temp):
                         result, message = file_handler.remove_dir_contents(
                             preservation_master_menu_path_temp
@@ -1069,9 +1081,9 @@ class Archive_Manager:
                 # real file OS errors.
                 pass
 
-        json_data_dict[file_path] = (
-            file_cuts  # Update or make new entry in the json_data_dict.
-        )
+        json_data_dict[
+            file_path
+        ] = file_cuts  # Update or make new entry in the json_data_dict.
 
         # Write the JSON file
         try:

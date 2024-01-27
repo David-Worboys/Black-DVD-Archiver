@@ -1731,7 +1731,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 tag="video_input_files",
             ),
         )
-        total_duration = 0
+        total_duration = 0.0
         self.project_video_standard = ""
         self.project_duration = ""
         self.dvd_percent_used = 0
@@ -1743,30 +1743,36 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 if (
                     video_data is None
-                ):  # Most likely something broke on grid load and grid data is corrupt
+                ):  # Most likely something broke on grid load and grid data is corrupt so skip
                     continue
 
                 encoding_info = video_data.encoding_info
 
                 total_duration += encoding_info.video_duration
 
-            encoding_info = file_grid.userdata_get(
+            # If something broke on grid load and grid data is corrupt, then delete those rows
+            while (
+                file_grid.row_count > 0
+                and file_grid.userdata_get(
+                    row=0, col=file_grid.colindex_get("settings")
+                )
+                is None
+            ):
+                file_grid.row_delete(0)
+
+            user_data = file_grid.userdata_get(
                 row=0, col=file_grid.colindex_get("settings")
-            ).encoding_info
-            self.project_video_standard = encoding_info.video_standard
+            )
+
+            if user_data is not None:
+                encoding_info = user_data.encoding_info
+                self.project_video_standard = encoding_info.video_standard
 
             self.project_duration = str(
                 datetime.timedelta(seconds=total_duration)
             ).split(".")[0]
-            self.dvd_percent_used = (
-                round(
-                    (
-                        (sys_consts.AVERAGE_BITRATE * total_duration)
-                        / sys_consts.SINGLE_SIDED_DVD_SIZE
-                    )
-                    * 100
-                )
-                + sys_consts.PERCENT_SAFTEY_BUFFER
+            self.dvd_percent_used = dvdarch_utils.DVD_Percent_Used(
+                total_duration=total_duration, pop_error_message=False
             )
 
         event.value_set(

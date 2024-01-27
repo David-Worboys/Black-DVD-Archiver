@@ -175,7 +175,7 @@ def DVD_Percent_Used(total_duration: float, pop_error_message: bool = True):
         pop_error_message (bool): if True popup an error message if the percentage used is > 100
 
     Returns:
-        float: percentage of DVD used
+        int: percentage of DVD used
 
     """
     assert (

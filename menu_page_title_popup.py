@@ -340,8 +340,8 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         menu_pages: list[list[Video_Data]] = []
         page_title: list[tuple[str, dict, list[Video_Data]]] = []
         item_index = 0
-        total_duration = 0
-        dvd_percent_used = 0.0
+        total_duration = 0.0
+        dvd_percent_used = 0
 
         # Check if the files will fit on the DVD
         for item_index, item in enumerate(merged_files):
