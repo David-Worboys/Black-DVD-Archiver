@@ -861,11 +861,11 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                     # grid_user_data = menu_title_grid.userdata_get(row=row, col=col)
                     if col == menu_titles_col_index:
                         menu_title: str = menu_title_grid.value_get(row=row, col=col)
-                        menu_title_user_data: dict[
-                            str, str
-                        ] = menu_title_grid.userdata_get(
-                            row=row,
-                            col=menu_titles_col_index,
+                        menu_title_user_data: dict[str, str] = (
+                            menu_title_grid.userdata_get(
+                                row=row,
+                                col=menu_titles_col_index,
+                            )
                         )
 
                         # Popup specific values can be stored here
@@ -874,9 +874,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                                 "disk_title": disk_title_lineedit.value_get()
                             }
                         else:
-                            menu_title_user_data[
-                                "disk_title"
-                            ] = disk_title_lineedit.value_get()
+                            menu_title_user_data["disk_title"] = (
+                                disk_title_lineedit.value_get()
+                            )
 
                     elif col == video_titles_col_index:
                         row_grid: qtg.Grid | None = menu_title_grid.row_widget_get(

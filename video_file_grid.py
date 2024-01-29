@@ -1998,7 +1998,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         control_container = qtg.VBoxContainer(
             tag="control_container",
             text="DVD Input Files",
-            align=qtg.Align.TOPRIGHT,
+            align=qtg.Align.CENTER,
             margin_left=9,
         ).add_row(file_control_container, button_container)
 

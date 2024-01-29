@@ -1081,9 +1081,9 @@ class Archive_Manager:
                 # real file OS errors.
                 pass
 
-        json_data_dict[
-            file_path
-        ] = file_cuts  # Update or make new entry in the json_data_dict.
+        json_data_dict[file_path] = (
+            file_cuts  # Update or make new entry in the json_data_dict.
+        )
 
         # Write the JSON file
         try:

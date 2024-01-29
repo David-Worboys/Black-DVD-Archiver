@@ -85,7 +85,6 @@ class Task_Manager:
         self._manager = multiprocessing.Manager()
         self._running_tasks = multiprocessing.Queue()
         self._update_event = multiprocessing.Event()
-        # create a shared memory
 
     @property
     def throw_errors(self) -> bool:
@@ -121,6 +120,7 @@ class Task_Manager:
         Args:
             task (_Task): The task object to be executed.
         """
+
         shared_mem_name = task.name
 
         if self._crash_event.is_set():
@@ -134,35 +134,23 @@ class Task_Manager:
             status, output = task.method(*task.arguments)
 
             if task.crashed:
-                data_bytes = b""
                 if self.throw_errors:
+                    self._write_to_shared_memory(
+                        shared_mem_name=shared_mem_name,
+                        message=f"{task.name}|crash",
+                    )
                     task.callback(-1, "crash", "", task.name)
-                    data_bytes = f"{task.name}|crash".encode("ascii")
             else:
+                self._write_to_shared_memory(
+                    shared_mem_name=shared_mem_name, message=f"{task.name}|ok"
+                )
                 task.callback(status, "ok", "" if output is None else output, task.name)
-                data_bytes = f"{task.name}|ok".encode("ascii")
-
-            # Write data to shared memory
-            try:
-                shared_mem: SharedMemory = SharedMemory(name=shared_mem_name)
-                shared_mem.buf[: len(data_bytes)] = data_bytes
-                shared_mem.close()
-            except Exception as write_error:
-                print(f"DBG Error writing to shared memory A: {write_error}")
 
         except Exception as e:
+            self._write_to_shared_memory(
+                shared_mem_name=shared_mem_name, message=f"{task.name}|exception"
+            )
             task.callback(-1, "error", "" if e is None else e, task.name)
-            data_bytes = f"{task.name}|exception".encode("ascii")
-
-            # Write data to shared memory
-            try:
-                shared_mem = SharedMemory(name=shared_mem_name)
-                shared_mem.buf[: len(data_bytes)] = data_bytes
-                shared_mem.close()
-            except Exception as write_error:
-                pass
-                # Ok, same exception as above, but I have not seen it fail!
-                # print(f"DBG Error writing to shared memory B: {write_error}")
 
         with self._lock:
             self._running_tasks_updated.set()  # Signal the update event
@@ -172,6 +160,7 @@ class Task_Manager:
         The _task_handler method is the main loop of the background task handler.
         It runs until the _stop_event is set and the _task_queue is empty.
         """
+        debug = False
 
         while not self._stop_event.is_set():
             if self._update_event.wait(timeout=1):  # Wait for up to 1 second
@@ -185,6 +174,7 @@ class Task_Manager:
                         self._running_tasks.put(task.name)
                         self._update_event.set()
 
+                    # This might look superfluous, but it is very necessary if I am to determine what task is done
                     try:
                         shared_mem = SharedMemory(name=task.name)
                     except FileNotFoundError:
@@ -210,14 +200,34 @@ class Task_Manager:
 
                         task.process.start()
                     except Exception as e:
-                        print(f"DBG _Task_Handler {e}")
+                        print(f"_Task_Handler Error {e}")
 
             sleep(0.1)
 
             if self._running_tasks_updated.wait(timeout=1):  # Wait for up to 1 second
-                with self._lock:
-                    if task_name in self._running_tasks_dict:
-                        del self._running_tasks_dict[task_name]
+                for task_name in self._running_tasks_dict.copy().keys():
+                    with self._lock:
+                        try:
+                            with SharedMemory(name=task_name) as shared_mem:
+                                content = shared_mem.buf.tobytes().decode("utf-8")
+
+                                if debug:
+                                    print(
+                                        f"Shared Memory Block Found {task_name=} {content=}"
+                                    )
+                        except FileNotFoundError:
+                            del self._running_tasks_dict[task_name]
+                            self._running_tasks_updated.clear()
+
+                            if debug:
+                                print(
+                                    f"Shared Memory Block Not Found {task_name=} And Deleted From {self._running_tasks_dict.keys()=}"
+                                )
+                        except Exception as e:
+                            if debug:
+                                print(f"Ignoring memory block '{task_name}'  {e}")
+                            else:
+                                pass
             try:
                 for task_name, task in list(self._running_tasks_dict.items()):
                     if task.kill_signal:
@@ -234,6 +244,39 @@ class Task_Manager:
 
             except Exception as e:
                 print(f"_Task_Handler {e=}")
+
+    def _write_to_shared_memory(self, shared_mem_name: str, message: str):
+        """Writes a message to a shared memory block, creating it if necessary.
+
+        Args:
+            shared_mem_name (str): Name of the shared memory block.
+            message (str): Message to write to the shared memory.
+        """
+
+        assert (
+            isinstance(shared_mem_name, str) and shared_mem_name.strip() != ""
+        ), f"{shared_mem_name=}. Must be non-empty str"
+        assert isinstance(message, str), f"{message=}. Must be str"
+
+        try:
+            data_bytes = message.encode("ascii")
+
+            # Check for existing shared memory block, creating if needed
+            try:
+                shared_mem = SharedMemory(name=shared_mem_name)
+            except FileNotFoundError:
+                shared_mem = SharedMemory(
+                    create=True, name=shared_mem_name, size=len(data_bytes)
+                )
+
+            shared_mem.buf[: len(data_bytes)] = data_bytes
+
+        except Exception as e:
+            print(f"Unexpected error writing to shared memory: {e}")
+        finally:
+            shared_mem.close()
+            if not shared_mem.name.startswith("__"):  # Avoid unlinking temporary blocks
+                shared_mem.unlink()  # Release system resources
 
     def add_task(
         self,
