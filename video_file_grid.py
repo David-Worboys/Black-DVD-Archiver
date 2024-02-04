@@ -1440,43 +1440,17 @@ class Video_File_Grid(DVD_Archiver_Base):
             )
 
             with qtg.sys_cursor(qtg.Cursor.hourglass):
+                # Performs grid cleansing
                 rejected = self._insert_files_into_grid(video_file_list)
 
             if file_grid.row_count > 0:
-                project_video_standard = ""
                 loaded_files = []
-
                 for row_index in reversed(range(file_grid.row_count)):
                     grid_video_data: Video_Data = file_grid.userdata_get(
                         row=row_index, col=file_grid.colindex_get("settings")
                     )
 
-                    if (
-                        grid_video_data is None
-                    ):  # At this point something is very wrong with the grid
-                        self._file_grid.row_delete(row_index)
-
-                    if project_video_standard == "":
-                        project_video_standard = (
-                            grid_video_data.encoding_info.video_standard
-                        )
-
-                    file_name = grid_video_data.video_path
-
-                    video_standard = grid_video_data.encoding_info.video_standard
-
-                    if project_video_standard != video_standard:
-                        rejected += (
-                            f"{sys_consts.SDELIM}{file_name} :"
-                            f" {sys_consts.SDELIM} Not"
-                            " Project Video Standard "
-                            f"{sys_consts.SDELIM}{project_video_standard}{sys_consts.SDELIM} \n"
-                        )
-
-                        file_grid.row_delete(row_index)
-                        continue
-
-                    loaded_files.append(file_name)
+                    loaded_files.append(grid_video_data.video_path)
 
                 # Keep a list of words common to all file names
                 self.common_words = utils.Find_Common_Words(loaded_files)
@@ -1515,23 +1489,40 @@ class Video_File_Grid(DVD_Archiver_Base):
         rejected = ""
         rows_loaded = self._file_grid.row_count
         row_index = 0
+        video_standard = ""
+
+        while self._file_grid.row_count > 0:
+            grid_video_data = self._file_grid.userdata_get(
+                row=0, col=self._file_grid.colindex_get("video_file")
+            )
+
+            if grid_video_data is None:  # The First row is invalid, so remove it
+                self._file_grid.row_delete(0)
+            else:
+                video_standard = grid_video_data.encoding_info.video_standard
+                break
 
         for file_video_data in selected_files:
-            # Check if file already loaded in grid
+            # Check if file already loaded in grid and cleanse the grid of bad data
             for check_row_index in reversed(range(self._file_grid.row_count)):
                 grid_video_data: Video_Data = self._file_grid.userdata_get(
                     row=check_row_index, col=self._file_grid.colindex_get("video_file")
                 )
 
-                if (
-                    grid_video_data is None
-                ):  # At this point something is very wrong with the grid
+                if grid_video_data is None:  # Invalid row so remove it
                     self._file_grid.row_delete(row_index)
 
                 if grid_video_data.video_path == file_video_data.video_path:
                     break
             else:  # File not in the grid
-                if file_video_data.encoding_info.video_tracks <= 0:
+                if (
+                    file_video_data.encoding_info.video_tracks <= 0
+                    or file_video_data.encoding_info.video_standard
+                    not in (
+                        sys_consts.PAL,
+                        sys_consts.NTSC,
+                    )
+                ):
                     file_video_data.encoding_info = (
                         dvdarch_utils.Get_File_Encoding_Info(file_video_data.video_path)
                     )
@@ -1544,7 +1535,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                     )
                     continue
 
-                toolbox = self._get_toolbox(file_video_data)
+                if video_standard == "":  # Only happens if no rows in grid
+                    video_standard = file_video_data.encoding_info.video_standard
 
                 if file_video_data.encoding_info.video_standard not in (
                     sys_consts.PAL,
@@ -1552,7 +1544,14 @@ class Video_File_Grid(DVD_Archiver_Base):
                 ):
                     rejected += (
                         f"{sys_consts.SDELIM}{file_video_data.video_path} :"
-                        f" {sys_consts.SDELIM} Is Not PAL or NTSC \n"
+                        f" {sys_consts.SDELIM} Is Not PAL, NTSC \n"
+                    )
+                    continue
+
+                if file_video_data.encoding_info.video_standard != video_standard:
+                    rejected += (
+                        f"{sys_consts.SDELIM}{file_video_data.video_path} ({file_video_data.encoding_info.video_standard}) :"
+                        f" {sys_consts.SDELIM} Is Not {video_standard} The Project Video Standard  \n"
                     )
                     continue
 
@@ -1562,6 +1561,49 @@ class Video_File_Grid(DVD_Archiver_Base):
                         f" {sys_consts.SDELIM}No Video Track \n"
                     )
                     continue
+
+                # Set default filter settings from database
+                if (
+                    self._db_settings.setting_exist("vf_normalise")
+                    and self._db_settings.setting_get("vf_normalise") is not None
+                ):
+                    file_video_data.video_file_settings.normalise = (
+                        self._db_settings.setting_get("vf_normalise")
+                    )
+
+                if (
+                    self._db_settings.setting_exist("vf_denoise")
+                    and self._db_settings.setting_get("vf_denoise") is not None
+                ):
+                    file_video_data.video_file_settings.denoise = (
+                        self._db_settings.setting_get("vf_denoise")
+                    )
+
+                if (
+                    self._db_settings.setting_exist("vf_white_balance")
+                    and self._db_settings.setting_get("vf_white_balance") is not None
+                ):
+                    file_video_data.video_file_settings.white_balance = (
+                        self._db_settings.setting_get("vf_white_balance")
+                    )
+
+                if (
+                    self._db_settings.setting_exist("vf_sharpen")
+                    and self._db_settings.setting_get("vf_sharpen") is not None
+                ):
+                    file_video_data.video_file_settings.sharpen = (
+                        self._db_settings.setting_get("vf_sharpen")
+                    )
+
+                if (
+                    self._db_settings.setting_exist("vf_auto_levels")
+                    and self._db_settings.setting_get("vf_auto_levels") is not None
+                ):
+                    file_video_data.video_file_settings.auto_bright = (
+                        self._db_settings.setting_get("vf_auto_levels")
+                    )
+
+                toolbox = self._get_toolbox(file_video_data)
 
                 duration = str(
                     datetime.timedelta(

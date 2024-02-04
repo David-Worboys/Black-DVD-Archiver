@@ -9014,7 +9014,7 @@ class Grid(_qtpyBase_Control):
 
         self._widget.setMinimumWidth(
             (self.width * char_pixel_size.width) + self.tune_hsize
-        )  # Allow for scroll-bar
+        )  # Allow for scroll-bard 
         self._widget.setMaximumWidth(
             (self.width * char_pixel_size.width) + self.tune_hsize
         )
@@ -10269,40 +10269,41 @@ class Grid(_qtpyBase_Control):
         row_index, col_index = self._rowcol_validate(row, col)
 
         item: _Grid_TableWidget_Item = self._widget.item(row_index, col_index)
-        item_data = item.data(qtC.Qt.UserRole)
 
-        if item_data is not None and item_data.widget is not None:
-            if tag == "-":  # Return container/widget
-                return item_data.widget
-            elif container_tag and isinstance(
-                item_data.widget, (FormContainer, VBoxContainer, HBoxContainer)
-            ):  # Rummage through containers for our widget
-                for widget_list in item_data.widget.control_list_get:
-                    for widget in widget_list:
-                        container_tag = (
-                            widget.container_tag.split("|")[1]
-                            if "|" in widget.container_tag
-                            else widget.container_tag
-                        )
-                        tag = widget.tag
+        if item is not None:
+            item_data = item.data(qtC.Qt.UserRole)
 
-                        if container_tag == container_tag and tag == widget.tag:
-                            return widget
-            else:  # Naked tag search, widget is not in a container
-                window_id = Get_Window_ID(self.parent_app, self.parent, self)
+            if item_data.widget is not None:
+                if tag == "-":  # Return container/widget
+                    return item_data.widget
+                elif container_tag and isinstance(
+                    item_data.widget, (FormContainer, VBoxContainer, HBoxContainer)
+                ):  # Rummage through containers for our widget
+                    for widget_list in item_data.widget.control_list_get:
+                        for widget in widget_list:
+                            container_tag = (
+                                widget.container_tag.split("|")[1]
+                                if "|" in widget.container_tag
+                                else widget.container_tag
+                            )
+                            tag = widget.tag
 
-                for item_id in self.item_ids_from_row(row_index):
-                    if self.parent_app.widget_exist(
-                        window_id=window_id,
-                        container_tag=item_data.widget.container_tag,
-                        tag=f"{item_id}|{tag}",
-                    ):
-                        return self.parent_app.widget_get(
+                            if container_tag == container_tag and tag == widget.tag:
+                                return widget
+                else:  # Naked tag search, widget is not in a container
+                    window_id = Get_Window_ID(self.parent_app, self.parent, self)
+
+                    for item_id in self.item_ids_from_row(row_index):
+                        if self.parent_app.widget_exist(
                             window_id=window_id,
                             container_tag=item_data.widget.container_tag,
                             tag=f"{item_id}|{tag}",
-                        )
-
+                        ):
+                            return self.parent_app.widget_get(
+                                window_id=window_id,
+                                container_tag=item_data.widget.container_tag,
+                                tag=f"{item_id}|{tag}",
+                            )
         return None
 
     def item_ids_from_row(self, row: int) -> list[int]:
@@ -15239,7 +15240,8 @@ class Video_Player(qtC.QObject):
         self._audio_output.setVolume(1)
 
         # Hook up signals
-        if self._use_lambda:  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and Nuitka < 1.8.4 == boom!
+        if self._use_lambda:  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and
+            # Nuitka < 1.8.4 == boom!
             self._video_sink.videoFrameChanged.connect(self._frame_handler)
             self._media_player.durationChanged.connect(self._duration_changed)
             self._media_player.positionChanged.connect(self._position_changed)
@@ -15356,26 +15358,35 @@ class Video_Player(qtC.QObject):
             self._input_file = input_file
             self._frame_rate = frame_rate
 
-            self._media_player.setSource(
-                qtC.QUrl.fromLocalFile("")
-            )  # Seems to stop a random app lockup
-            self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
+            with sys_cursor(Cursor.hourglass):
+                self._input_file = input_file
+                self._frame_rate = frame_rate
 
-            count = 0
+                # Trying to stop a random hang, seems to occur occasionally on second call to this method, if it gets
+                # past that it seems ok
+                self._setup_media_player()
 
-            while not self.available():
-                time.sleep(0.1)
-                count += 1
+                for attempt in range(3):  # Allow up to 3 retries
+                    try:
+                        self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
 
-                if count > 10:
-                    popups.PopError(
-                        title="Video File Error...",
-                        message="Video File Is Not Supported!",
-                    ).show()
-                    break
+                        while not self.available():
+                            time.sleep(0.1)
 
-            # Following loads the first frame into the viewer
-            self._media_player.pause()
+                        self._media_player.pause()
+
+                        return None
+
+                    except Exception as e:  # Do not expect this to be called
+                        print(
+                            f"Error ({e=}) on load of {input_file}. Attempt {attempt} of 3 - Retrying..."
+                        )
+
+                # If all retries fail, display the error message
+                popups.PopError(
+                    title="Video File Error...",
+                    message="Video File Is Not Supported!",
+                ).show()
 
     def _duration_changed(self, duration: int) -> None:
         """Handles a video duration change
