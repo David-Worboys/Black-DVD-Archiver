@@ -22,6 +22,7 @@
 import dataclasses
 import glob
 import hashlib
+import json
 import math
 import os
 import os.path
@@ -30,10 +31,8 @@ import pprint
 import shlex
 import shutil
 import subprocess
-from typing import Generator
 
 import psutil
-import xmltodict
 
 import file_utils
 import popups
@@ -1648,6 +1647,7 @@ def Transcode_MPEG2_High_Bitrate(
             height (int) : The height of the video
             interlaced (bool, optional): Whether to use interlaced video. Defaults to True.
             bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
+            iframe_only: (bool, optional): Generate iframe only. Defaults to False.
 
         Returns:
             tuple[int, str]:
@@ -3181,308 +3181,209 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         Video_Details: Check video_details.error if it is not an empty string an error occurred
 
     """
-
-    def _find_keys(node: list[str] | dict, key_value: str) -> Generator:
-        """Find an XML key based on a key value
-
-        Args:
-            node (list[str] | dict): The XML node
-            key_value: (str) : Value key being matched against
-
-        Returns:
-            Generator:
-        """
-        if isinstance(node, list):
-            for node_list in node:
-                for xml_key in _find_keys(node_list, key_value):
-                    yield xml_key
-        elif isinstance(node, dict):
-            if key_value in node:
-                yield node[key_value]
-
-            for node_dict in node.values():
-                for xml_key in _find_keys(node_dict, key_value):
-                    yield xml_key
-
-    assert (
-        isinstance(video_file, str) and video_file.strip() != ""
-    ), f"{video_file=}. Must bbe a non-empy str"
-
     debug = True
+    video_file_details = Encoding_Details()
 
     if utils.Is_Complied():
         debug = False
 
-    fmt = "--output=XML"
+    commands = [
+        sys_consts.FFPROBE,
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        "-show_frames",
+        "-read_intervals",
+        "%+1",
+        video_file,
+    ]
 
-    video_file_details = Encoding_Details()
-
-    try:
-        media_xml = subprocess.check_output(
-            [sys_consts.MEDIAINFO, fmt, video_file],
-            universal_newlines=True,
-            stderr=subprocess.STDOUT if debug else subprocess.DEVNULL,
-        ).strip()
-
-        video_info = xmltodict.parse(media_xml)
-
-        if debug:
-            print(f"=========== Video Info Debug {video_file} ===========")
-            pprint.pprint(video_info)
-            print("=========== Video Info Debug ===========")
-
-        track_info = list(_find_keys(video_info, "track"))
-
-        for tracks in track_info:
-            for track_dict in tracks:
-                if not isinstance(track_dict, dict):
-                    video_file_details.error = (
-                        f"Failed To Get Encoding Details : {video_file}"
-                    )
-
-                    return video_file_details
-
-                track_type = ""
-
-                for key, value in track_dict.items():
-                    if not isinstance(value, str) or not value.strip():
-                        continue
-
-                    if key == "@type":
-                        track_type = value
-
-                    if track_type == "General":
-                        match key:
-                            case "AudioCount":
-                                video_file_details.audio_tracks = int(value)
-                            case "VideoCount":
-                                video_file_details.video_tracks = int(value)
-                    if track_type == "Video":
-                        match key:
-                            case "BitRate":
-                                video_file_details.video_bitrate = int(value)
-                            case "Format":
-                                video_file_details.video_format = value
-                            case "Width":
-                                video_file_details.video_width = int(value)
-                            case "Height":
-                                video_file_details.video_height = int(value)
-                            case "PixelAspectRatio":
-                                video_file_details.video_par = float(value)
-                            case "DisplayAspectRatio":
-                                video_file_details.video_dar = float(value)
-
-                                if value.startswith("1.33"):
-                                    video_file_details.video_ar = sys_consts.AR43
-                                else:
-                                    video_file_details.video_ar = sys_consts.AR169
-
-                            case "Duration":
-                                video_file_details.video_duration = float(value)
-                            case (
-                                "ScanType_Original"
-                                | "ScanOrder"
-                                | "ScanType"
-                                | "ScanOrder_Original"
-                            ):
-                                if (
-                                    value == "MBAFF"
-                                ):  # H264/H25 adaptive interlaced indication
-                                    video_file_details.video_scan_type = "Interlaced"
-                                else:
-                                    if key.lower() in (
-                                        "ScanOrder_Original",
-                                        "ScanOrder",
-                                        "ScanType",
-                                    ):
-                                        if (
-                                            video_file_details.video_scan_type.strip()
-                                            == ""
-                                        ):
-                                            video_file_details.video_scan_type = value
-
-                                if (
-                                    value.strip()
-                                    and "bff" in value.lower()
-                                    or "tff" in value.lower()
-                                ):
-                                    video_file_details.video_scan_order = value
-                                    video_file_details.video_scan_type = (  # Only TFF and BFF are interlaced
-                                        "Interlaced"
-                                    )
-
-                            case (
-                                "FrameRate"
-                                | "FrameRate_Maximum"
-                                | "FrameRate_Original"
-                            ):
-                                video_file_details.video_frame_rate = float(value)
-                            case "Standard":
-                                if (
-                                    value.upper() in (sys_consts.PAL, sys_consts.NTSC)
-                                    and video_file_details.video_standard.strip() == ""
-                                ):
-                                    video_file_details.video_standard = value
-                            case "FrameCount":
-                                video_file_details.video_frame_count = int(value)
-                    if track_type == "Audio":
-                        match key:
-                            case "Format":
-                                video_file_details.audio_format = value
-                            case "Channels":
-                                video_file_details.audio_channels = int(value)
-
-                    if key == "@type":
-                        track_type = value
-
-    except subprocess.CalledProcessError as call_error:
-        if call_error.returncode == 127:  # Should not happen
-            video_file_details.error = f"{sys_consts.MEDIAINFO} Not Found"
-        elif call_error.returncode <= 125:
-            video_file_details.error = (
-                f" {call_error.returncode} {sys_consts.MEDIAINFO} Failed!\n {fmt}"
-            )
-        else:
-            video_file_details.error = (
-                f" {call_error.returncode} {sys_consts.MEDIAINFO} Crashed!\n {fmt}"
-            )
-    except OSError as call_error:
-        video_file_details.error = (
-            f"{sys_consts.MEDIAINFO} Failed! To Run\n {fmt} \n {call_error}"
-        )
-
-    result, codec = Get_Codec(video_file)
+    result, message = Execute_Check_Output(
+        commands=commands, debug=False, stderr_to_stdout=True
+    )
 
     if result == -1:
-        video_file_details.error = "Failed To Get Video Codec"
+        video_file_details.error = message
         return video_file_details
 
-    video_file_details.video_format = codec  # Decided to use FFMPEG codec extraction as it is different from Mediainfo
+    json_string = message
+    json_data = {}
 
-    # Emergency measures were key info is missing information try ffprobe
-    if video_file_details.video_scan_type.strip() == "":
-        video_file_details.video_scan_type = "Progressive"
+    try:
+        json_data = json.loads(json_string)
 
-    if (
-        video_file.lower().endswith(
-            "mts"
-        )  # MTS files, at least the Panasonic ones I have, are nothing but trouble
-        or video_file_details.video_frame_rate == 0
-        or video_file_details.video_frame_count == 0
-    ):
-        ffprobe_command = [
-            sys_consts.FFPROBE,
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",  # Select only the video stream
-            "-show_entries",
-            "stream=duration,r_frame_rate,nb_frames",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            video_file,
-        ]
+        audio_track_count = 0
+        video_track_count = 0
+        video_scan_type = ""
 
-        try:
-            result, output = Execute_Check_Output(commands=ffprobe_command, debug=False)
+        video_file_details.video_duration = float(json_data["format"]["duration"])
 
-            if result == -1 or output.strip() == "":
-                video_file_details.error = (
-                    f"Failed To Get Encoding Details : {video_file}"
-                )
-                return video_file_details
+        for frame in json_data["frames"]:
+            if (
+                "media_type" in frame
+                and frame["media_type"] == "video"
+                and video_scan_type == ""
+            ):
+                if video_scan_type == "" and "interlaced_frame" in frame:
+                    video_scan_type = (
+                        "interlaced"
+                        if frame["interlaced_frame"] == 1
+                        else "progressive"
+                    )
 
-            values = output.strip().split("\n")
+                if video_scan_type == "interlaced" and "top_field_first" in frame:
+                    if (
+                        frame["top_field_first"] == "1"
+                        and video_file_details.video_scan_order == ""
+                    ):
+                        video_file_details.video_scan_order = "tff"
+                    else:
+                        video_file_details.video_scan_order = "bff"
+                break
 
-            # Comes out in this order - who knows why
-            frame_rate = values[0]
-            duration = values[1]
-            frame_count = values[2]
-        except subprocess.CalledProcessError as e:
-            # Handle any errors or exceptions here
-            print(f"Error: {e}")
-            video_file_details.error = (
-                f"Failed To Get Encoding Details : {video_file} : {e}"
+        for stream in json_data["streams"]:
+            if "codec_type" in stream and stream["codec_type"] == "video":
+                video_track_count += 1
+
+                if "codec_name" in stream:
+                    video_file_details.video_format = stream["codec_name"]
+
+                if "width" in stream:
+                    video_file_details.video_width = int(stream["width"])
+
+                if "height" in stream:
+                    video_file_details.video_height = int(stream["height"])
+
+                if "r_frame_rate" in stream and "/" in stream["r_frame_rate"]:
+                    float_fr = int(stream["r_frame_rate"].split("/")[0]) / int(
+                        stream["r_frame_rate"].split("/")[1]
+                    )
+                    video_file_details.video_frame_rate = [
+                        math.floor(float_fr * 10**i) / 10**i for i in range(3)
+                    ][-1]
+
+                if (
+                    "display_aspect_ratio" in stream
+                    and ":" in stream["display_aspect_ratio"]
+                ):
+                    float_dar = int(stream["display_aspect_ratio"].split(":")[0]) / int(
+                        stream["display_aspect_ratio"].split(":")[1]
+                    )
+                    video_file_details.video_dar = [
+                        math.floor(float_dar * 10**i) / 10**i for i in range(3)
+                    ][-1]
+
+                if (
+                    "sample_aspect_ratio" in stream
+                    and ":" in stream["sample_aspect_ratio"]
+                ):
+                    float_par = int(stream["sample_aspect_ratio"].split(":")[0]) / int(
+                        stream["sample_aspect_ratio"].split(":")[1]
+                    )
+                    video_file_details.video_par = [
+                        math.floor(float_par * 10**i) / 10**i for i in range(3)
+                    ][-1]
+
+                if "display_aspect_ratio" in stream:
+                    video_file_details.video_ar = stream["display_aspect_ratio"]
+
+                if "field_order" in stream:
+                    if stream["field_order"] in ("interlaced", "progressive"):
+                        video_file_details.video_scan_type = stream["field_order"]
+
+                if "nb_frames" in stream:
+                    video_file_details.video_frame_count = int(stream["nb_frames"])
+
+                if "bit_rate" in stream:
+                    video_file_details.video_bitrate = int(stream["bit_rate"])
+
+            elif "codec_type" in stream and stream["codec_type"] == "audio":
+                audio_track_count += 1
+                if "codec_name" in stream:
+                    video_file_details.audio_format = stream["codec_name"]
+
+                if "channels" in stream:
+                    video_file_details.audio_channels = int(stream["channels"])
+
+        video_file_details.audio_tracks = audio_track_count
+        video_file_details.video_tracks = video_track_count
+
+        # Attempted fix-ups
+        if video_file_details.video_frame_count == 0:
+            video_file_details.video_frame_count = math.floor(
+                video_file_details.video_duration * video_file_details.video_frame_rate
             )
-            return video_file_details
 
-        if video_file_details.video_duration == 0 or video_file.lower().endswith(
-            "mts"
-        ):  # MTS files, at least the Panasonic ones I have, are nothing but trouble
-            if duration != "N/A":
-                video_file_details.video_duration = float(duration)
+        if video_file_details.video_scan_type == "" and video_scan_type != "":
+            video_file_details.video_scan_type = video_scan_type
 
-            if video_file_details.video_duration == 0:
-                video_file_details.error = (
-                    f"Failed To Get Video_Duration Encoding Details : {video_file} "
-                )
-                return video_file_details
+        if video_file_details.video_scan_type == "" and (
+            video_file_details.video_scan_order == "tff"
+            or video_file_details.video_scan_order == "bff"
+        ):
+            video_file_details.video_scan_type = "interlaced"
 
-        if video_file_details.video_frame_rate == 0 or video_file.lower().endswith(
-            "mts"
-        ):  # MTS files, at least the Panasonic ones I have, are nothing but trouble
-            if "/" in frame_rate:
-                nominator = float(frame_rate.split("/")[0])
-                denominator = float(frame_rate.split("/")[1])
-                video_file_details._video_frame_rate = round(nominator / denominator, 3)
-            else:
-                video_file_details._video_frame_rate = float(frame_rate.strip())
+        if video_file_details.video_bitrate == 0:
+            if "bit_rate" in json_data["format"]:
+                video_file_details.video_bitrate = int(json_data["format"]["bit_rate"])
 
-            if video_file_details.video_frame_rate == 0:
-                video_file_details.error = (
-                    f"Failed To Get Video_Frame_Rate Encoding Details : {video_file} "
-                )
-                return video_file_details
-
-        if video_file_details.video_frame_count == 0 or video_file.lower().endswith(
-            "mts"
-        ):  # MTS files, at least the Panasonic ones I have, are nothing but trouble
-            if frame_count == "N/A":
-                video_file_details.video_frame_count = int(
-                    video_file_details.video_duration
-                    * video_file_details.video_frame_rate
-                )
-            else:
-                video_file_details.video_frame_count = int(frame_count)
-
-            if video_file_details.video_frame_count == 0:
-                video_file_details.error = (
-                    f"Failed To Get Video_Frame_Count Encoding Details : {video_file} "
-                )
-                return video_file_details
-
-    if (
-        not video_file_details.video_standard
-    ):  # Emergency measures to try and determine if video is PAL or NTSC
         if (
-            video_file_details.video_width == sys_consts.PAL_SPECS.width_43
-            and video_file_details.video_height == sys_consts.PAL_SPECS.height_43
-            and video_file_details.video_frame_rate == sys_consts.PAL_SPECS.frame_rate
+            video_file_details.video_frame_rate == sys_consts.PAL_FRAME_RATE
+            or video_file_details.video_frame_rate == sys_consts.PAL_FIELD_RATE
         ):
             video_file_details.video_standard = sys_consts.PAL
         elif (
-            video_file_details.video_width == sys_consts.NTSC_SPECS.width_43
-            and video_file_details.video_height == sys_consts.NTSC_SPECS.height_43
-            and video_file_details.video_frame_rate == sys_consts.NTSC_SPECS.frame_rate
+            video_file_details.video_frame_rate == sys_consts.NTSC_FRAME_RATE
+            or video_file_details.video_frame_rate == sys_consts.NTSC_FIELD_RATE
+            or video_file_details.video_frame_rate == 30
         ):
             video_file_details.video_standard = sys_consts.NTSC
-        # At this point it is the wild wild west, so take a punt on field rates to determine DVD standard
-        # Most likely dealing with HD def video
-        elif video_file_details.video_frame_rate == sys_consts.PAL_SPECS.field_rate:
-            video_file_details.video_standard = sys_consts.PAL
-        elif video_file_details.video_frame_rate == sys_consts.PAL_FRAME_RATE:
-            video_file_details.video_standard = sys_consts.PAL
-        elif video_file_details.video_frame_rate == sys_consts.NTSC_SPECS.field_rate:
-            video_file_details.video_standard = sys_consts.NTSC
-        elif video_file_details.video_frame_rate in (sys_consts.NTSC_FRAME_RATE, 30):
-            video_file_details.video_standard = sys_consts.NTSC
-        else:  # At this point, I will need to think of something better!
-            video_file_details.video_standard = "N/A"
+
+        if video_file_details.video_duration == 0:
+            video_file_details.error = "Failed To Determine Duration"
+        elif video_file_details.video_dar == 0:
+            video_file_details.error = "Failed To Determine Display Aspect Ratio"
+        elif video_file_details.video_par == 0:
+            video_file_details.error = "Failed To Determine Pixel Aspect Ratio"
+        elif video_file_details.video_ar == "":
+            video_file_details.error = "Failed To Determine Aspect Ratio"
+        elif video_file_details.video_frame_rate == 0:
+            video_file_details.error = "Failed To Determine Frame Rate"
+        elif video_file_details.video_bitrate == 0:
+            video_file_details.error = "Failed To Determine Video Bit Rate"
+        elif video_file_details.video_frame_count == 0:
+            video_file_details.error = (
+                "Failed To Determine The Number f Frames In The Video"
+            )
+        elif video_file_details.video_height == 0:
+            video_file_details.error = "Failed To Determine The Video Height"
+        elif video_file_details.video_width == 0:
+            video_file_details.error = "Failed To Determine The Video Width"
+        elif video_file_details.video_standard == 0:
+            video_file_details.error = "Failed To Determine The Video Standard"
+        elif video_file_details.audio_tracks == 0:
+            video_file_details.error = "Failed To Determine The Number Of Audio Tracks"
+        elif video_file_details.audio_format == "":
+            video_file_details.error = "Failed To Determine The Audio Format"
+        elif video_file_details.audio_channels == 0:
+            video_file_details.error = (
+                "Failed To Determine The Number Of Audio Channels"
+            )
+    except Exception as e:
+        video_file_details.error = (
+            f"Failed To Parse File {video_file} Error is {str(e)}"
+        )
 
     if debug:
-        print(f"=========== video_details Debug {video_file} ===========")
+        print(f"==== File Encoding Details {video_file=} ")
+        print("==== JSON DATA")
+        pprint.pprint(json_data)
+        print("==== Vide File details ")
         pprint.pprint(video_file_details)
-        print("=========== video_details Debug ===========")
+        print("==== File Encoding Details End ")
 
     return video_file_details
 

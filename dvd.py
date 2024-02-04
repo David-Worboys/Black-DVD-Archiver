@@ -1126,7 +1126,7 @@ class DVD:
             )
 
             result, message = dvdarch_utils.Execute_Check_Output(
-                commands=command, debug=True
+                commands=command, debug=False
             )
 
             if result == -1:
