@@ -389,6 +389,7 @@ class Video_Editor(DVD_Archiver_Base):
             isinstance(output_folder, str) and output_folder.strip() != ""
         ), f"{output_folder=}. Must be non-empty str"
 
+        self._frame_display.value_set(0)
         self._output_folder = output_folder
 
         if self._video_file_input:

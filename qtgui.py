@@ -9014,7 +9014,7 @@ class Grid(_qtpyBase_Control):
 
         self._widget.setMinimumWidth(
             (self.width * char_pixel_size.width) + self.tune_hsize
-        )  # Allow for scroll-bard 
+        )  # Allow for scroll-bard
         self._widget.setMaximumWidth(
             (self.width * char_pixel_size.width) + self.tune_hsize
         )
@@ -15200,10 +15200,10 @@ class Video_Player(qtC.QObject):
             parent (qtC.QObject | None): The parent of the object
         """
         super().__init__(parent)
-
-        # os.environ[
-        #   "QT_MEDIA_BACKEND"
-        # ] = "gstreamer"  # Nice to know how to use gstreamer if you have to!
+        # Trying to stop a random hang, switching to gstreamer seems to address this issue
+        os.environ["QT_MEDIA_BACKEND"] = (
+            "gstreamer"  # Nice to know how to use gstreamer if you have to!
+        )
 
         assert parent is None or isinstance(
             parent, qtC.QObject
@@ -15318,10 +15318,9 @@ class Video_Player(qtC.QObject):
 
         time_offset = math.ceil((1000 / self._frame_rate) * frame)
 
-        if (
-            self._media_player.isSeekable()
-            and self._media_player.mediaStatus()
-            == qtM.QMediaPlayer.MediaStatus.BufferedMedia
+        if self._media_player.isSeekable() and self._media_player.mediaStatus() in (
+            qtM.QMediaPlayer.MediaStatus.BufferedMedia,
+            qtM.QMediaPlayer.MediaStatus.LoadedMedia,
         ):
             self._media_player.setPosition(time_offset)
 
@@ -15364,7 +15363,9 @@ class Video_Player(qtC.QObject):
 
                 # Trying to stop a random hang, seems to occur occasionally on second call to this method, if it gets
                 # past that it seems ok
-                self._setup_media_player()
+                # self._setup_media_player()
+                # self._media_player.setSource("")
+                # gc.collect()
 
                 for attempt in range(3):  # Allow up to 3 retries
                     try:
