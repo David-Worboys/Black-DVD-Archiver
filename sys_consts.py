@@ -99,7 +99,7 @@ NTSC_SPECS = namedtuple(
     field_rate=NTSC_FIELD_RATE,
 )
 
-SHELVE_FILE_EXTNS = ("dir", "dat", "bak")
+SHELVE_FILE_EXTNS = ("dir", "dat", "bak", "project_files", "dvdmenu")
 # fmt: off
 VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp", 
                     "3g2", "mj2","mkv","mpg","mpeg","ts", "m2ts", "mts","qt",

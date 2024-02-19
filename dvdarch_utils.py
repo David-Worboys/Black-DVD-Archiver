@@ -442,8 +442,10 @@ def Concatenate_Videos(
             container_format = "mp4"
         elif transcode_format == "mpg":
             container_format = "mpg"
-        elif transcode_format == "mjpeg":
-            container_format = "avi"
+        elif (
+            transcode_format == "mjpeg"
+        ):  # Note I use H264 instead, but mjpeg is still an option
+            container_format = "mkv"  # mkv if use MJPEG
         elif transcode_format == "ffv1":
             container_format = "mkv"
         else:
@@ -581,9 +583,12 @@ def Concatenate_Videos(
 
                     case "mjpeg":
                         transcode_file = file_handler.file_join(
-                            transcode_path, temp_name, "avi"
+                            transcode_path,
+                            temp_name,
+                            "mkv",  # avi if use MJPEG
                         )
-                        result, message = Transcode_MJPEG(
+                        # Set mjpeg argument to true and make the mkv/avi changes above to switch to MJPEG
+                        result, message = Transcode_Mezzanine(
                             input_file=video_file,
                             output_folder=transcode_path,
                             frame_rate=encoding_info.video_frame_rate,
@@ -1493,7 +1498,7 @@ def Create_SD_Intermediate_Copy(input_file: str, output_folder: str) -> tuple[in
     return 1, output_file
 
 
-def Transcode_MJPEG(
+def Transcode_Mezzanine(
     input_file: str,
     output_folder: str,
     frame_rate: float,
@@ -1501,23 +1506,25 @@ def Transcode_MJPEG(
     height: int,
     interlaced: bool = True,
     bottom_field_first: bool = True,
+    mjpeg: bool = False,
 ) -> tuple[int, str]:
-    """Converts an input video to MJPEG at supplied resolution and frame rate at a high bit rate to make an edit
-    copy that minimises generational losses. The video is transcoded to a file in the output folder.
+    """Converts an input video to MJPEG or H264 at supplied resolution and frame rate to make an edit copy that minimises
+    generational losses. The video is transcoded to a file in the output folder.
 
-        Args:
-            input_file (str): The path to the input video file.
-            output_folder (str): The path to the output folder.
-            frame_rate (float): The frame rate to use for the output video.
-            width (int) : The width of the video
-            height (int) : The height of the video
-            interlaced (bool, optional): Whether to use interlaced video. Defaults to True.
-            bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
+       Args:
+           input_file (str): The path to the input video file.
+           output_folder (str): The path to the output folder.
+           frame_rate (float): The frame rate to use for the output video.
+           width (int): The width of the video
+           height (int): The height of the video
+           interlaced (bool, optional): Whether to use interlaced video. Defaults to True.
+           bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
+           mjpeg (bool, optional): True use MJPEG video as a Mezzanine video, False use H264.
 
-        Returns:
-            tuple[int, str]:
-                - arg 1: 1 if ok, -1 if error
-                - arg 2: error message if error (-1) else output file path (1)
+       Returns:
+           tuple[int, str]:
+               - arg 1: 1 if ok, -1 if error
+               - arg 2: error message if error (-1) else output file path (1)
     """
     assert (
         isinstance(input_file, str) and input_file.strip() != ""
@@ -1533,6 +1540,7 @@ def Transcode_MJPEG(
     assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
     assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
     assert isinstance(bottom_field_first, bool), f"{bottom_field_first=}. Must be bool"
+    assert isinstance(mjpeg, bool), f"{mjpeg=}. Must be bool"
 
     file_handler = file_utils.File()
 
@@ -1546,8 +1554,6 @@ def Transcode_MJPEG(
         return -1, f"File Does Not Exist {input_file}"
 
     _, input_file_name, _ = file_handler.split_file_path(input_file)
-
-    output_file = file_handler.file_join(output_folder, f"{input_file_name}.avi")
 
     black_border_size = 12
     field_order = []
@@ -1578,44 +1584,97 @@ def Transcode_MJPEG(
 
     # Set bit rate based on video height
     if height <= 576:
-        bit_rate = 9  # Set a lower bit rate for SD
+        bit_rate = 25  # Set a lower bit rate for SD
     else:
-        bit_rate = 25  # Set a higher bit rate for HD ~ 50
+        bit_rate = 35  # Set a higher bit rate for HD ~ 40
 
-    command = [
-        sys_consts.FFMPG,
-        "-fflags",  # set ffmpeg flags
-        "+genpts",  # generate presentation timestamps
-        "-threads",
-        Get_Thread_Count(),
-        "-i",
-        input_file,
-        "-max_muxing_queue_size",
-        "9999",
-        *video_filter,
-        "-c:v",
-        "mjpeg",
-        *field_order,
-        "-q:v",
-        "3",  # Adjust quality (lower is higher quality)
-        "-b:v",
-        f"{bit_rate}M",  # Set a high bit rate suitable for an edit master
-        "-maxrate",
-        f"{int(float(bit_rate) * 4)}M",
-        "-bufsize",
-        f"{int(float(bit_rate) * 2)}M",
-        "-sn",  # Remove titles, causes problems sometimes
-        "-r",
-        str(frame_rate),  # set frame rate
-        "-pix_fmt",
-        "yuvj420p",  # use YUV 420p pixel format
-        "-c:a",
-        "mp3",
-        "-threads",
-        Get_Thread_Count(),
-        output_file,
-        "-y",
-    ]
+    if mjpeg:
+        output_file = file_handler.file_join(output_folder, f"{input_file_name}.avi")
+
+        command = [
+            sys_consts.FFMPG,
+            "-fflags",  # set ffmpeg flags
+            "+genpts",  # generate presentation timestamps
+            "-threads",
+            Get_Thread_Count(),
+            "-i",
+            input_file,
+            "-max_muxing_queue_size",
+            "9999",
+            *video_filter,
+            "-c:v",
+            "mjpeg",
+            *field_order,
+            "-q:v",
+            "3",  # Adjust quality (lower is higher quality)
+            "-b:v",
+            f"{bit_rate}M",  # Set a high bit rate suitable for an edit master
+            "-maxrate",
+            f"{int(float(bit_rate) * 2)}M",
+            "-bufsize",
+            f"{int(float(bit_rate) * 5)}M",
+            "-sn",  # Remove titles, causes problems sometimes
+            "-r",
+            str(frame_rate),  # set frame rate
+            "-pix_fmt",
+            "yuvj420p",  # use YUV 420p pixel format
+            "-c:a",
+            "aac",
+            "-threads",
+            Get_Thread_Count(),
+            output_file,
+            "-y",
+        ]
+    else:
+        output_file = file_handler.file_join(output_folder, f"{input_file_name}.mkv")
+
+        command = [
+            sys_consts.FFMPG,
+            "-fflags",
+            "+genpts",  # generate presentation timestamps
+            "-threads",
+            Get_Thread_Count(),
+            "-i",
+            input_file,
+            "-vsync",
+            "cfr",
+            "-max_muxing_queue_size",
+            "9999",
+            *video_filter,
+            "-r",
+            str(frame_rate),
+            "-c:v",
+            "libx264",
+            "-sn",  # Remove titles
+            "-pix_fmt",
+            "yuv420p",  # Ensure the pixel format is compatible with Blu-ray
+            "-crf",
+            "17",  # Visually Lossless
+            "-preset",
+            "ultrafast",
+            "-qp",
+            "0",
+            "-b:v",
+            f"{bit_rate}M",
+            "-maxrate",
+            f"{int(float(bit_rate) * 2.5)}M",
+            "-bufsize",
+            f"{int(float(bit_rate) * 5)}M",
+            "-g",
+            f"{1}",  # Set the GOP size to match the DVD standard
+            "-keyint_min",
+            f"{1}",  # Set the minimum key frame interval to Match DVD (same as GOP size for closed GOP)
+            "-sc_threshold",
+            "0",  # Set the scene change threshold to 0 for frequent key frames
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-threads",
+            Get_Thread_Count(),
+            output_file,
+            "-y",
+        ]
 
     result, message = Execute_Check_Output(
         commands=command, debug=False, stderr_to_stdout=False
@@ -1862,12 +1921,12 @@ def Transcode_H26x(
         filter_commands = [
             f"drawbox=x=0:y=0:w=iw:h={black_border_size}:color=black:t=fill",
             f"drawbox=x=0:y=ih-{black_border_size}:w=iw:h={black_border_size}:color=black:t=fill",
-            f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size*2}:color=black:t=fill",
-            f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size*2}:color=black:t=fill",
+            f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill",
+            f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill",
         ]
         black_box_filter = ",".join(filter_commands)
 
-        field_order = f"fieldorder={'bff' if bottom_field_first else 'tff' }"
+        field_order = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
         video_filter = [
             "-vf",
             f"{black_box_filter},scale={width}x{height},{field_order}",

@@ -37,7 +37,8 @@ from dvd import DVD, DVD_Config
 from menu_page_title_popup import Menu_Page_Title_Popup
 from sys_config import (DVD_Archiver_Base, DVD_Menu_Settings,
                         Get_DVD_Build_Folder, Get_Project_Layout_Names,
-                        Set_Shelved_DVD_Layout, Video_Data)
+                        Set_Shelved_DVD_Layout, Video_Data, Migrate_Shelves_To_DB, Set_Shelved_Project, Delete_Project,
+                        Delete_DVD_Layout)
 from utils import Countries, Text_To_File_Name
 from video_cutter import Video_Editor
 from video_file_grid import Video_File_Grid
@@ -726,66 +727,68 @@ class DVD_Archiver(DVD_Archiver_Base):
         """
         assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
 
-        file_handler = file_utils.File()
-
         dvd_layout_combo: qtg.ComboBox = cast(
             qtg.ComboBox,
             event.widget_get(container_tag="main_controls", tag="existing_layouts"),
         )
 
         layout_data = dvd_layout_combo.value_get()
-        layout_filename = f"{Text_To_File_Name(self._file_control.project_name)}.{Text_To_File_Name(layout_data.display)}.dvdmenu"
 
-        delete_file = False
+        if (
+            popups.PopYesNo(
+                title="Delete DVD Layout...",
+                message=(
+                    "Delete DVD Layout"
+                    f" {sys_consts.SDELIM}{layout_data.display}{sys_consts.SDELIM} ? "
+                ),
+            ).show()
+            == "no"
+        ):
+            return None
 
-        for extn in sys_consts.SHELVE_FILE_EXTNS:
-            dvd_layout_path = file_handler.file_join(
-                platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
-                layout_filename,
-                extn,
+        if (
+            self._file_control.project_name.strip() and layout_data.display.strip()
+        ):  # Should always have
+            result, message = Delete_DVD_Layout(
+                project_name=self._file_control.project_name,
+                layout_name=layout_data.display,
             )
 
-            if file_handler.file_exists(
-                platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
-                layout_filename,
-                extn,
-            ):
-                if extn == "dir":
-                    if (
-                        popups.PopYesNo(
-                            title="Delete DVD Layout...",
-                            message=(
-                                "Delete DVD Layout"
-                                f" {sys_consts.SDELIM}{layout_data.display}{sys_consts.SDELIM}?"
-                            ),
-                        ).show()
-                        == "yes"
-                    ):
-                        delete_file = True
-                    else:
-                        return None
+            if result == -1:
+                popups.PopError(
+                    title="DB Error...",
+                    message=(
+                        "Failed To Delete DVD Layout"
+                        f" {sys_consts.SDELIM}{layout_data.display}{sys_consts.SDELIM} - {message}!"
+                    ),
+                )
+                return None
 
-                if delete_file and file_handler.remove_file(dvd_layout_path) == 1:
-                    dvd_layout_combo.value_remove(layout_data.index)
+            # Remove from layout combo
+            dvd_layout_combo.value_remove(layout_data.index)
 
-                    if dvd_layout_combo.count_items == 0:
-                        dvd_layout_combo.value_set(
-                            qtg.Combo_Data(
-                                index=-1,
-                                display=sys_consts.DEFAULT_DVD_LAYOUT_NAME,
-                                data=f"{Text_To_File_Name(self._file_control.project_name)}.{Text_To_File_Name(sys_consts.DEFAULT_DVD_LAYOUT_NAME)}",
-                                user_data=None,
-                            )
-                        )
-                else:
+            if dvd_layout_combo.count_items == 0:
+                dvd_layout_combo.value_set(
+                    qtg.Combo_Data(
+                        index=-1,
+                        display=sys_consts.DEFAULT_DVD_LAYOUT_NAME,
+                        data=f"{self._file_control.project_name}.{sys_consts.DEFAULT_DVD_LAYOUT_NAME}",
+                        user_data=None,
+                    )
+                )
+                result, message = Set_Shelved_DVD_Layout(
+                    project_name=self._file_control.project_name,
+                    dvd_layout_name=sys_consts.DEFAULT_DVD_LAYOUT_NAME,
+                    dvd_menu_layout=[],
+                )
+
+                if result == -1:
                     popups.PopError(
-                        title="Failed To Delete DVD Layout...",
-                        message=(
-                            "Failed To Delete DVD Layout"
-                            f" {sys_consts.SDELIM}{layout_data.display}{sys_consts.SDELIM}!"
-                        ),
-                    ).show()
-                    break
+                        title="DB Error...",
+                        message="Failed To Create Default DVD Layout - {message}!",
+                    )
+
+        return None
 
     def _dvd_folder_select(self, event) -> None:
         """Select a DVD build folder and updates the settings in the database with the selected folder.
@@ -884,12 +887,19 @@ class DVD_Archiver(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event} is not an instance of qtg.Action"
 
+        project_combo: qtg.ComboBox = cast(
+            qtg.ComboBox,
+            event.widget_get(container_tag="main_controls", tag="existing_projects"),
+        )
+
+        project_name = project_combo.value_get().display
+
         dvd_layout_combo: qtg.ComboBox = cast(
             qtg.ComboBox,
             event.widget_get(container_tag="main_controls", tag="existing_layouts"),
         )
 
-        dvd_layout_name = f"{Text_To_File_Name(self._file_control.project_name)}.{Text_To_File_Name(dvd_layout_combo.value_get().display)}"
+        dvd_layout_name = dvd_layout_combo.value_get().display
 
         if self._file_control.dvd_percent_used + sys_consts.PERCENT_SAFTEY_BUFFER > 100:
             popups.PopError(
@@ -927,6 +937,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 ),
                 video_data_list=menu_video_data,  # Pass by reference
                 menu_layout=menu_layout,  # Pass by reference
+                project_name=project_name,
                 dvd_layout_name=dvd_layout_name,
             ).show()
             == "cancel"
@@ -1100,29 +1111,36 @@ class DVD_Archiver(DVD_Archiver_Base):
             label_above=True,
         ).show()
 
-        if layout_name.strip():
+        if self._file_control.project_name.strip() and layout_name.strip():
             if dvd_layout_combo.select_text(layout_name, partial_match=False) >= 0:
                 popups.PopMessage(
                     title="Invalid DVD Layout Name",
                     message="A DVD Layout Wih That Name Already Exists!",
                 ).show()
             else:
+                result, message = Set_Shelved_DVD_Layout(
+                    project_name=self._file_control.project_name,
+                    dvd_layout_name=layout_name,
+                    dvd_menu_layout=[],
+                )
+
+                if result == -1:
+                    popups.PopError(title="DB Error...", message=message)
+                    return None
+
                 dvd_layout_combo.value_set(
                     qtg.Combo_Data(
                         index=-1,
-                        display=Text_To_File_Name(layout_name).replace("_", " "),
-                        data=Text_To_File_Name(layout_name),
+                        display=layout_name,
+                        data=layout_name,
                         user_data=None,
                     )
-                )
-
-                Set_Shelved_DVD_Layout(
-                    f"{self._file_control.project_name}.{layout_name}", []
                 )
 
                 dvd_layout_combo.select_text(layout_name, partial_match=False)
                 file_grid.checkitems_all(checked=False, col_tag="video_file")
                 self._file_control.set_project_standard_duration(event)
+        return None
 
     def _new_project(self, event: qtg.Action):
         """Create a new project
@@ -1151,11 +1169,16 @@ class DVD_Archiver(DVD_Archiver_Base):
                     message="A Project With That Name Already Exists!",
                 ).show()
             else:
+                Set_Shelved_Project(
+                    project_name=project_name,
+                    dvd_menu_layout_names=[sys_consts.DEFAULT_DVD_LAYOUT_NAME],
+                )
+
                 project_combo.value_set(
                     qtg.Combo_Data(
                         index=-1,
-                        display=Text_To_File_Name(project_name).replace("_", " "),
-                        data=Text_To_File_Name(project_name),
+                        display=project_name,
+                        data=project_name,
                         user_data=None,
                     )
                 )
@@ -1168,80 +1191,44 @@ class DVD_Archiver(DVD_Archiver_Base):
 
                 file_grid.clear()
 
-                Set_Shelved_DVD_Layout(
-                    f"{Text_To_File_Name(project_name)}.{sys_consts.DEFAULT_DVD_LAYOUT_NAME}",
-                    [],
-                )
-
     def _delete_project(self, event: qtg.Action) -> None:
-        """Deletes a project by removing the corresponding python shelf files
+        """Deletes a project by removing the corresponding python sql shelf data
 
         Args:
             event (qtg.Action): Triggering event
         """
         assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
 
-        file_handler = file_utils.File()
-
         project_combo: qtg.ComboBox = cast(
             qtg.ComboBox,
             event.widget_get(container_tag="main_controls", tag="existing_projects"),
         )
 
-        _, dvd_layouts = Get_Project_Layout_Names(self._file_control.project_name)
+        dvd_layout_combo: qtg.ComboBox = cast(
+            qtg.ComboBox,
+            event.widget_get(container_tag="main_controls", tag="existing_layouts"),
+        )
 
         if (
             popups.PopYesNo(
                 title="Delete Project...",
                 message=(
                     "Delete Project"
-                    f" {sys_consts.SDELIM}{self._file_control.project_name}{sys_consts.SDELIM}?"
-                    " \n Warning All Project Data Except Source Video Files Will Be"
-                    " Lost!"
+                    f" {sys_consts.SDELIM}{self._file_control.project_name}{sys_consts.SDELIM} "
+                    "And All Project Data Except Source Video Files ?"
                 ),
             ).show()
             == "no"
         ):
             return None
 
-        for extn in sys_consts.SHELVE_FILE_EXTNS:
-            project_path = file_handler.file_join(
-                platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
-                f"{Text_To_File_Name(self._file_control.project_name)}.project_files",
-                extn,
+        result, message = Delete_Project(project_name=self._file_control.project_name)
+
+        if result == -1:
+            popups.PopError(
+                title="DB Error...", message=f"Failed To Delete Project : {message}"
             )
-
-            if file_handler.path_exists(project_path):
-                if file_handler.remove_file(project_path) == -1:
-                    popups.PopError(
-                        title="Failed To Delete Project...",
-                        message=(
-                            "Failed To Delete Project"
-                            f" {sys_consts.SDELIM}{self._file_control.project_name}{sys_consts.SDELIM}!"
-                        ),
-                    ).show()
-                    return None
-
-            for dvd_layout in dvd_layouts:
-                dvd_layout_name = f"{self._file_control.project_name}.{dvd_layout}"
-
-                layout_path = file_handler.file_join(
-                    platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
-                    f"{Text_To_File_Name(dvd_layout_name)}.dvdmenu",
-                    extn,
-                )
-
-                if file_handler.path_exists(layout_path):
-                    if file_handler.remove_file(layout_path) == -1:
-                        popups.PopError(
-                            title="Failed To Delete Project DVD Layouts...",
-                            message=(
-                                "Failed To Delete Project DVD Layouts"
-                                f" {sys_consts.SDELIM}{self._file_control.project_name}{sys_consts.SDELIM}!"
-                            ),
-                        ).show()
-
-                        return None
+            return None
 
         combo_data: qtg.Combo_Data = project_combo.value_get()
 
@@ -1270,9 +1257,19 @@ class DVD_Archiver(DVD_Archiver_Base):
                     )
                 )
 
+                dvd_layout_combo.value_set(
+                    qtg.Combo_Data(
+                        index=-1,
+                        display=sys_consts.DEFAULT_DVD_LAYOUT_NAME,
+                        data="",
+                        user_data=None,
+                    )
+                )
+
                 Set_Shelved_DVD_Layout(
-                    f"{sys_consts.DEFAULT_PROJECT_NAME}.{sys_consts.DEFAULT_DVD_LAYOUT_NAME}",
-                    [],
+                    project_name=sys_consts.DEFAULT_PROJECT_NAME,
+                    dvd_layout_name=sys_consts.DEFAULT_DVD_LAYOUT_NAME,
+                    dvd_menu_layout=[],
                 )
                 self._db_settings.setting_set(
                     "latest_project", sys_consts.DEFAULT_PROJECT_NAME
@@ -1282,6 +1279,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     message="Added Default Project...",
                     text="A Default Project Has Been Created",
                 ).show()
+
         return None
 
     def _processed_files_handler(self, video_file_input: list[Video_Data]):
@@ -1338,7 +1336,10 @@ class DVD_Archiver(DVD_Archiver_Base):
         if project_name is None or not project_name.strip():
             project_name = sys_consts.DEFAULT_PROJECT_NAME
 
+        Migrate_Shelves_To_DB()  # Basically, I am moving from shelves to SQL lite
         project_items, layout_items = Get_Project_Layout_Names(project_name)
+        project_items.sort()
+        layout_items.sort()
 
         project_combo_items = [
             qtg.Combo_Item(

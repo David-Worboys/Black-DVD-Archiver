@@ -891,8 +891,8 @@ class DVD:
         filter_commands = [
             f"drawbox=x=0:y=0:w=iw:h={black_border_size}:color=black:t=fill",
             f"drawbox=x=0:y=ih-{black_border_size}:w=iw:h={black_border_size}:color=black:t=fill",
-            f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size*2}:color=black:t=fill",
-            f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size*2}:color=black:t=fill",
+            f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill",
+            f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill",
         ]
         black_box_filter = ",".join(filter_commands)
 

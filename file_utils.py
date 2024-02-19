@@ -489,7 +489,7 @@ class File:
             return 1
         except FileExistsError:
             return 1  # folder already exists
-        except Exception as e:
+        except Exception:
             return -1
 
     @staticmethod
@@ -559,7 +559,7 @@ class File:
             try:
                 os.rename(old_file_path, new_file_path)
                 return 1
-            except OSError as e:
+            except OSError:
                 return -1
         return -1
 
@@ -692,9 +692,9 @@ class File:
             return -1  # File does not exist at the given path.
         except PermissionError:
             return -1  # Permission error occurred during removal.
-        except OSError as e:
+        except OSError:
             return -1  # Other OS-related error occurred during removal.
-        except Exception as e:
+        except Exception:
             return (
                 -1
             )  # Catching any other unexpected exception for logging and debugging.

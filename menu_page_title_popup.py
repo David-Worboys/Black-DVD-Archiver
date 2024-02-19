@@ -32,7 +32,7 @@ import sqldb
 import sys_consts
 from dvdarch_utils import DVD_Percent_Used
 from sys_config import (DVD_Menu_Settings, Get_Shelved_DVD_Layout,
-                        Set_Shelved_DVD_Layout, Video_Data)
+                        Set_Shelved_DVD_Layout, Video_Data, DVD_Menu_Page)
 
 # fmt: on
 
@@ -49,6 +49,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
     menu_layout: list[tuple[str, list[Video_Data]], dict[str:str]] = dataclasses.field(
         default_factory=list
     )  # Pass by reference
+    project_name: str = ""
     dvd_layout_name: str = ""
 
     # Private instance variable
@@ -66,9 +67,13 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         assert all(
             isinstance(video_data, Video_Data) for video_data in self.video_data_list
         ), "All elements must be Video_Data instances"
-        assert isinstance(
-            self.dvd_layout_name, str
-        ), f"{self.dvd_layout_name=}. Must be str"
+        assert (
+            isinstance(self.project_name, str) and self.project_name.strip() != ""
+        ), f"{self.project_name=}. Must be non-empty str"
+
+        assert (
+            isinstance(self.dvd_layout_name, str) and self.dvd_layout_name.strip() != ""
+        ), f"{self.dvd_layout_name=}. Must be non-empty str"
 
         super().__post_init__()  # This statement must be last
 
@@ -261,25 +266,26 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         buttons_per_page = DVD_Menu_Settings().buttons_per_page
 
-        dvd_menu_layout: list[
-            str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]
-        ] = self._load_DVD_menu(event)
+        dvd_menu_layout: list[DVD_Menu_Page] = self._load_DVD_menu(event)
 
         files_in_dvd_layout: list[tuple[str, dict, list[Video_Data]]] = []
         files_not_in_dvd_layout: list[tuple[str, dict, list[Video_Data]]] = []
 
         # Load files details from the stored dvd layout
-        for row_index, menu_item in enumerate(dvd_menu_layout):
-            if row_index == 0:
-                disk_title_lineedit.value_set(menu_item[2]["disk_title"])
+        for row_index, menu_page in enumerate(dvd_menu_layout):
+            if row_index == 0 and "disk_title" in menu_page.user_data:
+                disk_title_lineedit.value_set(menu_page.user_data["disk_title"])
 
             button_videos: list[Video_Data] = []
 
-            for button_item in menu_item[1]:
-                button_item[1]: Video_Data
+            for button_item in menu_page.get_button_titles.values():
                 button_videos.append(button_item[1])
 
-            files_in_dvd_layout.append((menu_item[0], menu_item[2], button_videos))
+            files_in_dvd_layout.append((
+                menu_page.menu_title,
+                menu_page.user_data,
+                button_videos,
+            ))
 
         # Find files selected in the file grid which are not in the stored dvd grid layout
         file_grid_videos: list[Video_Data] = []
@@ -495,20 +501,18 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         return None
 
-    def _load_DVD_menu(
-        self, event: qtg.Action
-    ) -> list[str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]]:
+    def _load_DVD_menu(self, event: qtg.Action) -> list[DVD_Menu_Page]:
         """Reads the DVD menu pages Video_Data definitions from the project database shelve file
 
         Args:
             event (qtg.Action): The event that triggered the load of the DVD menu
 
-        Returns: list[str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]]: The DVD menu page Video_Data
-        definitions loaded from the database file
+        Returns:
+            list[DVD_Menu_Page]: The DVD menu page Video_Data definitions loaded from the database
         """
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             dvd_menu_layout, error_message = Get_Shelved_DVD_Layout(
-                self.dvd_layout_name
+                project_name=self.project_name, dvd_layout_name=self.dvd_layout_name
             )
 
         if error_message:
@@ -828,7 +832,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             event (qtg.Action): The triggering event.
 
         Returns:
-            int: Returns 1 if ok , -1 otherwise
+            int: Returns 1 if ok, -1 otherwise
         """
 
         menu_title_grid: qtg.Grid = cast(
@@ -852,7 +856,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             row_data = []
+            menu_pages: list[DVD_Menu_Page] = []
             for row in range(menu_title_grid.row_count):
+                menu_page = DVD_Menu_Page()
                 menu_list: list[
                     tuple[str, tuple[tuple[str, Video_Data], ...], dict[str, str]]
                 ] = []
@@ -867,6 +873,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                                 col=menu_titles_col_index,
                             )
                         )
+
+                        menu_page.menu_title = menu_title
+                        menu_page.user_data = menu_title_user_data
 
                         # Popup specific values can be stored here
                         if menu_title_user_data is None:
@@ -887,6 +896,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                         )
 
                         button_list: list[tuple[str, Video_Data]] = []
+                        button_index = 0
 
                         for row_grid_row in range(row_grid.row_count):
                             for row_grid_col in range(row_grid.col_count):
@@ -903,6 +913,13 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                                     != button_title.strip()
                                 ):
                                     button_user_data.video_file_settings.button_title = button_title
+                                menu_page.add_button_title(
+                                    button_index=button_index,
+                                    button_title=button_title,
+                                    button_video_data=button_user_data,
+                                )
+
+                                button_index += 1
 
                                 button_list.append((
                                     button_title,
@@ -915,17 +932,19 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                             menu_title_user_data,
                         ))
 
+                        menu_pages.append(menu_page)
                 row_data.append(menu_list)
 
-            result = Set_Shelved_DVD_Layout(
+            result, message = Set_Shelved_DVD_Layout(
+                project_name=self.project_name,
                 dvd_layout_name=self.dvd_layout_name,
-                dvd_menu_layout=row_data,  # Pycharm sad but tests Ok!
+                dvd_menu_layout=menu_pages,
             )
 
-            if result:
+            if result == -1:
                 popups.PopError(
                     title="DVD Menu Grid Save Error...",
-                    message=f"{sys_consts.SDELIM}{result}{sys_consts.SDELIM}",
+                    message=f"{sys_consts.SDELIM}{message}{sys_consts.SDELIM}",
                 ).show()
                 return -1
         return 1

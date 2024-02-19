@@ -9666,7 +9666,7 @@ class Grid(_qtpyBase_Control):
             row (int): Row index in the grid.
         """
         assert (
-            isinstance(row, int) and 0 <= row < self.row_count
+            isinstance(row, int) and 0 <= row <= self.row_count
         ), f"{row=}. Must be an int between 0 and {self.row_count}"
         assert isinstance(
             self._widget, qtW.QTableWidget
@@ -10207,6 +10207,9 @@ class Grid(_qtpyBase_Control):
 
         item = self._widget.item(row_index, col_index)
 
+        if item is None:
+            return None
+
         item_data = item.data(qtC.Qt.UserRole)
 
         item.setText(str(value))
@@ -10350,7 +10353,7 @@ class Grid(_qtpyBase_Control):
         for row in range(self._widget.rowCount()):
             for col in range(self._widget.columnCount()):
                 item = self._widget.item(row, col)
-                if item.item_id == item_id:
+                if item is not None and item.item_id == item_id:
                     return row
         return -1
 
@@ -15200,10 +15203,10 @@ class Video_Player(qtC.QObject):
             parent (qtC.QObject | None): The parent of the object
         """
         super().__init__(parent)
-        # Trying to stop a random hang, switching to gstreamer seems to address this issue
-        os.environ["QT_MEDIA_BACKEND"] = (
-            "gstreamer"  # Nice to know how to use gstreamer if you have to!
-        )
+
+        # os.environ["QT_MEDIA_BACKEND"] = (
+        #    "gstreamer"  # Nice to know how to use gstreamer if you have to!
+        # )
 
         assert parent is None or isinstance(
             parent, qtC.QObject

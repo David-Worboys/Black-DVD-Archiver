@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # fmt: off
 import dataclasses
 import shelve
+import datetime
 
 import platformdirs
 
@@ -29,7 +30,6 @@ import popups
 import sqldb
 import sys_consts
 from qtgui import Action
-from utils import Text_To_File_Name
 
 # fmt: on
 
@@ -57,15 +57,491 @@ def Get_DVD_Build_Folder() -> str:
     return dvd_folder
 
 
-def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str]]:
-    """Get a list of project names and a list of dvd layout names associated with the project name
+def Migrate_Shelves_To_DB() -> tuple[int, str]:
+    """This is a temporary function to migrate existing shelved data to the new SQL-shelved data
+    TODO: Removed in later release
+
+    Returns:
+        tuple[list[str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]],str]:
+            The DVD menu layout and no error message if no issue.
+            Empty DVD menu layout and error message if there is an issue
+
+    """
+    file_handler = file_utils.File()
+    sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+    if sql_shelf.error == -1:
+        return -1, sql_shelf.error.message
+
+    if not file_handler.path_writeable(
+        platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
+    ):
+        return (
+            -1,
+            f"Path Not Writeable {platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)}",
+        )
+
+    backup_path = f"{platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)}{file_handler.ossep}backup"
+
+    if not file_handler.path_exists(backup_path):
+        if file_handler.make_dir(backup_path) == -1:
+            return -1, f"Failed To Create Backup Path {backup_path}"
+
+    file_list: file_utils.File_Result = file_handler.filelist(
+        path=platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
+        extensions=sys_consts.SHELVE_FILE_EXTNS,
+    )
+
+    project_dict = {}
+    dvd_layout_dict = {}
+    files_migrated = []
+
+    for item in file_list.files:
+        type = item.split(".")[-2]
+        extn = item.split(".")[-1]
+
+        if extn not in ("dir", "project_files", "dvdmenu"):
+            continue
+
+        if (
+            type == "project_files"
+            or extn == "project_files"
+            or item.endswith("project_files")
+        ):
+            file = ".".join(item.split(".")[0:-1])
+            project = ".".join(item.split(".")[0:1])
+
+            for file_extn in sys_consts.SHELVE_FILE_EXTNS:
+                files_migrated.append((
+                    file_handler.file_join(
+                        dir_path=platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
+                        file_name=file,
+                        ext=file_extn,
+                    ),
+                    file_handler.file_join(
+                        dir_path=platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
+                        file_name=file,
+                        ext=file_extn,
+                    ),
+                ))
+
+            with shelve.open(
+                f"{platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)}{file_handler.ossep}{file}"
+            ) as db:
+                db_data = db.get("video_grid")
+                video_grid_data = []
+                if db_data:
+                    for row_index, row in enumerate(db_data):
+                        for item in row:
+                            if item[1]:
+                                video_data: Video_Data = item[1]
+
+                                if (
+                                    video_data is None
+                                ):  # This is an error and should not happen
+                                    continue
+
+                                if not file_handler.file_exists(video_data.video_path):
+                                    break
+
+                                duration = str(
+                                    datetime.timedelta(
+                                        seconds=video_data.encoding_info.video_duration
+                                    )
+                                ).split(".")[0]
+
+                                video_grid_data.append({
+                                    "row_index": row_index,
+                                    "video_data": video_data,
+                                    "duration": duration,
+                                })
+                db.close()
+
+                if video_grid_data:
+                    shelf_dict = sql_shelf.open(shelf_name="video_grid")
+                    if sql_shelf.error == -1:
+                        return -1, sql_shelf.error.message
+
+                    result, message = sql_shelf.update(
+                        shelf_name="video_grid",
+                        shelf_data=shelf_dict
+                        | {project.replace("_", " "): video_grid_data},
+                    )
+
+                    if result == -1:
+                        return -1, message
+
+        elif type == "dvdmenu" or extn == "dvdmenu" or item.endswith("dvdmenu"):
+            project_name, layout_name = item.split(".")[0:2]
+
+            project_name = project_name.replace("_", " ")
+            layout_name = layout_name.replace("_", " ")
+
+            if project_name not in project_dict:
+                project_dict[project_name] = []
+
+            project_dict[project_name].append(layout_name)
+            file = ".".join(item.split(".")[0:-1])
+
+            for file_extn in sys_consts.SHELVE_FILE_EXTNS:
+                files_migrated.append((
+                    file_handler.file_join(
+                        dir_path=platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
+                        file_name=file,
+                        ext=file_extn,
+                    ),
+                    file_handler.file_join(
+                        dir_path=platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
+                        file_name=file,
+                        ext=file_extn,
+                    ),
+                ))
+
+                dvd_layout_key = f"{project_name}.{layout_name}"
+
+                with shelve.open(
+                    f"{platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)}{file_handler.ossep}{file}"
+                ) as db:
+                    db_data = db.get("dvd_menu_grid")
+                    dvd_menu_layout = []
+                    if db_data:
+                        try:
+                            for grid_index, grid_row in enumerate(db_data):
+                                if (
+                                    len(grid_row) == 2
+                                ):  # old layouts where I made an implementation error:
+                                    menu_page = DVD_Menu_Page()
+
+                                    if grid_index == 0:
+                                        menu_page.menu_title = grid_row[0][0]
+                                        menu_page.user_data = {
+                                            "disk_title": "",
+                                            "layout_style": "old",
+                                        }
+
+                                    for item_index, item in enumerate(grid_row[1][2]):
+                                        new_encoding_details = Encoding_Details()
+                                        new_attrs = [
+                                            attr
+                                            for attr in dir(new_encoding_details)
+                                            if attr.startswith("_")
+                                            and not attr.startswith("__")
+                                        ]  # Want to assign values directly to bypass variable checks
+
+                                        for attr in new_attrs:  # #Encoding Details has changed so have to map values
+                                            if hasattr(item[1].encoding_info, attr):
+                                                setattr(
+                                                    new_encoding_details,
+                                                    attr,
+                                                    getattr(
+                                                        item[1].encoding_info, attr
+                                                    ),
+                                                )
+
+                                        item[1].encoding_info = new_encoding_details
+
+                                        menu_page.add_button_title(
+                                            button_index=item_index,
+                                            button_title=item[0],
+                                            button_video_data=item[1],
+                                        )
+
+                                    dvd_menu_layout.append(menu_page)
+
+                                else:  # New layouts
+                                    menu_page = DVD_Menu_Page()
+                                    menu_page.menu_title = grid_row[0][0]
+                                    menu_page.user_data = grid_row[0][2] | {
+                                        "layout_style": "new"
+                                    }
+                                    for button_index, button_item in enumerate(
+                                        grid_row[0][1]
+                                    ):
+                                        menu_page.add_button_title(
+                                            button_index=button_index,
+                                            button_title=button_item[0],
+                                            button_video_data=button_item[1],
+                                        )
+
+                                    dvd_menu_layout.append(menu_page)
+
+                        except Exception as e:
+                            print(f"Migrate_Shelves_To_DB Failed : {e=}")
+
+                    db.close()
+
+                    dvd_layout_dict[dvd_layout_key] = dvd_menu_layout
+
+    if project_dict:
+        sql_shelf.open(shelf_name="projects")
+        if sql_shelf.error == -1:
+            return -1, sql_shelf.error.message
+
+        result, message = sql_shelf.update(
+            shelf_name="projects", shelf_data=project_dict
+        )
+
+        if result == -1:
+            return -1, message
+
+    if dvd_layout_dict:
+        shelf_dict = sql_shelf.open(shelf_name="dvdmenu")
+
+        result, message = sql_shelf.update(
+            shelf_name="dvdmenu", shelf_data=dvd_layout_dict
+        )
+
+        if result == -1:
+            return -1, message
+
+    # TODO remove shelf files when testing finished
+    for file_tuple in files_migrated:
+        if file_handler.path_exists(file_tuple[0]):
+            result, message = file_handler.copy_file(
+                source=file_tuple[0], destination_path=backup_path
+            )
+            if result == -1:
+                return -1, message
+
+            file_handler.remove_file(file_tuple[0])
+
+    return 1, ""
+
+
+def Delete_DVD_Layout(project_name: str, layout_name: str) -> tuple[int, str]:
+    """Deletes a DVD Layout
+
+    Args:
+        project_name (str): The project name
+        layout_name (str): The name of the DVD layout which will be deleted
+
+    Returns:
+    tuple[int, Optional[float]]: tuple containing result code and
+
+        - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+        - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+
+    """
+    assert (
+        isinstance(project_name, str) and project_name.strip() != ""
+    ), f"{project_name=}. Must be a non-empty str"
+    assert (
+        isinstance(layout_name, str) and layout_name.strip() != ""
+    ), f"{layout_name=}. Must be a non-empty str"
+
+    dvd_menu_key = f"{project_name}.{layout_name}"
+
+    sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+    if sql_shelf.error == -1:
+        return -1, sql_shelf.error.message
+
+    shelf_dict = sql_shelf.open(shelf_name="projects")
+    if sql_shelf.error == -1:
+        return -1, sql_shelf.error.message
+
+    if project_name in shelf_dict:
+        shelf_dict[project_name] = [
+            item for item in shelf_dict[project_name] if item != layout_name
+        ]
+
+    result, message = sql_shelf.update(shelf_name="projects", shelf_data=shelf_dict)
+
+    if result == -1:
+        return -1, message
+
+    shelf_dict = sql_shelf.open(shelf_name="dvdmenu")
+    if sql_shelf.error.code == -1:
+        return -1, sql_shelf.error.message
+
+    if dvd_menu_key in shelf_dict:
+        shelf_dict.pop(dvd_menu_key)
+
+    result, message = sql_shelf.update(shelf_name="dvdmenu", shelf_data=shelf_dict)
+
+    if result == -1:
+        return -1, message
+
+    return 1, ""
+
+
+def Delete_Project(project_name: str) -> tuple[int, str]:
+    """Deletes a project and associated records
 
     Args:
         project_name (str): The project name
 
     Returns:
-        tuple[list[str],list[str]]: A tuple of a list of all project names and a tuple of a list of DVD layouts for the
-        project name
+    tuple[int, Optional[float]]: tuple containing result code and
+
+        - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+        - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+
+    """
+    assert (
+        isinstance(project_name, str) and project_name.strip() != ""
+    ), f"{project_name=}. Must be a non-empty str"
+
+    sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+
+    if (
+        sql_shelf.error == -1
+    ):  # This should not happen unless the system goes off the rails
+        return -1, sql_shelf.error.message
+
+    project_shelf_dict = sql_shelf.open("projects")
+    if sql_shelf.error == -1:
+        return -1, sql_shelf.error.message
+
+    dvdmenu_shelf_dict = sql_shelf.open("dvdmenu")
+    if sql_shelf.error == -1:
+        return -1, sql_shelf.error.message
+
+    video_grid_shelf_dict = sql_shelf.open("video_grid")
+    if sql_shelf.error == -1:
+        return -1, sql_shelf.error.message
+
+    # Perform cleansing pass
+    for project_key in video_grid_shelf_dict.copy().keys():
+        if project_key not in project_shelf_dict:
+            video_grid_shelf_dict.pop(project_key)
+
+    if project_name in video_grid_shelf_dict:
+        video_grid_shelf_dict.pop(project_name)
+
+    if project_name in project_shelf_dict:
+        dvd_layout_names = project_shelf_dict[project_name]
+
+        for dvd_layout_name in dvd_layout_names:
+            dvd_laoot_key = f"{project_name}.{dvd_layout_name}"
+
+            if dvd_laoot_key in dvdmenu_shelf_dict:
+                dvdmenu_shelf_dict.pop(dvd_laoot_key)
+
+        project_shelf_dict.pop(project_name)
+
+    result, message = sql_shelf.update(
+        shelf_name="video_grid", shelf_data=video_grid_shelf_dict
+    )
+    if result == -1:
+        return -1, message
+
+    result, message = sql_shelf.update(
+        shelf_name="dvdmenu", shelf_data=dvdmenu_shelf_dict
+    )
+    if result == -1:
+        return -1, message
+
+    result, message = sql_shelf.update(
+        shelf_name="projects", shelf_data=project_shelf_dict
+    )
+    if result == -1:
+        return -1, message
+
+    return 1, ""
+
+
+def Get_Project_Files(
+    project_name: str,
+) -> tuple[int, list[dict[int, str, "Video_Data"]]]:
+    """Retrieves video files associated with a given project, removing duplicates and updating relevant data sources.
+
+    Args:
+        project_name (str): The name of the project to retrieve files for.
+
+    Returns:
+        tuple[int, list[dict[int, str, Video_Data]]]:
+            - int: Indicates success (1) or failure (-1).
+            - list[dict[int, str, "Video_Data"]]: A list of video data dictionaries, with updated with row indices.
+
+    """
+
+    assert (
+        isinstance(project_name, str) and project_name.strip() != ""
+    ), f"{project_name=}. Must be a non-empty str"
+
+    sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+    if sql_shelf.error == -1:
+        return -1, []
+
+    project_shelf_dict = sql_shelf.open("projects")
+    if sql_shelf.error == -1:
+        return -1, []
+
+    video_grid_shelf_dict = sql_shelf.open("video_grid")
+    if sql_shelf.error == -1:
+        return -1, []
+
+    dvdmenu_shelf_dict = sql_shelf.open("dvdmenu")
+    if sql_shelf.error == -1:
+        return -1, []
+
+    dvd_layout_videos = []
+    for dvd_layout in project_shelf_dict[project_name]:
+        dvd_layout_key = f"{project_name}.{dvd_layout}"
+
+        if dvd_layout_key in dvdmenu_shelf_dict:
+            for dvd_page in dvdmenu_shelf_dict[dvd_layout_key]:
+                dvd_page: DVD_Menu_Page
+
+                for button_index, button_item in dvd_page.get_button_titles.items():
+                    button_item[1]: Video_Data
+
+                    dvd_layout_videos.append({
+                        "row_index": button_index,
+                        "duration": str(
+                            datetime.timedelta(
+                                seconds=button_item[1].encoding_info.video_duration
+                            )
+                        ).split(".")[0],
+                        "video_data": button_item[1],
+                    })
+
+    # Perform cleansing pass
+    deleted_project_key = False
+    for project_key in video_grid_shelf_dict.copy().keys():
+        if project_key not in project_shelf_dict:
+            deleted_project_key = True
+            video_grid_shelf_dict.pop(project_key)
+
+    if deleted_project_key:
+        result, _ = sql_shelf.update(
+            shelf_name="video_grid", shelf_data=video_grid_shelf_dict
+        )
+        if result == -1:
+            return -1, []
+
+    if project_name in video_grid_shelf_dict:
+        seen_paths = set()
+        updated_grid_videos = []
+
+        for video_data in video_grid_shelf_dict[project_name]:
+            seen_paths.add(video_data["video_data"].video_path)
+            updated_grid_videos.append(video_data)
+
+        for dvd_layout_video in dvd_layout_videos:
+            video_path = dvd_layout_video["video_data"].video_path
+            if video_path not in seen_paths:
+                seen_paths.add(video_path)
+                updated_grid_videos.append(dvd_layout_video)
+
+        video_grid_shelf_dict[project_name] = updated_grid_videos
+
+        for row_count, video_item in enumerate(video_grid_shelf_dict[project_name]):
+            video_item["row_index"] = row_count
+
+        return 1, video_grid_shelf_dict[project_name]
+    else:
+        return 1, dvd_layout_videos
+
+
+def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str]]:
+    """Get a list of all project names and a list of the dvd layout names associated with the project name parameter
+
+    Args:
+        project_name (str): The project name
+
+    Returns:
+        tuple[list[str],list[str]]: A tuple of a list of all project names and a tuple of a list of DVD layouts associated
+        with the project name parameter
 
 
     """
@@ -73,144 +549,193 @@ def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str]]:
         isinstance(project_name, str) and project_name.strip() != ""
     ), f"{project_name=}. Must be a non-empty str"
 
-    project_name = Text_To_File_Name(project_name)
+    sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+    if sql_shelf.error == -1:
+        return [], []
 
-    file_handler = file_utils.File()
+    shelf_dict = sql_shelf.open("projects")
+    if sql_shelf.error == -1:
+        return [], []
 
-    layout_items = []
     project_items = []
+    layout_items = []
 
-    file_list: file_utils.File_Result = file_handler.filelist(
-        path=platformdirs.user_data_dir(sys_consts.PROGRAM_NAME),
-        extensions=sys_consts.SHELVE_FILE_EXTNS,
-    )
+    for key, value in shelf_dict.items():
+        if key == project_name:
+            layout_items = value
 
-    for item in file_list.files:
-        if item.count(".") == 2:
-            project, type, extn = item.split(".")
+        project_items.append(key)
 
-            if extn == "dir" and type == "project_files":
-                project_items.append(project.replace("_", " "))
-        elif item.count(".") == 3:
-            project, layout_name, type, extn = item.split(".")
-
-            if extn == "dir" and project == project_name and type == "dvdmenu":
-                layout_items.append(layout_name.replace("_", " "))
-
-    if not project_items:
-        project_items.append(project_name)
-    if not layout_items:
-        layout_items.append(sys_consts.DEFAULT_DVD_LAYOUT_NAME)
+    project_items.sort()
+    layout_items.sort()
 
     return project_items, layout_items
 
 
 def Get_Shelved_DVD_Layout(
+    project_name: str,
     dvd_layout_name: str,
-) -> tuple[list[str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]], str]:
-    """Gets the DVD menu layout from the shelved project file.
+) -> tuple[list["DVD_Menu_Page"], str]:
+    """Gets the DVD menu layout from the shelf database.
 
     Args:
         dvd_layout_name (str): The name of the shelved project file.
 
     Returns:
-        tuple[list[str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]],str]:
-            The DVD menu layout and no error message if no issue.
-            Empty DVD menu layout and error message if there is an issue
+        list[DVD_Menu_Page]: The DVD menu layout and no error message if no issue. Empty DVD menu layout and
+            error message if there is an issue
     """
+    assert (
+        isinstance(project_name, str) and project_name.strip() != ""
+    ), f"{project_name=}. Must be a non-empty str"
     assert (
         isinstance(dvd_layout_name, str) and dvd_layout_name.strip() != ""
     ), f"{dvd_layout_name=}. Must be a non-empty str"
 
-    db_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
-
-    file_handler = file_utils.File()
-    project_file_name = file_handler.file_join(
-        dir_path=db_path,
-        file_name=Text_To_File_Name(dvd_layout_name),
-        ext="dvdmenu",
-    )
+    key = f"{project_name}.{dvd_layout_name}"
 
     dvd_menu_layout: list[
-        str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]
+        str, tuple[tuple[str, "Video_Data"], ...], dict[str, str] | DVD_Menu_Page
     ] = []
 
-    try:
-        with shelve.open(project_file_name) as db:
-            db_data = db.get("dvd_menu_grid")
-            if db_data:
-                for grid_index, grid_row in enumerate(db_data):
-                    if (
-                        len(grid_row) == 2
-                    ):  # old layouts where I made an implementation error:
-                        if grid_index == 0:
-                            disk_title: str = grid_row[0][0]
+    sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+    if sql_shelf.error == -1:
+        return dvd_menu_layout, sql_shelf.error.message
 
-                        grid_data: list[
-                            str, tuple[tuple[str, Video_Data], ...], dict[str, str]
-                        ] = []
+    dvd_shelf = sql_shelf.open(shelf_name="dvdmenu")
 
-                        for grid__item_index, grid_item in enumerate(grid_row[1]):
-                            if grid__item_index == 0:
-                                grid_data.append(grid_row[0][0])
-                            elif grid__item_index == 2:
-                                grid_data.append(grid_item)
+    if sql_shelf.error == -1:
+        return dvd_menu_layout, sql_shelf.error.message
 
-                        grid_data.append({
-                            "disk_title": disk_title
-                            if disk_title.strip()
-                            else dvd_layout_name
-                        })
-                        dvd_menu_layout.append(tuple(grid_data))
-                    else:  # New layouts
-                        dvd_menu_layout.append((
-                            grid_row[0][0],
-                            grid_row[0][1],
-                            grid_row[0][2],
-                        ))
+    if dvd_shelf and key in dvd_shelf:
+        dvd_menu_layout = dvd_shelf[key]
 
-    except Exception as e:
-        return [], str(e)
+    if not all(
+        isinstance(page, DVD_Menu_Page) for page in dvd_menu_layout
+    ):  # Old dict format
+        temp_menu_pages: list[DVD_Menu_Page] = []
+
+        for row_index, menu_item in enumerate(dvd_menu_layout):
+            menu_page = DVD_Menu_Page()
+            menu_page.menu_title = menu_item[0]
+            menu_page.user_data = menu_item[2]
+
+            for button_index, button_item in enumerate(menu_item[1]):
+                menu_page.add_button_title(
+                    button_index=button_index,
+                    button_title=button_item[0],
+                    button_video_data=button_item[1],
+                )
+
+            temp_menu_pages.append(menu_page)
+
+        dvd_menu_layout = temp_menu_pages
+
+        # pprint.pprint(dvd_menu_layout)
 
     return dvd_menu_layout, ""
 
 
+def Set_Shelved_Project(
+    project_name: str, dvd_menu_layout_names: list[str]
+) -> tuple[int, str]:
+    """Saves a Project name and associated DVD menu layout names to the shelved project file.
+
+    Args:
+        project_name (str): The Project name
+        dvd_menu_layout_names: The DVD layout names associated with the project
+
+    Returns:
+        tuple[int, Optional[float]]: tuple containing result code and
+
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+
+    """
+    assert (
+        isinstance(project_name, str) and project_name.strip() != ""
+    ), f"{project_name=}. Must be a non-empty str"
+    assert isinstance(
+        dvd_menu_layout_names, list
+    ), f"{dvd_menu_layout_names=}. Must be a list of str"
+    assert all(
+        isinstance(element, str) for element in dvd_menu_layout_names
+    ), f"{dvd_menu_layout_names=}. Must be a list of str"
+
+    sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+
+    if (
+        sql_shelf.error == -1
+    ):  # This should not happen unless the system goes off the rails
+        RuntimeError(f"{sql_shelf.error.code} {sql_shelf.error.message}")
+
+    shelf_dict = sql_shelf.open("projects")
+
+    if sql_shelf.error == -1:
+        return -1, sql_shelf.error.message
+
+    if project_name not in shelf_dict:
+        shelf_dict[project_name] = dvd_menu_layout_names
+    else:
+        shelf_dict[project_name] = list(
+            set(shelf_dict[project_name])
+            | set(dvd_menu_layout_names)  # Using sets removes duplicates
+        )
+
+    result, message = sql_shelf.update(shelf_name="projects", shelf_data=shelf_dict)
+
+    return result, message
+
+
 def Set_Shelved_DVD_Layout(
+    project_name: str,
     dvd_layout_name: str,
-    dvd_menu_layout: list[
-        tuple[str, tuple[tuple[str, "Video_Data"], ...], dict[str, str]]
-    ],
-) -> str:
+    dvd_menu_layout: list["DVD_Menu_Page"],
+) -> tuple[int, str]:
     """Saves the DVD menu layout to the shelved project file.
 
     Args:
-        dvd_layout_name (str): The name of the shelved project.
-        dvd_menu_layout (list[tuple[str, tuple[tuple[str, Video_Data], ...], dict[str, str]]]): The DVD menu layout to save.
+        project_name (str): The name of the project
+        dvd_layout_name (str): The name of the dvd_layout.
+        dvd_menu_layout (list[DVD_Menu_Page]): The DVD menu layout to save.
 
     Returns:
         str: Empty string if successful, or an error message if there is an issue.
     """
     assert (
+        isinstance(project_name, str) and project_name.strip() != ""
+    ), f"{project_name=}. Must be non-empty str"
+    assert (
         isinstance(dvd_layout_name, str) and dvd_layout_name.strip() != ""
     ), f"{dvd_layout_name=}. Must be a non-empty str"
     assert isinstance(dvd_menu_layout, list), f"{dvd_menu_layout=}. Must be a list"
+    assert all(
+        isinstance(dvd_menu_page, DVD_Menu_Page) for dvd_menu_page in dvd_menu_layout
+    ), "All elements must be DVD_Menu_Page instances"
 
-    db_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
+    sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+    if sql_shelf.error == -1:
+        return -1, sql_shelf.error.message
 
-    file_handler = file_utils.File()
-    project_file_name = file_handler.file_join(
-        dir_path=db_path,
-        file_name=Text_To_File_Name(dvd_layout_name),
-        ext="dvdmenu",
-    )
+    shelf_dict = sql_shelf.open(shelf_name="projects")
+    if sql_shelf.error == -1:
+        return -1, sql_shelf.error.message
 
-    try:
-        with shelve.open(project_file_name) as db:
-            db["dvd_menu_grid"] = dvd_menu_layout
-    except Exception as e:
-        return str(e)
+    if project_name in shelf_dict:
+        if dvd_layout_name not in shelf_dict[project_name]:
+            shelf_dict[project_name].append(dvd_layout_name)
+    else:  # New Project
+        shelf_dict[project_name] = [dvd_layout_name]
 
-    return ""
+    result, message = sql_shelf.update(shelf_name="projects", shelf_data=shelf_dict)
+
+    if result == -1:
+        return -1, message
+
+    shelf_dict = {f"{project_name}.{dvd_layout_name}": dvd_menu_layout}
+    result, message = sql_shelf.update(shelf_name="dvdmenu", shelf_data=shelf_dict)
+
+    return result, message
 
 
 @dataclasses.dataclass
@@ -226,6 +751,53 @@ class DVD_Archiver_Base:
             None
         """
         pass
+
+
+@dataclasses.dataclass(slots=True)
+class DVD_Menu_Page:
+    _menu_title: str = ""
+    _user_data: dict = dataclasses.field(default_factory=dict)
+    _button_title: dict[int, tuple[str, "Video_Data"]] = dataclasses.field(
+        default_factory=dict
+    )
+
+    def __post_init__(self):
+        pass
+
+    @property
+    def menu_title(self) -> str:
+        return self._menu_title
+
+    @menu_title.setter
+    def menu_title(self, menu_title: str):
+        assert isinstance(menu_title, str), f"{menu_title=}. Myst be str"
+
+        self._menu_title = menu_title
+
+    @property
+    def get_button_titles(self) -> dict[int, tuple[str, "Video_Data"]]:
+        return self._button_title
+
+    @property
+    def user_data(self):
+        return self._user_data
+
+    @user_data.setter
+    def user_data(self, user_data: dict):
+        assert isinstance(user_data, dict), f"{user_data=}. Must be dict"
+        self._user_data = user_data
+
+    def add_button_title(
+        self, button_index: int, button_title: str, button_video_data: "Video_Data"
+    ):
+        assert (
+            isinstance(button_index, int) and button_index >= 0
+        ), f"{button_index=}. Must be int >= 0"
+        assert isinstance(button_title, str), f"{button_title=}. Must be str"
+        assert isinstance(
+            button_video_data, Video_Data
+        ), f"{button_video_data=}. Must be Video_Data"
+        self._button_title[button_index] = (button_title, button_video_data)
 
 
 @dataclasses.dataclass

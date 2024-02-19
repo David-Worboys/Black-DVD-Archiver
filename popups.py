@@ -521,8 +521,8 @@ class PopMessage(PopContainer):
 
         # Make text fit
         if "\n" in self.message:
-            self.message = f"\n".join(
-                f"{s : ^{self.width}}" for s in self.message.split("\n")
+            self.message = "\n".join(
+                f"{s: ^{self.width}}" for s in self.message.split("\n")
             )
         else:
             self.message = self.message.center(self.width, " ")

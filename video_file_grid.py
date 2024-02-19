@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import datetime
-import shelve
 from typing import cast
 
 import platformdirs
@@ -33,7 +32,7 @@ import sqldb
 import sys_consts
 import utils
 from dvd_menu_configuration import DVD_Menu_Config_Popup
-from sys_config import DVD_Archiver_Base, Get_DVD_Build_Folder, Video_Data
+from sys_config import DVD_Archiver_Base, Get_DVD_Build_Folder, Video_Data, Get_Project_Files
 from video_file_picker import Video_File_Picker_Popup
 
 # fmt: on
@@ -156,6 +155,14 @@ class Video_File_Grid(DVD_Archiver_Base):
             event.container_tag.split("|")[0]
         )  # Grid button container tag has the row_id embedded as the 1st element and delimitered by |
         row = file_grid.row_from_item_id(row_unique_id)
+
+        if row == -1:
+            popups.PopError(
+                title="Edit Video Error...",
+                message="Failed To Get Edit Row..",
+            ).show()
+
+            return None
 
         user_data: Video_Data = file_grid.userdata_get(
             row=row, col=file_grid.colindex_get("video_file")
@@ -416,19 +423,20 @@ class Video_File_Grid(DVD_Archiver_Base):
             ),
         )
 
-        file_handler = file_utils.File()
-        dir_path, _, extn = file_handler.split_file_path(self._grid_db)
-
         if save_existing and file_grid.changed:
             self._save_grid(event)
 
         self.project_name = project_name
 
-        if file_handler.file_exists(
-            directory_path=dir_path,
-            file_name=utils.Text_To_File_Name(self.project_name),
-            file_extension=f"{extn}.dir",
-        ):  # Existing Project
+        result, video_grid_dict = Get_Project_Files(project_name=self.project_name)
+
+        if result == -1:
+            popups.PopError(
+                title="Project Changed Error...", message="Failed to Get Project Files"
+            ).show()
+            return None
+
+        if video_grid_dict:  # Existing Project
             file_grid.clear()
             self._load_grid(event)
         else:
@@ -443,6 +451,8 @@ class Video_File_Grid(DVD_Archiver_Base):
         event.tag = "project_changed"
         event.value = self.project_name
         self._parent.event_handler(event=event)
+
+        return None
 
     def postinit_handler(self, event: qtg.Action):
         """
@@ -701,10 +711,10 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
                     match copy_method:
-                        case "reencode_edit":  # Only one file selected  with this option
+                        case "reencode_edit":  # Only one file selected with this option
                             video_data = video_file_data[0]
 
-                            result, message = dvdarch_utils.Transcode_MJPEG(
+                            result, message = dvdarch_utils.Transcode_Mezzanine(
                                 input_file=video_data.video_path,
                                 frame_rate=video_data.encoding_info.video_frame_rate,
                                 output_folder=transcode_folder,
@@ -1047,14 +1057,9 @@ class Video_File_Grid(DVD_Archiver_Base):
         file_handler = file_utils.File()
 
         if self.project_name:
-            dir_path, _, extn = file_handler.split_file_path(self._grid_db)
-            project_file_name = file_handler.file_join(
-                dir_path=dir_path,
-                file_name=utils.Text_To_File_Name(self.project_name),
-                ext=extn,
-            )
+            project_name = self.project_name
         else:
-            project_file_name = self._grid_db
+            project_name = self._grid_db
 
         file_grid: qtg.Grid = cast(
             qtg.Grid,
@@ -1066,90 +1071,71 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         removed_files = []
 
-        try:
-            with qtg.sys_cursor(qtg.Cursor.hourglass):
-                with shelve.open(
-                    project_file_name
-                ) as db:  # TODO should this be stored in the app db?
-                    db_data = db.get("video_grid")
+        with qtg.sys_cursor(qtg.Cursor.hourglass):
+            result, shelf_list = Get_Project_Files(project_name=project_name)
 
-                    if db_data:
-                        for row_index, row in enumerate(db_data):
-                            for item in row:
-                                if item[1]:
-                                    video_data: Video_Data = item[1]
+            if result == -1:
+                popups.PopError(
+                    title="File Grid Load Error...", message="Failed To Load Fles!"
+                ).show()
+                return None
 
-                                    if (
-                                        video_data is None
-                                    ):  # This is an error and should not happen
-                                        continue
+            for shelf_item in shelf_list:
+                if (
+                    shelf_item["video_data"] is None
+                ):  # This is an error and should not happen
+                    continue
 
-                                    if not file_handler.file_exists(
-                                        video_data.video_path
-                                    ):
-                                        removed_files.append(video_data.video_path)
-                                        break
+                if not file_handler.file_exists(shelf_item["video_data"].video_path):
+                    removed_files.append(shelf_item["video_data"].video_path)
 
-                                    duration = str(
-                                        datetime.timedelta(
-                                            seconds=video_data.encoding_info.video_duration
-                                        )
-                                    ).split(".")[0]
+                self._populate_grid_row(
+                    file_grid=file_grid,
+                    row_index=shelf_item["row_index"],
+                    video_user_data=shelf_item["video_data"],
+                    duration=shelf_item["duration"],
+                )
+                toolbox = self._get_toolbox(shelf_item["video_data"])
+                file_grid.row_widget_set(
+                    row=shelf_item["row_index"],
+                    col=file_grid.colindex_get("settings"),
+                    widget=toolbox,
+                )
 
-                                    self._populate_grid_row(
-                                        file_grid=file_grid,
-                                        row_index=row_index,
-                                        video_user_data=video_data,
-                                        duration=duration,
-                                    )
-                                    toolbox = self._get_toolbox(video_data)
-                                    file_grid.row_widget_set(
-                                        row=row_index,
-                                        col=file_grid.colindex_get("settings"),
-                                        widget=toolbox,
-                                    )
-                file_grid.row_scroll_to(0)
-                self.set_project_standard_duration(event)
+            file_grid.row_scroll_to(0)
+            self.set_project_standard_duration(event)
 
-                if removed_files:
-                    removed_file_list = "\n".join(removed_files)
-                    popups.PopMessage(
-                        width=80,
-                        title="Source Files Not Found...",
-                        message=(
-                            "The following video files do not exist and were removed"
-                            " from the project:"
-                            f"{sys_consts.SDELIM}{removed_file_list}{sys_consts.SDELIM}"
-                        ),
-                    ).show()
+            # Cleanup pass to ensure correctness of grid
+            for check_row_index in reversed(range(self._file_grid.row_count)):
+                grid_video_data: Video_Data = self._file_grid.userdata_get(
+                    row=check_row_index,
+                    col=self._file_grid.colindex_get("video_file"),
+                )
 
-                # Cleanup pass to ensure correctness of grid
-                for check_row_index in reversed(range(self._file_grid.row_count)):
-                    grid_video_data: Video_Data = self._file_grid.userdata_get(
-                        row=check_row_index,
+                # If grid_video_data is None, something went off the rails badly
+                if grid_video_data is None:
+                    self._file_grid.row_delete(check_row_index)
+                    continue
+
+                if check_row_index > 0:
+                    prior_grid_video_data: Video_Data = self._file_grid.userdata_get(
+                        row=check_row_index - 1,
                         col=self._file_grid.colindex_get("video_file"),
                     )
 
-                    # If grid_video_data is None, something went off the rails badly
-                    if grid_video_data is None:
+                    if grid_video_data.video_path == prior_grid_video_data.video_path:
                         self._file_grid.row_delete(check_row_index)
-                        continue
-
-                    if check_row_index > 0:
-                        prior_grid_video_data: Video_Data = (
-                            self._file_grid.userdata_get(
-                                row=check_row_index - 1,
-                                col=self._file_grid.colindex_get("video_file"),
-                            )
-                        )
-
-                        if (
-                            grid_video_data.video_path
-                            == prior_grid_video_data.video_path
-                        ):
-                            self._file_grid.row_delete(check_row_index)
-        except Exception as e:
-            popups.PopError(title="File Grid Load Error...", message=str(e)).show()
+        if removed_files:
+            removed_file_list = "\n".join(removed_files)
+            popups.PopMessage(
+                width=80,
+                title="Source Files Not Found...",
+                message=(
+                    "The following video files do not exist and were removed"
+                    " from the project:"
+                    f"{sys_consts.SDELIM}{removed_file_list}{sys_consts.SDELIM}"
+                ),
+            ).show()
 
         return None
 
@@ -1163,45 +1149,55 @@ class Video_File_Grid(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        if self.project_name:
-            file_handler = file_utils.File()
+        if not self.project_name:
+            self.project_file_name = self._grid_db
 
-            dir_path, _, extn = file_handler.split_file_path(self._grid_db)
-            project_file_name = file_handler.file_join(
-                dir_path=dir_path,
-                file_name=utils.Text_To_File_Name(self.project_name),
-                ext=extn,
+        sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+
+        if sql_shelf.error.code == -1:
+            popups.PopError(
+                title="File Grid Save Error...", message=sql_shelf.error.message
+            ).show()
+            return None
+
+        with qtg.sys_cursor(qtg.Cursor.hourglass):
+            shelf_dict = sql_shelf.open(shelf_name="video_grid")
+
+            if sql_shelf.error.code == -1:
+                popups.PopError(
+                    title="File Grid Save Error...", message=sql_shelf.error.message
+                ).show()
+                return None
+
+            row_data = []
+            file_grid: qtg.Grid = cast(
+                qtg.Grid,
+                event.widget_get(
+                    container_tag="video_file_controls",
+                    tag="video_input_files",
+                ),
             )
-        else:
-            project_file_name = self._grid_db
+            for row in range(file_grid.row_count):
+                row_data.append({
+                    "row_index": row,
+                    "video_data": file_grid.userdata_get(row=row, col=0),
+                    "duration": file_grid.value_get(
+                        row=row, col=file_grid.colindex_get("duration")
+                    ),
+                })
 
-        try:
-            with qtg.sys_cursor(qtg.Cursor.hourglass):
-                with shelve.open(
-                    project_file_name
-                ) as db:  # TODO should this be stored in the app db?
-                    row_data = []
-                    file_grid: qtg.Grid = cast(
-                        qtg.Grid,
-                        event.widget_get(
-                            container_tag="video_file_controls",
-                            tag="video_input_files",
-                        ),
-                    )
-                    for row in range(file_grid.row_count):
-                        col_value = []
-                        for col in range(file_grid.col_count):
-                            value = file_grid.value_get(row=row, col=col)
-                            user_data = file_grid.userdata_get(row=row, col=col)
+            if row_data:
+                shelf_dict[self.project_name] = row_data
+                result, message = sql_shelf.update(
+                    shelf_name="video_grid",
+                    shelf_data=shelf_dict,
+                )
 
-                            col_value.append((value, user_data))
-
-                        row_data.append(col_value)
-
-                    db["video_grid"] = row_data
-
-        except Exception as e:
-            popups.PopError(title="File Grid Save Error...", message=str(e)).show()
+                if result == -1:
+                    popups.PopError(
+                        title="File Grid Save Error...", message=message
+                    ).show()
+        return None
 
     def _toggle_file_button_names(self, event) -> None:
         """Toggles between file name display and button title display depending on the value of self._display_filename
@@ -1450,6 +1446,9 @@ class Video_File_Grid(DVD_Archiver_Base):
                         row=row_index, col=file_grid.colindex_get("settings")
                     )
 
+                    if grid_video_data is None:
+                        continue
+
                     loaded_files.append(grid_video_data.video_path)
 
                 # Keep a list of words common to all file names
@@ -1510,7 +1509,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                 )
 
                 if grid_video_data is None:  # Invalid row so remove it
-                    self._file_grid.row_delete(row_index)
+                    self._file_grid.row_delete(int(row_index))
+                    continue
 
                 if grid_video_data.video_path == file_video_data.video_path:
                     break
@@ -1707,11 +1707,11 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         encoder_str = (
             video_user_data.encoding_info.video_format
-            + f":{ video_user_data.encoding_info.video_scan_order}"
+            + f":{video_user_data.encoding_info.video_scan_order}"
             if video_user_data.encoding_info.video_scan_order != ""
             else (
                 f"{video_user_data.encoding_info.video_format} :"
-                f" { video_user_data.encoding_info.video_scan_type}"
+                f" {video_user_data.encoding_info.video_scan_type}"
             )
         )
 

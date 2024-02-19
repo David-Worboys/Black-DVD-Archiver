@@ -348,7 +348,7 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
                     title="Font Can Not Be Rendered...",
                     message=(
                         "The font"
-                        f" {sys_consts.SDELIM} {font_combo.value_get().display } {sys_consts.SDELIM} Can"
+                        f" {sys_consts.SDELIM} {font_combo.value_get().display} {sys_consts.SDELIM} Can"
                         " Not Be Rendered!"
                     ),
                 ).show()

@@ -19,9 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+import base64
 import binascii
 import dataclasses
 import hashlib
+import pickle
+
 import os
 import sqlite3 as pysqlite3
 from decimal import Decimal
@@ -41,8 +44,8 @@ from utils import NUMBER, Get_Unique_Sysid, Is_Complied, strEnum
 
 @dataclasses.dataclass(slots=True)
 class Error:
-    code: int
-    message: str
+    code: int = 1
+    message: str = ""
 
 
 @unique
@@ -850,6 +853,243 @@ def get_rowcol_value(row: int, col: int, row_list: list) -> str:
     return row_list[1][row][col]
 
 
+@dataclasses.dataclass(slots=True)
+class SQL_Shelf:
+    """Stores dictionaries in a Python shelf like manner"""
+
+    # Public
+    db_name: str = ""
+    error: Error = dataclasses.field(default_factory=Error)
+
+    # Private
+    _app_database: "SQLDB" = None
+    _data_path: str = ""
+
+    def __post_init__(self):
+        """Initialises the object"""
+        assert (
+            isinstance(self.db_name, str) and self.db_name.strip() != ""
+        ), f"{self.db_name=}. Must be non-empty str"
+
+        file_handler = File()
+        self._data_path = platformdirs.user_data_dir(self.db_name)
+
+        if not file_handler.path_exists(self._data_path):
+            file_handler.make_dir(self._data_path)
+
+            if not file_handler.path_exists(self._data_path):
+                self.error.message = f"Failed To Create {self.db_name} Data Folder"
+                return None
+
+        self._app_database = SQLDB(
+            appname=self.db_name,
+            dbpath=self._data_path,
+            dbfile=self.db_name,
+            suffix=".db",
+            dbpassword="666evil",
+        )
+
+        error_status = self._app_database.get_error_status()
+
+        if error_status.code == -1:
+            return None
+
+        self._db_init()
+
+        return None
+
+    def _db_init(self) -> [int, str]:
+        """Initialisea the database
+
+        Returns:
+            tuple[int, Optional[float]]: tuple containing result code and
+
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+        """
+
+        if not self._app_database.table_exists("shelves"):
+            shelve_def = (
+                ColDef(
+                    name="id",
+                    description="pk_id",
+                    data_type=SQL.INTEGER,
+                    primary_key=True,
+                ),
+                ColDef(
+                    name="name",
+                    description="Shelve Name",
+                    data_type=SQL.VARCHAR,
+                    size=255,
+                ),
+                ColDef(
+                    name="value",
+                    description="Shelve Value",
+                    data_type=SQL.VARCHAR,
+                    size=1000000000,  # Has to be big
+                ),
+            )
+
+            if (
+                self._app_database.table_create(
+                    table_name="shelves", col_defs=shelve_def
+                )
+                == -1
+            ):
+                self.error = self._app_database.get_error_status()
+
+                if self.error.code == -1:
+                    return -1, self.error.message
+
+        return 1, ""
+
+    def open(self, shelf_name: str) -> dict:
+        """Opens a shelf for use
+
+        Args:
+            shelf_name (str): THe shelf name
+
+        Returns:
+            dict: Dictionary stored on the shelf
+        """
+        assert (
+            isinstance(shelf_name, str) and shelf_name.strip() != ""
+        ), f"{shelf_name=}. Must be non-empty str"
+
+        sql_statement = (
+            f"{SQL.SELECT} {SQL.COUNT}('name') {SQL.FROM} shelves "
+            + f" {SQL.WHERE} name = '{shelf_name}' "
+        )
+
+        setting_result = self._app_database.sql_execute(sql_statement)
+        result: Error = self._app_database.get_error_status()
+
+        self.error.code = result.code
+        self.error.message = result.message
+
+        if self.error.code == 1:
+            if setting_result[0][0] == 0:  # Shelf Does Not Exist:
+                self.error.code, self.error.message = self._app_database.sql_update(
+                    col_dict={"name": shelf_name, "value": {}},
+                    table_str="shelves",
+                    debug=False,
+                )
+            else:
+                select_result = self._app_database.sql_select(
+                    col_str="name,value",
+                    table_str="shelves",
+                    where_str=f"name='{shelf_name}'",
+                    debug=False,
+                )
+
+                if select_result:
+                    try:
+                        shelf_dict = pickle.loads(
+                            base64.b64decode(select_result[0][1].encode())
+                        )
+
+                        return shelf_dict
+                    except Exception as e:
+                        self.error.code = -1
+                        self.error.message = f"{e}"
+
+        return {}
+
+    def delete(self, shelf_name: str, shelf_key: str) -> tuple[int, str]:
+        """Deletes an item from the shelf
+
+        Args:
+            shelf_name: The shelf name
+            shelf_key: The key of the shelf item to be deleted
+
+        Returns:
+            tuple[int, Optional[float]]: tuple containing result code and
+
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+
+        """
+        assert (
+            isinstance(shelf_name, str) and shelf_name.strip() != ""
+        ), f"{shelf_name=}. Must be non-empty str"
+
+        assert (
+            isinstance(shelf_key, str) and shelf_key.strip() != ""
+        ), f"{shelf_key=}. Must be non-empty str"
+
+        shelf_dict = self.open(shelf_name=shelf_name)
+
+        if self.error.code == -1:
+            return -1, self.error.message
+
+        if shelf_key in shelf_dict:
+            shelf_dict.pop(shelf_key)
+            self.update(shelf_name=shelf_name, shelf_data=shelf_dict)
+
+            if self.error.code == -1:
+                return -1, self.error.message
+
+        return 1, ""
+
+    def update(self, shelf_name: str, shelf_data: dict) -> tuple[int, str]:
+        """Updates the contents of the shelf with the passed in dictionary
+
+        Args:
+            shelf_name (str): THe shelf name
+            shelf_data (dict): The dictionary to store on the shelf
+
+        Returns:
+            tuple[int, Optional[float]]: tuple containing result code and
+
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+        """
+        assert (
+            isinstance(shelf_name, str) and shelf_name.strip() != ""
+        ), f"{shelf_name=}. Must be non-empty str"
+
+        assert isinstance(shelf_data, dict), f"{shelf_data=}. Must be a dict"
+
+        try:
+            pickle_dict_dump = base64.b64encode(pickle.dumps(shelf_data)).decode()
+
+            sql_statement = (
+                f"{SQL.SELECT} {SQL.COUNT}('name') {SQL.FROM} shelves "
+                + f" {SQL.WHERE} name = '{shelf_name}' "
+            )
+
+            setting_result = self._app_database.sql_execute(sql_statement)
+            result: Error = self._app_database.get_error_status()
+
+            self.error.code = result.code
+            self.error.message = result.message
+
+            if self.error.code == 1:
+                if setting_result[0][0] == 0:  # Shelf Does Not Exist:
+                    self.error.code, self.error.message = self._app_database.sql_update(
+                        col_dict={
+                            "value": pickle_dict_dump,
+                        },
+                        table_str="shelves",
+                        debug=False,
+                    )
+                else:
+                    self.error.code, self.error.message = self._app_database.sql_update(
+                        col_dict={
+                            "value": pickle_dict_dump,
+                        },
+                        table_str="shelves",
+                        where_str=f"name='{shelf_name}'",
+                        debug=False,
+                    )
+
+        except Exception as e:
+            self.error.code = -1
+            self.error.message = str(e)
+
+        return self.error.code, self.error.message
+
+
 class SQLDB:
     """Class provides app database, utility and SQL methods -> SQLLITE focused but could be extended"""
 
@@ -1540,7 +1780,7 @@ class SQLDB:
 
         sql_statement = (
             f"{SQL.CREATE_TABLE} {table_name} ({col_list.strip()} "
-            f"{',' + primary_key_stmt if '(' in primary_key_stmt else '' }) ;"
+            f"{',' + primary_key_stmt if '(' in primary_key_stmt else ''}) ;"
         )
 
         if drop_table:
