@@ -173,6 +173,12 @@ class DVD_Archiver(DVD_Archiver_Base):
         if self._db_settings.setting_get("First_Run"):
             # Do stuff that the application only ever needs to do once on first
             # startup of a new installation
+            Set_Shelved_DVD_Layout(
+                project_name=sys_consts.DEFAULT_PROJECT_NAME,
+                dvd_layout_name=sys_consts.DEFAULT_DVD_LAYOUT_NAME,
+                dvd_menu_layout=[],
+            )
+
             self._db_settings.setting_set("First_Run", False)
 
         self._menu_title_font_size = 24
@@ -636,7 +642,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     self._file_control.project_name, partial_match=False
                 )
 
-                _, layout_items = Get_Project_Layout_Names(
+                _, layout_items, _ = Get_Project_Layout_Names(
                     self._file_control.project_name
                 )
 
@@ -1336,10 +1342,8 @@ class DVD_Archiver(DVD_Archiver_Base):
         if project_name is None or not project_name.strip():
             project_name = sys_consts.DEFAULT_PROJECT_NAME
 
-        Migrate_Shelves_To_DB()  # Basically, I am moving from shelves to SQL lite
-        project_items, layout_items = Get_Project_Layout_Names(project_name)
-        project_items.sort()
-        layout_items.sort()
+        Migrate_Shelves_To_DB()  # Basically, I am moving from shelves to SQL lite TODO Remove In Later Release
+        project_items, layout_items, _ = Get_Project_Layout_Names(project_name)
 
         project_combo_items = [
             qtg.Combo_Item(

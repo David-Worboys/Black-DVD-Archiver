@@ -44,8 +44,52 @@ from utils import NUMBER, Get_Unique_Sysid, Is_Complied, strEnum
 
 @dataclasses.dataclass(slots=True)
 class Error:
-    code: int = 1
-    message: str = ""
+    """Used to store the error status"""
+
+    _code: int = 1
+    _message: str = ""
+
+    def __post_init__(self):
+        pass
+
+    @property
+    def code(self) -> int:
+        """Gets the error code
+
+        Returns:
+            int: The error code
+        """
+        return self._code
+
+    @code.setter
+    def code(self, value: int):
+        """Sets the error code
+
+        Args:
+            value (int): The integer error code
+        """
+        assert isinstance(value, int), f"{value=}. Must be int"
+        self._code = value
+
+    @property
+    def message(self) -> str:
+        """Gets the error message
+
+        Returns:
+            str: The error message
+
+        """
+        return self._message
+
+    @message.setter
+    def message(self, value: str):
+        """Sets the error message
+
+        Args:
+            value (str): The error message
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+        self._message = value
 
 
 @unique
@@ -982,7 +1026,13 @@ class SQL_Shelf:
                     debug=False,
                 )
 
-                if select_result:
+                # The "{}" check addresses a rare issue where "{}" is in the sql output instead of "" - I have not been
+                # able to track down why this occurs but suspect an empty dict is getting saved as string somewhere.
+                if (
+                    select_result
+                    and select_result[0][1].strip() != ""
+                    and select_result[0][1].strip() != "{}"
+                ):
                     try:
                         shelf_dict = pickle.loads(
                             base64.b64decode(select_result[0][1].encode())
@@ -1627,7 +1677,7 @@ class SQLDB:
             print(f">> {orderby_str=} <<")
             print(f">>>>>>>>>>>>>>>>>>>>>>>>> {sql_statement} <<<<<<<<<<<<<<<<")
 
-        return self.sql_execute(sql_statement)
+        return self.sql_execute(sql_statement=sql_statement, debug=debug)
 
     def sql_update(
         self,
@@ -2070,4 +2120,8 @@ class SQLDB:
         :return: (Error): code =  1 if ok, -1 if _error message = _error text
         """
 
-        return Error(code=self._error, message=self._error_txt)
+        error = Error()
+        error.code = self._error
+        error.message = self._error_txt
+
+        return error

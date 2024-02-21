@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
 import datetime
-from typing import cast
+from typing import cast, Final
 
 import platformdirs
 
@@ -32,7 +32,7 @@ import sqldb
 import sys_consts
 import utils
 from dvd_menu_configuration import DVD_Menu_Config_Popup
-from sys_config import DVD_Archiver_Base, Get_DVD_Build_Folder, Video_Data, Get_Project_Files
+from sys_config import DVD_Archiver_Base, Get_DVD_Build_Folder, Video_Data, Get_Project_Files, Get_Project_Layout_Names
 from video_file_picker import Video_File_Picker_Popup
 
 # fmt: on
@@ -54,7 +54,6 @@ class Video_File_Grid(DVD_Archiver_Base):
         self._file_grid: qtg.Grid | None = None
 
         self._parent = parent
-        file_handler = file_utils.File()
 
         if not project_name.strip():
             self.project_name = sys_consts.DEFAULT_PROJECT_NAME
@@ -71,9 +70,6 @@ class Video_File_Grid(DVD_Archiver_Base):
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
         self._db_path = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
-        self._grid_db = file_handler.file_join(
-            self._db_path, sys_consts.DEFAULT_PROJECT_NAME, "project_files"
-        )
         self._shutdown = False
 
     def grid_events(self, event: qtg.Action) -> None:
@@ -428,7 +424,9 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         self.project_name = project_name
 
-        result, video_grid_dict = Get_Project_Files(project_name=self.project_name)
+        project_names, _, result = Get_Project_Layout_Names(
+            project_name=self.project_name
+        )
 
         if result == -1:
             popups.PopError(
@@ -436,7 +434,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             ).show()
             return None
 
-        if video_grid_dict:  # Existing Project
+        if self.project_name in project_names:  # Existing Project
             file_grid.clear()
             self._load_grid(event)
         else:
@@ -634,7 +632,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                     "Stream Copy - Fast       :: Use Where There Is No Problem Joining Files ": (
                         "stream_copy"
                     ),
-                    "Make Edit File - Slow    :: Use Where There Is A Problem Joining Files & The Joined File Needs To Be Edited": "transjoin_edit",
+                    "Make Edit File - Slow    :: Use Where There Is A Problem Joining Files & The Joined File Needs "
+                    "To Be Edited": "transjoin_edit",
                     "Re-Encode H264 - Slower  ::  Use To Join Files Into The Common H264 Format": "transjoin_h264",
                     "Re-Encode H265 - Slowest ::  Use To Join Files Into The Newer H265 Format": "transjoin_h265",
                 }
@@ -877,6 +876,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             for item in reversed(file_grid.checkitems_get):
                 item: qtg.Grid_Item
                 file_grid.row_delete(item.row_index)
+            self._save_grid(event)
 
         self.set_project_standard_duration(event)
 
@@ -1059,7 +1059,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         if self.project_name:
             project_name = self.project_name
         else:
-            project_name = self._grid_db
+            project_name = sys_consts.DEFAULT_PROJECT_NAME
 
         file_grid: qtg.Grid = cast(
             qtg.Grid,
@@ -1076,7 +1076,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
             if result == -1:
                 popups.PopError(
-                    title="File Grid Load Error...", message="Failed To Load Fles!"
+                    title="File Grid Load Error...", message="Failed To Load Files!"
                 ).show()
                 return None
 
@@ -1128,7 +1128,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         if removed_files:
             removed_file_list = "\n".join(removed_files)
             popups.PopMessage(
-                width=80,
+                width=120,
                 title="Source Files Not Found...",
                 message=(
                     "The following video files do not exist and were removed"
@@ -1149,14 +1149,25 @@ class Video_File_Grid(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
+        error_title: Final[str] = "File Grid Save Error..."
+
+        file_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="video_file_controls",
+                tag="video_input_files",
+            ),
+        )
+
         if not self.project_name:
-            self.project_file_name = self._grid_db
+            self.project_name = sys_consts.DEFAULT_PROJECT_NAME
 
         sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
 
         if sql_shelf.error.code == -1:
             popups.PopError(
-                title="File Grid Save Error...", message=sql_shelf.error.message
+                title=error_title,
+                message=f"Instantiate - {sql_shelf.error.message}",
             ).show()
             return None
 
@@ -1165,18 +1176,12 @@ class Video_File_Grid(DVD_Archiver_Base):
 
             if sql_shelf.error.code == -1:
                 popups.PopError(
-                    title="File Grid Save Error...", message=sql_shelf.error.message
+                    title=error_title,
+                    message=f"Open -{sql_shelf.error.message}",
                 ).show()
                 return None
 
             row_data = []
-            file_grid: qtg.Grid = cast(
-                qtg.Grid,
-                event.widget_get(
-                    container_tag="video_file_controls",
-                    tag="video_input_files",
-                ),
-            )
             for row in range(file_grid.row_count):
                 row_data.append({
                     "row_index": row,
@@ -1186,17 +1191,16 @@ class Video_File_Grid(DVD_Archiver_Base):
                     ),
                 })
 
-            if row_data:
-                shelf_dict[self.project_name] = row_data
-                result, message = sql_shelf.update(
-                    shelf_name="video_grid",
-                    shelf_data=shelf_dict,
-                )
+            shelf_dict[self.project_name] = row_data
 
-                if result == -1:
-                    popups.PopError(
-                        title="File Grid Save Error...", message=message
-                    ).show()
+            result, message = sql_shelf.update(
+                shelf_name="video_grid",
+                shelf_data=shelf_dict,
+            )
+
+            if result == -1:
+                popups.PopError(title=error_title, message=f"Update - {message}").show()
+
         return None
 
     def _toggle_file_button_names(self, event) -> None:
@@ -1450,6 +1454,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                         continue
 
                     loaded_files.append(grid_video_data.video_path)
+                self._save_grid(event)
 
                 # Keep a list of words common to all file names
                 self.common_words = utils.Find_Common_Words(loaded_files)

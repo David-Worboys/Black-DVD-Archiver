@@ -475,25 +475,26 @@ def Get_Project_Files(
         return -1, []
 
     dvd_layout_videos = []
-    for dvd_layout in project_shelf_dict[project_name]:
-        dvd_layout_key = f"{project_name}.{dvd_layout}"
+    if project_name in project_shelf_dict:
+        for dvd_layout in project_shelf_dict[project_name]:
+            dvd_layout_key = f"{project_name}.{dvd_layout}"
 
-        if dvd_layout_key in dvdmenu_shelf_dict:
-            for dvd_page in dvdmenu_shelf_dict[dvd_layout_key]:
-                dvd_page: DVD_Menu_Page
+            if dvd_layout_key in dvdmenu_shelf_dict:
+                for dvd_page in dvdmenu_shelf_dict[dvd_layout_key]:
+                    dvd_page: DVD_Menu_Page
 
-                for button_index, button_item in dvd_page.get_button_titles.items():
-                    button_item[1]: Video_Data
+                    for button_index, button_item in dvd_page.get_button_titles.items():
+                        button_item[1]: Video_Data
 
-                    dvd_layout_videos.append({
-                        "row_index": button_index,
-                        "duration": str(
-                            datetime.timedelta(
-                                seconds=button_item[1].encoding_info.video_duration
-                            )
-                        ).split(".")[0],
-                        "video_data": button_item[1],
-                    })
+                        dvd_layout_videos.append({
+                            "row_index": button_index,
+                            "duration": str(
+                                datetime.timedelta(
+                                    seconds=button_item[1].encoding_info.video_duration
+                                )
+                            ).split(".")[0],
+                            "video_data": button_item[1],
+                        })
 
     # Perform cleansing pass
     deleted_project_key = False
@@ -533,15 +534,17 @@ def Get_Project_Files(
         return 1, dvd_layout_videos
 
 
-def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str]]:
+def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str], int]:
     """Get a list of all project names and a list of the dvd layout names associated with the project name parameter
 
     Args:
         project_name (str): The project name
 
     Returns:
-        tuple[list[str],list[str]]: A tuple of a list of all project names and a tuple of a list of DVD layouts associated
-        with the project name parameter
+        tuple[list[str],list[str],int]:
+         - arg 1 - List of all project names
+         - arg 2 - List of DVD layouts associated with the project name parameter
+         - arg 3 - Error code, 1 if Ok. -1 if an error occurred,
 
 
     """
@@ -551,11 +554,11 @@ def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str]]:
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
     if sql_shelf.error == -1:
-        return [], []
+        return [], [], -1
 
     shelf_dict = sql_shelf.open("projects")
     if sql_shelf.error == -1:
-        return [], []
+        return [], [], -1
 
     project_items = []
     layout_items = []
@@ -569,7 +572,7 @@ def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str]]:
     project_items.sort()
     layout_items.sort()
 
-    return project_items, layout_items
+    return project_items, layout_items, 1
 
 
 def Get_Shelved_DVD_Layout(
