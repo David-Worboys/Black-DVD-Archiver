@@ -2366,6 +2366,67 @@ def Text_To_File_Name(text: str) -> str:
     return cleaned_text
 
 
+def Transform_Str_To_Value(
+    value: str,
+) -> int | bool | float | str | datetime.date | datetime.time:
+    """
+    Attempts to infer the data type of a value contained in a string and returns the string transformed to the
+    inferred data type.
+
+    Assumptions: - Same assumptions as in the previous function regarding strings representing numbers, dates, times,
+    booleans, and others.
+
+    Args:
+        value (str): The string representing the value.
+
+    Returns: int|bool|float|datetime.date|datetime.time: The actual transformed value (e.g., int, float,
+    datetime.date, datetime.time, bool, str).
+    """
+    assert isinstance(value, str), f"{value=}. Must be str"
+
+    scrubbed_value = ""
+    for char in value:
+        if char.isalnum() or char in string.punctuation:
+            scrubbed_value += char
+
+    # Number
+    if re.match(r"^[-+]?[0-9]+\.?[0-9]*(?:[eE][-+]?[0-9]+)?$", scrubbed_value):
+        return float(scrubbed_value)
+    elif re.match(r"^[-+]?[0-9]+$", scrubbed_value):
+        return int(scrubbed_value)
+
+    # Date
+    date_formats = [
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%m/%d/%Y",
+        "%Y/%m/%d",
+        "%b %d, %Y",
+        "%d %b %Y",
+        "%Y %b %d",
+    ]
+    for format in date_formats:
+        try:
+            return datetime.datetime.strptime(scrubbed_value, format).date()
+        except ValueError:
+            pass
+
+    # Time
+    time_formats = ["%H:%M:%S", "%H:%M", "%I:%M %p", "%I %M %p"]
+    for format in time_formats:
+        try:
+            return datetime.datetime.strptime(scrubbed_value, format).time()
+        except ValueError:
+            pass
+
+    # Boolean
+    if scrubbed_value.lower() in ("true", "false"):
+        return bool(scrubbed_value)
+
+    # String
+    return str(scrubbed_value)
+
+
 """ Regex for email check TODO put in function
 re.fullmatch(regex, email):
 (?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=^_`{|}~-]+)*

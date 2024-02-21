@@ -9984,19 +9984,15 @@ class Grid(_qtpyBase_Control):
 
         item_data = item.data(qtC.Qt.UserRole)
 
+        transformed_value = utils.Transform_Str_To_Value(item.text().strip())
+
         current_value = item_data.current_value
-        new_value_str = item.text().strip()
 
-        if current_value is None or str(current_value).strip() != new_value_str:
-            if current_value is None:
-                new_value = new_value_str
-            else:
-                new_value = type(current_value)(new_value_str)
-
+        if current_value is None or str(current_value).strip() != item.text().strip():
             item_data = item_data.replace(
-                current_value=new_value,
+                current_value=transformed_value,
                 prev_value=current_value,
-                data_type=self._data_type_encode(new_value),
+                data_type=self._data_type_encode(transformed_value),
                 user_data=item_data.user_data,
                 widget=item_data.widget,
             )
