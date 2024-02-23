@@ -33,7 +33,6 @@ starting point to find the relevant licensing details):
 * ffmpeg  (https://ffmpeg.org/download.html)
 * ffprobe (https://ffmpeg.org/download.html)
 * identify (https://imagemagick.org/script/download.php)
-* mediainfo (https://mediaarea.net/en/MediaInfo/Download)
 * mplex (https://www.linuxtv.org/wiki/index.php/Mplex)
 * spumux (https://sourceforge.net/projects/dvdauthor/files/)
 * xorriso (https://www.gnu.org/software/xorriso/)
@@ -66,8 +65,7 @@ project folder
    │ dvdauthor
    │ ffmpeg 
    │ ffprobe
-   │ identify   
-   │ mediainfo   
+   │ identify         
    │ mplex
    │ spumux
    │ xorriso
@@ -85,7 +83,7 @@ The tool_apps folder can now be copied into the root of the Black DVD Archiver s
 **Note:**
 The paths will need to be changed to reflect the actual tools folder structure above:
 ```
-~/Programs/linuxdeploy-x86_64.AppImage --appdir /home/david/PycharmProjects/dvdarch/tools/tool_apps --executable /home/david/PycharmProjects/dvdarch/tools/composite   --executable /home/david/PycharmProjects/dvdarch/tools/dvdauthor   --executable /home/david/PycharmProjects/dvdarch/tools/ffmpeg --executable /home/david/PycharmProjects/dvdarch/tools/ffprobe --executable /home/david/PycharmProjects/dvdarch/tools/identify  --executable /home/david/PycharmProjects/dvdarch/tools/magick --executable /home/david/PycharmProjects/dvdarch/tools/mediainfo --executable /home/david/PycharmProjects/dvdarch/tools/mplex  --executable /home/david/PycharmProjects/dvdarch/tools/spumux   --executable /home/david/PycharmProjects/dvdarch/tools/xorriso
+~/Programs/linuxdeploy-x86_64.AppImage --appdir /home/david/PycharmProjects/dvdarch/tools/tool_apps --executable /home/david/PycharmProjects/dvdarch/tools/composite   --executable /home/david/PycharmProjects/dvdarch/tools/dvdauthor   --executable /home/david/PycharmProjects/dvdarch/tools/ffmpeg --executable /home/david/PycharmProjects/dvdarch/tools/ffprobe --executable /home/david/PycharmProjects/dvdarch/tools/identify  --executable /home/david/PycharmProjects/dvdarch/tools/magick --executable /home/david/PycharmProjects/dvdarch/tools/mplex  --executable /home/david/PycharmProjects/dvdarch/tools/spumux   --executable /home/david/PycharmProjects/dvdarch/tools/xorriso
 ```
 
 
