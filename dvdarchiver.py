@@ -1050,7 +1050,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             dvd_config.menu_buttons_per_page = dvd_menu_settings.buttons_per_page
 
             dvd_creator = DVD()
-            dvd_creator.dvd_setup = dvd_config
+            dvd_creator.dvd_config = dvd_config
             dvd_creator.working_folder = dvd_folder
 
             if self._video_editor.get_task_manager is None:

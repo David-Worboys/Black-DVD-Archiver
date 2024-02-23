@@ -25,7 +25,7 @@ import locale
 import math
 import subprocess
 from random import randint
-from typing import Final
+from typing import Final, Literal
 
 import xmltodict
 
@@ -37,8 +37,6 @@ from archive_management import Archive_Manager
 from sys_config import Video_Data
 
 # fmt: on
-
-SPUMUX_BUFFER: Final[int] = 43
 
 
 @dataclasses.dataclass
@@ -585,8 +583,12 @@ class DVD:
 
     _BACKGROUND_CANVAS_FILE: Final[str] = "background_canvas.png"
 
+    # Defaults to 43 pixels. Takes only 2 possible pixel unit values - 33 (AR169) and 43 (AR43). spumux is very sensitive
+    # to this setting
+    _SPUMUX_BUFFER: Literal[33, 43] = 43
+
     # Internal instance vars
-    _dvd_setup: DVD_Config = dataclasses.field(default_factory=DVD_Config)
+    _dvd_config: DVD_Config = dataclasses.field(default_factory=DVD_Config)
     _dvd_timestamp_x_offset: int = 10  # TODO Make user configurable
 
     # folders
@@ -605,14 +607,22 @@ class DVD:
         pass
 
     @property
-    def dvd_setup(self) -> DVD_Config:
-        return self._dvd_setup
+    def dvd_config(self) -> DVD_Config:
+        return self._dvd_config
 
-    @dvd_setup.setter
-    def dvd_setup(self, value: DVD_Config) -> None:
+    @dvd_config.setter
+    def dvd_config(self, value: DVD_Config) -> None:
         assert isinstance(value, DVD_Config), f"{value=}. Must be a DVD_Setup"
 
-        self._dvd_setup = value
+        self._dvd_config = value
+        if self.dvd_config.menu_aspect_ratio == sys_consts.AR43:
+            self._SPUMUX_BUFFER = (
+                43  # pixel unit, spumux is very sensitive to this setting
+            )
+        else:  # sys_consts.AR169
+            self._SPUMUX_BUFFER = (
+                33  # pixel unit, spumux is very sensitive to this setting
+            )
 
     @property
     def dvd_working_folder(self) -> str:
@@ -647,7 +657,7 @@ class DVD:
             - arg2: error message or "" if ok
         """
         assert (
-            len(self.dvd_setup.input_videos) > 0
+            len(self.dvd_config.input_videos) > 0
         ), "Must have at least one input video"
 
         error_no, error_message = self._build_working_folders()
@@ -695,13 +705,13 @@ class DVD:
         ), f"{cell_coords=}. Must be a list of _Cell_Coords"
 
         if (
-            self.dvd_setup.archive_folder and cell_coords
+            self.dvd_config.archive_folder and cell_coords
         ):  # Only archive if an archive folder is specified.
             archive_manager = Archive_Manager(
-                archive_folder=self.dvd_setup.archive_folder,
-                streaming_folder=self.dvd_setup.streaming_folder,
-                archive_size=self.dvd_setup.archive_size,
-                transcode_type=self.dvd_setup.transcode_type,
+                archive_folder=self.dvd_config.archive_folder,
+                streaming_folder=self.dvd_config.streaming_folder,
+                archive_size=self.dvd_config.archive_size,
+                transcode_type=self.dvd_config.transcode_type,
             )
             menu_layout: list[tuple[str, list[Video_Data]]] = []
             video_list: list[Video_Data] = []
@@ -714,8 +724,8 @@ class DVD:
                         menu_layout.append((
                             (
                                 f"menu_{page_index}"
-                                if self.dvd_setup.menu_title[page_index].strip() == ""
-                                else self.dvd_setup.menu_title[page_index]
+                                if self.dvd_config.menu_title[page_index].strip() == ""
+                                else self.dvd_config.menu_title[page_index]
                             ),
                             video_list,
                         ))
@@ -727,14 +737,14 @@ class DVD:
                     menu_layout.append((
                         (
                             f"menu_{page_index}"
-                            if self.dvd_setup.menu_title[page_index].strip() == ""
-                            else self.dvd_setup.menu_title[page_index]
+                            if self.dvd_config.menu_title[page_index].strip() == ""
+                            else self.dvd_config.menu_title[page_index]
                         ),
                         video_list,
                     ))
             result, message = archive_manager.archive_dvd_build(
                 dvd_name=(
-                    f"{self.dvd_setup.serial_number} - {self._dvd_setup.project_name}"
+                    f"{self.dvd_config.serial_number} - {self._dvd_config.project_name}"
                 ),
                 dvd_folder=self.dvd_image_folder,
                 iso_folder=self.iso_folder,
@@ -896,7 +906,7 @@ class DVD:
         ]
         black_box_filter = ",".join(filter_commands)
 
-        for video_file in self.dvd_setup.input_videos:
+        for video_file in self.dvd_config.input_videos:
             vob_file = file_handler.file_join(
                 self._vob_folder, video_file.video_file, "vob"
             )
@@ -956,7 +966,7 @@ class DVD:
 
             # Do not forget-widescreen stretches the file on display, so wide screen and standard screen are the
             # same size here
-            if self.dvd_setup.video_standard == sys_consts.PAL:
+            if self.dvd_config.video_standard == sys_consts.PAL:
                 frame_rate = f"{sys_consts.PAL_FRAME_RATE}"
 
                 if (
@@ -1145,18 +1155,18 @@ class DVD:
         debug = False
 
         timestamp_height = 0
-        buttons_per_page = self.dvd_setup.menu_buttons_per_page
-        buttons_across = self.dvd_setup.menu_buttons_across
+        buttons_per_page = self.dvd_config.menu_buttons_per_page
+        buttons_across = self.dvd_config.menu_buttons_across
 
         dvd_dims = dvdarch_utils.Get_DVD_Dims(
-            self.dvd_setup.menu_aspect_ratio, self.dvd_setup.video_standard
+            self.dvd_config.menu_aspect_ratio, self.dvd_config.video_standard
         )
 
         if dvd_dims.display_height == -1:
             return -1, "Failed To Get DVD Dimensions"
 
         if all(
-            file_def.dvd_page >= 0 for file_def in self.dvd_setup.input_videos
+            file_def.dvd_page >= 0 for file_def in self.dvd_config.input_videos
         ):  # Manual Layout
             cell_coords, message = self._dvd_page_calc_layout(
                 buttons_per_page=buttons_per_page,
@@ -1171,7 +1181,7 @@ class DVD:
             )
         else:  # Auto calc layout
             cell_coords, message = self._auto_calc_layout(
-                num_buttons=len(self.dvd_setup.input_videos),
+                num_buttons=len(self.dvd_config.input_videos),
                 buttons_per_page=buttons_per_page,
                 buttons_across=buttons_across,
                 button_aspect_ratio=4
@@ -1313,12 +1323,12 @@ class DVD:
                 in_file=menu_button_file,
                 out_file=menu_button_text_file,
                 text=menu_text,
-                text_font=self.dvd_setup.button_font,
-                text_pointsize=self.dvd_setup.button_font_point_size,
-                text_color=self.dvd_setup.button_font_color,
+                text_font=self.dvd_config.button_font,
+                text_pointsize=self.dvd_config.button_font_point_size,
+                text_color=self.dvd_config.button_font_color,
                 position="bottom",
-                background_color=self.dvd_setup.button_background_color,
-                opacity=self.dvd_setup.button_background_transparency,
+                background_color=self.dvd_config.button_background_color,
+                opacity=self.dvd_config.button_background_transparency,
                 y_offset=10,
             )
 
@@ -1454,13 +1464,13 @@ class DVD:
         button_padding = 20  # Min value that works with spumux
 
         # This keeps spumux happy
-        if border_right < SPUMUX_BUFFER:
-            border_right = SPUMUX_BUFFER
+        if border_right < self._SPUMUX_BUFFER:
+            border_right = self._SPUMUX_BUFFER
 
-        if border_left < SPUMUX_BUFFER:
-            border_left = SPUMUX_BUFFER
+        if border_left < self._SPUMUX_BUFFER:
+            border_left = self._SPUMUX_BUFFER
 
-        if not self.dvd_setup.menu_title:  # Header pad is only for titles
+        if not self.dvd_config.menu_title:  # Header pad is only for titles
             header_pad = 0
 
         # Compute the canvas size and ratio
@@ -1553,12 +1563,12 @@ class DVD:
                     x = int(x_offset + col_index * (rect_width + button_padding))
                     y = int(y_offset + row_index * (rect_height + rect_padding))
 
-                    if file_index > len(self.dvd_setup.input_videos) - 1:
+                    if file_index > len(self.dvd_config.input_videos) - 1:
                         return (
                             [],
                             (
                                 "File index out of range 0 -"
-                                f" {len(self.dvd_setup.input_videos) - 1}"
+                                f" {len(self.dvd_config.input_videos) - 1}"
                             ),
                         )
 
@@ -1573,7 +1583,7 @@ class DVD:
                             height=rect_height
                             - button_padding,  # Provide space between buttons
                             page=page_index,
-                            video_data=self.dvd_setup.input_videos[file_index],
+                            video_data=self.dvd_config.input_videos[file_index],
                         )
                     )
                     file_index += 1
@@ -1616,13 +1626,13 @@ class DVD:
         button_padding = 20  # Min value that works with spumux
 
         # This keeps spumux happy
-        if border_right < SPUMUX_BUFFER:
-            border_right = SPUMUX_BUFFER
+        if border_right < self._SPUMUX_BUFFER:
+            border_right = self._SPUMUX_BUFFER
 
-        if border_left < SPUMUX_BUFFER:
-            border_left = SPUMUX_BUFFER
+        if border_left < self._SPUMUX_BUFFER:
+            border_left = self._SPUMUX_BUFFER
 
-        if not self.dvd_setup.menu_title:  # Header pad is only for titles
+        if not self.dvd_config.menu_title:  # Header pad is only for titles
             header_pad = 0
 
         # Compute the canvas size and ratio
@@ -1632,7 +1642,7 @@ class DVD:
         )
 
         num_pages = (
-            self.dvd_setup.input_videos[-1].dvd_page + 1
+            self.dvd_config.input_videos[-1].dvd_page + 1
         )  # dvd_page is zero based
 
         if buttons_per_page == 1:
@@ -1680,7 +1690,7 @@ class DVD:
             page_file_defs = [
                 file_def
                 for file_def in sorted(
-                    self.dvd_setup.input_videos, key=lambda item: item.dvd_page
+                    self.dvd_config.input_videos, key=lambda item: item.dvd_page
                 )
                 if file_def.dvd_page == page_index
             ]
@@ -1741,12 +1751,12 @@ class DVD:
                     x = int(x_offset + col_index * (rect_width + button_padding))
                     y = int(y_offset + row_index * (rect_height + rect_padding))
 
-                    if file_index > len(self.dvd_setup.input_videos) - 1:
+                    if file_index > len(self.dvd_config.input_videos) - 1:
                         return (
                             [],
                             (
                                 "File index out of range 0 -"
-                                f" {len(self.dvd_setup.input_videos) - 1}"
+                                f" {len(self.dvd_config.input_videos) - 1}"
                             ),
                         )
 
@@ -1761,7 +1771,7 @@ class DVD:
                             height=rect_height
                             - button_padding,  # Provide space between buttons
                             page=page_index,
-                            video_data=self.dvd_setup.input_videos[file_index],
+                            video_data=self.dvd_config.input_videos[file_index],
                         )
                     )
                     file_index += 1
@@ -1788,7 +1798,7 @@ class DVD:
             sys_consts.CONVERT,
             "-size",
             f"{width}x{height}",
-            f"xc:{self.dvd_setup.menu_background_color}",
+            f"xc:{self.dvd_config.menu_background_color}",
             self._background_canvas_file,
         ]
 
@@ -1797,11 +1807,11 @@ class DVD:
         if result == -1:
             return -1, message
 
-        if self.dvd_setup.timestamp_font and self.dvd_setup.timestamp:
+        if self.dvd_config.timestamp_font and self.dvd_config.timestamp:
             _, timestamp_height = dvdarch_utils.Get_Text_Dims(
-                text=self.dvd_setup.timestamp,
-                font=self.dvd_setup.timestamp_font,
-                pointsize=self.dvd_setup.timestamp_font_point_size,
+                text=self.dvd_config.timestamp,
+                font=self.dvd_config.timestamp_font,
+                pointsize=self.dvd_config.timestamp_font_point_size,
             )
 
             if timestamp_height == -1:
@@ -1809,22 +1819,22 @@ class DVD:
 
             result, message = dvdarch_utils.Write_Text_On_File(
                 input_file=self._background_canvas_file,
-                text=self.dvd_setup.timestamp,
+                text=self.dvd_config.timestamp,
                 x=self._dvd_timestamp_x_offset,
                 y=height - timestamp_height,
-                pointsize=self.dvd_setup.timestamp_font_point_size,
-                color=self.dvd_setup.menu_font_color,
-                font=self.dvd_setup.timestamp_font,
+                pointsize=self.dvd_config.timestamp_font_point_size,
+                color=self.dvd_config.menu_font_color,
+                font=self.dvd_config.timestamp_font,
             )
 
             if result == -1:
                 return -1, message
 
-        if self.dvd_setup.timestamp_font and self.dvd_setup.serial_number:
+        if self.dvd_config.timestamp_font and self.dvd_config.serial_number:
             serial_num_width, serial_num_height = dvdarch_utils.Get_Text_Dims(
-                text=self.dvd_setup.serial_number,
-                font=self.dvd_setup.timestamp_font,
-                pointsize=self.dvd_setup.timestamp_font_point_size,
+                text=self.dvd_config.serial_number,
+                font=self.dvd_config.timestamp_font,
+                pointsize=self.dvd_config.timestamp_font_point_size,
             )
 
             if serial_num_height == -1:
@@ -1832,12 +1842,12 @@ class DVD:
 
             result, message = dvdarch_utils.Write_Text_On_File(
                 input_file=self._background_canvas_file,
-                text=self.dvd_setup.serial_number,
+                text=self.dvd_config.serial_number,
                 x=width - serial_num_width - self._dvd_timestamp_x_offset,
                 y=height - serial_num_height,
-                pointsize=self.dvd_setup.timestamp_font_point_size,
-                color=self.dvd_setup.menu_font_color,
-                font=self.dvd_setup.timestamp_font,
+                pointsize=self.dvd_config.timestamp_font_point_size,
+                color=self.dvd_config.menu_font_color,
+                font=self.dvd_config.timestamp_font,
             )
 
             if result == -1:
@@ -1850,8 +1860,8 @@ class DVD:
 
             progname_width, progname_height = dvdarch_utils.Get_Text_Dims(
                 text=calling_card,
-                font=self.dvd_setup.timestamp_font,
-                pointsize=self.dvd_setup.timestamp_font_point_size,
+                font=self.dvd_config.timestamp_font,
+                pointsize=self.dvd_config.timestamp_font_point_size,
             )
 
             if progname_height == -1:
@@ -1862,9 +1872,9 @@ class DVD:
                 text=calling_card,
                 x=width // 2 - progname_width // 2,
                 y=height - progname_height,
-                pointsize=self.dvd_setup.timestamp_font_point_size,
-                color=self.dvd_setup.menu_font_color,
-                font=self.dvd_setup.timestamp_font,
+                pointsize=self.dvd_config.timestamp_font_point_size,
+                color=self.dvd_config.menu_font_color,
+                font=self.dvd_config.timestamp_font,
             )
 
             if result == -1:
@@ -2152,7 +2162,7 @@ class DVD:
 
             spumux_dict = {
                 "subpictures": {
-                    "@format": self.dvd_setup.video_standard,
+                    "@format": self.dvd_config.video_standard,
                     "stream": {
                         "spu": {
                             "@force": "yes" if prev_page == 0 else "no",
@@ -2198,10 +2208,10 @@ class DVD:
 
         # TODO Make sys_consts.ICON_PATH user configurable
         page_pointer_left_file = file_handler.file_join(
-            sys_consts.ICON_PATH, self.dvd_setup.page_pointer_left_file
+            sys_consts.ICON_PATH, self.dvd_config.page_pointer_left_file
         )
         page_pointer_right_file = file_handler.file_join(
-            sys_consts.ICON_PATH, self.dvd_setup.page_pointer_right_file
+            sys_consts.ICON_PATH, self.dvd_config.page_pointer_right_file
         )
 
         left_path, left_file, left_extn = file_handler.split_file_path(
@@ -2250,10 +2260,10 @@ class DVD:
         max_page_no = cell_coords[-1].page + 1  # Zero based
         prev_page = -1
 
-        left_x = SPUMUX_BUFFER
-        left_y = canvas_height - (pointer_height + SPUMUX_BUFFER)
-        right_x = canvas_width - (pointer_width + SPUMUX_BUFFER)
-        right_y = canvas_height - (pointer_height + SPUMUX_BUFFER)
+        left_x = self._SPUMUX_BUFFER
+        left_y = canvas_height - (pointer_height + self._SPUMUX_BUFFER)
+        right_x = canvas_width - (pointer_width + self._SPUMUX_BUFFER)
+        right_y = canvas_height - (pointer_height + self._SPUMUX_BUFFER)
 
         # ----- Write out spumux files # TODO Enhance with button name/pos/action, split out to another method then
         prev_page = -1
@@ -2363,8 +2373,8 @@ class DVD:
                 if result == -1:
                     return -1, message
 
-                if cell_coord.page <= len(self.dvd_setup.menu_title) - 1:
-                    menu_title = self.dvd_setup.menu_title[cell_coord.page]
+                if cell_coord.page <= len(self.dvd_config.menu_title) - 1:
+                    menu_title = self.dvd_config.menu_title[cell_coord.page]
                 else:
                     menu_title = ""
 
@@ -2372,11 +2382,11 @@ class DVD:
                     result, message = dvdarch_utils.Overlay_Text(
                         in_file=canvas_images_file,
                         text=menu_title,
-                        text_font=self.dvd_setup.menu_font,
-                        text_pointsize=self.dvd_setup.menu_font_point_size,
-                        text_color=self.dvd_setup.menu_font_color,
+                        text_font=self.dvd_config.menu_font,
+                        text_pointsize=self.dvd_config.menu_font_point_size,
+                        text_color=self.dvd_config.menu_font_color,
                         position="top",
-                        background_color=self.dvd_setup.menu_background_color,
+                        background_color=self.dvd_config.menu_background_color,
                         opacity=0.9,
                     )
 
@@ -2557,7 +2567,7 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        for video_data in self.dvd_setup.input_videos:
+        for video_data in self.dvd_config.input_videos:
             if video_data.encoding_info.video_frame_count <= 0:
                 return -1, f"No video frame count found for {video_data.video_path}"
 
@@ -2646,7 +2656,7 @@ class DVD:
                         f"Sys Error : {background_canvas_images_file} does not exist!",
                     )
 
-                if self._dvd_setup.video_standard == sys_consts.PAL:
+                if self._dvd_config.video_standard == sys_consts.PAL:
                     frame_rate = sys_consts.PAL_SPECS.frame_rate
                 else:  # NTSC
                     frame_rate = sys_consts.NTSC_SPECS.frame_rate
@@ -2737,7 +2747,7 @@ class DVD:
                     path_name, f"{file_name}_menu_video_{coord.page}", "ac3"
                 )
 
-                if self._dvd_setup.video_standard == sys_consts.PAL:
+                if self._dvd_config.video_standard == sys_consts.PAL:
                     framerate = 25
                 else:
                     framerate = 30000 / 1001
@@ -2867,7 +2877,7 @@ class DVD:
                     path_name, f"spumux_{coord.page}", "xml"
                 )
 
-                env = {"VIDEO_FORMAT": self.dvd_setup.video_standard}
+                env = {"VIDEO_FORMAT": self.dvd_config.video_standard}
 
                 commands = [
                     sys_consts.SPUMUX,
@@ -2983,8 +2993,8 @@ class DVD:
 
         dvd_author_dict["dvdauthor"]["vmgm"]["menus"] = {
             "video": {
-                "@format": self.dvd_setup.video_standard,
-                "@aspect": self.dvd_setup.menu_aspect_ratio,
+                "@format": self.dvd_config.video_standard,
+                "@aspect": self.dvd_config.menu_aspect_ratio,
             },
             "pgc": pgcs,
         }
@@ -3002,7 +3012,7 @@ class DVD:
             dvd_author_dict["dvdauthor"]["titleset"].append({
                 "titles": {
                     "video": {
-                        "@format": self.dvd_setup.video_standard,
+                        "@format": self.dvd_config.video_standard,
                         "@aspect": coord.video_data.encoding_info.video_ar,
                     },
                     "pgc": pgc,
@@ -3022,7 +3032,7 @@ class DVD:
             return -1, f"Sys Error: Could Not Write {dvd_author_file}"
 
         # Run the DVDauthor XML control file
-        env = {"VIDEO_FORMAT": self.dvd_setup.video_standard}
+        env = {"VIDEO_FORMAT": self.dvd_config.video_standard}
 
         commands = [
             sys_consts.DVDAUTHOR,

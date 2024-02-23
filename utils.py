@@ -2385,8 +2385,8 @@ def Transform_Str_To_Value(
     assert isinstance(value, str), f"{value=}. Must be str"
 
     scrubbed_value = ""
-    for char in value:
-        if char.isalnum() or char in string.punctuation:
+    for char in value.strip():
+        if char.isalnum() or char in string.punctuation or char == " ":
             scrubbed_value += char
 
     # Number
