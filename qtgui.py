@@ -15317,11 +15317,17 @@ class Video_Player(qtC.QObject):
 
         time_offset = math.ceil((1000 / self._frame_rate) * frame)
 
-        if self._media_player.isSeekable() and self._media_player.mediaStatus() in (
-            qtM.QMediaPlayer.MediaStatus.BufferedMedia,
-            qtM.QMediaPlayer.MediaStatus.LoadedMedia,
-        ):
+        # This if statement does not always work and seek fails, so for now using try
+        # if self._media_player.isSeekable() and self._media_player.mediaStatus() in (
+        #     qtM.QMediaPlayer.MediaStatus.BufferedMedia,
+        #     qtM.QMediaPlayer.MediaStatus.LoadedMedia,
+        # ):
+
+        try:
             self._media_player.setPosition(time_offset)
+        except Exception as e:
+            if not utils.Is_Complied():
+                print(f"Seek Error {self.source_state=} {e=}")
 
     def state(self) -> str:
         playback_state = self._media_player.playbackState()
@@ -15356,37 +15362,33 @@ class Video_Player(qtC.QObject):
             self._input_file = input_file
             self._frame_rate = frame_rate
 
-            with sys_cursor(Cursor.hourglass):
-                self._input_file = input_file
-                self._frame_rate = frame_rate
+            # Trying to stop a random hang, seems to occur occasionally on second call to this method, if it gets
+            # past that it seems ok
+            self._setup_media_player()
+            self._media_player.setSource("")
+            # gc.collect()
 
-                # Trying to stop a random hang, seems to occur occasionally on second call to this method, if it gets
-                # past that it seems ok
-                # self._setup_media_player()
-                # self._media_player.setSource("")
-                # gc.collect()
+            for attempt in range(3):  # Allow up to 3 retries
+                try:
+                    self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
 
-                for attempt in range(3):  # Allow up to 3 retries
-                    try:
-                        self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
+                    while not self.available():
+                        time.sleep(0.1)
 
-                        while not self.available():
-                            time.sleep(0.1)
+                    self._media_player.pause()
 
-                        self._media_player.pause()
+                    return None
 
-                        return None
+                except Exception as e:  # Do not expect this to be called
+                    print(
+                        f"Error ({e=}) on load of {input_file}. Attempt {attempt} of 3 - Retrying..."
+                    )
 
-                    except Exception as e:  # Do not expect this to be called
-                        print(
-                            f"Error ({e=}) on load of {input_file}. Attempt {attempt} of 3 - Retrying..."
-                        )
-
-                # If all retries fail, display the error message
-                popups.PopError(
-                    title="Video File Error...",
-                    message="Video File Is Not Supported!",
-                ).show()
+            # If all retries fail, display the error message
+            popups.PopError(
+                title="Video File Error...",
+                message="Video File Is Not Supported!",
+            ).show()
 
     def _duration_changed(self, duration: int) -> None:
         """Handles a video duration change

@@ -26,7 +26,9 @@ from typing import Final
 
 import dvdarch_utils
 import file_utils
+import sqldb
 import sys_consts
+import utils
 from sys_config import Video_Data
 from utils import Is_Complied, Text_To_File_Name
 
@@ -924,23 +926,63 @@ class Archive_Manager:
 
         return 1, ""
 
-    def read_edit_cuts(self, file_path: str) -> tuple[(int, int, str)] | tuple:
+    def read_edit_cuts(
+        self,
+        file_path: str,
+        project: str,
+        layout: str,
+    ) -> tuple[int, str, tuple[tuple[int, int, str], ...]]:
         """
         Read edit cuts for a video file from a JSON file.
 
         Args:
             file_path (str): The path of the video file.
+            project (str): The project name
+            layout (str): The DVD layout name
 
         Returns:
-            tuple[(int,int,str)]: A tuple containing the edit cuts for the file_path,
-            or an empty tuple if the file_path is not stored or an error occurs.
-            Each cut is represented by a tuple with the cut_in value, cut_out value,
-            and cut_name string.
+           tuple[int,str,tuple[tuple[int, int, str],...]]:
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+            - arg 3: If the status code is 1 then a tuple of edit cut tuples is returned (mark_in,mark_out,clip_name)
         """
         assert (
             isinstance(file_path, str) and file_path.strip() != ""
         ), f"{file_path=}. Must be a str"
+        assert isinstance(project, str), f"{project=}. Must be a str"
+        # Make sure we have a layout with a project and vice versa
+        assert (
+            not project or layout
+        ), f"{layout=}. Must not be empty if {project=} is provided"
+        assert (
+            not layout.strip() or project.strip()
+        ), f"{project=}. Must not be empty if {layout=} is provided"
 
+        project_key = ""
+        if project.strip():
+            project_key = f"|{project}|{layout}"
+
+        shelf_dict_key = f"{file_path}{project_key}"
+
+        sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message, ()
+
+        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message, ()
+
+        if shelf_dict_key in shelf_dict:
+            edit_dict = shelf_dict[shelf_dict_key]
+            return 1, "", edit_dict["edit_cuts"]
+
+        # Code below migrates existing JSON file edit cuts  to a SQL shelf. TODO Remove in some future version
         self._error_message = ""
         self._error_code = 1
 
@@ -949,13 +991,18 @@ class Archive_Manager:
             self.archive_folder, self._json_edit_cuts_file, "json"
         )
 
+        if not utils.Is_Complied():
+            print(
+                f" Migrating [{file_path=}] Edit Points In [{json_cuts_file}]  To A SQL SHELF"
+            )
+
         if not file_handler.path_exists(self.archive_folder):
             self._error_message = (
                 f"{sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM} does not"
                 " exist"
             )
             self._error_code = -1
-            return ()
+            return -1, self._error_message, ()
 
         if not file_handler.path_writeable(self.archive_folder):
             self._error_message = (
@@ -963,14 +1010,14 @@ class Archive_Manager:
                 " writable"
             )
             self._error_code = -1
-            return ()
+            return -1, self._error_message, ()
 
         if not file_handler.file_exists(json_cuts_file):
             self._error_message = (
                 f"{sys_consts.SDELIM}{json_cuts_file}{sys_consts.SDELIM} does not exist"
             )
             self._error_code = 1  # May not be an actual error
-            return ()
+            return -1, self._error_message, ()
 
         # Read JSON data from file
         try:
@@ -987,12 +1034,12 @@ class Archive_Manager:
                 f" {e}{sys_consts.SDELIM}"
             )
             self._error_code = -1
-            return ()
+            return -1, self._error_message, ()
 
         if not isinstance(json_data_dict, dict):
             self._error_message = "Invalid JSON file format"
             self._error_code = -1
-            return ()
+            return -1, self._error_message, ()
 
         edit_cuts = []
         if file_path in json_data_dict:
@@ -1009,27 +1056,53 @@ class Archive_Manager:
                     )
                     edit_cuts = ()
                     break
+
                 edit_cuts.append(tuple(edit_point))
-        return tuple(edit_cuts)
+
+        shelf_dict[shelf_dict_key] = {
+            "project": project,
+            "layout": layout,
+            "edit_cuts": edit_cuts,
+        }
+
+        result, message = sql_shelf.update(
+            shelf_name="video_cutter", shelf_data=shelf_dict
+        )
+
+        self._error_message = message
+        self._error_code = result
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message, ()
+
+        return 1, "", tuple(edit_cuts)
 
     def write_edit_cuts(
         self,
         file_path: str,
+        project: str,
+        layout: str,
         file_cuts: list[(int, int, str)],
     ) -> tuple[int, str]:
         """Store files and cuts in the archive json_file.
 
         Args:
             file_path (str): The path of the video file that owns the cuts.
+            project (str): The project name
+            layout (str): The DVD layout name
             file_cuts (list[(int,int,str)]): A  list of cuts for the file_path.
                 Each cut is represented by a tuple with the cut_in value, cut_out value, and cut_name string.
 
         Returns:
-            int, str: Error code (1 Ok, -1 Fail) and Error Message ("" if all good otherwise an error message)
+            int, str:
+                - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+                - arg 2: If the status code is -1, an error occurred, and the message provides details.:
         """
         assert (
             isinstance(file_path, str) and file_path.strip() != ""
         ), f"{file_path=}. Must be a str"
+        assert isinstance(project, str), f"{project=}. Must be a str"
+        assert isinstance(layout, str), f"{layout=}. Must be a str"
         assert isinstance(file_cuts, list), f"{file_cuts=}. Must be a list"
 
         for cut in file_cuts:
@@ -1039,66 +1112,50 @@ class Archive_Manager:
             assert isinstance(cut[1], int), f"{cut[1]=}. Must be int"
             assert isinstance(cut[2], str), f"{cut[2]=}. Must be str"
 
-        self._error_message = ""
-        self._error_code = 1
+        # Make sure we have a layout with a project and vice versa
+        assert (
+            not project or layout
+        ), f"{layout=}. Must not be empty if {project=} is provided"
+        assert (
+            not layout.strip() or project.strip()
+        ), f"{project=}. Must not be empty if {layout=} is provided"
 
-        file_handler = file_utils.File()
+        project_key = ""
+        if project.strip():
+            project_key = f"|{project}|{layout}"
 
-        json_cuts_file = file_handler.file_join(
-            self.archive_folder, self._json_edit_cuts_file, "json"
+        shelf_dict_key = f"{file_path}{project_key}"
+
+        sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message
+
+        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message
+
+        if shelf_dict_key in shelf_dict:
+            edit_dict = shelf_dict[shelf_dict_key]
+            edit_dict["edit_cuts"] = tuple(file_cuts)
+        else:
+            edit_dict = {"project": "", "layout": "", "edit_cuts": tuple(file_cuts)}
+
+        shelf_dict[shelf_dict_key] = edit_dict
+
+        result, message = sql_shelf.update(
+            shelf_name="video_cutter", shelf_data=shelf_dict
         )
 
-        if not file_handler.path_exists(self.archive_folder):
-            self._error_message = (
-                f"{sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM} Does Not"
-                " Exist"
-            )
-            self._error_code = -1
-            return self._error_code, self._error_message
+        self._error_message = message
+        self._error_code = result
 
-        if not file_handler.path_writeable(self.archive_folder):
-            self._error_message = (
-                f"{sys_consts.SDELIM}{self.archive_folder}{sys_consts.SDELIM} Is Not"
-                " Writable"
-            )
-            self._error_code = -1
-            return self._error_code, self._error_message
+        if sql_shelf.error.code == -1:
+            return -1, message
 
-        json_data_dict = {}
-
-        if file_handler.file_exists(json_cuts_file):
-            # Read the JSON file. if it exists, so we update the file_path entry
-            try:
-                with open(json_cuts_file, "r") as json_file:
-                    json_data_dict = json.load(json_file)
-            except (
-                FileNotFoundError,
-                PermissionError,
-                IOError,
-                json.decoder.JSONDecodeError,
-            ):
-                # Ignore errors as the file might be empty or corrupt. The write statement below will catch
-                # real file OS errors.
-                pass
-
-        json_data_dict[file_path] = (
-            file_cuts  # Update or make new entry in the json_data_dict.
-        )
-
-        # Write the JSON file
-        try:
-            with open(json_cuts_file, "w") as json_file:
-                json.dump(json_data_dict, json_file)
-        except (
-            FileNotFoundError,
-            PermissionError,
-            IOError,
-            json.decoder.JSONDecodeError,
-        ) as e:
-            self._error_message = (
-                "Unable to write to JSON file:"
-                f" {sys_consts.SDELIM}{e}{sys_consts.SDELIM}"
-            )
-            self._error_code = -1
-
-        return self._error_code, self._error_message
+        return 1, ""

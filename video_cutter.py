@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import dataclasses
 import functools
+from time import sleep
 from typing import Callable, cast
 
 import PySide6.QtCore as qtC
@@ -436,6 +437,12 @@ class Video_Editor(DVD_Archiver_Base):
             self._video_handler.set_source(
                 self._video_file_input[0].video_path, self._frame_rate
             )
+
+            # This is done to clear the first frame of the prior video file from the video display. The sleep is
+            # esential
+            self._step_forward()
+            sleep(0.1)
+            self._step_backward()
         self._source_file_label.value_set(
             f"{self._video_file_input[0].video_file}{self._video_file_input[0].video_extension}"
         )
@@ -562,15 +569,15 @@ class Video_Editor(DVD_Archiver_Base):
         """
 
         if self._archive_manager and self._edit_list_grid:
-            edit_cuts = self._archive_manager.read_edit_cuts(
-                self._video_file_input[0].video_path
+            result, message, edit_cuts = self._archive_manager.read_edit_cuts(
+                self._video_file_input[0].video_path, project="", layout=""
             )
 
-            if not edit_cuts:
+            if result == -1:
                 if self._archive_manager.get_error_code == -1:
                     popups.PopError(
                         title="Archive Edit List",
-                        message=f"Read Failed : {self._archive_manager.get_error}",
+                        message=f"Read Failed : {message}",
                     ).show()
                     return None
 
@@ -622,7 +629,10 @@ class Video_Editor(DVD_Archiver_Base):
 
             if edit_list:
                 result, message = self._archive_manager.write_edit_cuts(
-                    self._video_file_input[0].video_path, edit_list
+                    file_path=self._video_file_input[0].video_path,
+                    project="",
+                    layout="",
+                    file_cuts=edit_list,
                 )
             else:
                 result, message = self._archive_manager.delete_edit_cuts(

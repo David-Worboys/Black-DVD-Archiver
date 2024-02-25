@@ -69,7 +69,7 @@ def Migrate_Shelves_To_DB() -> tuple[int, str]:
     """
     file_handler = file_utils.File()
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
     if not file_handler.path_writeable(
@@ -158,7 +158,7 @@ def Migrate_Shelves_To_DB() -> tuple[int, str]:
 
                 if video_grid_data:
                     shelf_dict = sql_shelf.open(shelf_name="video_grid")
-                    if sql_shelf.error == -1:
+                    if sql_shelf.error.code == -1:
                         return -1, sql_shelf.error.message
 
                     result, message = sql_shelf.update(
@@ -273,7 +273,7 @@ def Migrate_Shelves_To_DB() -> tuple[int, str]:
 
     if project_dict:
         sql_shelf.open(shelf_name="projects")
-        if sql_shelf.error == -1:
+        if sql_shelf.error.code == -1:
             return -1, sql_shelf.error.message
 
         result, message = sql_shelf.update(
@@ -331,11 +331,11 @@ def Delete_DVD_Layout(project_name: str, layout_name: str) -> tuple[int, str]:
     dvd_menu_key = f"{project_name}.{layout_name}"
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
     shelf_dict = sql_shelf.open(shelf_name="projects")
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
     if project_name in shelf_dict:
@@ -388,15 +388,15 @@ def Delete_Project(project_name: str) -> tuple[int, str]:
         return -1, sql_shelf.error.message
 
     project_shelf_dict = sql_shelf.open("projects")
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
     dvdmenu_shelf_dict = sql_shelf.open("dvdmenu")
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
     video_grid_shelf_dict = sql_shelf.open("video_grid")
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
     # Perform cleansing pass
@@ -459,19 +459,19 @@ def Get_Project_Files(
     ), f"{project_name=}. Must be a non-empty str"
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, []
 
     project_shelf_dict = sql_shelf.open("projects")
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, []
 
     video_grid_shelf_dict = sql_shelf.open("video_grid")
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, []
 
     dvdmenu_shelf_dict = sql_shelf.open("dvdmenu")
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, []
 
     dvd_layout_videos = []
@@ -553,11 +553,11 @@ def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str], i
     ), f"{project_name=}. Must be a non-empty str"
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return [], [], -1
 
     shelf_dict = sql_shelf.open("projects")
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return [], [], -1
 
     project_items = []
@@ -602,12 +602,12 @@ def Get_Shelved_DVD_Layout(
     ] = []
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return dvd_menu_layout, sql_shelf.error.message
 
     dvd_shelf = sql_shelf.open(shelf_name="dvdmenu")
 
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return dvd_menu_layout, sql_shelf.error.message
 
     if dvd_shelf and key in dvd_shelf:
@@ -674,7 +674,7 @@ def Set_Shelved_Project(
 
     shelf_dict = sql_shelf.open("projects")
 
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
     if project_name not in shelf_dict:
@@ -717,11 +717,11 @@ def Set_Shelved_DVD_Layout(
     ), "All elements must be DVD_Menu_Page instances"
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
     shelf_dict = sql_shelf.open(shelf_name="projects")
-    if sql_shelf.error == -1:
+    if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
     if project_name in shelf_dict:
