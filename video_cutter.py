@@ -630,7 +630,7 @@ class Video_Editor(DVD_Archiver_Base):
                 )
             else:
                 result, message = self._archive_manager.delete_edit_cuts(
-                    self._video_file_input[0].video_path
+                    self._video_file_input[0].video_path, project="", layout=""
                 )
 
             if result == -1:
