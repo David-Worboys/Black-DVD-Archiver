@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import dataclasses
 import functools
-from time import sleep
 from typing import Callable, cast
 
 import PySide6.QtCore as qtC
@@ -438,11 +437,6 @@ class Video_Editor(DVD_Archiver_Base):
                 self._video_file_input[0].video_path, self._frame_rate
             )
 
-            # This is done to clear the first frame of the prior video file from the video display. The sleep is
-            # esential
-            self._step_forward()
-            sleep(0.1)
-            self._step_backward()
         self._source_file_label.value_set(
             f"{self._video_file_input[0].video_file}{self._video_file_input[0].video_extension}"
         )

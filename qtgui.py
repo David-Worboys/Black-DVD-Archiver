@@ -15172,7 +15172,7 @@ class Spinbox(_qtpyBase_Control):
         self._widget.setValue(value)
 
 
-class Video_Player(qtC.QObject):
+class Video_Player(qtM.QMediaPlayer):
     """
     Implements a custom video player object
     """
@@ -15233,54 +15233,18 @@ class Video_Player(qtC.QObject):
         self._video_sink = qtM.QVideoSink()
         self._audio_output = qtM.QAudioOutput()
 
-        self._media_player = qtM.QMediaPlayer()
-        self._media_player.setVideoSink(self._video_sink)
-        self._media_player.setAudioOutput(self._audio_output)
+        self.setVideoSink(self._video_sink)
+        self.setAudioOutput(self._audio_output)
         self._audio_output.setVolume(1)
 
-        # Hook up signals
-        if self._use_lambda:  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and
-            # Nuitka < 1.8.4 == boom!
-            self._video_sink.videoFrameChanged.connect(self._frame_handler)
-            self._media_player.durationChanged.connect(self._duration_changed)
-            self._media_player.positionChanged.connect(self._position_changed)
-            self._media_player.errorOccurred.connect(self._player_error)
-            self._media_player.mediaStatusChanged.connect(self._media_status_change)
-            self._media_player.seekableChanged.connect(self._seekable_changed)
-            self._media_player.errorOccurred.connect(self._player_error)
-            self._frame_changed_handler.connect(self._video_sink.setVideoFrame)
-            self.is_available_handler.connect(self._media_player.isAvailable)
-        else:  # This saves the day!
-            self._video_sink.videoFrameChanged.connect(
-                functools.partial(self._frame_handler)
-            )
-
-            self._media_player.durationChanged.connect(
-                functools.partial(self._duration_changed)
-            )
-
-            self._media_player.positionChanged.connect(
-                functools.partial(self._position_changed)
-            )
-
-            self._media_player.errorOccurred.connect(
-                functools.partial(self._player_error)
-            )
-
-            self._media_player.mediaStatusChanged.connect(
-                functools.partial(self._media_status_change)
-            )
-            self._media_player.seekableChanged.connect(
-                functools.partial(self._seekable_changed)
-            )
-
-            self._frame_changed_handler.connect(
-                functools.partial(self._video_sink.setVideoFrame)
-            )
-
-            self.is_available_handler.connect(
-                functools.partial(self._media_player.isAvailable)
-            )
+        self._video_sink.videoFrameChanged.connect(self._frame_handler)
+        self.durationChanged.connect(self._duration_changed)
+        self.positionChanged.connect(self._position_changed)
+        self.errorOccurred.connect(self._player_error)
+        self.mediaStatusChanged.connect(self._media_status_change)
+        self.seekableChanged.connect(self._seekable_changed)
+        self._frame_changed_handler.connect(self._video_sink.setVideoFrame)
+        self.is_available_handler.connect(self.isAvailable)
 
     def available(self) -> bool:
         """
@@ -15291,20 +15255,10 @@ class Video_Player(qtC.QObject):
 
         """
 
-        return self._media_player.isAvailable()
+        return self.isAvailable()
 
     def current_frame(self) -> int:
-        return int(self._media_player.position() / (1000 / self._frame_rate))
-
-    def pause(self) -> None:
-        """Pauses the video"""
-        self._media_player.pause()
-
-    def play(self) -> None:
-        """
-        Plays the video
-        """
-        self._media_player.play()
+        return int(self.position() / (1000 / self._frame_rate))
 
     # @qtC.Slot()
     def seek(self, frame: int) -> None:
@@ -15314,23 +15268,26 @@ class Video_Player(qtC.QObject):
         Args:
             frame (int): The frame to seek to
         """
-
-        time_offset = math.ceil((1000 / self._frame_rate) * frame)
-
-        # This if statement does not always work and seek fails, so for now using try
-        # if self._media_player.isSeekable() and self._media_player.mediaStatus() in (
-        #     qtM.QMediaPlayer.MediaStatus.BufferedMedia,
-        #     qtM.QMediaPlayer.MediaStatus.LoadedMedia,
-        # ):
-
         try:
-            self._media_player.setPosition(time_offset)
+            if (
+                frame == 0
+            ):  # Ok, this seems odd, but if frame = 0 then a qt warning is thrown - set to 5ms seems to fix
+                time_offset = 5
+            else:
+                time_offset = math.ceil((1000 / self._frame_rate) * frame)
+
+            # This if statement does not always work and seek fails, so for now using try
+            # if self._media_player.isSeekable() and self._media_player.mediaStatus() in (
+            #     qtM.QMediaPlayer.MediaStatus.BufferedMedia,
+            #     qtM.QMediaPlayer.MediaStatus.LoadedMedia,
+            # ):
+            self.setPosition(time_offset)
         except Exception as e:
             if not utils.Is_Complied():
                 print(f"Seek Error {self.source_state=} {e=}")
 
     def state(self) -> str:
-        playback_state = self._media_player.playbackState()
+        playback_state = self.playbackState()
 
         if playback_state == qtM.QMediaPlayer.PlaybackState.PlayingState:
             return "playing"
@@ -15338,10 +15295,6 @@ class Video_Player(qtC.QObject):
             return "paused"
         elif playback_state == qtM.QMediaPlayer.PlaybackState.StoppedState:
             return "stop"
-
-    def stop(self):
-        """Stops the video"""
-        self._media_player.stop()
 
     def set_source(self, input_file: str, frame_rate: float) -> None:
         """Sets the source of the media player
@@ -15359,23 +15312,16 @@ class Video_Player(qtC.QObject):
         ), f"{input_file =} must be a non-empty str"
 
         with sys_cursor(Cursor.hourglass):
+            self.stop()
+
             self._input_file = input_file
             self._frame_rate = frame_rate
 
-            # Trying to stop a random hang, seems to occur occasionally on second call to this method, if it gets
-            # past that it seems ok
-            self._setup_media_player()
-            self._media_player.setSource("")
-            # gc.collect()
-
             for attempt in range(3):  # Allow up to 3 retries
                 try:
-                    self._media_player.setSource(qtC.QUrl.fromLocalFile(input_file))
-
-                    while not self.available():
-                        time.sleep(0.1)
-
-                    self._media_player.pause()
+                    self.setSource(qtC.QUrl.fromLocalFile(input_file))
+                    self.pause()
+                    self.seek(0)
 
                     return None
 
@@ -15430,9 +15376,10 @@ class Video_Player(qtC.QObject):
             int(position_milliseconds * self._frame_rate // 1000)
         )
 
-    def _player_error(self, error, error_string):
+    def _player_error(self, error: qtM.QMediaPlayer.Error, error_string: str):
         """Called when the media player encounters an error."""
-        print(f"Error: {error} - {error_string}")
+        if "Failed to seek" not in error_string:
+            print(f"Error: {error} - {error_string}")
 
     def _media_status_change(self, media_status: qtM.QMediaPlayer.mediaStatus) -> None:
         """Signals the state of the media has changed
