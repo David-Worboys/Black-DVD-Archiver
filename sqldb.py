@@ -1030,6 +1030,7 @@ class SQL_Shelf:
                 # able to track down why this occurs but suspect an empty dict is getting saved as string somewhere.
                 if (
                     select_result
+                    and select_result[0][1] is not None
                     and select_result[0][1].strip() != ""
                     and select_result[0][1].strip() != "{}"
                 ):
