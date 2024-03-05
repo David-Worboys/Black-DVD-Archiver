@@ -22,7 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import dataclasses
 import functools
-from typing import Callable, cast
+import json
+from typing import Callable, cast, Literal
 
 import PySide6.QtCore as qtC
 import PySide6.QtGui as qtG
@@ -137,9 +138,526 @@ def Error_Callback(error_message: str):
 
 
 ################################
+@dataclasses.dataclass(slots=True)
+class Edit_List:
+    """
+    Stores, updates and deletes the edit list
+    """
+
+    _error_message: str = ""
+    _error_code: int = 1
+
+    _archive_folder: str = ""
+    _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
+    _json_edit_cuts_file: str = "edit_cuts"
+    _video_shelf_name: Literal["video_cutter"] = "video_cutter"
+
+    def __post_init__(self):
+        if self._db_settings.setting_exist(sys_consts.ARCHIVE_FOLDER):
+            self._archive_folder = self._db_settings.setting_get(
+                sys_consts.ARCHIVE_FOLDER
+            )
+
+    def delete_edit_cuts(
+        self,
+        file_path: str,
+        project: str,
+        layout: str,
+    ) -> tuple[int, str]:
+        """
+        Deletes all edit cuts associated with the given file that are stored in the edit cuts SQL Shelve
+
+        Args:
+            file_path (str): The path of the video file.
+            project (str): The project name
+            layout (str): The DVD layout name
+
+        Returns:
+            tuple[int,str]:
+                arg 1 - error_code
+                arg 2 - error message
+        """
+        assert isinstance(project, str), f"{project=}. Must be a str"
+        # Make sure we have a layout with a project and vice versa
+        # assert (
+        #    not project or layout
+        # ), f"{layout=}. Must not be empty if {project=} is provided"
+        assert (
+            not layout.strip() or project.strip()
+        ), f"{project=}. Must not be empty if {layout=} is provided"
+        self._error_message = ""
+        self._error_code = 1
+
+        sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message
+
+        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message
+
+        if file_path in shelf_dict:
+            edit_cuts = shelf_dict[file_path]
+            if (
+                "user_data" in edit_cuts
+                and "project_edit_cuts" in edit_cuts["user_data"]
+                and project in edit_cuts["user_data"]["project_edit_cuts"]
+            ):
+                edit_cuts["user_data"]["project_edit_cuts"].pop(project)
+
+                if edit_cuts["user_data"]["project_edit_cuts"]:
+                    shelf_dict[file_path] = edit_cuts
+                else:
+                    shelf_dict.pop(file_path)
+            else:
+                shelf_dict.pop(file_path)
+
+            result, message = sql_shelf.update(
+                shelf_name="video_cutter", shelf_data=shelf_dict
+            )
+
+            self._error_message = message
+            self._error_code = result
+
+            if sql_shelf.error.code == -1:
+                return -1, sql_shelf.error.message
+
+        return self._error_code, self._error_message
+
+    def get_edit_cuts_visibility(
+        self, file_path: str, project: str, layout: str
+    ) -> tuple[int, str, Literal["global", "project", ""]]:
+        """Returns the edit cuts visibility for a project
+
+        Args:
+            file_path (str): The path of the video file.
+            project (str): The project name
+            layout (str): The DVD layout name
+        Returns:
+           tuple[int, str, Literal["global","project",""]]:
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.
+            - arg 3: If the status code is 1 then "project" or "global" is returned otherwise ""
+
+        """
+
+        assert (
+            isinstance(file_path, str) and file_path.strip() != ""
+        ), f"{file_path=}. Must be a str"
+        assert isinstance(project, str), f"{project=}. Must be a str"
+        # Make sure we have a layout with a project and vice versa
+        # assert (
+        #    not project or layout
+        # ), f"{layout=}. Must not be empty if {project=} is provided"
+        assert (
+            not layout.strip() or project.strip()
+        ), f"{project=}. Must not be empty if {layout=} is provided"
+
+        sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message, ""
+
+        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message, ""
+
+        if file_path in shelf_dict:
+            edit_cuts = shelf_dict[file_path]
+
+            if (
+                project
+                and "user_data" in edit_cuts
+                and "project_edit_cuts" in edit_cuts["user_data"]
+            ):
+                project_edit_cuts = edit_cuts["user_data"]["project_edit_cuts"]
+
+                if project in project_edit_cuts:
+                    return 1, "", "project"
+
+        return 1, "", "global"
+
+    def globalise_edit_cuts(
+        self, file_path: str, project: str, layout: str, combine: bool = False
+    ) -> tuple[int, str, tuple[tuple[int, int, str], ...]]:
+        """
+        Make the project edit cuts the global edit cuts for the video file.
+
+        Args:
+            file_path (str): The path of the video file.
+            project (str): The project name
+            layout (str): The DVD layout name
+            combine (bool): True : Combine Project and Global List, False : Do not combine
+
+        Returns:
+           tuple[int,str,tuple[tuple[int, int, str],...]]:
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.
+            - arg 3: If the status code is 1 then a tuple of edit cut tuples is returned (mark_in,mark_out,clip_name)
+        """
+        assert (
+            isinstance(file_path, str) and file_path.strip() != ""
+        ), f"{file_path=}. Must be a str"
+        assert isinstance(project, str), f"{project=}. Must be a str"
+        # Make sure we have a layout with a project and vice versa
+        # assert (
+        #    not project or layout
+        # ), f"{layout=}. Must not be empty if {project=} is provided"
+        assert (
+            not layout.strip() or project.strip()
+        ), f"{project=}. Must not be empty if {layout=} is provided"
+        assert isinstance(combine, bool), f"{combine=}. Must be bool"
+
+        sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message, ()
+
+        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message, ()
+
+        if file_path in shelf_dict:
+            edit_dict = shelf_dict[file_path]
+
+            if (
+                "user_data" in edit_dict
+                and "project_edit_cuts" in edit_dict["user_data"]
+            ):
+                project_edit_cuts = edit_dict["user_data"]["project_edit_cuts"]
+                if project in project_edit_cuts:
+                    project_edit_list = project_edit_cuts.pop(project)
+
+                    if combine:  # Combine Project and Global edit cut lists
+                        edit_dict["edit_cuts"] = tuple(
+                            set(edit_dict["edit_cuts"]) | set(project_edit_list)
+                        )
+                    else:  # Make the project edit cuts the global edit cuts
+                        edit_dict["edit_cuts"] = project_edit_list
+
+                    shelf_dict[file_path] = edit_dict
+
+                    result, message = sql_shelf.update(
+                        shelf_name="video_cutter", shelf_data=shelf_dict
+                    )
+
+                    self._error_message = message
+                    self._error_code = result
+
+                    if sql_shelf.error.code == -1:
+                        return -1, message, ()
+
+                    return self.read_edit_cuts(
+                        file_path=file_path, project="", layout=layout
+                    )
+        return 1, "", ()
+
+    def read_edit_cuts(
+        self,
+        file_path: str,
+        project: str,
+        layout: str,
+    ) -> tuple[int, str, tuple[tuple[int, int, str], ...]]:
+        """
+        Read edit cuts for a video file from a JSON file.
+
+        Args:
+            file_path (str): The path of the video file.
+            project (str): The project name
+            layout (str): The DVD layout name
+
+        Returns:
+           tuple[int,str,tuple[tuple[int, int, str],...]]:
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+            - arg 3: If the status code is 1 then a tuple of edit cut tuples is returned (mark_in,mark_out,clip_name)
+        """
+        assert (
+            isinstance(file_path, str) and file_path.strip() != ""
+        ), f"{file_path=}. Must be a str"
+        assert isinstance(project, str), f"{project=}. Must be a str"
+        # Make sure we have a layout with a project and vice versa
+        # assert (
+        #    not project or layout
+        # ), f"{layout=}. Must not be empty if {project=} is provided"
+        assert (
+            not layout.strip() or project.strip()
+        ), f"{project=}. Must not be empty if {layout=} is provided"
+
+        sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message, ()
+
+        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message, ()
+
+        if file_path in shelf_dict:
+            edit_dict = shelf_dict[file_path]
+
+            # Design oversight fix
+            if "user_data" not in edit_dict:
+                edit_dict["user_data"] = {}
+            if "project_edit_cuts" not in edit_dict["user_data"]:
+                edit_dict["user_data"] = {"project_edit_cuts": {}}
+                shelf_dict[file_path] = edit_dict
+
+                result, message = sql_shelf.update(
+                    shelf_name="video_cutter", shelf_data=shelf_dict
+                )
+
+                self._error_message = message
+                self._error_code = result
+
+                if sql_shelf.error.code == -1:
+                    return -1, message, ()
+
+            # Back to the regular programme
+            if project:
+                project_edit_cuts = edit_dict["user_data"]["project_edit_cuts"]
+
+                if project in project_edit_cuts:
+                    return 1, "", project_edit_cuts[project]
+
+            return 1, "", edit_dict["edit_cuts"]
+
+        # Code below migrates existing JSON file edit cuts  to a SQL shelf. TODO Remove in some future version
+        if self._archive_folder:
+            self._error_message = ""
+            self._error_code = 1
+
+            file_handler = file_utils.File()
+            json_cuts_file = file_handler.file_join(
+                self._archive_folder, self._json_edit_cuts_file, "json"
+            )
+
+            if not file_handler.path_exists(self._archive_folder):
+                self._error_message = (
+                    f"{sys_consts.SDELIM}{self._archive_folder}{sys_consts.SDELIM} does not"
+                    " exist"
+                )
+                self._error_code = -1
+                return -1, self._error_message, ()
+
+            if not file_handler.path_writeable(self._archive_folder):
+                self._error_message = (
+                    f"{sys_consts.SDELIM}{self._archive_folder}{sys_consts.SDELIM} is not"
+                    " writable"
+                )
+                self._error_code = -1
+                return -1, self._error_message, ()
+
+            if not file_handler.file_exists(json_cuts_file):
+                self._error_message = f"{sys_consts.SDELIM}{json_cuts_file}{sys_consts.SDELIM} does not exist"
+                self._error_code = 1  # May not be an actual error
+                return 1, self._error_message, ()
+
+            # Read JSON data from file
+            try:
+                with open(json_cuts_file, "r") as json_file:
+                    json_data_dict = json.load(json_file)
+            except (
+                FileNotFoundError,
+                PermissionError,
+                IOError,
+                json.decoder.JSONDecodeError,
+            ) as e:
+                self._error_message = (
+                    f"Can not read {sys_consts.SDELIM}{json_cuts_file}."
+                    f" {e}{sys_consts.SDELIM}"
+                )
+                self._error_code = -1
+                return -1, self._error_message, ()
+
+            if not isinstance(json_data_dict, dict):
+                self._error_message = "Invalid JSON file format"
+                self._error_code = -1
+                return -1, self._error_message, ()
+
+            edit_cuts = []
+            if file_path in json_data_dict:
+                for json_edit_cuts in json_data_dict[file_path]:
+                    if (
+                        len(json_edit_cuts) != 3
+                        or not isinstance(json_edit_cuts[0], int)  # Mark In
+                        or not isinstance(json_edit_cuts[1], int)  # Mark Out
+                        or not isinstance(json_edit_cuts[2], str)  # Clip name
+                    ):
+                        self._error_code = -1
+                        self._error_message = (
+                            "Invalid JSON format for"
+                            f" {sys_consts.SDELIM}{file_path}{sys_consts.SDELIM}"
+                        )
+
+                        edit_cuts = ()
+                        break
+
+                    edit_cuts.append(tuple(json_edit_cuts))
+                else:  # All good
+                    # if utils.Is_Complied():  # Remove file_path from JSON file
+                    json_data_dict.pop(file_path)
+                    try:
+                        with open(json_cuts_file, "w") as json_file:
+                            json.dump(json_data_dict, json_file)
+                    except (
+                        FileNotFoundError,
+                        PermissionError,
+                        IOError,
+                    ) as e:
+                        self._error_message = (
+                            f"Can not write {sys_consts.SDELIM}{json_cuts_file}."
+                            f" {e}{sys_consts.SDELIM}"
+                        )
+                        self._error_code = -1
+
+                if self._error_code == -1:  # JSON file error occurred
+                    return -1, self._error_message, ()
+
+                if edit_cuts:
+                    if not utils.Is_Complied():
+                        print(
+                            f" Migrating [{file_path=}] Edit Points In [{json_cuts_file}]  To A SQL SHELF"
+                        )
+                    # Add edit_cuts to the SQL shelf
+                    shelf_dict[file_path] = {
+                        "project": project,
+                        "layout": layout,
+                        "edit_cuts": edit_cuts,
+                    }
+
+                    result, message = sql_shelf.update(
+                        shelf_name="video_cutter", shelf_data=shelf_dict
+                    )
+
+                    self._error_message = message
+                    self._error_code = result
+
+                    if sql_shelf.error.code == -1:
+                        return -1, sql_shelf.error.message, ()
+
+                    return 1, "", tuple(edit_cuts)
+        return 1, "", ()
+
+    def write_edit_cuts(
+        self,
+        file_path: str,
+        project: str,
+        layout: str,
+        file_cuts: list[(int, int, str)],
+    ) -> tuple[int, str]:
+        """Store files and cuts in the archive json_file.
+
+        Args:
+            file_path (str): The path of the video file that owns the cuts.
+            project (str): The project name
+            layout (str): The DVD layout name
+            file_cuts (list[(int,int,str)]): A  list of cuts for the file_path.
+                Each cut is represented by a tuple with the cut_in value, cut_out value, and cut_name string.
+
+        Returns:
+            int, str:
+                - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+                - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+        """
+        assert (
+            isinstance(file_path, str) and file_path.strip() != ""
+        ), f"{file_path=}. Must be a str"
+        assert isinstance(project, str), f"{project=}. Must be a str"
+        assert isinstance(layout, str), f"{layout=}. Must be a str"
+        assert isinstance(file_cuts, list), f"{file_cuts=}. Must be a list"
+
+        for cut in file_cuts:
+            assert isinstance(cut, tuple), f"{cut=}. Must be a tuple"
+            assert len(cut) == 3, f"{cut=}. Must have Mark_In, Mark_Out, Cut Name"
+            assert isinstance(cut[0], int), f"{cut[0]=}. Must be int"
+            assert isinstance(cut[1], int), f"{cut[1]=}. Must be int"
+            assert isinstance(cut[2], str), f"{cut[2]=}. Must be str"
+
+        # Make sure we have a layout with a project and vice versa
+        # assert (
+        #    not project or layout
+        # ), f"{layout=}. Must not be empty if {project=} is provided"
+        assert (
+            not layout.strip() or project.strip()
+        ), f"{project=}. Must not be empty if {layout=} is provided"
+
+        sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message
+
+        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        self._error_message = sql_shelf.error.message
+        self._error_code = sql_shelf.error.code
+
+        if sql_shelf.error.code == -1:
+            return -1, sql_shelf.error.message
+
+        if file_path in shelf_dict:
+            edit_dict = shelf_dict[file_path]
+            edit_dict["project"] = project
+            edit_dict["layout"] = layout
+
+            if "user_data" not in edit_dict:
+                edit_dict["user_data"] = {}
+            if "project_edit_cuts" not in edit_dict["user_data"]:
+                edit_dict["user_data"] = {"project_edit_cuts": {}}
+
+        else:
+            edit_dict = {
+                "project": project,
+                "layout": layout,
+                "edit_cuts": tuple(file_cuts),
+                "user_data": {"project_edit_cuts": {}},
+            }
+
+        if project:  # Project edit cuts
+            project_edit_cuts = edit_dict["user_data"]["project_edit_cuts"]
+            project_edit_cuts[project] = tuple(file_cuts)
+            edit_dict["user_data"]["project_edit_cuts"] = project_edit_cuts
+        else:  # Global edit cuts
+            edit_dict["edit_cuts"] = tuple(file_cuts)
+
+        shelf_dict[file_path] = edit_dict
+
+        result, message = sql_shelf.update(
+            shelf_name="video_cutter", shelf_data=shelf_dict
+        )
+
+        self._error_message = message
+        self._error_code = result
+
+        if sql_shelf.error.code == -1:
+            return -1, message
+
+        return 1, ""
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class Video_Editor(DVD_Archiver_Base):
     """Implements a basic video editor"""
 
@@ -156,6 +674,7 @@ class Video_Editor(DVD_Archiver_Base):
     _display_height: int = -1
     _display_width: int = -1
     _edit_list_grid: qtg.Grid | None = None
+    _edit_list: Edit_List = dataclasses.field(default_factory=Edit_List)
     _file_system_init: bool = False
     _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
     _frame_rate: float = sys_consts.PAL_SPECS.frame_rate
@@ -170,6 +689,8 @@ class Video_Editor(DVD_Archiver_Base):
     _menu_frame: qtg.LineEdit | None = None
     _menu_title: qtg.LineEdit | None = None
     _progress_bar: qtg.ProgressBar | None = None
+    _all_projects_rb: qtg.RadioButton | None = None
+    _this_project_rb: qtg.RadioButton | None = None
     _source_file_label: qtg.Label | None = None
     _video_editor: qtg.HBoxContainer | None = None
     _video_filter_container: qtg.HBoxContainer | None = None
@@ -180,6 +701,7 @@ class Video_Editor(DVD_Archiver_Base):
     _edit_folder: str = sys_consts.EDIT_FOLDER
     _transcode_folder: str = sys_consts.TRANSCODE_FOLDER
     _video_file_input: list[Video_Data] = dataclasses.field(default_factory=list)
+    _project_name: str = ""
     _user_lambda: bool = False
 
     def __post_init__(self) -> None:
@@ -270,6 +792,88 @@ class Video_Editor(DVD_Archiver_Base):
                         self._edit_list_grid.checkitems_all(
                             checked=event.value, col_tag="mark_in"
                         )
+                    case "all_projects":
+                        copy_method = popups.PopOptions(
+                            title="Edit List...",
+                            message="Select An Edit List Option",
+                            options={
+                                "Use The Global Edit List And Delete The Project Edit List:: Deletes The  Project "
+                                "Edit List And Uses The Global Edit List": "delete_project",
+                                "Make The Edit List Global                                :: Makes The Project Edit "
+                                "List The Global Edit List ": "global_project",
+                                "Combine Project And Global Edit List                     :: Combines The Project And "
+                                "Global Edit List": "combine_project",
+                                "Cancel::": "cancel",
+                            },
+                        ).show()
+
+                        match copy_method:
+                            case "delete_project":
+                                result, message = self._edit_list.delete_edit_cuts(
+                                    file_path=self._video_file_input[0].video_path,
+                                    project=self._project_name,
+                                    layout="",
+                                )
+
+                                if result == -1:
+                                    return None
+
+                                result, message, edit_cuts = (
+                                    self._edit_list.read_edit_cuts(
+                                        file_path=self._video_file_input[0].video_path,
+                                        project="",
+                                        layout="",
+                                    )
+                                )
+                                if result == -1:
+                                    return None
+
+                                self._populate_edit_cuts(edit_cuts)
+                            case "global_project":
+                                result, message, edit_cuts = (
+                                    self._edit_list.globalise_edit_cuts(
+                                        file_path=self._video_file_input[0].video_path,
+                                        project=self._project_name,
+                                        layout="",
+                                    )
+                                )
+                                if result == -1:
+                                    return None
+
+                                self._populate_edit_cuts(edit_cuts)
+                            case "combine_project":
+                                result, message, edit_cuts = (
+                                    self._edit_list.globalise_edit_cuts(
+                                        file_path=self._video_file_input[0].video_path,
+                                        project=self._project_name,
+                                        layout="",
+                                        combine=True,
+                                    )
+                                )
+                                if result == -1:
+                                    return None
+
+                                self._populate_edit_cuts(edit_cuts)
+                            case "cancel":
+                                return None
+
+                    case "this_project":
+                        result, message, edit_cuts = self._edit_list.read_edit_cuts(
+                            file_path=self._video_file_input[0].video_path,
+                            project=self._project_name,
+                            layout="",
+                        )
+
+                        if not edit_cuts:
+                            result, message, edit_cuts = self._edit_list.read_edit_cuts(
+                                file_path=self._video_file_input[0].video_path,
+                                project="",
+                                layout="",
+                            )
+
+                        self._populate_edit_cuts(edit_cuts)
+
+                        # self.archive_edit_list_write()
                     case "assemble_segments":
                         self._assemble_segments(event)
                     case "delete_segments":
@@ -373,12 +977,13 @@ class Video_Editor(DVD_Archiver_Base):
         return self._video_handler.available()
 
     def set_source(
-        self, video_file_input: list[Video_Data], output_folder: str
+        self, video_file_input: list[Video_Data], output_folder: str, project_name: str
     ) -> None:
         """Sets the source of the media player
         Args:
             video_file_input (list[Video_Data]): The input video information
             output_folder (str): The folder in which processed video files are placed
+            project_name (str): The name of the currently selcted project
         """
         assert isinstance(video_file_input, list), f"{video_file_input=}. Must be list"
         assert all(
@@ -388,12 +993,13 @@ class Video_Editor(DVD_Archiver_Base):
         assert (
             isinstance(output_folder, str) and output_folder.strip() != ""
         ), f"{output_folder=}. Must be non-empty str"
+        assert isinstance(project_name, str), f"{project_name=}. Must be str"
 
         self._frame_display.value_set(0)
         self._output_folder = output_folder
+        self._project_name = project_name
 
         if self._video_file_input:
-            self.archive_edit_list_write()
             self._get_dvd_settings()
             self.processed_files_callback(self._video_file_input)
 
@@ -401,6 +1007,24 @@ class Video_Editor(DVD_Archiver_Base):
         self._menu_frame.value_set("")
 
         self._video_file_input = video_file_input
+        self._all_projects_rb.value_set(True)
+        self._this_project_rb.value_set(False)
+
+        result, message, edit_list_visibility = (
+            self._edit_list.get_edit_cuts_visibility(
+                file_path=self._video_file_input[0].video_path,
+                project=project_name,
+                layout="",
+            )
+        )
+
+        if result == -1:
+            return None
+
+        if edit_list_visibility == "global":
+            self._all_projects_rb.value_set(True)
+        else:
+            self._this_project_rb.value_set(True)
 
         self._archive_edit_list_read()
 
@@ -556,15 +1180,17 @@ class Video_Editor(DVD_Archiver_Base):
         ).value_set(self._video_file_input[0].video_file_settings.sharpen)
 
     def _archive_edit_list_read(self) -> None:
-        """Reads edit cuts from the archive manager and populates the edit list grid with the data.
-        If both the archive manager and the edit list grid exist, reads edit cuts for the input file from the archive
-        manager using the `read_edit_cuts` method. Then, for each cut tuple in the edit cuts list, sets the `mark_in` and
+        """Reads edit cuts from the archive manager and populates the edit list grid with the data. If both the
+        archive manager and the edit list grid exist, reads edit cuts for the input file from the archive manager
+        using the `read_edit_cuts` method. Then, for each cut tuple in the edit cuts list, sets the `mark_in` and
         `mark_out` values of the corresponding row in the edit list grid using the `value_set` method.
         """
 
-        if self._archive_manager and self._edit_list_grid:
-            result, message, edit_cuts = self._archive_manager.read_edit_cuts(
-                self._video_file_input[0].video_path, project="", layout=""
+        if self._edit_list_grid:
+            result, message, edit_cuts = self._edit_list.read_edit_cuts(
+                self._video_file_input[0].video_path,
+                "" if self._all_projects_rb.value_get() is True else self._project_name,
+                layout="",
             )
 
             if result == -1:
@@ -622,15 +1248,27 @@ class Video_Editor(DVD_Archiver_Base):
             ]
 
             if edit_list:
-                result, message = self._archive_manager.write_edit_cuts(
-                    file_path=self._video_file_input[0].video_path,
-                    project="",
-                    layout="",
-                    file_cuts=edit_list,
-                )
+                if self._all_projects_rb.value_get():
+                    result, message = self._edit_list.write_edit_cuts(
+                        file_path=self._video_file_input[0].video_path,
+                        project="",
+                        layout="",
+                        file_cuts=edit_list,
+                    )
+                else:
+                    result, message = self._edit_list.write_edit_cuts(
+                        file_path=self._video_file_input[0].video_path,
+                        project=self._project_name,
+                        layout="",
+                        file_cuts=edit_list,
+                    )
             else:
-                result, message = self._archive_manager.delete_edit_cuts(
-                    self._video_file_input[0].video_path, project="", layout=""
+                result, message = self._edit_list.delete_edit_cuts(
+                    self._video_file_input[0].video_path,
+                    project=""
+                    if self._all_projects_rb.value_get()
+                    else self._project_name,
+                    layout="",
                 )
 
             if result == -1:
@@ -1397,6 +2035,41 @@ class Video_Editor(DVD_Archiver_Base):
             )
         )
 
+    def _populate_edit_cuts(
+        self,
+        edit_cuts: tuple[tuple[int, int, str], ...] | list[tuple[int, int, str], ...],
+    ):
+        assert isinstance(
+            edit_cuts, (list, tuple)
+        ), f"{edit_cuts=}. Must be a list or tuple"
+        for edit_cut in edit_cuts:
+            assert len(edit_cut) == 3, f"{edit_cut=}. Must be (int,int,str)"
+            assert isinstance(edit_cut[0], int), f"{edit_cut[0]=}. Must be int"
+            assert isinstance(edit_cut[1], int), f"{edit_cut[1]=}. Must be int"
+            assert isinstance(edit_cut[2], str), f"{edit_cut[2]=}. Must be str"
+
+        self._edit_list_grid.clear()
+
+        mark_in = self._edit_list_grid.colindex_get("mark_in")
+        mark_out = self._edit_list_grid.colindex_get("mark_out")
+        clip_name = self._edit_list_grid.colindex_get("clip_name")
+
+        for row, cut_tuple in enumerate(edit_cuts):
+            self._edit_list_grid.value_set(
+                row=row, col=mark_in, value=cut_tuple[0], user_data=cut_tuple
+            )
+
+            self._edit_list_grid.value_set(
+                row=row, col=mark_out, value=cut_tuple[1], user_data=cut_tuple
+            )
+
+            self._edit_list_grid.value_set(
+                row=row, col=clip_name, value=cut_tuple[2], user_data=cut_tuple
+            )
+        self._edit_list_grid.select_row(0, clip_name)
+
+        return None
+
     def _position_changed(self, frame: int) -> None:
         """
         A method that is called when the position of the media player changes.
@@ -1888,7 +2561,7 @@ class Video_Editor(DVD_Archiver_Base):
 
             self._edit_list_grid = qtg.Grid(
                 tag="edit_list_grid",
-                height=self.display_height,
+                height=self.display_height - 50,
                 col_def=edit_list_cols,
                 pixel_unit=True,
                 callback=self.event_handler,
@@ -1936,10 +2609,37 @@ class Video_Editor(DVD_Archiver_Base):
             )
 
             self._progress_bar = qtg.ProgressBar(
-                tag="file_progress", buddy_control=qtg.Label(text="To Cut", width=6)
+                tag="file_progress",
+                tooltip="Displays % Completion Of File Operations",
+                buddy_control=qtg.Label(
+                    text="To Cut",
+                    width=6,
+                ),
+            )
+
+            self._all_projects_rb = qtg.RadioButton(
+                text="All Projects",
+                tag="all_projects",
+                tooltip="File Edit List Is Visible To All Projects ",
+                checked=True,
+                callback=self.event_handler,
+            )
+            self._this_project_rb = qtg.RadioButton(
+                text="This Project Only",
+                tag="this_project",
+                tooltip="File Edit List Is Only Visible To This Project ",
+                callback=self.event_handler,
+            )
+
+            edit_list_visibility = qtg.HBoxContainer(
+                align=qtg.Align.BOTTOMCENTER, text="Visible To"
+            ).add_row(
+                self._all_projects_rb,
+                self._this_project_rb,
             )
 
             edit_file_list = qtg.VBoxContainer(align=qtg.Align.TOPLEFT).add_row(
+                edit_list_visibility,
                 qtg.HBoxContainer(margin_left=4).add_row(
                     qtg.Checkbox(
                         text="Select All",
@@ -1952,7 +2652,8 @@ class Video_Editor(DVD_Archiver_Base):
                     self._progress_bar,
                 ),
                 qtg.VBoxContainer(align=qtg.Align.BOTTOMRIGHT).add_row(
-                    self._edit_list_grid, edit_list_buttons
+                    self._edit_list_grid,
+                    edit_list_buttons,
                 ),
             )
 

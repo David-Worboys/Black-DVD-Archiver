@@ -340,16 +340,19 @@ class DVD_Archiver(DVD_Archiver_Base):
             case qtg.Sys_Events.CHANGED:  # Tab changed!
                 match event.tag:
                     case "control_tab":
-                        self._video_editor.video_pause()
+                        with qtg.sys_cursor(qtg.Cursor.hourglass):
+                            self._video_editor.video_pause()
+                            self._video_editor.archive_edit_list_write()
 
-                        if self._video_editor.video_file_input:
-                            self._file_control.process_edited_video_files(
-                                video_file_input=self._video_editor.video_file_input
-                            )
+                            if self._video_editor.video_file_input:
+                                self._file_control.process_edited_video_files(
+                                    video_file_input=self._video_editor.video_file_input
+                                )
 
-                        self._tab_enable_handler(event=event, enable=True)
+                            self._tab_enable_handler(event=event, enable=True)
                     case "video_editor_tab":
-                        self._tab_enable_handler(event=event, enable=False)
+                        with qtg.sys_cursor(qtg.Cursor.hourglass):
+                            self._tab_enable_handler(event=event, enable=False)
 
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
@@ -434,7 +437,9 @@ class DVD_Archiver(DVD_Archiver_Base):
                             return None
 
                         self._video_editor.set_source(
-                            video_file_input=video_data, output_folder=dvd_folder
+                            video_file_input=video_data,
+                            output_folder=dvd_folder,
+                            project_name=self._file_control.project_name,
                         )
                         self._control_tab.select_tab(tag_name="video_editor_tab")
                         self._control_tab.enable_set(
