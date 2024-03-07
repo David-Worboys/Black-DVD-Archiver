@@ -2770,6 +2770,21 @@ class _qtpyBase_Control(_qtpyBase):
 
         if self.guiwidget_get is not None and hasattr(self.guiwidget_get, "setEnabled"):
             self.guiwidget_get.setEnabled(enable)
+            palette = g_application.app_get.palette()
+
+            if not enable:
+                # This is ugly, setEnabled (possibly by design) is not greying out controls so have to do myslf
+                # Not sure best approach so trying the Window pallette for now
+                # disabled_color = qtG.QColor(128, 128, 128)
+                background_color = palette.color(qtG.QPalette.Window)
+                disabled_color = background_color.darker(150)
+
+                palette.setColor(qtG.QPalette.Text, disabled_color)
+                palette.setColor(qtG.QPalette.ButtonText, disabled_color)
+                palette.setColor(qtG.QPalette.WindowText, disabled_color)
+
+            self.guiwidget_get.setPalette(palette)
+
             return 1
 
         return -1
@@ -3372,7 +3387,6 @@ class QtPyApp(_qtpyBase):
 
         # Stop Annoying QT Badwindow debug error messages - that are not supposed to be errors
         os.environ["QT_LOGGING_RULES"] = "*.debug=false;qt.qpa.*=false"
-
         self._app: qtW.QApplication = qtW.QApplication(sys.argv)
 
         super().__init__(self)
@@ -3408,7 +3422,7 @@ class QtPyApp(_qtpyBase):
         assert isinstance(width, int) and width > 0, f"{width=}. Must be > 0"
         assert isinstance(app_font, Font), f"{app_font=}. Must be Font"
 
-        # TODO Add languge, file and icon check
+        # TODO Add language, file and icon check
 
         # Private instance variables
         self.callback: Optional[Callable] = callback
@@ -3547,7 +3561,7 @@ class QtPyApp(_qtpyBase):
                 app_font = qtG.QFont("Geneva", requested_font.size)
             elif "Ubuntu" in family_list:
                 app_font = qtG.QFont("Ubuntu", requested_font.size)
-            elif "Ref Hat" in family_list:
+            elif "Red Hat" in family_list:
                 app_font = qtG.QFont("Red Hat", requested_font.size)
             elif "DejaVu Sans" in family_list:
                 app_font = qtG.QFont("DejaVu Sans", requested_font.size)
@@ -15225,6 +15239,7 @@ class Video_Player(qtM.QMediaPlayer):
         self._frame_rate: float = -1.0
         self._input_file = ""
         self._use_lambda = USE_LAMBDA
+        self._init = False
 
         self._setup_media_player()
 
@@ -15269,19 +15284,17 @@ class Video_Player(qtM.QMediaPlayer):
             frame (int): The frame to seek to
         """
         try:
-            if (
-                frame == 0
-            ):  # Ok, this seems odd, but if frame = 0 then a qt warning is thrown - set to 5ms seems to fix
-                time_offset = 5
-            else:
-                time_offset = math.ceil((1000 / self._frame_rate) * frame)
+            time_offset = math.ceil((1000 / self._frame_rate) * frame)
 
-            # This if statement does not always work and seek fails, so for now using try
-            # if self._media_player.isSeekable() and self._media_player.mediaStatus() in (
-            #     qtM.QMediaPlayer.MediaStatus.BufferedMedia,
-            #     qtM.QMediaPlayer.MediaStatus.LoadedMedia,
-            # ):
-            self.setPosition(time_offset)
+            if self.isSeekable() and (
+                self.mediaStatus()
+                in (
+                    qtM.QMediaPlayer.MediaStatus.BufferingMedia,
+                    qtM.QMediaPlayer.MediaStatus.BufferedMedia,
+                    qtM.QMediaPlayer.MediaStatus.LoadedMedia,
+                )
+            ):
+                self.setPosition(time_offset)
         except Exception as e:
             if not utils.Is_Complied():
                 print(f"Seek Error {self.source_state=} {e=}")
@@ -15297,12 +15310,18 @@ class Video_Player(qtM.QMediaPlayer):
             return "stop"
 
     def set_source(self, input_file: str, frame_rate: float) -> None:
-        """Sets the source of the media player
+        """Sets the source file and frame rate for the media player.
+
+        This method sets the source of the media player to the provided input file
+        and configures the media player's frame rate. It performs up to three attempts
+        to set the source file, and if all attempts fail, it displays an error message.
 
         Args:
-            input_file (str): The source file of the media player
-            frame_rate (float): The frame rate of the media player
+            input_file (str): The source file of the media player.
+            frame_rate (float): The frame rate of the media player.
+
         """
+
         assert (
             isinstance(frame_rate, float) and frame_rate > 0
         ), f"{frame_rate =}. Must be float > 0"
@@ -15316,12 +15335,11 @@ class Video_Player(qtM.QMediaPlayer):
 
             self._input_file = input_file
             self._frame_rate = frame_rate
+            self._init = False
 
             for attempt in range(3):  # Allow up to 3 retries
                 try:
                     self.setSource(qtC.QUrl.fromLocalFile(input_file))
-                    self.pause()
-                    self.seek(0)
 
                     return None
 
@@ -15335,6 +15353,8 @@ class Video_Player(qtM.QMediaPlayer):
                 title="Video File Error...",
                 message="Video File Is Not Supported!",
             ).show()
+
+        return None
 
     def _duration_changed(self, duration: int) -> None:
         """Handles a video duration change
@@ -15394,12 +15414,24 @@ class Video_Player(qtM.QMediaPlayer):
                 self.source_state = "loading"
             case qtM.QMediaPlayer.MediaStatus.LoadedMedia:
                 self.source_state = "loaded"
+
+                if not self._init:
+                    self._init = True
+                    self.pause()
+                    self.seek(0)
+                    
             case qtM.QMediaPlayer.MediaStatus.StalledMedia:
                 self.source_state = "stalled"
             case qtM.QMediaPlayer.MediaStatus.BufferingMedia:
                 self.source_state = "buffering"
             case qtM.QMediaPlayer.MediaStatus.BufferedMedia:
                 self.source_state = "buffered"
+
+                if not self._init:
+                    self._init = True
+                    self.pause()
+                    self.seek(0)
+
             case qtM.QMediaPlayer.MediaStatus.EndOfMedia:
                 self.source_state = "end_of_media"
             case qtM.QMediaPlayer.MediaStatus.InvalidMedia:
