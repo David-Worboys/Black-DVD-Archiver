@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Tell Black to leave this block alone (realm of isort)
 # fmt: off
+import dataclasses
 import datetime
 from typing import cast, Final
 
@@ -32,45 +33,83 @@ import sqldb
 import sys_consts
 import utils
 from dvd_menu_configuration import DVD_Menu_Config_Popup
-from sys_config import DVD_Archiver_Base, Get_DVD_Build_Folder, Video_Data, Get_Project_Files, Get_Project_Layout_Names
+from sys_config import (DVD_Archiver_Base, Get_Video_Editor_Folder, Video_Data, Get_Project_Files, 
+                        Get_Project_Layout_Names, Remove_Project_Files)
 from video_file_picker import Video_File_Picker_Popup
 
 # fmt: on
 
 
+@dataclasses.dataclass(slots=True)
 class Video_File_Grid(DVD_Archiver_Base):
     """This class implements the file handling of the Black DVD Archiver ui"""
 
-    def __init__(self, parent: DVD_Archiver_Base, project_name="") -> None:
+    parent: DVD_Archiver_Base
+
+    # Private instance variables
+    _display_filename: bool = True
+    _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
+    _db_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
+    _dvd_percent_used: int = 0  # TODO Make A selection of DVD5 and DVD9
+    _file_grid: qtg.Grid = None
+    _project_duration: str = ""
+    _project_name: str = ""
+    _project_video_standard: str = ""  # PAL or NTSC
+    _shutdown: bool = False
+
+    @property
+    def dvd_percent_used(self) -> int:
+        return self._dvd_percent_used
+
+    @dvd_percent_used.setter
+    def dvd_percent_used(self, value: int) -> None:
+        assert (
+            isinstance(value, int) and 0 <= value <= 100
+        ), f"{value=}. Must be int 0 <= value <= 100"
+        self._dvd_percent_used = value
+
+    @property
+    def project_duration(self) -> str:
+        return self._project_duration
+
+    @project_duration.setter
+    def project_duration(self, value: str) -> None:
+        assert isinstance(value, str), f"{value=}. Must be str"
+        self._project_duration = value
+
+    @property
+    def project_name(self) -> str:
+        return self._project_name
+
+    @project_name.setter
+    def project_name(self, value: str) -> None:
+        assert isinstance(value, str) and value.strip() != "", f"{value=}. Must be str"
+        self._project_name = value
+
+    @property
+    def project_video_standard(self) -> str:
+        return self._project_video_standard
+
+    @project_video_standard.setter
+    def project_video_standard(self, value: str) -> None:
+        assert isinstance(value, str) and value in (
+            "",
+            sys_consts.PAL,
+            sys_consts.NTSC,
+        ), f"{value=}. Must be str PAL Or " f"NTSC"
+        self._project_video_standard = value
+
+    def __post_init__(self) -> None:
         """Initializes the instance for use"""
         assert isinstance(
-            parent, DVD_Archiver_Base
-        ), f"{parent=}. Must be an instance of DVD_Archiver_Base"
+            self.parent, DVD_Archiver_Base
+        ), f"{self.parent=}. Must be an instance of DVD_Archiver_Base"
 
-        assert isinstance(project_name, str), f"{project_name=}. Must be str"
-
-        super().__init__()
-
-        self._file_grid: qtg.Grid | None = None
-
-        self._parent = parent
-
-        if not project_name.strip():
-            self.project_name = sys_consts.DEFAULT_PROJECT_NAME
+        if self._db_settings.setting_exist("latest_project"):
+            self.project_name = self._db_settings.setting_get("latest_project")
         else:
-            self.project_name = project_name
-
-        self.dvd_percent_used = 0  # TODO Make A selection of DVD5 and DVD9
-        self.common_words = []
-        self.project_video_standard = ""  # PAL or NTSC
-        self.project_duration = ""
-
-        # Private instance variables
-        self._display_filename: bool = True
-        self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
-        self._db_path = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
-
-        self._shutdown = False
+            self.project_name = sys_consts.DEFAULT_PROJECT_NAME
+            self._db_settings.setting_set("latest_project", self.project_name)
 
     def grid_events(self, event: qtg.Action) -> None:
         """Process Grid Events
@@ -135,9 +174,9 @@ class Video_File_Grid(DVD_Archiver_Base):
             event, qtg.Action
         ), f"{event=}. Must be an instance of qtg.Action"
 
-        dvd_folder = Get_DVD_Build_Folder()
+        video_editor_folder = Get_Video_Editor_Folder()
 
-        if not dvd_folder:
+        if not video_editor_folder:
             return None
 
         file_grid: qtg.Grid = cast(
@@ -173,7 +212,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         event.tag = "video_editor"
         event.value = video_file_input
-        self._parent.event_handler(event)  # Processed in DVD Archiver!
+        self.parent.event_handler(event)  # Processed in DVD Archiver!
 
         return None
 
@@ -315,7 +354,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 event.container_tag = ""
                 event.tag = "project_changed"
                 event.value = self.project_name
-                self._parent.event_handler(event=event)
+                self.parent.event_handler(event=event)
 
             case qtg.Sys_Events.APPEXIT | qtg.Sys_Events.APPCLOSED:
                 if not self._shutdown:  # Prevent getting called twice
@@ -375,9 +414,9 @@ class Video_File_Grid(DVD_Archiver_Base):
                         self._move_video_file(event=event, up=True)
 
                     case "select_files":
-                        dvd_folder = Get_DVD_Build_Folder()
+                        video_editor_folder = Get_Video_Editor_Folder()
 
-                        if dvd_folder.strip() == "":
+                        if video_editor_folder.strip() == "":
                             return None
 
                         self.load_video_input_files(event)
@@ -434,6 +473,8 @@ class Video_File_Grid(DVD_Archiver_Base):
             ).show()
             return None
 
+        self._db_settings.setting_set("latest_project", self.project_name)
+
         if self.project_name in project_names:  # Existing Project
             file_grid.clear()
             self._load_grid(event)
@@ -442,13 +483,11 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         self._save_grid(event)
 
-        self._db_settings.setting_set("latest_project", self.project_name)
-
         event.event = qtg.Sys_Events.CUSTOM
         event.container_tag = ""
         event.tag = "project_changed"
         event.value = self.project_name
-        self._parent.event_handler(event=event)
+        self.parent.event_handler(event=event)
 
         return None
 
@@ -559,13 +598,31 @@ class Video_File_Grid(DVD_Archiver_Base):
             ),
         )
 
+        # Get the required file paths
         file_handler = file_utils.File()
-        dvd_folder = Get_DVD_Build_Folder()
+        video_editor_folder = Get_Video_Editor_Folder()
 
-        if dvd_folder.strip() == "":
+        if video_editor_folder.strip() == "":
             return None
 
-        edit_folder = file_handler.file_join(dvd_folder, sys_consts.EDIT_FOLDER)
+        video_editor_folder = file_handler.file_join(
+            video_editor_folder, utils.Text_To_File_Name(self.project_name)
+        )
+
+        if not file_handler.path_exists(video_editor_folder):
+            if file_handler.make_dir(video_editor_folder) == -1:
+                popups.PopError(
+                    title="Error Creating Project Folder",
+                    message=(
+                        "Error Creating Project Folder!\n"
+                        f"{sys_consts.SDELIM}{video_editor_folder}{sys_consts.SDELIM}"
+                    ),
+                ).show()
+                return None
+
+        edit_folder = file_handler.file_join(
+            video_editor_folder, sys_consts.EDIT_FOLDER
+        )
 
         if not file_handler.path_exists(edit_folder):
             if file_handler.make_dir(edit_folder) == -1:
@@ -578,6 +635,23 @@ class Video_File_Grid(DVD_Archiver_Base):
                 ).show()
                 return None
 
+        transcode_folder = file_handler.file_join(
+            video_editor_folder,
+            sys_consts.TRANSCODE_FOLDER,
+        )
+
+        if not file_handler.path_exists(transcode_folder):
+            if file_handler.make_dir(transcode_folder) == -1:
+                popups.PopError(
+                    title="Error Creating Transcode Folder",
+                    message=(
+                        "Error Creating Transcode Folder!\n"
+                        f"{sys_consts.SDELIM}{transcode_folder}{sys_consts.SDELIM}"
+                    ),
+                ).show()
+                return None
+
+        # Transcode or Join the selected files
         checked_items = file_grid.checkitems_get
 
         if not checked_items:
@@ -670,7 +744,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                     vd_id = video_data.vd_id
                     button_title = video_data.video_file_settings.button_title
                     output_file = file_handler.file_join(
-                        dir_path=video_data.video_folder,
+                        dir_path=transcode_folder,
                         file_name=f"{video_data.video_file}_joined",
                         ext=(
                             container_format
@@ -687,26 +761,6 @@ class Video_File_Grid(DVD_Archiver_Base):
             if concatenating_files and output_file:
                 result = -1
                 message = ""
-                dvd_folder = Get_DVD_Build_Folder()
-
-                if dvd_folder.strip() == "":
-                    return None
-
-                transcode_folder = file_handler.file_join(
-                    dvd_folder,
-                    sys_consts.TRANSCODE_FOLDER,
-                )
-
-                if not file_handler.path_exists(transcode_folder):
-                    if file_handler.make_dir(transcode_folder) == -1:
-                        popups.PopError(
-                            title="Error Creating Transcode Folder",
-                            message=(
-                                "Error Creating Transcode Folder!\n"
-                                f"{sys_consts.SDELIM}{transcode_folder}{sys_consts.SDELIM}"
-                            ),
-                        ).show()
-                        return None
 
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
                     match copy_method:
@@ -1056,11 +1110,6 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         file_handler = file_utils.File()
 
-        if self.project_name:
-            project_name = self.project_name
-        else:
-            project_name = sys_consts.DEFAULT_PROJECT_NAME
-
         file_grid: qtg.Grid = cast(
             qtg.Grid,
             event.widget_get(
@@ -1072,7 +1121,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         removed_files = []
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
-            result, shelf_list = Get_Project_Files(project_name=project_name)
+            result, shelf_list = Get_Project_Files(project_name=self.project_name)
 
             if result == -1:
                 popups.PopError(
@@ -1080,6 +1129,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 ).show()
                 return None
 
+            grid_row = 0
             for shelf_item in shelf_list:
                 if (
                     shelf_item["video_data"] is None
@@ -1088,19 +1138,21 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 if not file_handler.file_exists(shelf_item["video_data"].video_path):
                     removed_files.append(shelf_item["video_data"].video_path)
+                    continue
 
                 self._populate_grid_row(
                     file_grid=file_grid,
-                    row_index=shelf_item["row_index"],
+                    row_index=grid_row,
                     video_user_data=shelf_item["video_data"],
                     duration=shelf_item["duration"],
                 )
                 toolbox = self._get_toolbox(shelf_item["video_data"])
                 file_grid.row_widget_set(
-                    row=shelf_item["row_index"],
+                    row=grid_row,
                     col=file_grid.colindex_get("settings"),
                     widget=toolbox,
                 )
+                grid_row += 1
 
             file_grid.row_scroll_to(0)
             self.set_project_standard_duration(event)
@@ -1123,6 +1175,10 @@ class Video_File_Grid(DVD_Archiver_Base):
                         col=self._file_grid.colindex_get("video_file"),
                     )
 
+                    if prior_grid_video_data is None:
+                        self._file_grid.row_delete(check_row_index)
+                        continue
+
                     if grid_video_data.video_path == prior_grid_video_data.video_path:
                         self._file_grid.row_delete(check_row_index)
         if removed_files:
@@ -1131,11 +1187,29 @@ class Video_File_Grid(DVD_Archiver_Base):
                 width=120,
                 title="Source Files Not Found...",
                 message=(
-                    "The following video files do not exist and were removed"
-                    " from the project:"
+                    "The Following Video Files Do Not Exist And Were Removed"
+                    " From The Project Grid:\n\n"
                     f"{sys_consts.SDELIM}{removed_file_list}{sys_consts.SDELIM}"
                 ),
             ).show()
+
+            if (
+                popups.PopYesNo(
+                    title="Remove From Project..",
+                    message="Permanently Remove These Files From The Project And Project DVD Layouts?",
+                ).show()
+                == "yes"
+            ):
+                result, message = Remove_Project_Files(
+                    project_name=self.project_name, file_paths=removed_files
+                )
+
+                if result == -1:
+                    popups.PopError(
+                        title="Project File Error...",
+                        message=f"Failed To Remove Files! <{message}>",
+                    ).show()
+                    return None
 
         return None
 
@@ -1158,9 +1232,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                 tag="video_input_files",
             ),
         )
-
-        if not self.project_name:
-            self.project_name = sys_consts.DEFAULT_PROJECT_NAME
 
         sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
 
@@ -1780,7 +1851,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         )
         total_duration = 0.0
         self.project_video_standard = ""
-        self.project_duration = ""
+        self._project_duration = ""
         self.dvd_percent_used = 0
 
         if file_grid.row_count > 0:
@@ -1815,7 +1886,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 encoding_info = user_data.encoding_info
                 self.project_video_standard = encoding_info.video_standard
 
-            self.project_duration = str(
+            self._project_duration = str(
                 datetime.timedelta(seconds=total_duration)
             ).split(".")[0]
             self.dvd_percent_used = dvdarch_utils.DVD_Percent_Used(
@@ -1833,7 +1904,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         event.value_set(
             container_tag="dvd_properties",
             tag="project_duration",
-            value=f"{sys_consts.SDELIM}{self.project_duration}{sys_consts.SDELIM}",
+            value=f"{sys_consts.SDELIM}{self._project_duration}{sys_consts.SDELIM}",
         )
         event.value_set(
             container_tag="dvd_properties",

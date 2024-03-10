@@ -980,10 +980,11 @@ class Video_Editor(DVD_Archiver_Base):
         self, video_file_input: list[Video_Data], output_folder: str, project_name: str
     ) -> None:
         """Sets the source of the media player
+
         Args:
             video_file_input (list[Video_Data]): The input video information
             output_folder (str): The folder in which processed video files are placed
-            project_name (str): The name of the currently selcted project
+            project_name (str): The name of the currently selected project
         """
         assert isinstance(video_file_input, list), f"{video_file_input=}. Must be list"
         assert all(
@@ -1007,24 +1008,34 @@ class Video_Editor(DVD_Archiver_Base):
         self._menu_frame.value_set("")
 
         self._video_file_input = video_file_input
-        self._all_projects_rb.value_set(True)
-        self._this_project_rb.value_set(False)
+        self._all_projects_rb.enable_set(False)
+        self._this_project_rb.enable_set(False)
 
-        result, message, edit_list_visibility = (
-            self._edit_list.get_edit_cuts_visibility(
-                file_path=self._video_file_input[0].video_path,
-                project=project_name,
-                layout="",
-            )
-        )
+        # if not self._file_system_init:
+        result = self._video_file_system_maker()
 
         if result == -1:
             return None
 
-        if edit_list_visibility == "global":
-            self._all_projects_rb.value_set(True)
-        else:
+        if self._video_file_input[0].video_path.startswith(self._edit_folder):
             self._this_project_rb.value_set(True)
+        else:
+            self._all_projects_rb.enable_set(True)
+            self._this_project_rb.enable_set(True)
+
+            result, _, edit_list_visibility = self._edit_list.get_edit_cuts_visibility(
+                file_path=self._video_file_input[0].video_path,
+                project=project_name,
+                layout="",
+            )
+
+            if result == -1:
+                return None
+
+            if edit_list_visibility == "global":
+                self._all_projects_rb.value_set(True)
+            else:
+                self._this_project_rb.value_set(True)
 
         self._archive_edit_list_read()
 
@@ -1033,12 +1044,6 @@ class Video_Editor(DVD_Archiver_Base):
         self._frame_height = self._video_file_input[0].encoding_info.video_height
         self._frame_rate = self._video_file_input[0].encoding_info.video_frame_rate
         self._frame_count = self._video_file_input[0].encoding_info.video_frame_count
-
-        if not self._file_system_init:
-            result = self._video_file_system_maker()
-
-            if result == -1:
-                return None
 
         self._video_slider.value_set(0)
         self._video_slider.range_max_set(
@@ -1787,7 +1792,7 @@ class Video_Editor(DVD_Archiver_Base):
                 temp_files=temp_files,
                 output_file=output_file,
                 delete_temp_files=True,
-                debug=True,
+                debug=False,
             )
 
             if result == -1:
@@ -2278,6 +2283,12 @@ class Video_Editor(DVD_Archiver_Base):
         if not file_handler.path_exists(self._output_folder):
             file_handler.make_dir(self._output_folder)
 
+        if file_handler.path_exists(self._output_folder):
+            self._output_folder = file_handler.file_join(
+                self._output_folder, utils.Text_To_File_Name(self._project_name)
+            )
+            file_handler.make_dir(self._output_folder)
+
         if not file_handler.path_exists(self._output_folder):
             popups.PopError(
                 title="Video Output Folder Does Not Exist",
@@ -2291,7 +2302,7 @@ class Video_Editor(DVD_Archiver_Base):
             return -1
 
         self._edit_folder = file_handler.file_join(
-            self._output_folder, self._edit_folder
+            self._output_folder, sys_consts.EDIT_FOLDER
         )
 
         if self._video_file_input and not file_handler.file_exists(
@@ -2332,6 +2343,10 @@ class Video_Editor(DVD_Archiver_Base):
                     ),
                 ).show()
                 return -1
+
+        self._transcode_folder = file_handler.file_join(
+            self._output_folder, sys_consts.TRANSCODE_FOLDER
+        )
 
         if not file_handler.path_exists(self._transcode_folder):
             if file_handler.make_dir(self._transcode_folder) == -1:

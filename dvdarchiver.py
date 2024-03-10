@@ -36,7 +36,7 @@ from background_task_manager import Task_Manager_Popup
 from dvd import DVD, DVD_Config
 from menu_page_title_popup import Menu_Page_Title_Popup
 from sys_config import (DVD_Archiver_Base, DVD_Menu_Settings,
-                        Get_DVD_Build_Folder, Get_Project_Layout_Names,
+                        Get_Video_Editor_Folder, Get_Project_Layout_Names,
                         Set_Shelved_DVD_Layout, Video_Data, Migrate_Shelves_To_DB, Set_Shelved_Project, Delete_Project,
                         Delete_DVD_Layout)
 from utils import Countries, Text_To_File_Name
@@ -407,7 +407,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                             "archive_disk_transcode", sys_consts.TRANSCODE_H265
                         )
                     case "video_editor":  # Signal from file_grid
-                        dvd_folder = Get_DVD_Build_Folder()
+                        video_edit_folder = Get_Video_Editor_Folder()
                         video_data: list[Video_Data] = event.value
 
                         if (
@@ -426,7 +426,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                             ).show()
                             return None
 
-                        if dvd_folder.strip() == "":
+                        if video_edit_folder.strip() == "":
                             popups.PopError(
                                 title="DVD Build Folder Not Set...",
                                 message=(
@@ -438,7 +438,7 @@ class DVD_Archiver(DVD_Archiver_Base):
 
                         self._video_editor.set_source(
                             video_file_input=video_data,
-                            output_folder=dvd_folder,
+                            output_folder=video_edit_folder,
                             project_name=self._file_control.project_name,
                         )
                         self._control_tab.select_tab(tag_name="video_editor_tab")

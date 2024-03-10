@@ -29,32 +29,68 @@ import file_utils
 import popups
 import sqldb
 import sys_consts
+import utils
 from qtgui import Action
 
 # fmt: on
 
 
-def Get_DVD_Build_Folder() -> str:
-    """Gets the DVD build folder
+def Get_Video_Editor_Folder(suppress_error: bool = False) -> str:
+    """Gets the video editor folder
+
+    Args:
+        suppress_error (bool, optional): If True, suppresses the error popup.
 
     Returns:
-        str: The DVD build folder or an empty sting if an error occurs - in this case, an error message also pops-up.
+        str: The video editor folder or an empty sting if an error occurs.
     """
     file_handler = file_utils.File()
     db = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
-    dvd_folder = db.setting_get(sys_consts.DVD_BUILD_FOLDER)
+    dvd_build_folder = db.setting_get(sys_consts.DVD_BUILD_FOLDER)
 
-    if dvd_folder is None or dvd_folder.strip() == "":
-        popups.PopError(
-            title="DVD Build Folder Error...",
-            message="A DVD Build Folder Must Be Entered Before Making A Video Edit/Transcode Or Join!",
-        ).show()
+    if dvd_build_folder is None or dvd_build_folder.strip() == "":
+        if not suppress_error:
+            popups.PopError(
+                title="DVD Build Folder Error...",
+                message="A DVD Build Folder Must Be Entered Before Making A Video Edit/Transcode Or Join!",
+            ).show()
 
         return ""
 
-    dvd_folder = file_handler.file_join(dvd_folder, sys_consts.VIDEO_EDITOR_FOLDER_NAME)
+    video_editor_folder = file_handler.file_join(
+        dvd_build_folder, sys_consts.VIDEO_EDITOR_FOLDER_NAME
+    )
 
-    return dvd_folder
+    return video_editor_folder
+
+
+def Get_Transcode_Folder(suppress_error: bool = False) -> str:
+    """Gets the video transcode folder
+
+    Args:
+        suppress_error (bool, optional): If True, suppresses the error popup.
+
+    Returns:
+        str: The video transcode folder or an empty sting if an error occurs.
+    """
+    file_handler = file_utils.File()
+    db = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
+    dvd_build_folder = db.setting_get(sys_consts.DVD_BUILD_FOLDER)
+
+    if dvd_build_folder is None or dvd_build_folder.strip() == "":
+        if not suppress_error:
+            popups.PopError(
+                title="DVD Build Folder Error...",
+                message="A DVD Build Folder Must Be Entered Before Making A Video Edit/Transcode Or Join!",
+            ).show()
+
+        return ""
+
+    video_transcode_folder = file_handler.file_join(
+        dvd_build_folder, sys_consts.TRANSCODE_FOLDER
+    )
+
+    return video_transcode_folder
 
 
 def Migrate_Shelves_To_DB() -> tuple[int, str]:
@@ -380,6 +416,25 @@ def Delete_Project(project_name: str) -> tuple[int, str]:
         isinstance(project_name, str) and project_name.strip() != ""
     ), f"{project_name=}. Must be a non-empty str"
 
+    # Remove Project Folder
+    file_handler = file_utils.File()
+
+    video_editor_folder = Get_Video_Editor_Folder(suppress_error=True)
+
+    if video_editor_folder.strip() and file_handler.path_exists(video_editor_folder):
+        project_folder = file_handler.file_join(
+            video_editor_folder, utils.Text_To_File_Name(project_name)
+        )
+
+        if file_handler.path_exists(project_folder):
+            result, message = file_handler.remove_dir_contents(
+                file_path=project_folder, keep_parent=False
+            )
+
+            if result == -1:
+                return -1, message
+
+    # Remove project from DB
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
 
     if (
@@ -411,10 +466,10 @@ def Delete_Project(project_name: str) -> tuple[int, str]:
         dvd_layout_names = project_shelf_dict[project_name]
 
         for dvd_layout_name in dvd_layout_names:
-            dvd_laoot_key = f"{project_name}.{dvd_layout_name}"
+            dvd_layout_key = f"{project_name}.{dvd_layout_name}"
 
-            if dvd_laoot_key in dvdmenu_shelf_dict:
-                dvdmenu_shelf_dict.pop(dvd_laoot_key)
+            if dvd_layout_key in dvdmenu_shelf_dict:
+                dvdmenu_shelf_dict.pop(dvd_layout_key)
 
         project_shelf_dict.pop(project_name)
 
@@ -433,6 +488,85 @@ def Delete_Project(project_name: str) -> tuple[int, str]:
     result, message = sql_shelf.update(
         shelf_name="projects", shelf_data=project_shelf_dict
     )
+    if result == -1:
+        return -1, message
+
+    return 1, ""
+
+
+def Remove_Project_Files(project_name: str, file_paths: list[str]) -> tuple[int, str]:
+    """Removes project files
+
+    Args:
+        project_name (str): The project name
+        file_paths (list[str]): List of video file paths
+
+    Returns:
+    tuple[int, str]: tuple containing result code and
+
+        - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+        - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+
+    """
+    assert (
+        isinstance(project_name, str) and project_name.strip() != ""
+    ), f"{project_name=}. Must be a non-empty str"
+    assert isinstance(file_paths, list), f"{file_paths=}. Must be a list"
+    assert all(
+        isinstance(item, str) and item.strip() != "" for item in file_paths
+    ), f"{file_paths=}. Must be a list of non-empty str"
+
+    sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
+    if (
+        sql_shelf.error == -1
+    ):  # This should not happen unless the system goes off the rails
+        return -1, sql_shelf.error.message
+
+    project_shelf_dict = sql_shelf.open("projects")
+    if sql_shelf.error.code == -1:
+        return -1, sql_shelf.error.message
+
+    video_grid_shelf_dict = sql_shelf.open("video_grid")
+    if sql_shelf.error.code == -1:
+        return -1, sql_shelf.error.message
+
+    dvdmenu_shelf_dict = sql_shelf.open("dvdmenu")
+    if sql_shelf.error.code == -1:
+        return -1, sql_shelf.error.message
+
+    for file_path in file_paths:
+        if project_name in video_grid_shelf_dict:
+            for video_data in video_grid_shelf_dict[project_name]:
+                if video_data["video_data"] is None:  # Off the rails error
+                    continue
+
+                if video_data["video_data"].video_path == file_path:
+                    video_grid_shelf_dict[project_name].pop(video_data["row_index"])
+
+        if project_name in project_shelf_dict:
+            for dvd_layout in project_shelf_dict[project_name]:
+                dvd_layout_key = f"{project_name}.{dvd_layout}"
+
+                for dvd_page in dvdmenu_shelf_dict[dvd_layout_key]:
+                    dvd_page: DVD_Menu_Page
+
+                    for button_index, button_item in reversed(
+                        dvd_page.get_button_titles.copy().items()
+                    ):
+                        button_item[1]: Video_Data
+                        if button_item[1].video_path == file_path:
+                            dvd_page.get_button_titles.pop(button_index)
+
+    result, message = sql_shelf.update(
+        shelf_name="video_grid", shelf_data=video_grid_shelf_dict
+    )
+    if result == -1:
+        return -1, message
+
+    result, message = sql_shelf.update(
+        shelf_name="dvdmenu", shelf_data=dvdmenu_shelf_dict
+    )
+
     if result == -1:
         return -1, message
 
@@ -515,10 +649,16 @@ def Get_Project_Files(
         updated_grid_videos = []
 
         for video_data in video_grid_shelf_dict[project_name]:
+            if video_data["video_data"] is None:  # Off the rails error
+                continue
+
             seen_paths.add(video_data["video_data"].video_path)
             updated_grid_videos.append(video_data)
 
         for dvd_layout_video in dvd_layout_videos:
+            if dvd_layout_video["video_data"] is None:  # Off the rails error
+                continue
+
             video_path = dvd_layout_video["video_data"].video_path
             if video_path not in seen_paths:
                 seen_paths.add(video_path)

@@ -778,6 +778,257 @@ def Create_DVD_Iso(input_dir: str, output_file: str) -> tuple[int, str]:
     return Execute_Check_Output(command)
 
 
+def Create_DVD_Case_Insert(
+    dvd_title: str,
+    insert_titles: list[str],
+    insert_width=183,  # Standard DVD case insert width in millimeters
+    insert_height=273,  # Standard DVD case insert height in millimeters
+    resolution=300,  # Standard resolution for print quality
+    font_size=24,
+    font_path="Arial.ttf",
+    background_color="white",
+    text_color="black",
+) -> tuple[int, bytes]:
+    """
+    Creates a DVD case insert image with DVD title, menu titles, and using ImageMagick.
+
+    Args:
+        dvd_title (str): Title of the DVD.
+        insert_titles (list): List of menu titles to be displayed on the insert.
+        insert_width (int): Width of the DVD case insert.
+        insert_height (int): Height of the DVD case insert.
+        resolution (int): Resolution of the image.
+        font_size (int): Font size.
+        font_path (str): Path to the font file.
+        background_color (str): Background color of the insert.
+        text_color (str): Color of the text.
+
+    Returns:
+        - arg 1 : Status code. Returns 1 if the iso image was created, -1 otherwise.
+        - arg 2 : bytes: The generated DVD case insert image data.
+    """
+    assert (
+        isinstance(dvd_title, str) and dvd_title.strip() != ""
+    ), f"{dvd_title=}. Must be a non-empty str"
+    assert isinstance(insert_titles, list), f"{insert_titles=}. Must be a list of str"
+    assert (
+        isinstance(insert_width, int) and insert_width > 0
+    ), f"{insert_width=}. Must be an int >"
+    assert (
+        isinstance(insert_height, int) and insert_height > 0
+    ), f"{insert_height=}. Must be an int > 0"
+    assert (
+        isinstance(resolution, int) and resolution > 0
+    ), f"{resolution=}. Must be an int > 0"
+    assert (
+        isinstance(font_size, int) and font_size > 0
+    ), f"{font_size=}. Must be an int > 0"
+    assert (
+        isinstance(font_path, str) and font_path.strip() != ""
+    ), f"{font_path=}. Must be a non-empty str"
+    assert (
+        isinstance(background_color, str) and background_color.strip() != ""
+    ), f"{background_color=}. Must be a non-empty str"
+    assert (
+        isinstance(text_color, str) and text_color.strip() != ""
+    ), f"{text_color=}. Must be a non-empty str"
+
+    # Check if font file exists
+    if not os.path.exists(font_path):
+        return -1, b""
+    try:
+        # Calculate width and height in pixels
+        width = int(insert_width * resolution)
+        height = int(insert_height * resolution)
+
+        # Construct ImageMagick command
+        base_command = [sys_consts.CONVERT]
+        commands = [
+            ["-size", f"{width}x{height}"],
+            ["xc:" + background_color],
+            ["-fill", text_color],
+            ["-font", font_path],
+            ["-pointsize", str(font_size)],
+            [
+                "-annotate",
+                "10,10",
+                f"{dvd_title}",
+            ],
+        ]
+
+        # Add DVD title with annotation
+
+        # Add menu titles with annotations
+        y_position = 40  # Initial y position for menu titles
+        for title in insert_titles:
+            commands.append([
+                "-annotate",
+                f"10,{y_position}",
+                f"{title}",
+            ])
+            y_position += 30  # Increase the y position for the next menu title
+
+        # Combine base command and individual arguments for subprocess.check_output
+        full_command = base_command + sum(commands, [])
+
+        return 1, subprocess.check_output(full_command, stderr=subprocess.DEVNULL)
+
+    except subprocess.CalledProcessError:
+        return -1, b""
+
+
+def Create_DVD_Label(
+    menu_titles,
+    label_diameter=118,  # Standard DVD label diameter in millimeters
+    resolution=300,  #  # Standard resolution for print quality
+    font_size=24,
+    font_path="Arial.ttf",
+    hole_radius=0.25,
+    hole_color="white",
+) -> tuple[int, bytes]:
+    """
+    Creates a DVD label image with menu titles and a central hole using ImageMagick.
+
+    Args:
+        menu_titles (list): List of menu titles.
+        label_diameter (float): Diameter of the DVD label.
+        resolution (int): Resolution of the image.
+        font_size (int): Font size.
+        font_path (str): Path to the font file.
+        hole_radius (float): Radius of the central hole.
+        hole_color (str): Color of the central hole.
+
+    Returns:
+        tuple[int, bytes]
+        - arg 1 : Status code. Returns 1 if the iso image was created, -1 otherwise.
+        - arg 2 : bytes: The generated DVD label image data.
+    """
+
+    ##### Helper
+    def draw_text_size(text, font_path, font_size) -> tuple[int, str, int, int]:
+        """
+        Estimates text size using ImageMagick's identify command.
+
+        Args:
+            text (str): The text to measure.
+            font_path (str): Path to the font file.
+            font_size (int): Font size.
+
+        Returns:
+            tuple[int, str, int, int]
+            - arg 1: Status code. Returns 1 if the iso image was created, -1 otherwise.
+            - arg 2: str: The error message if the status code is -1 otherwise ""
+            - arg 3: int: The width of the text in pixels.
+            - arg 4: int: The height of the text in pixels.
+
+        """
+        command = [
+            sys_consts.CONVERT,
+            "identify",
+            "-format",
+            "%wx%h",
+            f"label:{text}",
+            "-font",
+            font_path,
+            "-pointsize",
+            str(font_size),
+        ]
+        result, message = Execute_Check_Output(commands=command)
+
+        if result == -1:
+            return -1, message, -1, -1
+
+        x = int(message.split("x")[0])
+        y = int(message.split("x")[1])
+
+        return 1, "", x, y
+
+    ##### Main
+    assert isinstance(menu_titles, list), f"{menu_titles=}. Must be a list of str"
+    assert (
+        isinstance(label_diameter, (int, float)) and label_diameter > 0
+    ), f"{label_diameter=}. Must be a float > 0"
+    assert (
+        isinstance(resolution, int) and resolution > 0
+    ), f"{resolution=}. Must be an int > 0"
+    assert (
+        isinstance(font_size, int) and font_size > 0
+    ), f"{font_size=}. Must be an int > 0"
+    assert (
+        isinstance(font_path, str) and font_path.strip() != ""
+    ), f"{font_path=}. Must be a non-empty str"
+    assert (
+        isinstance(hole_radius, (int, float)) and hole_radius > 0
+    ), f"{hole_radius=}. Must be a float > 0"
+    assert (
+        isinstance(hole_color, str) and hole_color.strip() != ""
+    ), f"{hole_color=}. Must be a non-empty str"
+
+    # Check if all elements in menu_titles are of type str
+    assert all(
+        map(lambda x: isinstance(x, str), menu_titles)
+    ), f"{menu_titles=}. Must be a list of str"
+
+    if not os.path.exists(font_path):
+        return -1, b""
+
+    try:
+        width = height = int(label_diameter * resolution)
+
+        # Calculate hole dimensions and position
+        hole_diameter = int(hole_radius * width)
+        hole_offset = int((width - hole_diameter) / 2)
+        hole_left = hole_offset
+        hole_top = hole_offset
+        # hole_right = hole_left + hole_diameter, hole_top + hole_diameter
+        hole_bottom = hole_left + hole_diameter, hole_top + hole_diameter
+
+        base_command = [sys_consts.CONVERT]
+        commands = [
+            ["-size", f"{width}x{height}"],
+            ["xc:transparent"],
+            [
+                "(",
+            ],
+            ["-fill", "black"],
+            [
+                "-draw",
+                f"circle {width // 2},{height // 2} {hole_diameter // 2},{height // 2} {width // 2},{hole_bottom}",
+            ],
+        ]
+
+        # Add menu titles with annotations
+        for i, title in enumerate(menu_titles):
+            result, message, draw_x, draw_y = draw_text_size(
+                title, font_path, font_size
+            )
+
+            if result == -1:
+                return -1, b""
+
+            x_offset = int((width - draw_x) / 2)
+            y_position = 0  # Replace with the actual y position calculation
+            commands.append([
+                "-annotate",
+                f"+{x_offset}+{y_position}",
+                f"{title}",
+                "-font",
+                font_path,
+                "-pointsize",
+                f"{font_size}",
+            ])
+
+        commands.append([")"])
+
+        # Combine base command and individual arguments for subprocess.check_output
+        full_command = base_command + sum(commands, [])
+
+        return 1, subprocess.check_output(full_command, stderr=subprocess.DEVNULL)
+
+    except subprocess.CalledProcessError:
+        return -1, b""
+
+
 def Get_Space_Available(path: str) -> tuple[int, str]:
     """Returns the amount of available disk space in bytes for the specified file system path.
 
@@ -3240,7 +3491,7 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         Video_Details: Check video_details.error if it is not an empty string an error occurred
 
     """
-    debug = True
+    debug = False
     video_file_details = Encoding_Details()
 
     if utils.Is_Complied():
