@@ -547,6 +547,9 @@ def Remove_Project_Files(project_name: str, file_paths: list[str]) -> tuple[int,
             for dvd_layout in project_shelf_dict[project_name]:
                 dvd_layout_key = f"{project_name}.{dvd_layout}"
 
+                if dvd_layout_key not in dvdmenu_shelf_dict:
+                    continue
+
                 for dvd_page in dvdmenu_shelf_dict[dvd_layout_key]:
                     dvd_page: DVD_Menu_Page
 
@@ -575,7 +578,7 @@ def Remove_Project_Files(project_name: str, file_paths: list[str]) -> tuple[int,
 
 def Get_Project_Files(
     project_name: str,
-) -> tuple[int, list[dict[int, str, "Video_Data"]]]:
+) -> tuple[int, list[dict[int, str, "Video_Data"] | dict[int, str, "Video_Data", str]]]:
     """Retrieves video files associated with a given project, removing duplicates and updating relevant data sources.
 
     Args:
@@ -618,16 +621,18 @@ def Get_Project_Files(
                     dvd_page: DVD_Menu_Page
 
                     for button_index, button_item in dvd_page.get_button_titles.items():
-                        button_item[1]: Video_Data
+                        button_video_data: Video_Data = button_item[1]
+                        button_video_duration: float = button_item[
+                            1
+                        ].encoding_info.video_duration
 
                         dvd_layout_videos.append({
                             "row_index": button_index,
                             "duration": str(
-                                datetime.timedelta(
-                                    seconds=button_item[1].encoding_info.video_duration
-                                )
+                                datetime.timedelta(seconds=button_video_duration)
                             ).split(".")[0],
-                            "video_data": button_item[1],
+                            "video_data": button_video_data,
+                            "dvdmenu": dvd_layout,
                         })
 
     # Perform cleansing pass

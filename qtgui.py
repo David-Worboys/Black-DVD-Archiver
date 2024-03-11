@@ -6782,20 +6782,6 @@ class Checkbox(_qtpyBase_Control):
             qtC.Qt.CheckState.Checked if value else qtC.Qt.CheckState.Unchecked
         )
 
-    def value_set(self, value: bool = True):
-        """Toggles the checkbox on or off.
-
-        Args:
-            value (bool): True checkbox is checked, False checkbox is unchecked. Defaults to True
-        """
-
-        if self._widget is None:
-            raise RuntimeError(f"{self._widget=}. Not set")
-
-        assert isinstance(value, bool), f"{value=}. Must be bool"
-
-        self.button_toggle(value)
-
     @property
     def label_get(self) -> str:
         """Returns the label text of the checkbox.
@@ -6827,6 +6813,9 @@ class Checkbox(_qtpyBase_Control):
 
         """
         assert isinstance(value, bool), f"{value=} must be bool"
+
+        if self._widget is None:
+            raise RuntimeError(f"{self._widget=}. Not set")
 
         self.button_toggle(value)
 
@@ -10142,17 +10131,41 @@ class Grid(_qtpyBase_Control):
 
     @overload
     def value_set(
-        self, value: float, row: int, col: int, user_data: any, tooltip: str = ""
+        self,
+        value: float,
+        row: int,
+        col: int,
+        user_data: any,
+        tooltip: str = "",
+        bold: bool = False,
+        italic: bool = False,
+        underline: bool = False,
     ) -> None: ...
 
     @overload
     def value_set(
-        self, value: int, row: int, col: int, user_data: any, tooltip: str = ""
+        self,
+        value: int,
+        row: int,
+        col: int,
+        user_data: any,
+        tooltip: str = "",
+        bold: bool = False,
+        italic: bool = False,
+        underline: bool = False,
     ) -> None: ...
 
     @overload
     def value_set(
-        self, value: str, row: int, col: int, user_data: any, tooltip: str = ""
+        self,
+        value: str,
+        row: int,
+        col: int,
+        user_data: any,
+        tooltip: str = "",
+        bold: bool = False,
+        italic: bool = False,
+        underline: bool = False,
     ) -> None: ...
 
     def value_set(
@@ -10164,6 +10177,9 @@ class Grid(_qtpyBase_Control):
         col: int,
         user_data: any,
         tooltip: str = "",
+        bold: bool = False,
+        italic: bool = False,
+        underline: bool = False,
     ) -> None:
         """
         Sets a display value (and user data if supplied) at a given row and column.
@@ -10174,6 +10190,9 @@ class Grid(_qtpyBase_Control):
             col (int): Column index reference.
             user_data (any): User data to be stored.
             tooltip (str): Tooltip to be displayed.
+            bold (bool): Bold font.
+            italic (bool): Italic font.
+            underline (bool): Underline font.
 
         Returns:
             None.
@@ -10190,6 +10209,10 @@ class Grid(_qtpyBase_Control):
         assert isinstance(col, int) and (
             col == -1 or col >= 0
         ), f"{col=}. Must be an int == -1 or int >= 0"
+        assert isinstance(tooltip, str), f"{tooltip=}. Must be str"
+        assert isinstance(bold, bool), f"{bold=}. Must be bool"
+        assert isinstance(italic, bool), f"{italic=}. Must be bool"
+        assert isinstance(underline, bool), f"{underline=}. Must be bool"
 
         if self._widget is None:
             raise RuntimeError(f"{self._widget=} not set")
@@ -10221,8 +10244,22 @@ class Grid(_qtpyBase_Control):
             return None
 
         item_data = item.data(qtC.Qt.UserRole)
-
         item.setText(str(value))
+
+        if bold or italic or underline:
+            # Create a new font with appropriate  style and set it to the item
+            item_font = item.font()  # Get the current font
+
+            if bold:
+                item_font.setBold(True)
+            if italic:
+                item_font.setItalic(True)
+            if underline:
+                item_font.setUnderline(True)
+
+            item.setFont(item_font)
+        else:
+            item.setFont(item.font().resolve(item.font()))
 
         if tooltip:
             item.setToolTip(self.trans_str(tooltip))
@@ -15419,7 +15456,7 @@ class Video_Player(qtM.QMediaPlayer):
                     self._init = True
                     self.pause()
                     self.seek(0)
-                    
+
             case qtM.QMediaPlayer.MediaStatus.StalledMedia:
                 self.source_state = "stalled"
             case qtM.QMediaPlayer.MediaStatus.BufferingMedia:

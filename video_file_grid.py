@@ -59,44 +59,89 @@ class Video_File_Grid(DVD_Archiver_Base):
 
     @property
     def dvd_percent_used(self) -> int:
+        """Returns the percentage of the DVD used
+
+        Allow > 100% because code checks > 100% and code needs to know total percentage even if greater than 100%
+
+        Returns:
+            int: The percentage of the DVD used
+        """
         return self._dvd_percent_used
 
     @dvd_percent_used.setter
     def dvd_percent_used(self, value: int) -> None:
-        assert (
-            isinstance(value, int) and 0 <= value <= 100
-        ), f"{value=}. Must be int 0 <= value <= 100"
+        """Sets the percentage of the DVD used
+
+        Allow > 100% because code checks > 100% and code needs to know total percentage even if greater than 100%
+
+        Args:
+            value (int): The percentage of the DVD used >= 0
+        """
+
+        assert isinstance(value, int) and 0 >= 0, f"{value=}. Must be int >=0"
+
         self._dvd_percent_used = value
 
     @property
     def project_duration(self) -> str:
+        """Returns the project duration as a string
+
+        Returns:
+            str: The project duration
+        """
         return self._project_duration
 
     @project_duration.setter
     def project_duration(self, value: str) -> None:
+        """Sets the project duration as a string
+
+        Args:
+            value (str): The project duration
+        """
         assert isinstance(value, str), f"{value=}. Must be str"
         self._project_duration = value
 
     @property
     def project_name(self) -> str:
+        """Returns the project name
+
+        Returns:
+            str: The project name
+        """
         return self._project_name
 
     @project_name.setter
     def project_name(self, value: str) -> None:
+        """Sets the project name
+
+        Args:
+            value (str): The project name
+        """
         assert isinstance(value, str) and value.strip() != "", f"{value=}. Must be str"
+
         self._project_name = value
 
     @property
     def project_video_standard(self) -> str:
+        """Returns the project video standard
+
+        Returns:
+            str: The project video standard ("", PAL or NTSC)
+        """
         return self._project_video_standard
 
     @project_video_standard.setter
     def project_video_standard(self, value: str) -> None:
+        """Sets the project video standard
+
+        Args:
+            value (str): The project video standard ("", PAL or NTSC)
+        """
         assert isinstance(value, str) and value in (
             "",
             sys_consts.PAL,
             sys_consts.NTSC,
-        ), f"{value=}. Must be str PAL Or " f"NTSC"
+        ), f"{value=}. Must be str PAL Or NTSC"
         self._project_video_standard = value
 
     def __post_init__(self) -> None:
@@ -320,7 +365,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 self._populate_grid_row(
                     file_grid=file_grid,
                     row_index=row,
-                    video_user_data=updated_user_data,
+                    video_data=updated_user_data,
                     duration=duration,
                 )
 
@@ -1140,11 +1185,19 @@ class Video_File_Grid(DVD_Archiver_Base):
                     removed_files.append(shelf_item["video_data"].video_path)
                     continue
 
+                video_data: Video_Data = shelf_item["video_data"]
+
                 self._populate_grid_row(
                     file_grid=file_grid,
                     row_index=grid_row,
-                    video_user_data=shelf_item["video_data"],
+                    video_data=shelf_item["video_data"],
                     duration=shelf_item["duration"],
+                    italic=True
+                    if "dvdmenu" in shelf_item
+                    else False,  # Item comes from a dvd layout button
+                    tooltip=f"{sys_consts.SDELIM} {shelf_item['dvdmenu']} {video_data.video_path}{sys_consts.SDELIM}"
+                    if "dvdmenu" in shelf_item
+                    else "",
                 )
                 toolbox = self._get_toolbox(shelf_item["video_data"])
                 file_grid.row_widget_set(
@@ -1152,6 +1205,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                     col=file_grid.colindex_get("settings"),
                     widget=toolbox,
                 )
+
                 grid_row += 1
 
             file_grid.row_scroll_to(0)
@@ -1308,7 +1362,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                         f"{grid_video_data.video_file}{grid_video_data.video_extension}"
                     ),
                     user_data=grid_video_data,
-                    tooltip=f"{sys_consts.SDELIM}{grid_video_data.video_path}{sys_consts.SDELIM}",
                 )
             else:
                 file_grid.value_set(
@@ -1316,7 +1369,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                     col=file_grid.colindex_get("video_file"),
                     value=grid_video_data.video_file_settings.button_title,
                     user_data=grid_video_data,
-                    tooltip=f"{sys_consts.SDELIM}{grid_video_data.video_path}{sys_consts.SDELIM}",
                 )
 
             for col in range(file_grid.col_count):
@@ -1690,7 +1742,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 self._populate_grid_row(
                     file_grid=self._file_grid,
                     row_index=rows_loaded + row_index,
-                    video_user_data=file_video_data,
+                    video_data=file_video_data,
                     duration=duration,
                 )
 
@@ -1734,60 +1786,72 @@ class Video_File_Grid(DVD_Archiver_Base):
         self,
         file_grid: qtg.Grid,
         row_index: int,
-        video_user_data: Video_Data,
+        video_data: Video_Data,
         duration: str,
+        italic: bool = False,
+        tooltip: str = "",
     ) -> None:
         """Populates the grid row with the video information.
 
         Args:
             file_grid (qtg.Grid): The grid to populate.
             row_index (int): The index of the row to populate.
-            video_user_data (File_Control.Video_Data): The video data to populate.
+            video_data (File_Control.Video_Data): The video data to populate.
             duration (str): The duration of the video.
+            italic (bool): Whether the text should be italic. Defaults to False.
+            tooltip (str): The tooltip text. Defaults to "".
         """
         assert isinstance(
             file_grid, qtg.Grid
         ), f"{file_grid=}. Must be an instance of qtg.Grid"
         assert isinstance(
-            video_user_data, Video_Data
-        ), f"{video_user_data=}. Must be an instance of File_Control.Video_Data"
+            video_data, Video_Data
+        ), f"{video_data=}. Must be an instance of File_Control.Video_Data"
         assert isinstance(duration, str), f"{duration=}. Must be str."
+        assert isinstance(italic, bool), f"{italic=}. Must be bool."
+        assert isinstance(tooltip, str), f"{tooltip=}. Must be str."
+
+        if tooltip.strip() != "":
+            value_tooltip = tooltip
+        else:
+            value_tooltip = (
+                f"{sys_consts.SDELIM}{video_data.video_path}{sys_consts.SDELIM}"
+            )
 
         file_grid.value_set(
             value=(
-                f"{video_user_data.video_file}{video_user_data.video_extension}"
+                f"{video_data.video_file}{video_data.video_extension}"
                 if self._display_filename
-                else video_user_data.video_file_settings.button_title
+                else video_data.video_file_settings.button_title
             ),
             row=row_index,
             col=file_grid.colindex_get("video_file"),
-            user_data=video_user_data,
-            tooltip=(
-                f"{sys_consts.SDELIM}{video_user_data.video_path}{sys_consts.SDELIM}"
-            ),
+            user_data=video_data,
+            tooltip=value_tooltip,
+            italic=italic,
         )
 
         file_grid.value_set(
-            value=str(video_user_data.encoding_info.video_width),
+            value=str(video_data.encoding_info.video_width),
             row=row_index,
             col=file_grid.colindex_get("width"),
-            user_data=video_user_data,
+            user_data=video_data,
         )
 
         file_grid.value_set(
-            value=str(video_user_data.encoding_info.video_height),
+            value=str(video_data.encoding_info.video_height),
             row=row_index,
             col=file_grid.colindex_get("height"),
-            user_data=video_user_data,
+            user_data=video_data,
         )
 
         encoder_str = (
-            video_user_data.encoding_info.video_format
-            + f":{video_user_data.encoding_info.video_scan_order}"
-            if video_user_data.encoding_info.video_scan_order != ""
+            video_data.encoding_info.video_format
+            + f":{video_data.encoding_info.video_scan_order}"
+            if video_data.encoding_info.video_scan_order != ""
             else (
-                f"{video_user_data.encoding_info.video_format} :"
-                f" {video_user_data.encoding_info.video_scan_type}"
+                f"{video_data.encoding_info.video_format} :"
+                f" {video_data.encoding_info.video_scan_type}"
             )
         )
 
@@ -1796,38 +1860,38 @@ class Video_File_Grid(DVD_Archiver_Base):
             tooltip=encoder_str,
             row=row_index,
             col=file_grid.colindex_get("encoder"),
-            user_data=video_user_data,
+            user_data=video_data,
         )
 
         file_grid.value_set(
             value=duration,
             row=row_index,
             col=file_grid.colindex_get("duration"),
-            user_data=video_user_data,
+            user_data=video_data,
         )
 
         file_grid.value_set(
-            value=video_user_data.encoding_info.video_standard,
+            value=video_data.encoding_info.video_standard,
             row=row_index,
             col=file_grid.colindex_get("standard"),
-            user_data=video_user_data,
+            user_data=video_data,
         )
 
         file_grid.value_set(
             value=(
-                f"{video_user_data.video_file_settings.menu_group}"
-                if video_user_data.video_file_settings.menu_group >= 0
+                f"{video_data.video_file_settings.menu_group}"
+                if video_data.video_file_settings.menu_group >= 0
                 else ""
             ),
             row=row_index,
             col=file_grid.colindex_get("group"),
-            user_data=video_user_data,
+            user_data=video_data,
         )
 
         file_grid.userdata_set(
             row=row_index,
             col=file_grid.colindex_get("settings"),
-            user_data=video_user_data,
+            user_data=video_data,
         )
 
     def set_project_standard_duration(self, event: qtg.Action) -> None:
