@@ -31,6 +31,8 @@ import pprint
 import shlex
 import shutil
 import subprocess
+import textwrap
+from typing import Final
 
 import psutil
 
@@ -38,7 +40,7 @@ import file_utils
 import popups
 import sys_consts
 import utils
-from sys_config import Encoding_Details
+from sys_config import Encoding_Details, DVD_Menu_Page
 
 # fmt: on
 
@@ -113,6 +115,20 @@ colors = {
     "whitesmoke": "#f5f5f5",
     "yellowgreen": "#9acd32",
 }
+
+valid_gravities = [
+    "center",
+    "north",
+    "northeast",
+    "east",
+    "southeast",
+    "south",
+    "southwest",
+    "west",
+    "northwest",
+    "static",
+    "forget",
+]
 
 
 @dataclasses.dataclass(slots=True)
@@ -878,155 +894,331 @@ def Create_DVD_Case_Insert(
 
 
 def Create_DVD_Label(
-    menu_titles,
-    label_diameter=118,  # Standard DVD label diameter in millimeters
-    resolution=300,  #  # Standard resolution for print quality
-    font_size=24,
-    font_path="Arial.ttf",
-    hole_radius=0.25,
-    hole_color="white",
+    title: str,
+    menu_pages: list[DVD_Menu_Page],
+    disk_diameter: float = 115.0,  # 120mm standard, make DVD label a little smaller
+    disk_colour: str = "white",
+    resolution: int = 300,  # Standard resolution for print quality
+    title_font_colour: str = "black",
+    title_font_size: int = 48,
+    menu_font_colour: str = "black",
+    menu_font_size: int = 24,
+    title_font_path: str = "",
+    menu_font_path: str = "",
+    spindle_diameter: float = 36,  # 15mm standard make a little larger (Verbatim guide 36)
 ) -> tuple[int, bytes]:
     """
-    Creates a DVD label image with menu titles and a central hole using ImageMagick.
+    Creates a DVD label image with menu titles and a central hole.
+    Note:
+        - The title can be manually split into separate lines using the | character placed where line breaks are required
+        - There is a maximum of four lines in a title, more than that generates an error
+        - Text is auto-wrapped to fit within the label and a manually split label may exceed the four lines allowed
+
 
     Args:
-        menu_titles (list): List of menu titles.
-        label_diameter (float): Diameter of the DVD label.
+        title (str): Title of the DVD.
+        menu_pages (list[DVD_Menu_Page]): List of menu pages.
+        disk_diameter (float): Diameter of the DVD label.
+        disk_colour (str): Colour of the DVD label.
         resolution (int): Resolution of the image.
-        font_size (int): Font size.
-        font_path (str): Path to the font file.
-        hole_radius (float): Radius of the central hole.
-        hole_color (str): Color of the central hole.
+        title_font_colour (str): Colour of the title text.
+        title_font_size (int): Font size of the title.
+        menu_font_colour (str): Colour of the menu text.
+        menu_font_size (int): Font size.
+        title_font_path (str): Path to the title font file.
+        menu_font_path (str): Path to the menu font file.
+        spindle_diameter (float): diameter of the central hole.
 
     Returns:
         tuple[int, bytes]
-        - arg 1 : Status code. Returns 1 if the iso image was created, -1 otherwise.
-        - arg 2 : bytes: The generated DVD label image data.
+        - arg 1 : Status code. Returns 1 if the png image was created, -1 otherwise.
+        - arg 2 : bytes: The generated DVD label image data as a PNG byte  string.
     """
 
-    ##### Helper
-    def draw_text_size(text, font_path, font_size) -> tuple[int, str, int, int]:
-        """
-        Estimates text size using ImageMagick's identify command.
-
-        Args:
-            text (str): The text to measure.
-            font_path (str): Path to the font file.
-            font_size (int): Font size.
-
-        Returns:
-            tuple[int, str, int, int]
-            - arg 1: Status code. Returns 1 if the iso image was created, -1 otherwise.
-            - arg 2: str: The error message if the status code is -1 otherwise ""
-            - arg 3: int: The width of the text in pixels.
-            - arg 4: int: The height of the text in pixels.
-
-        """
-        command = [
-            sys_consts.CONVERT,
-            "identify",
-            "-format",
-            "%wx%h",
-            f"label:{text}",
-            "-font",
-            font_path,
-            "-pointsize",
-            str(font_size),
-        ]
-        result, message = Execute_Check_Output(commands=command)
-
-        if result == -1:
-            return -1, message, -1, -1
-
-        x = int(message.split("x")[0])
-        y = int(message.split("x")[1])
-
-        return 1, "", x, y
-
-    ##### Main
-    assert isinstance(menu_titles, list), f"{menu_titles=}. Must be a list of str"
+    assert isinstance(title, str), f"{title=}. Must be a str"
     assert (
-        isinstance(label_diameter, (int, float)) and label_diameter > 0
-    ), f"{label_diameter=}. Must be a float > 0"
+        isinstance(menu_pages, list) and len(menu_pages) > 0
+    ), f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
+    assert all(
+        isinstance(page, DVD_Menu_Page) for page in menu_pages
+    ), f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
+    assert (
+        isinstance(disk_diameter, (int, float)) and disk_diameter > 0
+    ), f"{disk_diameter=}. Must be a float > 0"
     assert (
         isinstance(resolution, int) and resolution > 0
     ), f"{resolution=}. Must be an int > 0"
     assert (
-        isinstance(font_size, int) and font_size > 0
-    ), f"{font_size=}. Must be an int > 0"
+        isinstance(title_font_colour, str) and title_font_colour.strip() != ""
+    ), f"{title_font_colour=}. Must be a non-empty str"
     assert (
-        isinstance(font_path, str) and font_path.strip() != ""
-    ), f"{font_path=}. Must be a non-empty str"
+        isinstance(title_font_size, int) and title_font_size > 0
+    ), f"{title_font_size=}. Must be an int > 0"
     assert (
-        isinstance(hole_radius, (int, float)) and hole_radius > 0
-    ), f"{hole_radius=}. Must be a float > 0"
+        isinstance(menu_font_colour, str) and menu_font_colour.strip() != ""
+    ), f"{menu_font_colour=}. Must be a non-empty str"
     assert (
-        isinstance(hole_color, str) and hole_color.strip() != ""
-    ), f"{hole_color=}. Must be a non-empty str"
+        isinstance(menu_font_size, int) and menu_font_size > 0
+    ), f"{menu_font_size=}. Must be an int > 0"
+    assert isinstance(title_font_path, str), f"{title_font_path=}. Must be a str"
+    assert isinstance(menu_font_path, str), f"{menu_font_path=}. Must be a str"
+    assert (
+        isinstance(spindle_diameter, (int, float)) and 21 <= spindle_diameter <= 36
+    ), f"{spindle_diameter=}. Must be a float >= 21 and <= 36"
 
-    # Check if all elements in menu_titles are of type str
-    assert all(
-        map(lambda x: isinstance(x, str), menu_titles)
-    ), f"{menu_titles=}. Must be a list of str"
+    assert disk_colour in [
+        colour for colour in colors.keys()
+    ], f"{disk_colour=}. Must be one of {colors}"
+    assert title_font_colour in [
+        colour for colour in colors.keys()
+    ], f"{title_font_colour=}. Must be one of {colors}"
+    assert menu_font_colour in [
+        colour for colour in colors.keys()
+    ], f"{menu_font_colour=}. Must be one of {colors}"
 
-    if not os.path.exists(font_path):
-        return -1, b""
+    debug = True
+    MAX_TITLE_LINES: Final[int] = 4
 
+    if title_font_path.strip() == "":
+        fonts = Get_Fonts()
+        for font in fonts:
+            if font[0].lower().startswith("ubuntu") or "arial" in font[0].lower():
+                title_font_path = font[1]
+                break
+        else:
+            return -1, b"A Default Title Font Could Not Be Found "
+
+    if menu_font_path.strip() == "":
+        fonts = Get_Fonts()
+        for font in fonts:
+            if font[0].lower().startswith("ubuntu"):
+                menu_font_path = font[1]
+                break
+        else:
+            return -1, b"A Default Menu Font Could Not Be Found "
+
+    if not os.path.exists(title_font_path):
+        return -1, f"Title Font file not found: {menu_font_path}".encode("utf-8")
+
+    if not os.path.exists(menu_font_path):
+        return -1, f"Menu Font file not found: {menu_font_path}".encode("utf-8")
+
+    dpm = resolution / 25.4  # Convert DPI to DPMM
+
+    disk_diameter = round(disk_diameter * dpm)
+    spindle_diameter = round(spindle_diameter * dpm)
+
+    disk_radius = disk_diameter // 2
+    spindle_radius = spindle_diameter // 2
+    background_canvas_width = disk_diameter
+    background_canvas_height = disk_diameter
+    label_x = background_canvas_width // 2
+    label_y = background_canvas_height // 2
+
+    # Get the largest square that fits in the circle
+    disk_square_size = round(disk_radius * math.sqrt(2))
+    spindle_square_size = round(spindle_radius * math.sqrt(2))
+    label_square_width = (
+        disk_square_size // 2 - spindle_square_size // 2 - 20  # Padding
+    )  # Take into account spindle hole
+
+    # Generate the background CD/DVD label image
+    command = [
+        sys_consts.CONVERT,
+        "-size",
+        f"{background_canvas_width}x{background_canvas_height}",
+        "xc:none",
+        "-fill",
+        "white",
+        "-draw",
+        f"'circle' {label_x - 0.5},{label_y - 0.5} {disk_radius - 0.5},{0}'",
+        "(",
+        "-size",
+        f"{background_canvas_width}x{background_canvas_height}",
+        "xc:none",
+        "-fill",
+        "black",
+        "-draw",
+        f"'circle' {label_x},{label_y} {label_x + spindle_radius},{label_y + spindle_radius}'",
+        ")",
+        "-alpha",
+        "Set",
+        "-compose",
+        "Dst_Out",
+        "-composite",
+        "PNG:-",  # Output to standard output (pipe)
+    ]
     try:
-        width = height = int(label_diameter * resolution)
+        image_data = subprocess.check_output(command, stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        return -1, "Error Generating DVD Label Image".encode("utf-8")
 
-        # Calculate hole dimensions and position
-        hole_diameter = int(hole_radius * width)
-        hole_offset = int((width - hole_diameter) / 2)
-        hole_left = hole_offset
-        hole_top = hole_offset
-        # hole_right = hole_left + hole_diameter, hole_top + hole_diameter
-        hole_bottom = hole_left + hole_diameter, hole_top + hole_diameter
+    # Extract text to place on the DVD image
+    dvd_text = []
 
-        base_command = [sys_consts.CONVERT]
-        commands = [
-            ["-size", f"{width}x{height}"],
-            ["xc:transparent"],
-            [
-                "(",
-            ],
-            ["-fill", "black"],
-            [
-                "-draw",
-                f"circle {width // 2},{height // 2} {hole_diameter // 2},{height // 2} {width // 2},{hole_bottom}",
-            ],
-        ]
+    menu_char_width, menu_char_height = Get_Text_Dims(
+        text="W", font=menu_font_path, pointsize=menu_font_size
+    )  # In English at least and in most fonts W is the widest
 
-        # Add menu titles with annotations
-        for i, title in enumerate(menu_titles):
-            result, message, draw_x, draw_y = draw_text_size(
-                title, font_path, font_size
+    for menu_index, menu_title in enumerate(menu_pages):
+        if menu_title.menu_title.strip():
+            dvd_text.append(f"* {menu_title.menu_title}")
+        else:
+            dvd_text.append(f"* Menu {menu_index + 1}")
+
+        for button_item in menu_title.get_button_titles.values():
+            button_title = f"\  - {button_item[0]}"  # Button titles are indented 4 spaces (\ required!)
+
+            width, _ = Get_Text_Dims(
+                text=f"{button_title}", font=menu_font_path, pointsize=menu_font_size
             )
 
-            if result == -1:
-                return -1, b""
+            if width > label_square_width:
+                wrapped_text = textwrap.wrap(
+                    button_title,
+                    width=label_square_width // menu_char_width,
+                    subsequent_indent="    ",
+                )
 
-            x_offset = int((width - draw_x) / 2)
-            y_position = 0  # Replace with the actual y position calculation
-            commands.append([
-                "-annotate",
-                f"+{x_offset}+{y_position}",
-                f"{title}",
-                "-font",
-                font_path,
-                "-pointsize",
-                f"{font_size}",
-            ])
+                for line_index, button_line in enumerate(wrapped_text):
+                    dvd_text.append(
+                        f"{button_line}" if line_index == 0 else f"\ {button_line}"
+                    )
 
-        commands.append([")"])
+            else:
+                dvd_text.append(f"{button_title}")
 
-        # Combine base command and individual arguments for subprocess.check_output
-        full_command = base_command + sum(commands, [])
+        dvd_text.append(" ")
 
-        return 1, subprocess.check_output(full_command, stderr=subprocess.DEVNULL)
+    dvd_text.pop(len(dvd_text) - 1)  # Remove the last blank line
 
-    except subprocess.CalledProcessError:
-        return -1, b""
+    # Get the length of the longest line in the menu/button text
+    max_menu_length = 0
+    for line in dvd_text:
+        if len(line) > max_menu_length:
+            max_menu_length = len(line)
+
+    # Calculate co-ordinates for 2 rectangles on the left and right side of the spindle hole
+    left_sq_x1 = 80  # Fixed
+
+    right_sq_x1 = (
+        label_x + spindle_square_size + 20  # Padding
+    )
+
+    left_sq_y1 = background_canvas_height - disk_square_size
+    # right_sq_y1 = background_canvas_height - disk_square_size
+    left_sq_y2 = disk_square_size
+
+    x_offset = left_sq_x1
+
+    # Now write the text on the DVD image
+    if title:  # First up deal with the title - Max 4 lines allowed
+        title_char_width, title_char_height = Get_Text_Dims(
+            text="W", font=title_font_path, pointsize=title_font_size
+        )
+
+        title_px_width = math.sqrt(
+            (left_sq_x1 - (disk_square_size * 2)) ** 2
+            + (left_sq_y1 - (left_sq_y1 - MAX_TITLE_LINES * title_char_height)) ** 2
+        )  # Pythagoras is your friend
+
+        if "|" in title:  # Manual spacing of title text
+            title_wrapped_text = []
+            temp_wrapped_text = title.split("|")
+
+            max_title_length = 0
+            max_title_text = ""
+            for line in temp_wrapped_text:
+                if len(line) > max_title_length:
+                    max_title_length = len(line)
+                    max_title_text = line
+
+            _, title_height = Get_Text_Dims(
+                text=max_title_text, font=title_font_path, pointsize=title_font_size
+            )
+
+            for title_text in temp_wrapped_text:
+                title_wrapped_text += textwrap.wrap(
+                    text=title_text,
+                    width=round((title_px_width // 2 - 50) // title_char_width),
+                    subsequent_indent="    ",
+                )
+
+        else:  # Automatic spacing of the title text
+            _, title_height = Get_Text_Dims(
+                text=title, font=title_font_path, pointsize=title_font_size
+            )
+
+            title_wrapped_text = textwrap.wrap(
+                text=title,
+                width=round((title_px_width // 2 - 50) // title_char_width),
+                subsequent_indent="    ",
+            )
+
+        if len(title_wrapped_text) > 4:
+            return (
+                -1,
+                f"Menu Title Is {len(title_wrapped_text)} Lines Long And Only {MAX_TITLE_LINES} Are Allowed".encode(
+                    "utf-8"
+                ),
+            )
+
+        for line_num, title_line in enumerate(title_wrapped_text):
+            result, image_data = Write_Text_On_Image(
+                image_data=image_data,
+                text=title_line,
+                x=round(title_px_width // label_x),
+                y=left_sq_y1
+                - ((MAX_TITLE_LINES + 1) * title_height)
+                + (line_num * title_char_height),
+                color="black",
+                font=title_font_path,
+                pointsize=title_font_size,
+                gravity="north",
+            )
+
+            if result == -1:  # Image data will contain the error message in this case
+                return -1, image_data.decode("utf-8")
+
+    # Now write the menu and button text on the DVD image
+    line_num = 0
+    side = 1
+
+    for line in dvd_text:
+        y_position = left_sq_y1 + (line_num * menu_char_height)
+
+        if y_position > left_sq_y2:  # Switch to right side
+            side += 1
+            if side > 2:
+                return -1, "Too Many Menu Titles To Print!".encode("utf-8")
+
+            line_num = 0
+            x_offset = right_sq_x1
+            if line.strip() == "":
+                continue
+
+            y_position = left_sq_y1 + (line_num * menu_char_height)
+
+        result, image_data = Write_Text_On_Image(
+            image_data=image_data,
+            text=line,
+            x=x_offset,
+            y=y_position,
+            color=menu_font_colour,
+            font=menu_font_path,
+            pointsize=menu_font_size,
+        )
+
+        if result == -1:  # Image data will contain the error message in this case
+            return -1, image_data.decode("utf-8")
+
+        line_num += 1
+
+    if debug and not utils.Is_Complied():
+        with open("cddvd_label.png", "wb") as png_file:
+            png_file.write(image_data)
+
+    return 1, image_data
 
 
 def Get_Space_Available(path: str) -> tuple[int, str]:
@@ -2244,6 +2436,98 @@ def Transcode_H26x(
             return -1, message
 
     return 1, output_file
+
+
+def Write_Text_On_Image(
+    image_data: bytes,
+    text: str,
+    x: int,
+    y: int,
+    font: str,
+    pointsize: int,
+    color: str,
+    gravity: str = "northwest",
+) -> (int, bytes):
+    """Writes text on an image (provided as bytes) and returns the modified image as a byte string (PNG format).
+
+    Args:
+        image_data (bytes): The image data in bytes format (e.g., from reading a file)
+        text (str): The text to be written
+        x (int): The x co-ordinate
+        y (int): The y co-ordinate
+        font (str): The font of the text
+        pointsize (int): The point size of the text
+        color (str): The color of the text
+        gravity: (str): The gravity positioning of the text
+
+    Returns:
+        tuple(int, bytes):
+            - arg1: 1, ok, -1, error.
+            - arg2: The modified image data as a byte string (PNG format) on success empty bytes on error.
+    """
+
+    assert (
+        isinstance(gravity.lower(), str) and gravity.lower() in valid_gravities
+    ), f"{gravity=} must be a gravity str"
+
+    assert (
+        isinstance(image_data, bytes) and image_data != b""
+    ), f"{image_data=}. Must be non-empty bytes"
+    assert isinstance(text, str), f"{text=}. Must be str"
+    assert (
+        isinstance(font, str) and font.strip() != ""
+    ), f"{font=}. Must be non-empty str"
+    assert isinstance(x, int) and x > 0, f"{x=}. Must be int > 0"
+    assert (
+        isinstance(pointsize, int) and pointsize > 0
+    ), f"{pointsize=}. Must be int > 0"
+    assert isinstance(y, int) and y > 0, f"{y=}. Must be int > 0"
+
+    assert isinstance(color, str) and color in colors, f"{color=} must be a string"
+
+    try:
+        # Escape special characters in text for safe command construction
+        # escaped_text = text.replace("\\", "\\\\").replace(
+        #    "'", "\\'"
+        # )  # Escape backslashes and single quotes
+
+        # Construct ImageMagick command (pipe image data as input)
+        command = [
+            sys_consts.CONVERT,
+            "-",  # Read input from standard input (pipe)
+            "-background",
+            "none",  # Transparent background
+            "-fill",
+            color,
+            "-gravity",
+            gravity,
+            "-font",
+            font,
+            "-pointsize",
+            f"{pointsize}",
+            "-annotate",
+            f"+{x}+{y}",
+            f"{text}",
+            "PNG:-",  # Output to standard output (pipe)
+        ]
+
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        # Send the image data directly
+        stdout, stderr = process.communicate(input=image_data)
+
+        if process.returncode != 0:
+            return -1, stderr
+
+        return 1, stdout
+
+    except Exception as e:
+        return -1, f"Error processing image: {str(e)}".encode("utf-8")
 
 
 def Write_Text_On_File(
