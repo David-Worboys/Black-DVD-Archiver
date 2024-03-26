@@ -1267,7 +1267,7 @@ class Video_Editor(DVD_Archiver_Base):
                         layout="",
                         file_cuts=edit_list,
                     )
-            else:
+            elif self._video_file_input:
                 result, message = self._edit_list.delete_edit_cuts(
                     self._video_file_input[0].video_path,
                     project=""
@@ -1275,6 +1275,9 @@ class Video_Editor(DVD_Archiver_Base):
                     else self._project_name,
                     layout="",
                 )
+            else:
+                result = 1
+                message = ""
 
             if result == -1:
                 popups.PopError(
