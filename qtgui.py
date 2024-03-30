@@ -15310,6 +15310,12 @@ class Video_Player(qtM.QMediaPlayer):
         return self.isAvailable()
 
     def current_frame(self) -> int:
+        """
+        Calculates the current frame based on the current position and the frame rate.
+
+        Returns:
+            int: The current frame.
+        """
         return int(self.position() / (1000 / self._frame_rate))
 
     # @qtC.Slot()
@@ -15337,6 +15343,9 @@ class Video_Player(qtM.QMediaPlayer):
                 print(f"Seek Error {self.source_state=} {e=}")
 
     def state(self) -> str:
+        """
+        Return the state of the media player as a string.
+        """
         playback_state = self.playbackState()
 
         if playback_state == qtM.QMediaPlayer.PlaybackState.PlayingState:

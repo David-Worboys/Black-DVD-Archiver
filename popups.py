@@ -38,6 +38,7 @@ from PySide6 import QtGui as qtG
 
 import file_utils
 import sqldb
+import sys_consts
 from file_utils import App_Path
 from qtgui import (Action, Align, Button, Col_Def, Combo_Data, Combo_Item,
                    ComboBox, Command_Button_Container, Cursor, FolderView,
@@ -1399,10 +1400,10 @@ class Langtran_Popup(PopContainer):
 
         # Default country combo to the country specified in the application-selected country
         if self._db_settings.setting_exist(
-            setting_name="app_country",
+            setting_name=sys_consts.APP_COUNTRY,
         ):
             app_country = self._db_settings.setting_get(
-                setting_name="app_country",
+                setting_name=sys_consts.APP_COUNTRY,
             )
 
             if app_country:

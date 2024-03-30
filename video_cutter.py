@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import dataclasses
 import functools
 import json
-from typing import Callable, cast, Literal
+from typing import Callable, cast, Literal, Final
 
 import PySide6.QtCore as qtC
 import PySide6.QtGui as qtG
@@ -150,7 +150,7 @@ class Edit_List:
     _archive_folder: str = ""
     _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
     _json_edit_cuts_file: str = "edit_cuts"
-    _video_shelf_name: Literal["video_cutter"] = "video_cutter"
+    _video_shelf_name: Final[str] = sys_consts.VIDEO_CUTTER_SHELF
 
     def __post_init__(self):
         if self._db_settings.setting_exist(sys_consts.ARCHIVE_FOLDER):
@@ -195,7 +195,7 @@ class Edit_List:
         if sql_shelf.error.code == -1:
             return -1, sql_shelf.error.message
 
-        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        shelf_dict = sql_shelf.open(shelf_name=sys_consts.VIDEO_CUTTER_SHELF)
         self._error_message = sql_shelf.error.message
         self._error_code = sql_shelf.error.code
 
@@ -219,7 +219,7 @@ class Edit_List:
                 shelf_dict.pop(file_path)
 
             result, message = sql_shelf.update(
-                shelf_name="video_cutter", shelf_data=shelf_dict
+                shelf_name=sys_consts.VIDEO_CUTTER_SHELF, shelf_data=shelf_dict
             )
 
             self._error_message = message
@@ -266,7 +266,7 @@ class Edit_List:
         if sql_shelf.error.code == -1:
             return -1, sql_shelf.error.message, ""
 
-        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        shelf_dict = sql_shelf.open(shelf_name=sys_consts.VIDEO_CUTTER_SHELF)
         self._error_message = sql_shelf.error.message
         self._error_code = sql_shelf.error.code
 
@@ -326,7 +326,7 @@ class Edit_List:
         if sql_shelf.error.code == -1:
             return -1, sql_shelf.error.message, ()
 
-        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        shelf_dict = sql_shelf.open(shelf_name=sys_consts.VIDEO_CUTTER_SHELF)
         self._error_message = sql_shelf.error.message
         self._error_code = sql_shelf.error.code
 
@@ -354,7 +354,7 @@ class Edit_List:
                     shelf_dict[file_path] = edit_dict
 
                     result, message = sql_shelf.update(
-                        shelf_name="video_cutter", shelf_data=shelf_dict
+                        shelf_name=sys_consts.VIDEO_CUTTER_SHELF, shelf_data=shelf_dict
                     )
 
                     self._error_message = message
@@ -392,10 +392,6 @@ class Edit_List:
             isinstance(file_path, str) and file_path.strip() != ""
         ), f"{file_path=}. Must be a str"
         assert isinstance(project, str), f"{project=}. Must be a str"
-        # Make sure we have a layout with a project and vice versa
-        # assert (
-        #    not project or layout
-        # ), f"{layout=}. Must not be empty if {project=} is provided"
         assert (
             not layout.strip() or project.strip()
         ), f"{project=}. Must not be empty if {layout=} is provided"
@@ -407,7 +403,7 @@ class Edit_List:
         if sql_shelf.error.code == -1:
             return -1, sql_shelf.error.message, ()
 
-        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        shelf_dict = sql_shelf.open(shelf_name=sys_consts.VIDEO_CUTTER_SHELF)
         self._error_message = sql_shelf.error.message
         self._error_code = sql_shelf.error.code
 
@@ -425,7 +421,7 @@ class Edit_List:
                 shelf_dict[file_path] = edit_dict
 
                 result, message = sql_shelf.update(
-                    shelf_name="video_cutter", shelf_data=shelf_dict
+                    shelf_name=sys_consts.VIDEO_CUTTER_SHELF, shelf_data=shelf_dict
                 )
 
                 self._error_message = message
@@ -548,7 +544,7 @@ class Edit_List:
                     }
 
                     result, message = sql_shelf.update(
-                        shelf_name="video_cutter", shelf_data=shelf_dict
+                        shelf_name=sys_consts.VIDEO_CUTTER_SHELF, shelf_data=shelf_dict
                     )
 
                     self._error_message = message
@@ -610,7 +606,7 @@ class Edit_List:
         if sql_shelf.error.code == -1:
             return -1, sql_shelf.error.message
 
-        shelf_dict = sql_shelf.open(shelf_name="video_cutter")
+        shelf_dict = sql_shelf.open(shelf_name=sys_consts.VIDEO_CUTTER_SHELF)
         self._error_message = sql_shelf.error.message
         self._error_code = sql_shelf.error.code
 
@@ -645,7 +641,7 @@ class Edit_List:
         shelf_dict[file_path] = edit_dict
 
         result, message = sql_shelf.update(
-            shelf_name="video_cutter", shelf_data=shelf_dict
+            shelf_name=sys_consts.VIDEO_CUTTER_SHELF, shelf_data=shelf_dict
         )
 
         self._error_message = message
@@ -1424,26 +1420,49 @@ class Video_Editor(DVD_Archiver_Base):
                                 if result == -1:
                                     return None
 
-                                if self._db_settings.setting_exist("vf_denoise"):
-                                    video_file_settings.denoise = (
-                                        self._db_settings.setting_get("vf_denoise")
-                                    )
-
-                                if self._db_settings.setting_exist("vf_white_balance"):
-                                    video_file_settings.white_balance = (
+                                if self._db_settings.setting_exist(
+                                    sys_consts.VF_NORMALISE
+                                ):
+                                    video_file_settings.normalise = (
                                         self._db_settings.setting_get(
-                                            "vf_white_balance"
+                                            sys_consts.VF_NORMALISE
                                         )
                                     )
 
-                                if self._db_settings.setting_exist("vf_sharpen"):
-                                    video_file_settings.sharpen = (
-                                        self._db_settings.setting_get("vf_sharpen")
+                                if self._db_settings.setting_exist(
+                                    sys_consts.VF_DENOISE
+                                ):
+                                    video_file_settings.denoise = (
+                                        self._db_settings.setting_get(
+                                            sys_consts.VF_DENOISE
+                                        )
                                     )
 
-                                if self._db_settings.setting_exist("vf_auto_levels"):
+                                if self._db_settings.setting_exist(
+                                    sys_consts.VF_WHITE_BALANCE
+                                ):
+                                    video_file_settings.white_balance = (
+                                        self._db_settings.setting_get(
+                                            sys_consts.VF_WHITE_BALANCE
+                                        )
+                                    )
+
+                                if self._db_settings.setting_exist(
+                                    sys_consts.VF_SHARPEN
+                                ):
+                                    video_file_settings.sharpen = (
+                                        self._db_settings.setting_get(
+                                            sys_consts.VF_SHARPEN
+                                        )
+                                    )
+
+                                if self._db_settings.setting_exist(
+                                    sys_consts.VF_AUTO_LEVELS
+                                ):
                                     video_file_settings.auto_bright = (
-                                        self._db_settings.setting_get("vf_auto_levels")
+                                        self._db_settings.setting_get(
+                                            sys_consts.VF_AUTO_LEVELS
+                                        )
                                     )
 
                                 video_file_settings.button_title = (

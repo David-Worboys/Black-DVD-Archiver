@@ -23,6 +23,8 @@ import datetime
 from collections import namedtuple
 from typing import Final
 
+import platformdirs
+
 import file_utils
 import utils
 
@@ -126,15 +128,51 @@ ICON_PATH: Final[str] = f"{executable_folder}{file_sep}icons"
 PRODUCT_LINE: Final[str] = "product_line"
 
 # Database Setting Keys
+APP_LANG: Final[str] = "app_lang"  # All qtgui apps
+APP_COUNTRY: Final[str] = "app_country"  # All qtgui apps
+
+ARCHIVE_DISK_SIZE: Final[str] = "archive_disk_size"
+ARCHIVE_DISK_TRANSCODE: Final[str] = "archive_disk_transcode"
 ARCHIVE_FOLDER: Final[str] = "archive_folder"
-STREAMING_FOLDER: Final[str] = "streaming_folder"
-DVD_BUILD_FOLDER: Final[str] = "dvd_build_folder"
+BUTTON_BACKGROUND_COLOUR: Final[str] = "button_background_color"
+BUTTON_BACKGROUND_TRANSPARENCY: Final[str] = "button_background_transparency"
+BUTTON_FONT: Final[str] = "button_font"
+BUTTON_FONT_COLOUR: Final[str] = "button_font_color"
+BUTTON_FONT_POINT_SIZE: Final[str] = "button_font_point_size"
+BUTTONS_ACROSS: Final[str] = "buttons_across"
+BUTTONS_PER_PAGE: Final[str] = "buttons_per_page"
 DEFAULT_PROJECT_NAME: Final[str] = "Default"
 DEFAULT_DVD_LAYOUT_NAME: Final[str] = "DVD 1"
+DVD_BUILD_FOLDER: Final[str] = "dvd_build_folder"
+FIRST_RUN: Final[str] = "first_run"
+LATEST_PROJECT: Final[str] = "latest_project"
+MENU_ASPECT_RATIO: Final[str] = "menu_aspect_ratio"
+MENU_BACKGROUND_COLOUR: Final[str] = "menu_background_color"
+MENU_FONT: Final[str] = "menu_font"
+MENU_FONT_COLOUR: Final[str] = "menu_font_color"
+MENU_FONT_POINT_SIZE: Final[str] = "menu_font_point_size"
+PAGE_POINTER_LEFT: Final[str] = "page_pointer_left"
+PAGE_POINTER_RIGHT: Final[str] = "page_pointer_right"
+SERIAL_NUMBER: Final[str] = "serial_number"
+STREAMING_FOLDER: Final[str] = "streaming_folder"
+VF_AUTO_LEVELS: Final[str] = "vf_auto_levels"
+VF_DENOISE: Final[str] = "vf_denoise"
+VF_NORMALISE: Final[str] = "vf_normalise"
+VF_WHITE_BALANCE: Final[str] = "vf_white_balance"
+VF_SHARPEN: Final[str] = "vf_sharpen"
+VIDEO_IMPORT_FOLDER: Final[str] = "video_import_folder"
+
+# File Paths
 EDIT_FOLDER: Final[str] = "edits"
 TRANSCODE_FOLDER: Final[str] = "transcodes"
 DVD_BUILD_FOLDER_NAME: Final[str] = f"{PROGRAM_NAME} DVD Builder"
-VIDEO_EDITOR_FOLDER_NAME = f"{PROGRAM_NAME} Video Editor"
+VIDEO_EDITOR_FOLDER_NAME: Final[str] = f"{PROGRAM_NAME} Video Editor"
+
+# SQL Shelf keys
+DVD_MENU_SHELF: Final[str] = "dvdmenu"
+PROJECTS_SHELF: Final[str] = "projects"
+VIDEO_CUTTER_SHELF: Final[str] = "video_cutter"
+VIDEO_GRID_SHELF: Final[str] = "video_grid"
 
 PERCENT_SAFTEY_BUFFER: Final[int] = (
     5  # Used to limit DVD size so that it never exceeds 100%
@@ -145,9 +183,9 @@ DEFAULT_FONT: Final[str] = "IBMPlexMono-SemiBold.ttf"  # Packaged with DVD Archi
 class SPECIAL_PATH(utils.strEnum):
     """Contains enums for strings that represent special paths on the user's computer"""
 
-    DESKTOP: Final[str] = "Desktop"
-    DOCUMENTS: Final[str] = "Documents"
-    DOWNLOADS: Final[str] = "Downloads"
-    MUSIC: Final[str] = "Music"
-    PICTURES: Final[str] = "Pictures"
-    VIDEOS: Final[str] = "Videos"
+    DESKTOP: Final[str] = platformdirs.user_desktop_dir()
+    DOCUMENTS: Final[str] = platformdirs.user_documents_dir()
+    DOWNLOADS: Final[str] = platformdirs.user_downloads_dir()
+    MUSIC: Final[str] = platformdirs.user_music_dir()
+    PICTURES: Final[str] = platformdirs.user_pictures_dir()
+    VIDEOS: Final[str] = platformdirs.user_videos_dir()

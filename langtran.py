@@ -25,6 +25,7 @@ from typing import Optional
 import platformdirs
 
 import sqldb
+import sys_consts
 from file_utils import File
 from sys_consts import PROGRAM_NAME, SDELIM
 from utils import Is_Complied, Singleton
@@ -166,8 +167,8 @@ class Lang_Tran(metaclass=Singleton):
         ):
             return trans_word.strip(delim)
 
-        if self._db_settings.setting_exist("app_lang"):
-            self._language_code = self._db_settings.setting_get("app_lang")
+        if self._db_settings.setting_exist(sys_consts.APP_LANG):
+            self._language_code = self._db_settings.setting_get(sys_consts.APP_LANG)
 
         ignore_chars = "+="
         split_list = trans_word.split(delim)

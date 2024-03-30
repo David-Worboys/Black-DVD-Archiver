@@ -63,13 +63,17 @@ class Video_File_Picker_Popup(qtg.PopContainer):
 
         match event.event:
             case qtg.Sys_Events.WINDOWOPEN:
-                video_folder = self._db_settings.setting_get("video_import_folder")
+                video_folder = self._db_settings.setting_get(
+                    sys_consts.VIDEO_IMPORT_FOLDER
+                )
 
                 if video_folder is None or video_folder.strip() == "":
                     video_folder = file_utils.Special_Path(
                         sys_consts.SPECIAL_PATH.VIDEOS
                     )
-                    self._db_settings.setting_set("video_import_folder", video_folder)
+                    self._db_settings.setting_set(
+                        sys_consts.VIDEO_IMPORT_FOLDER, video_folder
+                    )
 
                 self.load_files(video_folder=video_folder, event=event)
             case qtg.Sys_Events.CLICKED:
@@ -97,7 +101,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
 
                     case "video_import_folder":
                         video_folder = self._db_settings.setting_get(
-                            "video_import_folder"
+                            sys_consts.VIDEO_IMPORT_FOLDER
                         )
 
                         video_folder = popups.PopFolderGet(
@@ -111,7 +115,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
 
                         if video_folder.strip() != "":
                             self._db_settings.setting_set(
-                                "video_import_folder", video_folder
+                                sys_consts.VIDEO_IMPORT_FOLDER, video_folder
                             )
                             file_grid: qtg.Grid = cast(
                                 qtg.Grid,
@@ -256,25 +260,29 @@ class Video_File_Picker_Popup(qtg.PopContainer):
 
                 video_settings = Video_File_Settings()
 
-                if self._db_settings.setting_exist("vf_normalise"):
+                if self._db_settings.setting_exist(sys_consts.VF_NORMALISE):
                     video_settings.normalise = self._db_settings.setting_get(
-                        "vf_normalise"
+                        sys_consts.VF_NORMALISE
                     )
 
-                if self._db_settings.setting_exist("vf_denoise"):
-                    video_settings.denoise = self._db_settings.setting_get("vf_denoise")
+                if self._db_settings.setting_exist(sys_consts.VF_DENOISE):
+                    video_settings.denoise = self._db_settings.setting_get(
+                        sys_consts.VF_DENOISE
+                    )
 
-                if self._db_settings.setting_exist("vf_white_balance"):
+                if self._db_settings.setting_exist(sys_consts.VF_WHITE_BALANCE):
                     video_settings.white_balance = self._db_settings.setting_get(
-                        "vf_white_balance"
+                        sys_consts.VF_WHITE_BALANCE
                     )
 
-                if self._db_settings.setting_exist("vf_sharpen"):
-                    video_settings.sharpen = self._db_settings.setting_get("vf_sharpen")
+                if self._db_settings.setting_exist(sys_consts.VF_SHARPEN):
+                    video_settings.sharpen = self._db_settings.setting_get(
+                        sys_consts.VF_SHARPEN
+                    )
 
-                if self._db_settings.setting_exist("vf_auto_levels"):
+                if self._db_settings.setting_exist(sys_consts.VF_AUTO_LEVELS):
                     video_settings.auto_bright = self._db_settings.setting_get(
-                        "vf_auto_levels"
+                        sys_consts.VF_AUTO_LEVELS
                     )
 
                 video_settings.button_title = file_handler.extract_title(file_name)

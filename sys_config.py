@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import dataclasses
 import shelve
 import datetime
+from typing import cast
 
 import platformdirs
 
@@ -193,12 +194,12 @@ def Migrate_Shelves_To_DB() -> tuple[int, str]:
                 db.close()
 
                 if video_grid_data:
-                    shelf_dict = sql_shelf.open(shelf_name="video_grid")
+                    shelf_dict = sql_shelf.open(shelf_name=sys_consts.VIDEO_GRID_SHELF)
                     if sql_shelf.error.code == -1:
                         return -1, sql_shelf.error.message
 
                     result, message = sql_shelf.update(
-                        shelf_name="video_grid",
+                        shelf_name=sys_consts.VIDEO_GRID_SHELF,
                         shelf_data=shelf_dict
                         | {project.replace("_", " "): video_grid_data},
                     )
@@ -308,22 +309,22 @@ def Migrate_Shelves_To_DB() -> tuple[int, str]:
                     dvd_layout_dict[dvd_layout_key] = dvd_menu_layout
 
     if project_dict:
-        sql_shelf.open(shelf_name="projects")
+        sql_shelf.open(shelf_name=sys_consts.PROJECTS_SHELF)
         if sql_shelf.error.code == -1:
             return -1, sql_shelf.error.message
 
         result, message = sql_shelf.update(
-            shelf_name="projects", shelf_data=project_dict
+            shelf_name=sys_consts.PROJECTS_SHELF, shelf_data=project_dict
         )
 
         if result == -1:
             return -1, message
 
     if dvd_layout_dict:
-        shelf_dict = sql_shelf.open(shelf_name="dvdmenu")
+        shelf_dict = sql_shelf.open(shelf_name=sys_consts.DVD_MENU_SHELF)
 
         result, message = sql_shelf.update(
-            shelf_name="dvdmenu", shelf_data=dvd_layout_dict
+            shelf_name=sys_consts.DVD_MENU_SHELF, shelf_data=dvd_layout_dict
         )
 
         if result == -1:
@@ -370,7 +371,7 @@ def Delete_DVD_Layout(project_name: str, layout_name: str) -> tuple[int, str]:
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
-    shelf_dict = sql_shelf.open(shelf_name="projects")
+    shelf_dict = sql_shelf.open(shelf_name=sys_consts.PROJECTS_SHELF)
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
@@ -379,19 +380,23 @@ def Delete_DVD_Layout(project_name: str, layout_name: str) -> tuple[int, str]:
             item for item in shelf_dict[project_name] if item != layout_name
         ]
 
-    result, message = sql_shelf.update(shelf_name="projects", shelf_data=shelf_dict)
+    result, message = sql_shelf.update(
+        shelf_name=sys_consts.PROJECTS_SHELF, shelf_data=shelf_dict
+    )
 
     if result == -1:
         return -1, message
 
-    shelf_dict = sql_shelf.open(shelf_name="dvdmenu")
+    shelf_dict = sql_shelf.open(shelf_name=sys_consts.DVD_MENU_SHELF)
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
     if dvd_menu_key in shelf_dict:
         shelf_dict.pop(dvd_menu_key)
 
-    result, message = sql_shelf.update(shelf_name="dvdmenu", shelf_data=shelf_dict)
+    result, message = sql_shelf.update(
+        shelf_name=sys_consts.DVD_MENU_SHELF, shelf_data=shelf_dict
+    )
 
     if result == -1:
         return -1, message
@@ -442,15 +447,15 @@ def Delete_Project(project_name: str) -> tuple[int, str]:
     ):  # This should not happen unless the system goes off the rails
         return -1, sql_shelf.error.message
 
-    project_shelf_dict = sql_shelf.open("projects")
+    project_shelf_dict = sql_shelf.open(shelf_name=sys_consts.PROJECTS_SHELF)
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
-    dvdmenu_shelf_dict = sql_shelf.open("dvdmenu")
+    dvdmenu_shelf_dict = sql_shelf.open(shelf_name=sys_consts.DVD_MENU_SHELF)
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
-    video_grid_shelf_dict = sql_shelf.open("video_grid")
+    video_grid_shelf_dict = sql_shelf.open(shelf_name=sys_consts.VIDEO_GRID_SHELF)
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
@@ -474,19 +479,19 @@ def Delete_Project(project_name: str) -> tuple[int, str]:
         project_shelf_dict.pop(project_name)
 
     result, message = sql_shelf.update(
-        shelf_name="video_grid", shelf_data=video_grid_shelf_dict
+        shelf_name=sys_consts.VIDEO_GRID_SHELF, shelf_data=video_grid_shelf_dict
     )
     if result == -1:
         return -1, message
 
     result, message = sql_shelf.update(
-        shelf_name="dvdmenu", shelf_data=dvdmenu_shelf_dict
+        shelf_name=sys_consts.DVD_MENU_SHELF, shelf_data=dvdmenu_shelf_dict
     )
     if result == -1:
         return -1, message
 
     result, message = sql_shelf.update(
-        shelf_name="projects", shelf_data=project_shelf_dict
+        shelf_name=sys_consts.PROJECTS_SHELF, shelf_data=project_shelf_dict
     )
     if result == -1:
         return -1, message
@@ -522,15 +527,15 @@ def Remove_Project_Files(project_name: str, file_paths: list[str]) -> tuple[int,
     ):  # This should not happen unless the system goes off the rails
         return -1, sql_shelf.error.message
 
-    project_shelf_dict = sql_shelf.open("projects")
+    project_shelf_dict = sql_shelf.open(shelf_name=sys_consts.PROJECTS_SHELF)
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
-    video_grid_shelf_dict = sql_shelf.open("video_grid")
+    video_grid_shelf_dict = sql_shelf.open(shelf_name=sys_consts.VIDEO_GRID_SHELF)
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
-    dvdmenu_shelf_dict = sql_shelf.open("dvdmenu")
+    dvdmenu_shelf_dict = sql_shelf.open(shelf_name=sys_consts.DVD_MENU_SHELF)
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
@@ -561,13 +566,13 @@ def Remove_Project_Files(project_name: str, file_paths: list[str]) -> tuple[int,
                             dvd_page.get_button_titles.pop(button_index)
 
     result, message = sql_shelf.update(
-        shelf_name="video_grid", shelf_data=video_grid_shelf_dict
+        shelf_name=sys_consts.VIDEO_GRID_SHELF, shelf_data=video_grid_shelf_dict
     )
     if result == -1:
         return -1, message
 
     result, message = sql_shelf.update(
-        shelf_name="dvdmenu", shelf_data=dvdmenu_shelf_dict
+        shelf_name=sys_consts.DVD_MENU_SHELF, shelf_data=dvdmenu_shelf_dict
     )
 
     if result == -1:
@@ -599,15 +604,15 @@ def Get_Project_Files(
     if sql_shelf.error.code == -1:
         return -1, []
 
-    project_shelf_dict = sql_shelf.open("projects")
+    project_shelf_dict = sql_shelf.open(shelf_name=sys_consts.PROJECTS_SHELF)
     if sql_shelf.error.code == -1:
         return -1, []
 
-    video_grid_shelf_dict = sql_shelf.open("video_grid")
+    video_grid_shelf_dict = sql_shelf.open(shelf_name=sys_consts.VIDEO_GRID_SHELF)
     if sql_shelf.error.code == -1:
         return -1, []
 
-    dvdmenu_shelf_dict = sql_shelf.open("dvdmenu")
+    dvdmenu_shelf_dict = sql_shelf.open(shelf_name=sys_consts.DVD_MENU_SHELF)
     if sql_shelf.error.code == -1:
         return -1, []
 
@@ -644,7 +649,7 @@ def Get_Project_Files(
 
     if deleted_project_key:
         result, _ = sql_shelf.update(
-            shelf_name="video_grid", shelf_data=video_grid_shelf_dict
+            shelf_name=sys_consts.VIDEO_GRID_SHELF, shelf_data=video_grid_shelf_dict
         )
         if result == -1:
             return -1, []
@@ -701,7 +706,7 @@ def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str], i
     if sql_shelf.error.code == -1:
         return [], [], -1
 
-    shelf_dict = sql_shelf.open("projects")
+    shelf_dict = sql_shelf.open(shelf_name=sys_consts.PROJECTS_SHELF)
     if sql_shelf.error.code == -1:
         return [], [], -1
 
@@ -750,7 +755,7 @@ def Get_Shelved_DVD_Layout(
     if sql_shelf.error.code == -1:
         return dvd_menu_layout, sql_shelf.error.message
 
-    dvd_shelf = sql_shelf.open(shelf_name="dvdmenu")
+    dvd_shelf = sql_shelf.open(shelf_name=sys_consts.DVD_MENU_SHELF)
 
     if sql_shelf.error.code == -1:
         return dvd_menu_layout, sql_shelf.error.message
@@ -817,7 +822,7 @@ def Set_Shelved_Project(
     ):  # This should not happen unless the system goes off the rails
         RuntimeError(f"{sql_shelf.error.code} {sql_shelf.error.message}")
 
-    shelf_dict = sql_shelf.open("projects")
+    shelf_dict = sql_shelf.open(shelf_name=sys_consts.PROJECTS_SHELF)
 
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
@@ -830,7 +835,9 @@ def Set_Shelved_Project(
             | set(dvd_menu_layout_names)  # Using sets removes duplicates
         )
 
-    result, message = sql_shelf.update(shelf_name="projects", shelf_data=shelf_dict)
+    result, message = sql_shelf.update(
+        shelf_name=sys_consts.PROJECTS_SHELF, shelf_data=shelf_dict
+    )
 
     return result, message
 
@@ -865,7 +872,7 @@ def Set_Shelved_DVD_Layout(
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
-    shelf_dict = sql_shelf.open(shelf_name="projects")
+    shelf_dict = sql_shelf.open(shelf_name=sys_consts.PROJECTS_SHELF)
     if sql_shelf.error.code == -1:
         return -1, sql_shelf.error.message
 
@@ -875,13 +882,17 @@ def Set_Shelved_DVD_Layout(
     else:  # New Project
         shelf_dict[project_name] = [dvd_layout_name]
 
-    result, message = sql_shelf.update(shelf_name="projects", shelf_data=shelf_dict)
+    result, message = sql_shelf.update(
+        shelf_name=sys_consts.PROJECTS_SHELF, shelf_data=shelf_dict
+    )
 
     if result == -1:
         return -1, message
 
     shelf_dict = {f"{project_name}.{dvd_layout_name}": dvd_menu_layout}
-    result, message = sql_shelf.update(shelf_name="dvdmenu", shelf_data=shelf_dict)
+    result, message = sql_shelf.update(
+        shelf_name=sys_consts.DVD_MENU_SHELF, shelf_data=shelf_dict
+    )
 
     return result, message
 
@@ -966,9 +977,9 @@ class DVD_Menu_Settings:
             str : The background color of the menu
 
         """
-        if not self._db_settings.setting_exist("menu_background_color"):
-            self._db_settings.setting_set("menu_background_color", "blue")
-        return self._db_settings.setting_get("menu_background_color")
+        if not self._db_settings.setting_exist(sys_consts.MENU_BACKGROUND_COLOUR):
+            self._db_settings.setting_set(sys_consts.MENU_BACKGROUND_COLOUR, "blue")
+        return self._db_settings.setting_get(sys_consts.MENU_BACKGROUND_COLOUR)
 
     @menu_background_color.setter
     def menu_background_color(self, value: str) -> None:
@@ -981,7 +992,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set("menu_background_color", value)
+        self._db_settings.setting_set(sys_consts.MENU_BACKGROUND_COLOUR, value)
 
     @property
     def menu_font_color(self) -> str:
@@ -994,9 +1005,9 @@ class DVD_Menu_Settings:
         Returns:
             str : The color of the font used in menus
         """
-        if not self._db_settings.setting_exist("menu_font_color"):
-            self._db_settings.setting_set("menu_font_color", "yellow")
-        return self._db_settings.setting_get("menu_font_color")
+        if not self._db_settings.setting_exist(sys_consts.MENU_FONT_COLOUR):
+            self._db_settings.setting_set(sys_consts.MENU_FONT_COLOUR, "yellow")
+        return self._db_settings.setting_get(sys_consts.MENU_FONT_COLOUR)
 
     @menu_font_color.setter
     def menu_font_color(self, value: str) -> None:
@@ -1009,7 +1020,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set("menu_font_color", value)
+        self._db_settings.setting_set(sys_consts.MENU_FONT_COLOUR, value)
 
     @property
     def menu_font_point_size(self) -> int:
@@ -1022,9 +1033,9 @@ class DVD_Menu_Settings:
             The menu font point size
 
         """
-        if not self._db_settings.setting_exist("menu_font_point_size"):
-            self._db_settings.setting_set("menu_font_point_size", 24)
-        return int(self._db_settings.setting_get("menu_font_point_size"))
+        if not self._db_settings.setting_exist(sys_consts.MENU_FONT_POINT_SIZE):
+            self._db_settings.setting_set(sys_consts.MENU_FONT_POINT_SIZE, 24)
+        return int(self._db_settings.setting_get(sys_consts.MENU_FONT_POINT_SIZE))
 
     @menu_font_point_size.setter
     def menu_font_point_size(self, value: int) -> None:
@@ -1037,7 +1048,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
 
-        self._db_settings.setting_set("menu_font_point_size", value)
+        self._db_settings.setting_set(sys_consts.MENU_FONT_POINT_SIZE, value)
 
     @property
     def menu_font(self) -> str:
@@ -1051,9 +1062,9 @@ class DVD_Menu_Settings:
             str: The font used in the menu
 
         """
-        if not self._db_settings.setting_exist("menu_font"):
-            self._db_settings.setting_set("menu_font", sys_consts.DEFAULT_FONT)
-        return self._db_settings.setting_get("menu_font")
+        if not self._db_settings.setting_exist(sys_consts.MENU_FONT):
+            self._db_settings.setting_set(sys_consts.MENU_FONT, sys_consts.DEFAULT_FONT)
+        return self._db_settings.setting_get(sys_consts.MENU_FONT)
 
     @menu_font.setter
     def menu_font(self, value: str) -> None:
@@ -1068,7 +1079,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set("menu_font", value)
+        self._db_settings.setting_set(sys_consts.MENU_FONT, value)
 
     @property
     def page_pointer_left(self) -> str:
@@ -1082,7 +1093,7 @@ class DVD_Menu_Settings:
 
         """
 
-        if not self._db_settings.setting_exist("page_pointer_left"):
+        if not self._db_settings.setting_exist(sys_consts.PAGE_POINTER_LEFT):
             file_handler = file_utils.File()
             if file_handler.file_exists(
                 directory_path=sys_consts.ICON_PATH,
@@ -1090,10 +1101,10 @@ class DVD_Menu_Settings:
                 file_extension="png",
             ):
                 self._db_settings.setting_set(
-                    "page_pointer_left", "pointer.black.left.png"
+                    sys_consts.PAGE_POINTER_LEFT, "pointer.black.left.png"
                 )
 
-        return self._db_settings.setting_get("page_pointer_left")
+        return self._db_settings.setting_get(sys_consts.PAGE_POINTER_LEFT)
 
     @page_pointer_left.setter
     def page_pointer_left(self, value: str) -> None:
@@ -1108,7 +1119,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set("page_pointer_left", value)
+        self._db_settings.setting_set(sys_consts.PAGE_POINTER_LEFT, value)
 
     @property
     def page_pointer_right(self) -> str:
@@ -1122,7 +1133,7 @@ class DVD_Menu_Settings:
 
         """
 
-        if not self._db_settings.setting_exist("page_pointer_right"):
+        if not self._db_settings.setting_exist(sys_consts.PAGE_POINTER_RIGHT):
             file_handler = file_utils.File()
 
             if file_handler.file_exists(
@@ -1131,10 +1142,10 @@ class DVD_Menu_Settings:
                 file_extension="png",
             ):
                 self._db_settings.setting_set(
-                    "page_pointer_right", "pointer.black.right.png"
+                    sys_consts.PAGE_POINTER_RIGHT, "pointer.black.right.png"
                 )
 
-        return self._db_settings.setting_get("page_pointer_right")
+        return self._db_settings.setting_get(sys_consts.PAGE_POINTER_RIGHT)
 
     @page_pointer_right.setter
     def page_pointer_right(self, value: str) -> None:
@@ -1149,7 +1160,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set("page_pointer_right", value)
+        self._db_settings.setting_set(sys_consts.PAGE_POINTER_RIGHT, value)
 
     @property
     def button_background_color(self) -> str:
@@ -1163,9 +1174,11 @@ class DVD_Menu_Settings:
             str: The background color of the buttons
 
         """
-        if not self._db_settings.setting_exist("button_background_color"):
-            self._db_settings.setting_set("button_background_color", "darkgray")
-        return self._db_settings.setting_get("button_background_color")
+        if not self._db_settings.setting_exist(sys_consts.BUTTON_BACKGROUND_COLOUR):
+            self._db_settings.setting_set(
+                sys_consts.BUTTON_BACKGROUND_COLOUR, "darkgray"
+            )
+        return self._db_settings.setting_get(sys_consts.BUTTON_BACKGROUND_COLOUR)
 
     @button_background_color.setter
     def button_background_color(self, value: str) -> None:
@@ -1178,7 +1191,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set("button_background_color", value)
+        self._db_settings.setting_set(sys_consts.BUTTON_BACKGROUND_COLOUR, value)
 
     @property
     def button_background_transparency(self) -> int:
@@ -1192,9 +1205,14 @@ class DVD_Menu_Settings:
             int : Percentage transparency of the button background
 
         """
-        if not self._db_settings.setting_exist("button_background_transparency"):
-            self._db_settings.setting_set("button_background_transparency", 90)
-        return self._db_settings.setting_get("button_background_transparency")
+        if not self._db_settings.setting_exist(
+            sys_consts.BUTTON_BACKGROUND_TRANSPARENCY
+        ):
+            self._db_settings.setting_set(sys_consts.BUTTON_BACKGROUND_TRANSPARENCY, 90)
+        return cast(
+            int,
+            self._db_settings.setting_get(sys_consts.BUTTON_BACKGROUND_TRANSPARENCY),
+        )
 
     @button_background_transparency.setter
     def button_background_transparency(self, value: int) -> None:
@@ -1207,7 +1225,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
 
-        self._db_settings.setting_set("button_background_transparency", value)
+        self._db_settings.setting_set(sys_consts.BUTTON_BACKGROUND_TRANSPARENCY, value)
 
     @property
     def button_font(self) -> str:
@@ -1220,9 +1238,11 @@ class DVD_Menu_Settings:
             str : The font used for button text
 
         """
-        if not self._db_settings.setting_exist("button_font"):
-            self._db_settings.setting_set("button_font", sys_consts.DEFAULT_FONT)
-        return self._db_settings.setting_get("button_font")
+        if not self._db_settings.setting_exist(sys_consts.BUTTON_FONT):
+            self._db_settings.setting_set(
+                sys_consts.BUTTON_FONT, sys_consts.DEFAULT_FONT
+            )
+        return self._db_settings.setting_get(sys_consts.BUTTON_FONT)
 
     @button_font.setter
     def button_font(self, value: str) -> None:
@@ -1235,7 +1255,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set("button_font", value)
+        self._db_settings.setting_set(sys_consts.BUTTON_FONT, value)
 
     @property
     def button_font_color(self) -> str:
@@ -1247,9 +1267,9 @@ class DVD_Menu_Settings:
             str : The value of the button_font_color setting
 
         """
-        if not self._db_settings.setting_exist("button_font_color"):
-            self._db_settings.setting_set("button_font_color", "white")
-        return self._db_settings.setting_get("button_font_color")
+        if not self._db_settings.setting_exist(sys_consts.BUTTON_FONT_COLOUR):
+            self._db_settings.setting_set(sys_consts.BUTTON_FONT_COLOUR, "white")
+        return self._db_settings.setting_get(sys_consts.BUTTON_FONT_COLOUR)
 
     @button_font_color.setter
     def button_font_color(self, value: str) -> None:
@@ -1260,7 +1280,7 @@ class DVD_Menu_Settings:
             value (str): Set the button_font_color setting
 
         """
-        self._db_settings.setting_set("button_font_color", value)
+        self._db_settings.setting_set(sys_consts.BUTTON_FONT_COLOUR, value)
 
     @property
     def button_font_point_size(self) -> int:
@@ -1274,9 +1294,11 @@ class DVD_Menu_Settings:
             int : The point size of the font used for buttons
 
         """
-        if not self._db_settings.setting_exist("button_font_point_size"):
-            self._db_settings.setting_set("button_font_point_size", 12)
-        return self._db_settings.setting_get("button_font_point_size")
+        if not self._db_settings.setting_exist(sys_consts.BUTTON_FONT_POINT_SIZE):
+            self._db_settings.setting_set(sys_consts.BUTTON_FONT_POINT_SIZE, 12)
+        return cast(
+            int, self._db_settings.setting_get(sys_consts.BUTTON_FONT_POINT_SIZE)
+        )
 
     @button_font_point_size.setter
     def button_font_point_size(self, value: int) -> None:
@@ -1289,7 +1311,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
 
-        self._db_settings.setting_set("button_font_point_size", value)
+        self._db_settings.setting_set(sys_consts.BUTTON_FONT_POINT_SIZE, value)
 
     @property
     def buttons_across(self) -> int:
@@ -1302,9 +1324,9 @@ class DVD_Menu_Settings:
             int : The number of buttons across the screen
 
         """
-        if not self._db_settings.setting_exist("buttons_across"):
-            self._db_settings.setting_set("buttons_across", 2)
-        return self._db_settings.setting_get("buttons_across")
+        if not self._db_settings.setting_exist(sys_consts.BUTTONS_ACROSS):
+            self._db_settings.setting_set(sys_consts.BUTTONS_ACROSS, 2)
+        return cast(int, self._db_settings.setting_get(sys_consts.BUTTONS_ACROSS))
 
     @buttons_across.setter
     def buttons_across(self, value: int) -> None:
@@ -1316,7 +1338,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, int) and 1 <= value <= 4, f"{value=}. Must be int"
 
-        self._db_settings.setting_set("buttons_across", value)
+        self._db_settings.setting_set(sys_consts.BUTTONS_ACROSS, value)
 
     @property
     def buttons_per_page(self) -> int:
@@ -1329,9 +1351,9 @@ class DVD_Menu_Settings:
         Returns:
             int : The number of buttons per page
         """
-        if not self._db_settings.setting_exist("buttons_per_page"):
-            self._db_settings.setting_set("buttons_per_page", 4)
-        return self._db_settings.setting_get("buttons_per_page")
+        if not self._db_settings.setting_exist(sys_consts.BUTTONS_PER_PAGE):
+            self._db_settings.setting_set(sys_consts.BUTTONS_PER_PAGE, 4)
+        return cast(int, self._db_settings.setting_get(sys_consts.BUTTONS_PER_PAGE))
 
     @buttons_per_page.setter
     def buttons_per_page(self, value: int) -> None:
@@ -1344,7 +1366,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, int) and 1 <= value <= 6, f"{value=}. Must be int"
 
-        self._db_settings.setting_set("buttons_per_page", value)
+        self._db_settings.setting_set(sys_consts.BUTTONS_PER_PAGE, value)
 
 
 @dataclasses.dataclass(slots=True)

@@ -170,7 +170,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         self._app_db = self.db_init()
         self._db_tables_create()
 
-        if self._db_settings.setting_get("First_Run"):
+        if self._db_settings.setting_get(sys_consts.FIRST_RUN):
             # Do stuff that the application only ever needs to do once on first
             # startup of a new installation
             Set_Shelved_DVD_Layout(
@@ -179,7 +179,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 dvd_menu_layout=[],
             )
 
-            self._db_settings.setting_set("First_Run", False)
+            self._db_settings.setting_set(sys_consts.FIRST_RUN, False)
 
         self._menu_title_font_size = 24
         self._timestamp_font_point_size = 9
@@ -360,11 +360,12 @@ class DVD_Archiver(DVD_Archiver_Base):
                         self._archive_folder_select(event)
                     case "backup_bluray":
                         self._db_settings.setting_set(
-                            "archive_disk_size", sys_consts.BLUERAY_ARCHIVE_SIZE
+                            sys_consts.ARCHIVE_DISK_SIZE,
+                            sys_consts.BLUERAY_ARCHIVE_SIZE,
                         )
                     case "backup_dvd":
                         self._db_settings.setting_set(
-                            "archive_disk_size", sys_consts.DVD_ARCHIVE_SIZE
+                            sys_consts.ARCHIVE_DISK_SIZE, sys_consts.DVD_ARCHIVE_SIZE
                         )
                     case "delete_dvd_layout":
                         self._delete_dvd_layout(event)
@@ -392,19 +393,20 @@ class DVD_Archiver(DVD_Archiver_Base):
                             ).show()
                     case "transcode_none":
                         self._db_settings.setting_set(
-                            "archive_disk_transcode", sys_consts.TRANSCODE_NONE
+                            sys_consts.ARCHIVE_DISK_TRANSCODE, sys_consts.TRANSCODE_NONE
                         )
                     case "transcode_archival":
                         self._db_settings.setting_set(
-                            "archive_disk_transcode", sys_consts.TRANSCODE_FFV1ARCHIVAL
+                            sys_consts.ARCHIVE_DISK_TRANSCODE,
+                            sys_consts.TRANSCODE_FFV1ARCHIVAL,
                         )
                     case "transcode_h264":
                         self._db_settings.setting_set(
-                            "archive_disk_transcode", sys_consts.TRANSCODE_H264
+                            sys_consts.ARCHIVE_DISK_TRANSCODE, sys_consts.TRANSCODE_H264
                         )
                     case "transcode_h265":
                         self._db_settings.setting_set(
-                            "archive_disk_transcode", sys_consts.TRANSCODE_H265
+                            sys_consts.ARCHIVE_DISK_TRANSCODE, sys_consts.TRANSCODE_H265
                         )
                     case "video_editor":  # Signal from file_grid
                         video_edit_folder = Get_Video_Editor_Folder()
@@ -497,21 +499,21 @@ class DVD_Archiver(DVD_Archiver_Base):
         combo_data: qtg.Combo_Data = event.value
         if combo_data.data == "N/A":  # Sets default language - untranslated is English
             self._db_settings.setting_set(
-                setting_name="app_lang",
+                setting_name=sys_consts.APP_LANG,
                 setting_value="",
             )
 
             self._db_settings.setting_set(
-                setting_name="app_country",
+                setting_name=sys_consts.APP_COUNTRY,
                 setting_value="",
             )
         else:
             self._db_settings.setting_set(
-                setting_name="app_lang",
+                setting_name=sys_consts.APP_LANG,
                 setting_value=combo_data.data,
             )
             self._db_settings.setting_set(
-                setting_name="app_country",
+                setting_name=sys_consts.APP_COUNTRY,
                 setting_value=combo_data.display,
             )
 
@@ -531,8 +533,10 @@ class DVD_Archiver(DVD_Archiver_Base):
                 event.widget_get(container_tag="app_lang", tag="countries"),
             )
 
-            if self._db_settings.setting_exist(setting_name="app_country"):
-                app_country = self._db_settings.setting_get(setting_name="app_country")
+            if self._db_settings.setting_exist(setting_name=sys_consts.APP_COUNTRY):
+                app_country = self._db_settings.setting_get(
+                    setting_name=sys_consts.APP_COUNTRY
+                )
 
                 if app_country:
                     country_combo.select_text(
@@ -855,12 +859,14 @@ class DVD_Archiver(DVD_Archiver_Base):
         ), f"{product_description=}. Must be a non-empty string"
 
         # Increment the sequential number for each DVD produced
-        if not self._db_settings.setting_exist("serial_number"):
-            self._db_settings.setting_set("serial_number", 0)
+        if not self._db_settings.setting_exist(sys_consts.SERIAL_NUMBER):
+            self._db_settings.setting_set(sys_consts.SERIAL_NUMBER, 0)
 
-        serial_number: int = cast(int, self._db_settings.setting_get("serial_number"))
+        serial_number: int = cast(
+            int, self._db_settings.setting_get(sys_consts.SERIAL_NUMBER)
+        )
         serial_number += 1
-        self._db_settings.setting_set("serial_number", serial_number)
+        self._db_settings.setting_set(sys_consts.SERIAL_NUMBER, serial_number)
 
         # Generate the serial number string
         serial_number_str = "{:06d}".format(serial_number)
@@ -978,7 +984,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             dvd_config = DVD_Config()
 
             dvd_config.menu_aspect_ratio = self._db_settings.setting_get(
-                "menu_aspect_ratio"
+                sys_consts.MENU_ASPECT_RATIO
             )
 
             dvd_config.project_name = (
@@ -995,16 +1001,16 @@ class DVD_Archiver(DVD_Archiver_Base):
                 dvd_config.streaming_folder = self._db_settings.setting_get(
                     sys_consts.STREAMING_FOLDER
                 )
-            if self._db_settings.setting_exist("archive_disk_size"):
+            if self._db_settings.setting_exist(sys_consts.ARCHIVE_DISK_SIZE):
                 dvd_config.archive_size = self._db_settings.setting_get(
-                    "archive_disk_size"
+                    sys_consts.ARCHIVE_DISK_SIZE
                 )
             else:
                 dvd_config.archive_size = sys_consts.DVD_ARCHIVE_SIZE
 
-            if self._db_settings.setting_exist("archive_disk_transcode"):
+            if self._db_settings.setting_exist(sys_consts.ARCHIVE_DISK_TRANSCODE):
                 dvd_config.transcode_type = self._db_settings.setting_get(
-                    "archive_disk_transcode"
+                    sys_consts.ARCHIVE_DISK_TRANSCODE
                 )
             else:
                 dvd_config.transcode_type = sys_consts.TRANSCODE_NONE
@@ -1253,10 +1259,10 @@ class DVD_Archiver(DVD_Archiver_Base):
             project_combo.value_remove(combo_data.index)
             self._save_existing_project = True
 
-        if self._db_settings.setting_exist("latest_project"):
+        if self._db_settings.setting_exist(sys_consts.LATEST_PROJECT):
             if project_combo.count_items > 0:
                 self._db_settings.setting_set(
-                    "latest_project", self._file_control.project_name
+                    sys_consts.LATEST_PROJECT, self._file_control.project_name
                 )
             else:
                 project_combo.value_set(
@@ -1283,7 +1289,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     dvd_menu_layout=[],
                 )
                 self._db_settings.setting_set(
-                    "latest_project", sys_consts.DEFAULT_PROJECT_NAME
+                    sys_consts.LATEST_PROJECT, sys_consts.DEFAULT_PROJECT_NAME
                 )
 
                 popups.PopMessage(
@@ -1312,18 +1318,24 @@ class DVD_Archiver(DVD_Archiver_Base):
             FormContainer: The application layout
         """
 
-        if self._db_settings.setting_exist("archive_disk_size"):
-            archive_disk_size = self._db_settings.setting_get("archive_disk_size")
+        if self._db_settings.setting_exist(sys_consts.ARCHIVE_DISK_SIZE):
+            archive_disk_size = self._db_settings.setting_get(
+                sys_consts.ARCHIVE_DISK_SIZE
+            )
         else:
             archive_disk_size = sys_consts.DVD_ARCHIVE_SIZE
-            self._db_settings.setting_set("archive_disk_size", archive_disk_size)
+            self._db_settings.setting_set(
+                sys_consts.ARCHIVE_DISK_SIZE, archive_disk_size
+            )
 
-        if self._db_settings.setting_exist("archive_disk_transcode"):
-            transcode_type = self._db_settings.setting_get("archive_disk_transcode")
+        if self._db_settings.setting_exist(sys_consts.ARCHIVE_DISK_TRANSCODE):
+            transcode_type = self._db_settings.setting_get(
+                sys_consts.ARCHIVE_DISK_TRANSCODE
+            )
         else:
             transcode_type = sys_consts.TRANSCODE_NONE
             transcode_type = self._db_settings.setting_set(
-                "archive_disk_transcode", transcode_type
+                sys_consts.ARCHIVE_DISK_TRANSCODE, transcode_type
             )
 
         archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
@@ -1342,7 +1354,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             dvd_build_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
             self._db_settings.setting_set(sys_consts.DVD_BUILD_FOLDER, dvd_build_folder)
 
-        project_name = self._db_settings.setting_get("latest_project")
+        project_name = self._db_settings.setting_get(sys_consts.LATEST_PROJECT)
 
         if project_name is None or not project_name.strip():
             project_name = sys_consts.DEFAULT_PROJECT_NAME
@@ -1467,7 +1479,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     height=1,
                     width=1,
                     icon=qtg.Sys_Icon.dir.get(),
-                    tooltip="Select The  DVD Build Folder",
+                    tooltip="Select The DVD Build Folder",
                 ),
             ),
         )

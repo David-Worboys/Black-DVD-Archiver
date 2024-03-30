@@ -150,11 +150,11 @@ class Video_File_Grid(DVD_Archiver_Base):
             self.parent, DVD_Archiver_Base
         ), f"{self.parent=}. Must be an instance of DVD_Archiver_Base"
 
-        if self._db_settings.setting_exist("latest_project"):
-            self.project_name = self._db_settings.setting_get("latest_project")
+        if self._db_settings.setting_exist(sys_consts.LATEST_PROJECT):
+            self.project_name = self._db_settings.setting_get(sys_consts.LATEST_PROJECT)
         else:
             self.project_name = sys_consts.DEFAULT_PROJECT_NAME
-            self._db_settings.setting_set("latest_project", self.project_name)
+            self._db_settings.setting_set(sys_consts.LATEST_PROJECT, self.project_name)
 
     def grid_events(self, event: qtg.Action) -> None:
         """Process Grid Events
@@ -387,8 +387,10 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         match event.event:
             case qtg.Sys_Events.APPINIT:
-                if self._db_settings.setting_exist("latest_project"):
-                    self.project_name = self._db_settings.setting_get("latest_project")
+                if self._db_settings.setting_exist(sys_consts.LATEST_PROJECT):
+                    self.project_name = self._db_settings.setting_get(
+                        sys_consts.LATEST_PROJECT
+                    )
                 else:
                     self.project_name = sys_consts.DEFAULT_PROJECT_NAME
 
@@ -413,12 +415,12 @@ class Video_File_Grid(DVD_Archiver_Base):
                         ).show()
                         if project_name.strip():
                             self._db_settings.setting_set(
-                                "latest_project", project_name
+                                sys_consts.LATEST_PROJECT, project_name
                             )
 
                     else:  # Project might be changed
                         self._db_settings.setting_set(
-                            "latest_project", self.project_name
+                            sys_consts.LATEST_PROJECT, self.project_name
                         )
                 self._save_grid(event)
             case qtg.Sys_Events.CLICKED:
@@ -438,15 +440,25 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                         self.set_project_standard_duration(event)
                     case "normalise":
-                        self._db_settings.setting_set("vf_normalise", event.value)
+                        self._db_settings.setting_set(
+                            sys_consts.VF_NORMALISE, event.value
+                        )
                     case "denoise":
-                        self._db_settings.setting_set("vf_denoise", event.value)
+                        self._db_settings.setting_set(
+                            sys_consts.VF_DENOISE, event.value
+                        )
                     case "white_balance":
-                        self._db_settings.setting_set("vf_white_balance", event.value)
+                        self._db_settings.setting_set(
+                            sys_consts.VF_WHITE_BALANCE, event.value
+                        )
                     case "sharpen":
-                        self._db_settings.setting_set("vf_sharpen", event.value)
+                        self._db_settings.setting_set(
+                            sys_consts.VF_SHARPEN, event.value
+                        )
                     case "auto_levels":
-                        self._db_settings.setting_set("vf_auto_levels", event.value)
+                        self._db_settings.setting_set(
+                            sys_consts.VF_AUTO_LEVELS, event.value
+                        )
                     case "dvd_menu_configuration":
                         DVD_Menu_Config_Popup(title="DVD Menu Configuration").show()
                     case "group_files":
@@ -518,7 +530,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             ).show()
             return None
 
-        self._db_settings.setting_set("latest_project", self.project_name)
+        self._db_settings.setting_set(sys_consts.LATEST_PROJECT, self.project_name)
 
         if self.project_name in project_names:  # Existing Project
             file_grid.clear()
@@ -551,11 +563,11 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         self._load_grid(event)
 
-        if self._db_settings.setting_exist("vf_normalise"):
+        if self._db_settings.setting_exist(sys_consts.VF_NORMALISE):
             event.value_set(
                 container_tag="default_video_filters",
                 tag="normalise",
-                value=self._db_settings.setting_get("vf_normalise"),
+                value=self._db_settings.setting_get(sys_consts.VF_NORMALISE),
             )
         else:
             event.value_set(
@@ -564,11 +576,11 @@ class Video_File_Grid(DVD_Archiver_Base):
                 value=False,
             )
 
-        if self._db_settings.setting_exist("vf_denoise"):
+        if self._db_settings.setting_exist(sys_consts.VF_DENOISE):
             event.value_set(
                 container_tag="default_video_filters",
                 tag="denoise",
-                value=self._db_settings.setting_get("vf_denoise"),
+                value=self._db_settings.setting_get(sys_consts.VF_DENOISE),
             )
         else:
             event.value_set(
@@ -577,11 +589,11 @@ class Video_File_Grid(DVD_Archiver_Base):
                 value=False,
             )
 
-        if self._db_settings.setting_exist("vf_white_balance"):
+        if self._db_settings.setting_exist(sys_consts.VF_WHITE_BALANCE):
             event.value_set(
                 container_tag="default_video_filters",
                 tag="white_balance",
-                value=self._db_settings.setting_get("vf_white_balance"),
+                value=self._db_settings.setting_get(sys_consts.VF_WHITE_BALANCE),
             )
         else:
             event.value_set(
@@ -590,11 +602,11 @@ class Video_File_Grid(DVD_Archiver_Base):
                 value=False,
             )
 
-        if self._db_settings.setting_exist("vf_sharpen"):
+        if self._db_settings.setting_exist(sys_consts.VF_SHARPEN):
             event.value_set(
                 container_tag="default_video_filters",
                 tag="sharpen",
-                value=self._db_settings.setting_get("vf_sharpen"),
+                value=self._db_settings.setting_get(sys_consts.VF_SHARPEN),
             )
         else:
             event.value_set(
@@ -603,11 +615,11 @@ class Video_File_Grid(DVD_Archiver_Base):
                 value=False,
             )
 
-        if self._db_settings.setting_exist("vf_auto_levels"):
+        if self._db_settings.setting_exist(sys_consts.VF_AUTO_LEVELS):
             event.value_set(
                 container_tag="default_video_filters",
                 tag="auto_levels",
-                value=self._db_settings.setting_get("vf_auto_levels"),
+                value=self._db_settings.setting_get(sys_consts.VF_AUTO_LEVELS),
             )
         else:
             event.value_set(
@@ -1692,43 +1704,46 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 # Set default filter settings from database
                 if (
-                    self._db_settings.setting_exist("vf_normalise")
-                    and self._db_settings.setting_get("vf_normalise") is not None
+                    self._db_settings.setting_exist(sys_consts.VF_NORMALISE)
+                    and self._db_settings.setting_get(sys_consts.VF_NORMALISE)
+                    is not None
                 ):
                     file_video_data.video_file_settings.normalise = (
-                        self._db_settings.setting_get("vf_normalise")
+                        self._db_settings.setting_get(sys_consts.VF_NORMALISE)
                     )
 
                 if (
-                    self._db_settings.setting_exist("vf_denoise")
-                    and self._db_settings.setting_get("vf_denoise") is not None
+                    self._db_settings.setting_exist(sys_consts.VF_DENOISE)
+                    and self._db_settings.setting_get(sys_consts.VF_DENOISE) is not None
                 ):
                     file_video_data.video_file_settings.denoise = (
-                        self._db_settings.setting_get("vf_denoise")
+                        self._db_settings.setting_get(sys_consts.VF_DENOISE)
                     )
 
                 if (
-                    self._db_settings.setting_exist("vf_white_balance")
-                    and self._db_settings.setting_get("vf_white_balance") is not None
+                    self._db_settings.setting_exist(sys_consts.VF_WHITE_BALANCE)
+                    and self._db_settings.setting_get(sys_consts.VF_WHITE_BALANCE)
+                    is not None
                 ):
                     file_video_data.video_file_settings.white_balance = (
-                        self._db_settings.setting_get("vf_white_balance")
+                        self._db_settings.setting_get(sys_consts.VF_WHITE_BALANCE)
                     )
 
                 if (
-                    self._db_settings.setting_exist("vf_sharpen")
-                    and self._db_settings.setting_get("vf_sharpen") is not None
+                    self._db_settings.setting_exist(sys_consts.VF_SHARPEN)
+                    and self._db_settings.setting_get(sys_consts.VF_SHARPEN) is not None
                 ):
                     file_video_data.video_file_settings.sharpen = (
-                        self._db_settings.setting_get("vf_sharpen")
+                        self._db_settings.setting_get(sys_consts.VF_SHARPEN)
                     )
 
                 if (
-                    self._db_settings.setting_exist("vf_auto_levels")
-                    and self._db_settings.setting_get("vf_auto_levels") is not None
+                    self._db_settings.setting_exist(sys_consts.VF_AUTO_LEVELS)
+                    and self._db_settings.setting_get(sys_consts.VF_AUTO_LEVELS)
+                    is not None
                 ):
                     file_video_data.video_file_settings.auto_bright = (
-                        self._db_settings.setting_get("vf_auto_levels")
+                        self._db_settings.setting_get(sys_consts.VF_AUTO_LEVELS)
                     )
 
                 toolbox = self._get_toolbox(file_video_data)

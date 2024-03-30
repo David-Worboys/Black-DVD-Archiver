@@ -31,6 +31,7 @@ import qtgui as qtg
 import sqldb
 import sys_consts
 from dvdarch_utils import DVD_Percent_Used
+from print_popup import Print_DVD_Label_Popup
 from sys_config import (DVD_Menu_Settings, Get_Shelved_DVD_Layout,
                         Set_Shelved_DVD_Layout, Video_Data, DVD_Menu_Page)
 
@@ -117,11 +118,11 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                             self._remove_video_title(self._current_button_grid)
                     case "menu_43":
                         self._db_settings.setting_set(
-                            "menu_aspect_ratio", sys_consts.AR43
+                            sys_consts.MENU_ASPECT_RATIO, sys_consts.AR43
                         )
                     case "menu_169":
                         self._db_settings.setting_set(
-                            "menu_aspect_ratio", sys_consts.AR169
+                            sys_consts.MENU_ASPECT_RATIO, sys_consts.AR169
                         )
                     case "move_menu_up":
                         menu_grid: qtg.Grid = cast(
@@ -153,6 +154,20 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                                 source_grid=self._current_button_grid,
                                 up=True,
                             )
+                    case "print_disk":
+                        disk_title: qtg.LineEdit = cast(
+                            qtg.LineEdit,
+                            event.widget_get(
+                                container_tag="menu_page_controls",
+                                tag="disk_title",
+                            ),
+                        )
+
+                        result = Print_DVD_Label_Popup(
+                            disk_title=disk_title.value_get(),
+                            dvd_menu_pages=self._get_menu_pages(event=event),
+                        ).show()
+
                     case "save_layout":
                         if (
                             popups.PopYesNo(
@@ -824,6 +839,116 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         return None
 
+    def _get_menu_pages(self, event: qtg.Action) -> list[DVD_Menu_Page]:
+        """Returns a list  of menu pages
+
+        Args:
+            event (qtg.Action): The triggering event
+
+        Returns:
+            list[DVD_Menu_Page]: List of DVD menu pages
+
+        """
+        menu_title_grid: qtg.Grid = cast(
+            qtg.Grid,
+            event.widget_get(
+                container_tag="menu_page_controls",
+                tag="menu_titles",
+            ),
+        )
+
+        disk_title_lineedit: qtg.LineEdit = cast(
+            qtg.LineEdit,
+            event.widget_get(
+                container_tag="menu_page_controls",
+                tag="disk_title",
+            ),
+        )
+
+        menu_titles_col_index = menu_title_grid.colindex_get("menu_title")
+        video_titles_col_index = menu_title_grid.colindex_get("videos_on_page")
+
+        row_data = []
+        menu_pages: list[DVD_Menu_Page] = []
+        for row in range(menu_title_grid.row_count):
+            menu_page = DVD_Menu_Page()
+            menu_list: list[
+                tuple[str, tuple[tuple[str, Video_Data], ...], dict[str, str]]
+            ] = []
+
+            for col in range(menu_title_grid.col_count):
+                # grid_user_data = menu_title_grid.userdata_get(row=row, col=col)
+                if col == menu_titles_col_index:
+                    menu_title: str = menu_title_grid.value_get(row=row, col=col)
+                    menu_title_user_data: dict[str, str] = menu_title_grid.userdata_get(
+                        row=row,
+                        col=menu_titles_col_index,
+                    )
+
+                    menu_page.menu_title = menu_title
+                    menu_page.user_data = menu_title_user_data
+
+                    # Popup specific values can be stored here
+                    if menu_title_user_data is None:
+                        menu_title_user_data = {
+                            "disk_title": disk_title_lineedit.value_get()
+                        }
+                    else:
+                        menu_title_user_data["disk_title"] = (
+                            disk_title_lineedit.value_get()
+                        )
+
+                elif col == video_titles_col_index:
+                    row_grid: qtg.Grid | None = menu_title_grid.row_widget_get(
+                        row=row,
+                        col=video_titles_col_index,
+                        container_tag="control_box",
+                        tag="row_grid",
+                    )
+
+                    button_list: list[tuple[str, Video_Data]] = []
+                    button_index = 0
+
+                    for row_grid_row in range(row_grid.row_count):
+                        for row_grid_col in range(row_grid.col_count):
+                            button_title: str = row_grid.value_get(
+                                row=row_grid_row, col=row_grid_col
+                            )
+
+                            button_user_data: Video_Data = row_grid.userdata_get(
+                                row=row_grid_row, col=row_grid_col
+                            )
+
+                            if (
+                                button_user_data.video_file_settings.button_title.strip()
+                                != button_title.strip()
+                            ):
+                                button_user_data.video_file_settings.button_title = (
+                                    button_title
+                                )
+                            menu_page.add_button_title(
+                                button_index=button_index,
+                                button_title=button_title,
+                                button_video_data=button_user_data,
+                            )
+
+                            button_index += 1
+
+                            button_list.append((
+                                button_title,
+                                button_user_data,
+                            ))
+
+                    menu_list.append((
+                        menu_title,
+                        tuple(button_list),
+                        menu_title_user_data,
+                    ))
+
+                    menu_pages.append(menu_page)
+            row_data.append(menu_list)
+        return menu_pages
+
     def _save_dvd_menu(self, event: qtg.Action) -> int:
         """
         Attempts to save the DVD menu layout in a project related shelf
@@ -864,7 +989,6 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 ] = []
 
                 for col in range(menu_title_grid.col_count):
-                    # grid_user_data = menu_title_grid.userdata_get(row=row, col=col)
                     if col == menu_titles_col_index:
                         menu_title: str = menu_title_grid.value_get(row=row, col=col)
                         menu_title_user_data: dict[str, str] = (
@@ -954,10 +1078,14 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         menu_aspect_ratio = sys_consts.AR43
 
-        if self._db_settings.setting_exist("menu_aspect_ratio"):
-            menu_aspect_ratio = self._db_settings.setting_get("menu_aspect_ratio")
+        if self._db_settings.setting_exist(sys_consts.MENU_ASPECT_RATIO):
+            menu_aspect_ratio = self._db_settings.setting_get(
+                sys_consts.MENU_ASPECT_RATIO
+            )
         else:
-            self._db_settings.setting_set("menu_aspect_ratio", menu_aspect_ratio)
+            self._db_settings.setting_set(
+                sys_consts.MENU_ASPECT_RATIO, menu_aspect_ratio
+            )
 
         menu_page_control_container = qtg.VBoxContainer(
             tag="menu_page_controls", align=qtg.Align.TOPLEFT
@@ -1066,7 +1194,15 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                         tooltip="Saves The DVD Menu Layout",
                         width=2,
                     ),
-                    qtg.Spacer(width=27),
+                    qtg.Spacer(width=1),
+                    qtg.Button(
+                        tag="print_disk",
+                        icon=file_utils.App_Path("print.svg"),
+                        callback=self.event_handler,
+                        tooltip="Prints Disk Label",
+                        width=2,
+                    ),
+                    qtg.Spacer(width=21),
                 ),
                 qtg.Command_Button_Container(
                     ok_callback=self.event_handler,
