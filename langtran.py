@@ -167,8 +167,8 @@ class Lang_Tran(metaclass=Singleton):
         ):
             return trans_word.strip(delim)
 
-        if self._db_settings.setting_exist(sys_consts.APP_LANG):
-            self._language_code = self._db_settings.setting_get(sys_consts.APP_LANG)
+        if self._db_settings.setting_exist(sys_consts.APP_LANG_DBK):
+            self._language_code = self._db_settings.setting_get(sys_consts.APP_LANG_DBK)
 
         ignore_chars = "+="
         split_list = trans_word.split(delim)

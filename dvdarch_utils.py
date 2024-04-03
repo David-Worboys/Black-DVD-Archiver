@@ -899,12 +899,12 @@ def Create_DVD_Label(
     disk_diameter: float = 115.0,  # 120mm standard, make DVD label a little smaller
     disk_colour: str = "white",
     resolution: int = 300,  # Standard resolution for print quality
+    title_font_path: str = "",
     title_font_colour: str = "black",
     title_font_size: int = 48,
+    menu_font_path: str = "",
     menu_font_colour: str = "black",
     menu_font_size: int = 24,
-    title_font_path: str = "",
-    menu_font_path: str = "",
     spindle_diameter: float = 36,  # 15mm standard make a little larger (Verbatim guide 36)
 ) -> tuple[int, bytes]:
     """
@@ -923,9 +923,9 @@ def Create_DVD_Label(
         resolution (int): Resolution of the image.
         title_font_colour (str): Colour of the title text.
         title_font_size (int): Font size of the title.
+         title_font_path (str): Path to the title font file.
         menu_font_colour (str): Colour of the menu text.
         menu_font_size (int): Font size.
-        title_font_path (str): Path to the title font file.
         menu_font_path (str): Path to the menu font file.
         spindle_diameter (float): diameter of the central hole.
 
@@ -1029,7 +1029,7 @@ def Create_DVD_Label(
         f"{background_canvas_width}x{background_canvas_height}",
         "xc:none",
         "-fill",
-        "white",
+        disk_colour,
         "-draw",
         f"'circle' {label_x - 0.5},{label_y - 0.5} {disk_radius - 0.5},{0}'",
         "(",
@@ -1158,9 +1158,8 @@ def Create_DVD_Label(
         if len(title_wrapped_text) > 4:
             return (
                 -1,
-                f"Menu Title Is {len(title_wrapped_text)} Lines Long And Only {MAX_TITLE_LINES} Are Allowed".encode(
-                    "utf-8"
-                ),
+                f"Menu Title Is {len(title_wrapped_text)} Lines Long And Only {MAX_TITLE_LINES} Are Allowed! Reduce "
+                f"Title Font Size Or Change Title Font".encode("utf-8"),
             )
 
         for line_num, title_line in enumerate(title_wrapped_text):
@@ -1171,7 +1170,7 @@ def Create_DVD_Label(
                 y=left_sq_y1
                 - ((MAX_TITLE_LINES + 1) * title_height)
                 + (line_num * title_char_height),
-                color="black",
+                color=title_font_colour,
                 font=title_font_path,
                 pointsize=title_font_size,
                 gravity="north",
@@ -1190,7 +1189,12 @@ def Create_DVD_Label(
         if y_position > left_sq_y2:  # Switch to right side
             side += 1
             if side > 2:
-                return -1, "Too Many Menu Titles To Print!".encode("utf-8")
+                return (
+                    -1,
+                    "Too Many Menu Titles To Print! Reduce Menu Font Size Or Change Font".encode(
+                        "utf-8"
+                    ),
+                )
 
             line_num = 0
             x_offset = right_sq_x1
@@ -1380,6 +1384,9 @@ def Get_Font_Example(
                 text_width, text_height = Get_Text_Dims(
                     text=text, font=font_file, pointsize=mid
                 )
+
+                if text_width == -1 and text_height == -1:
+                    return -1, b""
 
                 if (0 < width < text_width) or (0 < height < text_height):
                     high = mid - 1
@@ -2631,6 +2638,15 @@ def Get_Text_Dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
 
     # Convert the message to width and height
     dimensions = message.strip().split("x")
+
+    if (
+        not dimensions
+        or len(dimensions) != 2
+        or dimensions[0].strip() == ""
+        or dimensions[1].strip() == ""
+    ):  # Very rare error cases
+        return -1, -1
+
     width = int(dimensions[0])
     height = int(dimensions[1])
 

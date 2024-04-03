@@ -118,11 +118,11 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                             self._remove_video_title(self._current_button_grid)
                     case "menu_43":
                         self._db_settings.setting_set(
-                            sys_consts.MENU_ASPECT_RATIO, sys_consts.AR43
+                            sys_consts.MENU_ASPECT_RATIO_DBK, sys_consts.AR43
                         )
                     case "menu_169":
                         self._db_settings.setting_set(
-                            sys_consts.MENU_ASPECT_RATIO, sys_consts.AR169
+                            sys_consts.MENU_ASPECT_RATIO_DBK, sys_consts.AR169
                         )
                     case "move_menu_up":
                         menu_grid: qtg.Grid = cast(
@@ -1078,13 +1078,13 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         menu_aspect_ratio = sys_consts.AR43
 
-        if self._db_settings.setting_exist(sys_consts.MENU_ASPECT_RATIO):
+        if self._db_settings.setting_exist(sys_consts.MENU_ASPECT_RATIO_DBK):
             menu_aspect_ratio = self._db_settings.setting_get(
-                sys_consts.MENU_ASPECT_RATIO
+                sys_consts.MENU_ASPECT_RATIO_DBK
             )
         else:
             self._db_settings.setting_set(
-                sys_consts.MENU_ASPECT_RATIO, menu_aspect_ratio
+                sys_consts.MENU_ASPECT_RATIO_DBK, menu_aspect_ratio
             )
 
         menu_page_control_container = qtg.VBoxContainer(

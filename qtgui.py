@@ -2377,7 +2377,7 @@ class _qtpyBase_Control(_qtpyBase):
 
         # ===== Helper
         def _run_widget_factory() -> None:
-            """Creates the appropriate lowlevel qt widget"""
+            """Creates the appropriate low level qt widget"""
 
             match self:
                 case Button():
@@ -3253,7 +3253,7 @@ class _qtpyBase_Control(_qtpyBase):
         return True
 
     def value_get(self) -> any:
-        """If the widget has a value attribute, return the value containsd in the widget. Usually overridden by
+        """If the widget has a value attribute, return the value contained in the widget. Usually overridden by
         subclasses.
 
         Returns:
@@ -4357,22 +4357,22 @@ class _Container(_qtpyBase_Control):
             isinstance(self.margin_left, int)
             and self.margin_left == -1
             or self.margin_left >= 0
-        ), f"{self.margin_left=}. Must be int == -1 oe >=0"
+        ), f"{self.margin_left=}. Must be int == -1 or >=0"
         assert (
             isinstance(self.margin_right, int)
             and self.margin_right == -1
             or self.margin_right >= 0
-        ), f"{self.margin_right=}. Must be int == -1 oe >=0"
+        ), f"{self.margin_right=}. Must be int == -1 or >=0"
         assert (
             isinstance(self.margin_top, int)
             and self.margin_top == -1
             or self.margin_top >= 0
-        ), f"{self.margin_top=}. Must be int == -1 oe >=0"
+        ), f"{self.margin_top=}. Must be int == -1 or >=0"
         assert (
             isinstance(self.margin_bottom, int)
             and self.margin_bottom == -1
             or self.margin_bottom >= 0
-        ), f"{self.margin_bottom=}. Must be int == -1 oe >=0"
+        ), f"{self.margin_bottom=}. Must be int == -1 or >=0"
 
         self._scroll_deque: deque = deque()
 

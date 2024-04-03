@@ -47,7 +47,7 @@ def Get_Video_Editor_Folder(suppress_error: bool = False) -> str:
     """
     file_handler = file_utils.File()
     db = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
-    dvd_build_folder = db.setting_get(sys_consts.DVD_BUILD_FOLDER)
+    dvd_build_folder = db.setting_get(sys_consts.DVD_BUILD_FOLDER_DBK)
 
     if dvd_build_folder is None or dvd_build_folder.strip() == "":
         if not suppress_error:
@@ -76,7 +76,7 @@ def Get_Transcode_Folder(suppress_error: bool = False) -> str:
     """
     file_handler = file_utils.File()
     db = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
-    dvd_build_folder = db.setting_get(sys_consts.DVD_BUILD_FOLDER)
+    dvd_build_folder = db.setting_get(sys_consts.DVD_BUILD_FOLDER_DBK)
 
     if dvd_build_folder is None or dvd_build_folder.strip() == "":
         if not suppress_error:
@@ -88,7 +88,7 @@ def Get_Transcode_Folder(suppress_error: bool = False) -> str:
         return ""
 
     video_transcode_folder = file_handler.file_join(
-        dvd_build_folder, sys_consts.TRANSCODE_FOLDER
+        dvd_build_folder, sys_consts.TRANSCODE_FOLDER_NAME
     )
 
     return video_transcode_folder
@@ -977,9 +977,9 @@ class DVD_Menu_Settings:
             str : The background color of the menu
 
         """
-        if not self._db_settings.setting_exist(sys_consts.MENU_BACKGROUND_COLOUR):
-            self._db_settings.setting_set(sys_consts.MENU_BACKGROUND_COLOUR, "blue")
-        return self._db_settings.setting_get(sys_consts.MENU_BACKGROUND_COLOUR)
+        if not self._db_settings.setting_exist(sys_consts.MENU_BACKGROUND_COLOUR_DBK):
+            self._db_settings.setting_set(sys_consts.MENU_BACKGROUND_COLOUR_DBK, "blue")
+        return self._db_settings.setting_get(sys_consts.MENU_BACKGROUND_COLOUR_DBK)
 
     @menu_background_color.setter
     def menu_background_color(self, value: str) -> None:
@@ -992,7 +992,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set(sys_consts.MENU_BACKGROUND_COLOUR, value)
+        self._db_settings.setting_set(sys_consts.MENU_BACKGROUND_COLOUR_DBK, value)
 
     @property
     def menu_font_color(self) -> str:
@@ -1005,9 +1005,9 @@ class DVD_Menu_Settings:
         Returns:
             str : The color of the font used in menus
         """
-        if not self._db_settings.setting_exist(sys_consts.MENU_FONT_COLOUR):
-            self._db_settings.setting_set(sys_consts.MENU_FONT_COLOUR, "yellow")
-        return self._db_settings.setting_get(sys_consts.MENU_FONT_COLOUR)
+        if not self._db_settings.setting_exist(sys_consts.MENU_FONT_COLOUR_DBK):
+            self._db_settings.setting_set(sys_consts.MENU_FONT_COLOUR_DBK, "yellow")
+        return self._db_settings.setting_get(sys_consts.MENU_FONT_COLOUR_DBK)
 
     @menu_font_color.setter
     def menu_font_color(self, value: str) -> None:
@@ -1020,7 +1020,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set(sys_consts.MENU_FONT_COLOUR, value)
+        self._db_settings.setting_set(sys_consts.MENU_FONT_COLOUR_DBK, value)
 
     @property
     def menu_font_point_size(self) -> int:
@@ -1033,9 +1033,9 @@ class DVD_Menu_Settings:
             The menu font point size
 
         """
-        if not self._db_settings.setting_exist(sys_consts.MENU_FONT_POINT_SIZE):
-            self._db_settings.setting_set(sys_consts.MENU_FONT_POINT_SIZE, 24)
-        return int(self._db_settings.setting_get(sys_consts.MENU_FONT_POINT_SIZE))
+        if not self._db_settings.setting_exist(sys_consts.MENU_FONT_POINT_SIZE_DBK):
+            self._db_settings.setting_set(sys_consts.MENU_FONT_POINT_SIZE_DBK, 24)
+        return int(self._db_settings.setting_get(sys_consts.MENU_FONT_POINT_SIZE_DBK))
 
     @menu_font_point_size.setter
     def menu_font_point_size(self, value: int) -> None:
@@ -1048,7 +1048,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
 
-        self._db_settings.setting_set(sys_consts.MENU_FONT_POINT_SIZE, value)
+        self._db_settings.setting_set(sys_consts.MENU_FONT_POINT_SIZE_DBK, value)
 
     @property
     def menu_font(self) -> str:
@@ -1062,9 +1062,11 @@ class DVD_Menu_Settings:
             str: The font used in the menu
 
         """
-        if not self._db_settings.setting_exist(sys_consts.MENU_FONT):
-            self._db_settings.setting_set(sys_consts.MENU_FONT, sys_consts.DEFAULT_FONT)
-        return self._db_settings.setting_get(sys_consts.MENU_FONT)
+        if not self._db_settings.setting_exist(sys_consts.MENU_FONT_DBK):
+            self._db_settings.setting_set(
+                sys_consts.MENU_FONT_DBK, sys_consts.DEFAULT_FONT
+            )
+        return self._db_settings.setting_get(sys_consts.MENU_FONT_DBK)
 
     @menu_font.setter
     def menu_font(self, value: str) -> None:
@@ -1079,7 +1081,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set(sys_consts.MENU_FONT, value)
+        self._db_settings.setting_set(sys_consts.MENU_FONT_DBK, value)
 
     @property
     def page_pointer_left(self) -> str:
@@ -1093,7 +1095,7 @@ class DVD_Menu_Settings:
 
         """
 
-        if not self._db_settings.setting_exist(sys_consts.PAGE_POINTER_LEFT):
+        if not self._db_settings.setting_exist(sys_consts.PAGE_POINTER_LEFT_DBK):
             file_handler = file_utils.File()
             if file_handler.file_exists(
                 directory_path=sys_consts.ICON_PATH,
@@ -1101,10 +1103,10 @@ class DVD_Menu_Settings:
                 file_extension="png",
             ):
                 self._db_settings.setting_set(
-                    sys_consts.PAGE_POINTER_LEFT, "pointer.black.left.png"
+                    sys_consts.PAGE_POINTER_LEFT_DBK, "pointer.black.left.png"
                 )
 
-        return self._db_settings.setting_get(sys_consts.PAGE_POINTER_LEFT)
+        return self._db_settings.setting_get(sys_consts.PAGE_POINTER_LEFT_DBK)
 
     @page_pointer_left.setter
     def page_pointer_left(self, value: str) -> None:
@@ -1119,7 +1121,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set(sys_consts.PAGE_POINTER_LEFT, value)
+        self._db_settings.setting_set(sys_consts.PAGE_POINTER_LEFT_DBK, value)
 
     @property
     def page_pointer_right(self) -> str:
@@ -1133,7 +1135,7 @@ class DVD_Menu_Settings:
 
         """
 
-        if not self._db_settings.setting_exist(sys_consts.PAGE_POINTER_RIGHT):
+        if not self._db_settings.setting_exist(sys_consts.PAGE_POINTER_RIGHT_DBK):
             file_handler = file_utils.File()
 
             if file_handler.file_exists(
@@ -1142,10 +1144,10 @@ class DVD_Menu_Settings:
                 file_extension="png",
             ):
                 self._db_settings.setting_set(
-                    sys_consts.PAGE_POINTER_RIGHT, "pointer.black.right.png"
+                    sys_consts.PAGE_POINTER_RIGHT_DBK, "pointer.black.right.png"
                 )
 
-        return self._db_settings.setting_get(sys_consts.PAGE_POINTER_RIGHT)
+        return self._db_settings.setting_get(sys_consts.PAGE_POINTER_RIGHT_DBK)
 
     @page_pointer_right.setter
     def page_pointer_right(self, value: str) -> None:
@@ -1160,7 +1162,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set(sys_consts.PAGE_POINTER_RIGHT, value)
+        self._db_settings.setting_set(sys_consts.PAGE_POINTER_RIGHT_DBK, value)
 
     @property
     def button_background_color(self) -> str:
@@ -1174,11 +1176,11 @@ class DVD_Menu_Settings:
             str: The background color of the buttons
 
         """
-        if not self._db_settings.setting_exist(sys_consts.BUTTON_BACKGROUND_COLOUR):
+        if not self._db_settings.setting_exist(sys_consts.BUTTON_BACKGROUND_COLOUR_DBK):
             self._db_settings.setting_set(
-                sys_consts.BUTTON_BACKGROUND_COLOUR, "darkgray"
+                sys_consts.BUTTON_BACKGROUND_COLOUR_DBK, "darkgray"
             )
-        return self._db_settings.setting_get(sys_consts.BUTTON_BACKGROUND_COLOUR)
+        return self._db_settings.setting_get(sys_consts.BUTTON_BACKGROUND_COLOUR_DBK)
 
     @button_background_color.setter
     def button_background_color(self, value: str) -> None:
@@ -1191,7 +1193,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set(sys_consts.BUTTON_BACKGROUND_COLOUR, value)
+        self._db_settings.setting_set(sys_consts.BUTTON_BACKGROUND_COLOUR_DBK, value)
 
     @property
     def button_background_transparency(self) -> int:
@@ -1206,12 +1208,16 @@ class DVD_Menu_Settings:
 
         """
         if not self._db_settings.setting_exist(
-            sys_consts.BUTTON_BACKGROUND_TRANSPARENCY
+            sys_consts.BUTTON_BACKGROUND_TRANSPARENCY_DBK
         ):
-            self._db_settings.setting_set(sys_consts.BUTTON_BACKGROUND_TRANSPARENCY, 90)
+            self._db_settings.setting_set(
+                sys_consts.BUTTON_BACKGROUND_TRANSPARENCY_DBK, 90
+            )
         return cast(
             int,
-            self._db_settings.setting_get(sys_consts.BUTTON_BACKGROUND_TRANSPARENCY),
+            self._db_settings.setting_get(
+                sys_consts.BUTTON_BACKGROUND_TRANSPARENCY_DBK
+            ),
         )
 
     @button_background_transparency.setter
@@ -1225,7 +1231,9 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
 
-        self._db_settings.setting_set(sys_consts.BUTTON_BACKGROUND_TRANSPARENCY, value)
+        self._db_settings.setting_set(
+            sys_consts.BUTTON_BACKGROUND_TRANSPARENCY_DBK, value
+        )
 
     @property
     def button_font(self) -> str:
@@ -1238,11 +1246,11 @@ class DVD_Menu_Settings:
             str : The font used for button text
 
         """
-        if not self._db_settings.setting_exist(sys_consts.BUTTON_FONT):
+        if not self._db_settings.setting_exist(sys_consts.BUTTON_FONT_DBK):
             self._db_settings.setting_set(
-                sys_consts.BUTTON_FONT, sys_consts.DEFAULT_FONT
+                sys_consts.BUTTON_FONT_DBK, sys_consts.DEFAULT_FONT
             )
-        return self._db_settings.setting_get(sys_consts.BUTTON_FONT)
+        return self._db_settings.setting_get(sys_consts.BUTTON_FONT_DBK)
 
     @button_font.setter
     def button_font(self, value: str) -> None:
@@ -1255,7 +1263,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, str), f"{value=}. Must be str"
 
-        self._db_settings.setting_set(sys_consts.BUTTON_FONT, value)
+        self._db_settings.setting_set(sys_consts.BUTTON_FONT_DBK, value)
 
     @property
     def button_font_color(self) -> str:
@@ -1267,9 +1275,9 @@ class DVD_Menu_Settings:
             str : The value of the button_font_color setting
 
         """
-        if not self._db_settings.setting_exist(sys_consts.BUTTON_FONT_COLOUR):
-            self._db_settings.setting_set(sys_consts.BUTTON_FONT_COLOUR, "white")
-        return self._db_settings.setting_get(sys_consts.BUTTON_FONT_COLOUR)
+        if not self._db_settings.setting_exist(sys_consts.BUTTON_FONT_COLOUR_DBK):
+            self._db_settings.setting_set(sys_consts.BUTTON_FONT_COLOUR_DBK, "white")
+        return self._db_settings.setting_get(sys_consts.BUTTON_FONT_COLOUR_DBK)
 
     @button_font_color.setter
     def button_font_color(self, value: str) -> None:
@@ -1280,7 +1288,7 @@ class DVD_Menu_Settings:
             value (str): Set the button_font_color setting
 
         """
-        self._db_settings.setting_set(sys_consts.BUTTON_FONT_COLOUR, value)
+        self._db_settings.setting_set(sys_consts.BUTTON_FONT_COLOUR_DBK, value)
 
     @property
     def button_font_point_size(self) -> int:
@@ -1294,10 +1302,10 @@ class DVD_Menu_Settings:
             int : The point size of the font used for buttons
 
         """
-        if not self._db_settings.setting_exist(sys_consts.BUTTON_FONT_POINT_SIZE):
-            self._db_settings.setting_set(sys_consts.BUTTON_FONT_POINT_SIZE, 12)
+        if not self._db_settings.setting_exist(sys_consts.BUTTON_FONT_POINT_SIZE_DBK):
+            self._db_settings.setting_set(sys_consts.BUTTON_FONT_POINT_SIZE_DBK, 12)
         return cast(
-            int, self._db_settings.setting_get(sys_consts.BUTTON_FONT_POINT_SIZE)
+            int, self._db_settings.setting_get(sys_consts.BUTTON_FONT_POINT_SIZE_DBK)
         )
 
     @button_font_point_size.setter
@@ -1311,7 +1319,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
 
-        self._db_settings.setting_set(sys_consts.BUTTON_FONT_POINT_SIZE, value)
+        self._db_settings.setting_set(sys_consts.BUTTON_FONT_POINT_SIZE_DBK, value)
 
     @property
     def buttons_across(self) -> int:
@@ -1324,9 +1332,9 @@ class DVD_Menu_Settings:
             int : The number of buttons across the screen
 
         """
-        if not self._db_settings.setting_exist(sys_consts.BUTTONS_ACROSS):
-            self._db_settings.setting_set(sys_consts.BUTTONS_ACROSS, 2)
-        return cast(int, self._db_settings.setting_get(sys_consts.BUTTONS_ACROSS))
+        if not self._db_settings.setting_exist(sys_consts.BUTTONS_ACROSS_DBK):
+            self._db_settings.setting_set(sys_consts.BUTTONS_ACROSS_DBK, 2)
+        return cast(int, self._db_settings.setting_get(sys_consts.BUTTONS_ACROSS_DBK))
 
     @buttons_across.setter
     def buttons_across(self, value: int) -> None:
@@ -1338,7 +1346,7 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, int) and 1 <= value <= 4, f"{value=}. Must be int"
 
-        self._db_settings.setting_set(sys_consts.BUTTONS_ACROSS, value)
+        self._db_settings.setting_set(sys_consts.BUTTONS_ACROSS_DBK, value)
 
     @property
     def buttons_per_page(self) -> int:
@@ -1351,9 +1359,9 @@ class DVD_Menu_Settings:
         Returns:
             int : The number of buttons per page
         """
-        if not self._db_settings.setting_exist(sys_consts.BUTTONS_PER_PAGE):
-            self._db_settings.setting_set(sys_consts.BUTTONS_PER_PAGE, 4)
-        return cast(int, self._db_settings.setting_get(sys_consts.BUTTONS_PER_PAGE))
+        if not self._db_settings.setting_exist(sys_consts.BUTTONS_PER_PAGE_DBK):
+            self._db_settings.setting_set(sys_consts.BUTTONS_PER_PAGE_DBK, 4)
+        return cast(int, self._db_settings.setting_get(sys_consts.BUTTONS_PER_PAGE_DBK))
 
     @buttons_per_page.setter
     def buttons_per_page(self, value: int) -> None:
@@ -1366,7 +1374,698 @@ class DVD_Menu_Settings:
         """
         assert isinstance(value, int) and 1 <= value <= 6, f"{value=}. Must be int"
 
-        self._db_settings.setting_set(sys_consts.BUTTONS_PER_PAGE, value)
+        self._db_settings.setting_set(sys_consts.BUTTONS_PER_PAGE_DBK, value)
+
+
+@dataclasses.dataclass(slots=True)
+class DVD_Print_Settings:
+    """Stores/Retrieves the DVD print settings from the database."""
+
+    _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
+
+    @property
+    def insert_title_background_color(self) -> str:
+        """
+        The insert_title_background_color method returns the background color of the DVD case insert title.
+        If no setting exists, it creates one and sets it to white.
+
+        Args:
+
+        Returns:
+            str: The background color of the buttons
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_INSERT_TITLE_BACKGROUND_COLOUR_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_INSERT_TITLE_BACKGROUND_COLOUR_DBK, "white"
+            )
+        return self._db_settings.setting_get(
+            sys_consts.DVD_INSERT_TITLE_BACKGROUND_COLOUR_DBK
+        )
+
+    @insert_title_background_color.setter
+    def insert_title_background_color(self, value: str) -> None:
+        """
+        The insert_title_background_color method sets the background color of the DVD case insert title.
+
+        Args:
+            value (str): Set the insert background title color
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._db_settings.setting_set(
+            sys_consts.DVD_INSERT_TITLE_BACKGROUND_COLOUR_DBK, value
+        )
+
+    @property
+    def insert_title_background_transparency(self) -> int:
+        """
+        The insert_title_background_transparency method returns the transparency of the DVD case insert title background.
+            If it does not exist, it is set to 0.
+
+        Args:
+
+        Returns:
+            int : Percentage transparency of the DVD case insert title background
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_INSERT_TITLE_BACKGROUND_TRANSPARENCY_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_INSERT_TITLE_BACKGROUND_TRANSPARENCY_DBK, 0
+            )
+        return cast(
+            int,
+            self._db_settings.setting_get(
+                sys_consts.DVD_INSERT_TITLE_BACKGROUND_TRANSPARENCY_DBK
+            ),
+        )
+
+    @insert_title_background_transparency.setter
+    def insert_title_background_transparency(self, value: int) -> None:
+        """
+        The insert_title_background_transparency method sets the transparency of the insert title background.
+
+        Args:
+            value (int): The percentage transparency of the insert title background
+
+        """
+        assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
+
+        self._db_settings.setting_set(
+            sys_consts.DVD_INSERT_TITLE_BACKGROUND_TRANSPARENCY_DBK, value
+        )
+
+    @property
+    def insert_title_font(self) -> str:
+        """
+        The insert_title_font method is used to set the font of the DVD case insert title.
+        The function first checks if a setting for insert_title_font exists, and if it does not,
+        then it sets one with the app default font. Then, it returns that value.
+
+        Returns:
+            str : The font used for DVD case insert title text
+
+        """
+        if not self._db_settings.setting_exist(sys_consts.DVD_INSERT_TITLE_FONT_DBK):
+            self._db_settings.setting_set(
+                sys_consts.DVD_INSERT_TITLE_FONT_DBK, sys_consts.DEFAULT_FONT
+            )
+        return self._db_settings.setting_get(sys_consts.DVD_INSERT_TITLE_FONT_DBK)
+
+    @insert_title_font.setter
+    def insert_title_font(self, value: str) -> None:
+        """
+        The insert_title_font method sets the font for the text in the DVD case insert title.
+
+        Args:
+            value (str): Sets the insert_title_font
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._db_settings.setting_set(sys_consts.DVD_INSERT_TITLE_FONT_DBK, value)
+
+    @property
+    def insert_title_font_color(self) -> str:
+        """
+        The insert_title_font_color method returns the color of the DVD case insert title font.
+        If no insert_title_font_color setting exists, it creates one with a default value of black.
+
+        Returns:
+            str : The value of the insert_title_font_color setting
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_INSERT_TITLE_FONT_COLOUR_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_INSERT_TITLE_FONT_COLOUR_DBK, "black"
+            )
+        return self._db_settings.setting_get(
+            sys_consts.DVD_INSERT_TITLE_FONT_COLOUR_DBK
+        )
+
+    @insert_title_font_color.setter
+    def insert_title_font_color(self, value: str) -> None:
+        """
+        The insert_title_font_color method sets the font color of the DVD case insert title text.
+
+        Args:
+            value (str): Set the insert_title_font_color setting
+
+        """
+        self._db_settings.setting_set(
+            sys_consts.DVD_INSERT_TITLE_FONT_COLOUR_DBK, value
+        )
+
+    @property
+    def insert_title_font_point_size(self) -> int:
+        """
+        The insert_title_font_point_size method returns the point size of the font used in the DVD case insert title text.
+        If no value is stored in the database, it will be set to 24 and returned.
+
+        Args:
+
+        Returns:
+            int : The point size of the font used for DVD case insert title text
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_INSERT_TITLE_FONT_POINT_SIZE_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_INSERT_TITLE_FONT_POINT_SIZE_DBK, 24
+            )
+        return cast(
+            int,
+            self._db_settings.setting_get(
+                sys_consts.DVD_INSERT_TITLE_FONT_POINT_SIZE_DBK
+            ),
+        )
+
+    @insert_title_font_point_size.setter
+    def insert_title_font_point_size(self, value: int) -> None:
+        """
+        The insert_title_font_point_size method sets the font size of the text on the DVD case insert title text.
+
+        Args:
+            value (int): Sets the insert_title_font_point_size setting
+
+        """
+        assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
+
+        self._db_settings.setting_set(
+            sys_consts.DVD_INSERT_TITLE_FONT_POINT_SIZE_DBK, value
+        )
+
+    @property
+    def insert_background_color(self) -> str:
+        """
+        The insert_background_color method returns the background color of the DVD case insert.
+        If no setting exists, it creates one and sets it to white.
+
+        Args:
+
+        Returns:
+            str: The background color of the DVD case insert text
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_INSERT_BACKGROUND_COLOUR_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_INSERT_BACKGROUND_COLOUR_DBK, "white"
+            )
+        return self._db_settings.setting_get(
+            sys_consts.DVD_INSERT_BACKGROUND_COLOUR_DBK
+        )
+
+    @insert_background_color.setter
+    def insert_background_color(self, value: str) -> None:
+        """
+        The insert_background_color method sets the background color of the DVD case insert.
+
+        Args:
+            value (str): Set the insert background color
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._db_settings.setting_set(
+            sys_consts.DVD_INSERT_BACKGROUND_COLOUR_DBK, value
+        )
+
+    @property
+    def insert_background_transparency(self) -> int:
+        """
+        The insert_background_transparency method returns the transparency of the DVD case insert background.
+            If it does not exist, it is set to 0.
+
+        Args:
+
+        Returns:
+            int : Percentage transparency of the DVD case insert background
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_INSERT_BACKGROUND_TRANSPARENCY_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_INSERT_BACKGROUND_TRANSPARENCY_DBK, 0
+            )
+        return cast(
+            int,
+            self._db_settings.setting_get(
+                sys_consts.DVD_INSERT_BACKGROUND_TRANSPARENCY_DBK
+            ),
+        )
+
+    @insert_background_transparency.setter
+    def insert_background_transparency(self, value: int) -> None:
+        """
+        The button_background_transparency method sets the transparency of the DVD case insert text background.
+
+        Args:
+            value (int): The percentage transparency of the DVD case insert text background
+
+        """
+        assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
+
+        self._db_settings.setting_set(
+            sys_consts.DVD_INSERT_BACKGROUND_TRANSPARENCY_DBK, value
+        )
+
+    @property
+    def insert_font(self) -> str:
+        """
+        The insert_font method is used to set the font of the DVD case insert.
+        The function first checks if a setting for insert_font exists, and if it does not,
+        then it sets one with the app default font. Then, it returns that value.
+
+        Returns:
+            str : The font used for DVD case insert text
+
+        """
+        if not self._db_settings.setting_exist(sys_consts.DVD_INSERT_FONT_DBK):
+            self._db_settings.setting_set(
+                sys_consts.DVD_INSERT_FONT_DBK, sys_consts.DEFAULT_FONT
+            )
+        return self._db_settings.setting_get(sys_consts.DVD_INSERT_FONT_DBK)
+
+    @insert_font.setter
+    def insert_font(self, value: str) -> None:
+        """
+        The insert_font method sets the font for all the text in the DVD case insert.
+
+        Args:
+            value (str): Sets the insert_font of the DVD case insert
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._db_settings.setting_set(sys_consts.DVD_INSERT_FONT_DBK, value)
+
+    @property
+    def insert_font_color(self) -> str:
+        """
+        The insert_font_color method returns the color of the DVD case insert font.
+        If no insert_font_color setting exists, it creates one with a default value of black.
+
+        Returns:
+            str : The value of the insert_font_color setting
+
+        """
+        if not self._db_settings.setting_exist(sys_consts.DVD_INSERT_FONT_COLOUR_DBK):
+            self._db_settings.setting_set(
+                sys_consts.DVD_INSERT_FONT_COLOUR_DBK, "black"
+            )
+        return self._db_settings.setting_get(sys_consts.DVD_INSERT_FONT_COLOUR_DBK)
+
+    @insert_font_color.setter
+    def insert_font_color(self, value: str) -> None:
+        """
+        The insert_font_color method sets the font color of the text on the DVD case insert.
+
+        Args:
+            value (str): Set the insert_font_color setting
+
+        """
+        self._db_settings.setting_set(sys_consts.DVD_INSERT_FONT_COLOUR_DBK, value)
+
+    @property
+    def insert_font_point_size(self) -> int:
+        """
+        The insert_font_point_size method returns the point size of the font used in the DVD case insert.
+        If no value is stored in the database, it will be set to 12 and returned.
+
+        Args:
+
+        Returns:
+            int : The point size of the font used for DVD case insert text
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_INSERT_FONT_POINT_SIZE_DBK
+        ):
+            self._db_settings.setting_set(sys_consts.DVD_INSERT_FONT_POINT_SIZE_DBK, 12)
+        return cast(
+            int,
+            self._db_settings.setting_get(sys_consts.DVD_INSERT_FONT_POINT_SIZE_DBK),
+        )
+
+    @insert_font_point_size.setter
+    def insert_font_point_size(self, value: int) -> None:
+        """
+        The insert_font_point_size method sets the font size of the text on the DVD case insert.
+
+        Args:
+            value (int): Sets the insert_font_point_size setting
+
+        """
+        assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
+
+        self._db_settings.setting_set(sys_consts.DVD_INSERT_FONT_POINT_SIZE_DBK, value)
+
+    @property
+    def disk_title_background_color(self) -> str:
+        """
+        The disk_title_background_color method returns the background color of the DVD disk title.
+        If no setting exists, it creates one and sets it to white.
+
+        Args:
+
+        Returns:
+            str: The background color of the DVD disk title
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_DISK_TITLE_BACKGROUND_COLOUR_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_DISK_TITLE_BACKGROUND_COLOUR_DBK, "white"
+            )
+        return self._db_settings.setting_get(
+            sys_consts.DVD_DISK_TITLE_BACKGROUND_COLOUR_DBK
+        )
+
+    @disk_title_background_color.setter
+    def disk_title_background_color(self, value: str) -> None:
+        """
+        The disk_background_color method sets the background color of the DVD disk title.
+
+        Args:
+            value (str): Set the disk background color
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._db_settings.setting_set(
+            sys_consts.DVD_DISK_TITLE_BACKGROUND_COLOUR_DBK, value
+        )
+
+    @property
+    def disk_title_background_transparency(self) -> int:
+        """
+        The disk_title_background_transparency method returns the transparency of the DVD disk title background.
+            If it does not exist, it is set to 0.
+
+        Args:
+
+        Returns:
+            int : Percentage transparency of the DVD disk title background
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_DISK_TITLE_BACKGROUND_TRANSPARENCY_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_DISK_TITLE_BACKGROUND_TRANSPARENCY_DBK, 0
+            )
+        return cast(
+            int,
+            self._db_settings.setting_get(
+                sys_consts.DVD_DISK_TITLE_BACKGROUND_TRANSPARENCY_DBK
+            ),
+        )
+
+    @disk_title_background_transparency.setter
+    def disk_title_background_transparency(self, value: int) -> None:
+        """
+        The disk_title_background_transparency method sets the transparency of the DVD disk title background.
+
+        Args:
+            value (int): The percentage transparency of the DVD disk title background
+
+        """
+        assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
+
+        self._db_settings.setting_set(
+            sys_consts.DVD_DISK_TITLE_BACKGROUND_TRANSPARENCY_DBK, value
+        )
+
+    @property
+    def disk_title_font(self) -> str:
+        """
+        The disk_title_font method is used to set the font of the DVD disk title.
+        The function first checks if a setting for dvd_titel_font exists, and if it does not,
+        then it sets one with the app default font. Then, it returns that value.
+
+        Returns:
+            str : The font used for DVD disk title text
+
+        """
+        if not self._db_settings.setting_exist(sys_consts.DVD_DISK_TITLE_FONT_DBK):
+            self._db_settings.setting_set(
+                sys_consts.DVD_DISK_TITLE_FONT_DBK, sys_consts.DEFAULT_FONT
+            )
+        return self._db_settings.setting_get(sys_consts.DVD_DISK_TITLE_FONT_DBK)
+
+    @disk_title_font.setter
+    def disk_title_font(self, value: str) -> None:
+        """
+        The disk_title_font method sets the font for all the DVD disk title text.
+
+        Args:
+            value (str): Sets the disk_title_font
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._db_settings.setting_set(sys_consts.DVD_DISK_TITLE_FONT_DBK, value)
+
+    @property
+    def disk_title_font_color(self) -> str:
+        """
+        The disk_title_font_color method returns the color of the DVD disk title font.
+        If no disk_title_font_color setting exists, it creates one with a default value of black.
+
+        Returns:
+            str : The value of the disk_title_font_color setting
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_DISK_TITLE_FONT_COLOUR_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_DISK_TITLE_FONT_COLOUR_DBK, "black"
+            )
+        return self._db_settings.setting_get(sys_consts.DVD_DISK_TITLE_FONT_COLOUR_DBK)
+
+    @disk_title_font_color.setter
+    def disk_title_font_color(self, value: str) -> None:
+        """
+        The disk_title_font_color method sets the font color of the DVD disk title text.
+
+        Args:
+            value (str): Set the disk_title_font_color setting
+
+        """
+        self._db_settings.setting_set(sys_consts.DVD_DISK_TITLE_FONT_COLOUR_DBK, value)
+
+    @property
+    def disk_title_font_point_size(self) -> int:
+        """
+        The disk_title_font_point_size method returns the point size of the font used on the DVD disk title text.
+        If no value is stored in the database, it will be set to 24 and returned.
+
+        Args:
+
+        Returns:
+            int : The point size of the font used on the DVD disk title text
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_DISK_TITLE_FONT_POINT_SIZE_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_DISK_TITLE_FONT_POINT_SIZE_DBK, 24
+            )
+        return cast(
+            int,
+            self._db_settings.setting_get(
+                sys_consts.DVD_DISK_TITLE_FONT_POINT_SIZE_DBK
+            ),
+        )
+
+    @disk_title_font_point_size.setter
+    def disk_title_font_point_size(self, value: int) -> None:
+        """
+        The disk_title_font_point_size method sets the font size of the text on the DVD disk title.
+
+        Args:
+            value (int): Sets the disk_title_font_point_size setting
+
+        """
+        assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
+
+        self._db_settings.setting_set(
+            sys_consts.DVD_DISK_TITLE_FONT_POINT_SIZE_DBK, value
+        )
+
+    @property
+    def disk_background_color(self) -> str:
+        """
+        The disk_background_color method returns the background color of the DVD disk.
+        If no setting exists, it creates one and sets it to white.
+
+        Args:
+
+        Returns:
+            str: The background color of the DVD disk
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_DISK_BACKGROUND_COLOUR_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_DISK_BACKGROUND_COLOUR_DBK, "white"
+            )
+        return self._db_settings.setting_get(sys_consts.DVD_DISK_BACKGROUND_COLOUR_DBK)
+
+    @disk_background_color.setter
+    def disk_background_color(self, value: str) -> None:
+        """
+        The disk_background_color method sets the background color of the DVD disk.
+
+        Args:
+            value (str): Set the disk background color
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._db_settings.setting_set(sys_consts.DVD_DISK_BACKGROUND_COLOUR_DBK, value)
+
+    @property
+    def disk_background_transparency(self) -> int:
+        """
+        The disk_background_transparency method returns the transparency of the DVD disk background.
+            If it does not exist, it is set to 0.
+
+        Args:
+
+        Returns:
+            int : Percentage transparency of the DVD disk background
+
+        """
+        if not self._db_settings.setting_exist(
+            sys_consts.DVD_DISK_BACKGROUND_TRANSPARENCY_DBK
+        ):
+            self._db_settings.setting_set(
+                sys_consts.DVD_DISK_BACKGROUND_TRANSPARENCY_DBK, 0
+            )
+        return cast(
+            int,
+            self._db_settings.setting_get(
+                sys_consts.DVD_DISK_BACKGROUND_TRANSPARENCY_DBK
+            ),
+        )
+
+    @disk_background_transparency.setter
+    def disk_background_transparency(self, value: int) -> None:
+        """
+        The disk_background_transparency method sets the transparency of the DVD disk background.
+
+        Args:
+            value (int): The percentage transparency of the DVD disk background
+
+        """
+        assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
+
+        self._db_settings.setting_set(
+            sys_consts.DVD_DISK_BACKGROUND_TRANSPARENCY_DBK, value
+        )
+
+    @property
+    def disk_font(self) -> str:
+        """
+        The disk_font method is used to set the font of the DVD disk insert.
+        The function first checks if a setting for dvd_font exists, and if it does not,
+        then it sets one with the app default font. Then, it returns that value.
+
+        Returns:
+            str : The font used for DVD disk insert text
+
+        """
+        if not self._db_settings.setting_exist(sys_consts.DVD_DISK_FONT_DBK):
+            self._db_settings.setting_set(
+                sys_consts.DVD_DISK_FONT_DBK, sys_consts.DEFAULT_FONT
+            )
+        return self._db_settings.setting_get(sys_consts.DVD_DISK_FONT_DBK)
+
+    @disk_font.setter
+    def disk_font(self, value: str) -> None:
+        """
+        The disk_font method sets the font for all the text on the DVD disk.
+
+        Args:
+            value (str): Sets the disk_font
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._db_settings.setting_set(sys_consts.DVD_DISK_FONT_DBK, value)
+
+    @property
+    def disk_font_color(self) -> str:
+        """
+        The disk_font_color method returns the color of the DVD disk font.
+        If no disk_font_color setting exists, it creates one with a default value of black.
+
+        Returns:
+            str : The value of the disk_font_color setting
+
+        """
+        if not self._db_settings.setting_exist(sys_consts.DVD_DISK_FONT_COLOUR_DBK):
+            self._db_settings.setting_set(sys_consts.DVD_DISK_FONT_COLOUR_DBK, "black")
+        return self._db_settings.setting_get(sys_consts.DVD_DISK_FONT_COLOUR_DBK)
+
+    @disk_font_color.setter
+    def disk_font_color(self, value: str) -> None:
+        """
+        The disk_font_color method sets the font color of the text on the DVD disk.
+
+        Args:
+            value (str): Set the disk_font_color setting
+
+        """
+        self._db_settings.setting_set(sys_consts.DVD_DISK_FONT_COLOUR_DBK, value)
+
+    @property
+    def disk_font_point_size(self) -> int:
+        """
+        The disk_font_point_size method returns the point size of the font used on the DVD disk.
+        If no value is stored in the database, it will be set to 12 and returned.
+
+        Args:
+
+        Returns:
+            int : The point size of the font used on the DVD disk
+
+        """
+        if not self._db_settings.setting_exist(sys_consts.DVD_DISK_FONT_POINT_SIZE_DBK):
+            self._db_settings.setting_set(sys_consts.DVD_DISK_FONT_POINT_SIZE_DBK, 12)
+        return cast(
+            int,
+            self._db_settings.setting_get(sys_consts.DVD_DISK_FONT_POINT_SIZE_DBK),
+        )
+
+    @disk_font_point_size.setter
+    def disk_font_point_size(self, value: int) -> None:
+        """
+        The disk_font_point_size method sets the font size of the text on the DVD disk.
+
+        Args:
+            value (int): Sets the disk_font_point_size setting
+
+        """
+        assert isinstance(value, int) and 0 <= value <= 100, f"{value=}. Must be int"
+
+        self._db_settings.setting_set(sys_consts.DVD_DISK_FONT_POINT_SIZE_DBK, value)
 
 
 @dataclasses.dataclass(slots=True)

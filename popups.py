@@ -1400,10 +1400,10 @@ class Langtran_Popup(PopContainer):
 
         # Default country combo to the country specified in the application-selected country
         if self._db_settings.setting_exist(
-            setting_name=sys_consts.APP_COUNTRY,
+            setting_name=sys_consts.APP_COUNTRY_DBK,
         ):
             app_country = self._db_settings.setting_get(
-                setting_name=sys_consts.APP_COUNTRY,
+                setting_name=sys_consts.APP_COUNTRY_DBK,
             )
 
             if app_country:

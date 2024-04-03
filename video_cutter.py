@@ -153,9 +153,9 @@ class Edit_List:
     _video_shelf_name: Final[str] = sys_consts.VIDEO_CUTTER_SHELF
 
     def __post_init__(self):
-        if self._db_settings.setting_exist(sys_consts.ARCHIVE_FOLDER):
+        if self._db_settings.setting_exist(sys_consts.ARCHIVE_FOLDER_DBK):
             self._archive_folder = self._db_settings.setting_get(
-                sys_consts.ARCHIVE_FOLDER
+                sys_consts.ARCHIVE_FOLDER_DBK
             )
 
     def delete_edit_cuts(
@@ -694,8 +694,8 @@ class Video_Editor(DVD_Archiver_Base):
     _source_state = "no_media"
     _step_value: int = 1
     _video_handler: qtg.Video_Player | None = None
-    _edit_folder: str = sys_consts.EDIT_FOLDER
-    _transcode_folder: str = sys_consts.TRANSCODE_FOLDER
+    _edit_folder: str = sys_consts.EDIT_FOLDER_NAME
+    _transcode_folder: str = sys_consts.TRANSCODE_FOLDER_NAME
     _video_file_input: list[Video_Data] = dataclasses.field(default_factory=list)
     _project_name: str = ""
     _user_lambda: bool = False
@@ -740,7 +740,7 @@ class Video_Editor(DVD_Archiver_Base):
                 functools.partial(self._position_changed)
             )
 
-        archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER)
+        archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER_DBK)
 
         if archive_folder:
             self._archive_manager = Archive_Manager(archive_folder=archive_folder)
@@ -1421,47 +1421,47 @@ class Video_Editor(DVD_Archiver_Base):
                                     return None
 
                                 if self._db_settings.setting_exist(
-                                    sys_consts.VF_NORMALISE
+                                    sys_consts.VF_NORMALISE_DBK
                                 ):
                                     video_file_settings.normalise = (
                                         self._db_settings.setting_get(
-                                            sys_consts.VF_NORMALISE
+                                            sys_consts.VF_NORMALISE_DBK
                                         )
                                     )
 
                                 if self._db_settings.setting_exist(
-                                    sys_consts.VF_DENOISE
+                                    sys_consts.VF_DENOISE_DBK
                                 ):
                                     video_file_settings.denoise = (
                                         self._db_settings.setting_get(
-                                            sys_consts.VF_DENOISE
+                                            sys_consts.VF_DENOISE_DBK
                                         )
                                     )
 
                                 if self._db_settings.setting_exist(
-                                    sys_consts.VF_WHITE_BALANCE
+                                    sys_consts.VF_WHITE_BALANCE_DBK
                                 ):
                                     video_file_settings.white_balance = (
                                         self._db_settings.setting_get(
-                                            sys_consts.VF_WHITE_BALANCE
+                                            sys_consts.VF_WHITE_BALANCE_DBK
                                         )
                                     )
 
                                 if self._db_settings.setting_exist(
-                                    sys_consts.VF_SHARPEN
+                                    sys_consts.VF_SHARPEN_DBK
                                 ):
                                     video_file_settings.sharpen = (
                                         self._db_settings.setting_get(
-                                            sys_consts.VF_SHARPEN
+                                            sys_consts.VF_SHARPEN_DBK
                                         )
                                     )
 
                                 if self._db_settings.setting_exist(
-                                    sys_consts.VF_AUTO_LEVELS
+                                    sys_consts.VF_AUTO_LEVELS_DBK
                                 ):
                                     video_file_settings.auto_bright = (
                                         self._db_settings.setting_get(
-                                            sys_consts.VF_AUTO_LEVELS
+                                            sys_consts.VF_AUTO_LEVELS_DBK
                                         )
                                     )
 
@@ -2324,7 +2324,7 @@ class Video_Editor(DVD_Archiver_Base):
             return -1
 
         self._edit_folder = file_handler.file_join(
-            self._output_folder, sys_consts.EDIT_FOLDER
+            self._output_folder, sys_consts.EDIT_FOLDER_NAME
         )
 
         if self._video_file_input and not file_handler.file_exists(
@@ -2367,7 +2367,7 @@ class Video_Editor(DVD_Archiver_Base):
                 return -1
 
         self._transcode_folder = file_handler.file_join(
-            self._output_folder, sys_consts.TRANSCODE_FOLDER
+            self._output_folder, sys_consts.TRANSCODE_FOLDER_NAME
         )
 
         if not file_handler.path_exists(self._transcode_folder):
