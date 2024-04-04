@@ -795,38 +795,49 @@ def Create_DVD_Iso(input_dir: str, output_file: str) -> tuple[int, str]:
 
 
 def Create_DVD_Case_Insert(
-    dvd_title: str,
-    insert_titles: list[str],
-    insert_width=183,  # Standard DVD case insert width in millimeters
-    insert_height=273,  # Standard DVD case insert height in millimeters
+    title: str,
+    menu_pages: list[DVD_Menu_Page],
+    insert_width=120,  # 130 # Standard DVD case insert width in millimeters (One side)
+    insert_height=120,  # 184 # Standard DVD case insert height in millimeters (One side)
+    insert_colour="white",
     resolution=300,  # Standard resolution for print quality
-    font_size=24,
-    font_path="Arial.ttf",
-    background_color="white",
-    text_color="black",
+    title_font_path: str = "",
+    title_font_colour: str = "black",
+    title_font_size: int = 48,
+    menu_font_size=24,
+    menu_font_path="",
+    menu_font_colour="black",
 ) -> tuple[int, bytes]:
     """
     Creates a DVD case insert image with DVD title, menu titles, and using ImageMagick.
 
     Args:
-        dvd_title (str): Title of the DVD.
-        insert_titles (list): List of menu titles to be displayed on the insert.
+        title (str): Title of the DVD.
+        menu_pages list[DVD_Menu_Page]: List of menu pages to be displayed on the insert.
         insert_width (int): Width of the DVD case insert.
         insert_height (int): Height of the DVD case insert.
+        insert_colour (str): Background colour of the insert.
         resolution (int): Resolution of the image.
-        font_size (int): Font size.
-        font_path (str): Path to the font file.
-        background_color (str): Background color of the insert.
-        text_color (str): Color of the text.
+        title_font_colour (str): Colour of the title text.
+        title_font_size (int): Font size of the title.
+        title_font_path (str): Path to the title font file.
+        menu_font_size (int): Font size.
+        menu_font_path (str): Path to the font file.
+        menu_font_colour (str): Color of the text.
 
     Returns:
         - arg 1 : Status code. Returns 1 if the iso image was created, -1 otherwise.
         - arg 2 : bytes: The generated DVD case insert image data.
     """
     assert (
-        isinstance(dvd_title, str) and dvd_title.strip() != ""
-    ), f"{dvd_title=}. Must be a non-empty str"
-    assert isinstance(insert_titles, list), f"{insert_titles=}. Must be a list of str"
+        isinstance(title, str) and title.strip() != ""
+    ), f"{title=}. Must be a non-empty str"
+    assert (
+        isinstance(menu_pages, list) and len(menu_pages) > 0
+    ), f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
+    assert all(
+        isinstance(page, DVD_Menu_Page) for page in menu_pages
+    ), f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
     assert (
         isinstance(insert_width, int) and insert_width > 0
     ), f"{insert_width=}. Must be an int >"
@@ -837,60 +848,219 @@ def Create_DVD_Case_Insert(
         isinstance(resolution, int) and resolution > 0
     ), f"{resolution=}. Must be an int > 0"
     assert (
-        isinstance(font_size, int) and font_size > 0
-    ), f"{font_size=}. Must be an int > 0"
+        isinstance(menu_font_size, int) and menu_font_size > 0
+    ), f"{menu_font_size=}. Must be an int > 0"
     assert (
-        isinstance(font_path, str) and font_path.strip() != ""
-    ), f"{font_path=}. Must be a non-empty str"
+        isinstance(menu_font_path, str) and menu_font_path.strip() != ""
+    ), f"{menu_font_path=}. Must be a non-empty str"
     assert (
-        isinstance(background_color, str) and background_color.strip() != ""
-    ), f"{background_color=}. Must be a non-empty str"
+        isinstance(insert_colour, str) and insert_colour.strip() != ""
+    ), f"{insert_colour=}. Must be a non-empty str"
     assert (
-        isinstance(text_color, str) and text_color.strip() != ""
-    ), f"{text_color=}. Must be a non-empty str"
+        isinstance(menu_font_colour, str) and menu_font_colour.strip() != ""
+    ), f"{menu_font_colour=}. Must be a non-empty str"
+
+    MAX_TITLE_LINES: Final[int] = 4
+
+    if menu_font_path.strip() == "":
+        fonts = Get_Fonts()
+        for font in fonts:
+            if font[0].lower().startswith("ubuntu"):
+                menu_font_path = font[1]
+                break
+        else:
+            return -1, b"A Default Menu Font Could Not Be Found "
 
     # Check if font file exists
-    if not os.path.exists(font_path):
+    if not os.path.exists(menu_font_path):
         return -1, b""
+
+    debug = True
+    dpm = resolution / 25.4  # Convert DPI to DPMM
+
+    background_canvas_width = insert_width * dpm
+    background_canvas_height = insert_height * dpm
+
+    title_char_width, title_char_height = Get_Text_Dims(
+        text="W", font=title_font_path, pointsize=title_font_size
+    )  # In English at least and in most fonts W is the widest
+
+    menu_char_width, menu_char_height = Get_Text_Dims(
+        text="W", font=menu_font_path, pointsize=menu_font_size
+    )  # In English at least and in most fonts W is the widest
+
+    dvd_text = []
+
+    max_text_column_width = (background_canvas_width // 2) - 20  # Padding
+    max_char_width = int(max_text_column_width // menu_char_width)
+
+    for menu_index, menu_title in enumerate(menu_pages):
+        if menu_title.menu_title.strip():
+            dvd_text.append(f"* {menu_title.menu_title}")
+        else:
+            dvd_text.append(f"* Menu {menu_index + 1}")
+
+        for button_item in menu_title.get_button_titles.values():
+            button_title = f"\  - {button_item[0]}"  # Button titles are indented 4 spaces (\ required!)
+
+            width, _ = Get_Text_Dims(
+                text=f"{button_title}", font=menu_font_path, pointsize=menu_font_size
+            )
+
+            if width > max_text_column_width:
+                wrapped_text = textwrap.wrap(
+                    button_title,
+                    width=max_char_width,
+                    subsequent_indent="    ",
+                )
+
+                for line_index, button_line in enumerate(wrapped_text):
+                    dvd_text.append(
+                        f"{button_line}" if line_index == 0 else f"\ {button_line}"
+                    )
+
+            else:
+                dvd_text.append(f"{button_title}")
+
+        dvd_text.append(" ")
+
+    dvd_text.pop(len(dvd_text) - 1)  # Remove the last blank line
+
+    # Get the length of the longest line in the menu/button text
+    max_menu_length = 0
+    for line in dvd_text:
+        if len(line) > max_menu_length:
+            max_menu_length = len(line)
+
+    command = [
+        sys_consts.CONVERT,
+        "-size",
+        f"{background_canvas_width}x{background_canvas_height}",
+        "xc:none",
+        "-fill",
+        insert_colour,
+        "-draw",
+        f"'rectangle' 0,0 {background_canvas_width},{background_canvas_height}'",
+        "PNG:-",  # Output to standard output (pipe)
+    ]
+
     try:
-        # Calculate width and height in pixels
-        width = int(insert_width * resolution)
-        height = int(insert_height * resolution)
+        image_data = subprocess.check_output(command, stderr=subprocess.DEVNULL)
 
-        # Construct ImageMagick command
-        base_command = [sys_consts.CONVERT]
-        commands = [
-            ["-size", f"{width}x{height}"],
-            ["xc:" + background_color],
-            ["-fill", text_color],
-            ["-font", font_path],
-            ["-pointsize", str(font_size)],
-            [
-                "-annotate",
-                "10,10",
-                f"{dvd_title}",
-            ],
-        ]
+        left_y1 = 50  # Padding
+        left_y2 = background_canvas_height - 20  # Padding
 
-        # Add DVD title with annotation
+        left_y2 = left_y1 + left_y2
+        left_x1 = 50  # Padding
 
-        # Add menu titles with annotations
-        y_position = 40  # Initial y position for menu titles
-        for title in insert_titles:
-            commands.append([
-                "-annotate",
-                f"10,{y_position}",
-                f"{title}",
-            ])
-            y_position += 30  # Increase the y position for the next menu title
+        # left_x2 = max_text_column_width - 20 # Padding
+        right_x1 = max_text_column_width + 20  # Padding
+        right_x1 = right_x1 + max_text_column_width - 20  # Padding
 
-        # Combine base command and individual arguments for subprocess.check_output
-        full_command = base_command + sum(commands, [])
+        # Write title
+        if "|" in title:  # Manual spacing of title text
+            title_wrapped_text = []
+            temp_wrapped_text = title.split("|")
 
-        return 1, subprocess.check_output(full_command, stderr=subprocess.DEVNULL)
+            max_title_length = 0
+            max_title_text = ""
+            for line in temp_wrapped_text:
+                if len(line) > max_title_length:
+                    max_title_length = len(line)
+                    max_title_text = line
 
-    except subprocess.CalledProcessError:
-        return -1, b""
+            _, title_height = Get_Text_Dims(
+                text=max_title_text, font=title_font_path, pointsize=title_font_size
+            )
+
+            for title_text in temp_wrapped_text:
+                title_wrapped_text += textwrap.wrap(
+                    text=title_text,
+                    width=round((background_canvas_width - 40) // title_char_width),
+                    subsequent_indent="    ",
+                )
+
+        else:  # Automatic spacing of the title text
+            _, title_height = Get_Text_Dims(
+                text=title, font=title_font_path, pointsize=title_font_size
+            )
+
+            title_wrapped_text = textwrap.wrap(
+                text=title,
+                width=round((background_canvas_width - 40) // title_char_width),
+                subsequent_indent="    ",
+            )
+
+        if len(title_wrapped_text) > 4:
+            return (
+                -1,
+                f"Menu Title Is {len(title_wrapped_text)} Lines Long And Only {MAX_TITLE_LINES} Are Allowed! Reduce "
+                f"Title Font Size Or Change Title Font".encode("utf-8"),
+            )
+
+        for line_num, title_line in enumerate(title_wrapped_text):
+            result, image_data = Write_Text_On_Image(
+                image_data=image_data,
+                text=title_line,
+                x=20,
+                y=left_y1 + (line_num * title_char_height),
+                color=title_font_colour,
+                font=title_font_path,
+                pointsize=title_font_size,
+                gravity="north",
+            )
+
+            if result == -1:  # Image data will contain the error message in this case
+                return -1, image_data.decode("utf-8")
+
+        # Write menu titles
+        line_num = 0
+        side = 0
+        x_offset = left_x1
+        left_y1 = left_y1 + ((MAX_TITLE_LINES + 1) * title_height) + 20  # Padding
+
+        for line in dvd_text:
+            y_position = left_y1 + (line_num * menu_char_height)
+
+            if y_position > left_y2:  # Switch to right side
+                side += 1
+                if side > 2:
+                    return (
+                        -1,
+                        "Too Many Menu Titles To Print! Reduce Menu Font Size Or Change Font".encode(
+                            "utf-8"
+                        ),
+                    )
+
+                line_num = 0
+                x_offset = right_x1
+                if line.strip() == "":
+                    continue
+
+                y_position = left_y1 + (line_num * menu_char_height)
+
+            result, image_data = Write_Text_On_Image(
+                image_data=image_data,
+                text=line,
+                x=x_offset,
+                y=y_position,
+                color=menu_font_colour,
+                font=menu_font_path,
+                pointsize=menu_font_size,
+            )
+
+            if result == -1:  # Image data will contain the error message in this case
+                return -1, image_data.decode("utf-8")
+
+            line_num += 1
+
+        if debug and not utils.Is_Complied():
+            with open("cddvd_insert.png", "wb") as png_file:
+                png_file.write(image_data)
+
+        return 1, image_data
+    except subprocess.CalledProcessError as e:
+        return -1, f"Error Generating DVD Insert Image - {e}".encode("utf-8")
 
 
 def Create_DVD_Label(
@@ -923,7 +1093,7 @@ def Create_DVD_Label(
         resolution (int): Resolution of the image.
         title_font_colour (str): Colour of the title text.
         title_font_size (int): Font size of the title.
-         title_font_path (str): Path to the title font file.
+        title_font_path (str): Path to the title font file.
         menu_font_colour (str): Colour of the menu text.
         menu_font_size (int): Font size.
         menu_font_path (str): Path to the menu font file.
@@ -1050,6 +1220,7 @@ def Create_DVD_Label(
     ]
     try:
         image_data = subprocess.check_output(command, stderr=subprocess.DEVNULL)
+
     except subprocess.CalledProcessError:
         return -1, "Error Generating DVD Label Image".encode("utf-8")
 

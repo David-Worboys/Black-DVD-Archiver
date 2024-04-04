@@ -31,14 +31,14 @@ import popups
 import qtgui as qtg
 import sqldb
 import sys_consts
-from dvdarch_utils import Create_DVD_Label
+from dvdarch_utils import Create_DVD_Case_Insert, Create_DVD_Label
 from sys_config import DVD_Menu_Page, DVD_Print_Settings
 
 
 # fmt: on
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass()
 class Print_DVD_Label_Popup(qtg.PopContainer):
     """Prints DVD Labels/Inserts"""
 
@@ -67,6 +67,8 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
         self.container = self.layout()
 
         super().__post_init__()  # This statement must be last
+
+        return None
 
     def event_handler(self, event: qtg.Action) -> None:
         """Handles  form events
@@ -117,6 +119,8 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                     selected_printer: str = event.value.data
                     self._set_printer_status(event, selected_printer)
 
+        return None
+
     def _toggle_textProperties(self, event: qtg.Action) -> None:
         """Toggles the text properties
 
@@ -126,6 +130,8 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
         Returns:
             None
         """
+        assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
+
         if not self._startup and event.tag in ("title_text", "menu_text"):
             if (
                 event.value
@@ -430,6 +436,8 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
 
         self._startup = False
 
+        return None
+
     def _font_combo_init(self, event: qtg.Action) -> None:
         """Initializes font combo boxes
 
@@ -527,6 +535,8 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
         event.container_tag = "dvd_label_text"
         self._font_combo_change(event)
 
+        return None
+
     def _font_combo_change(self, event: qtg.Action) -> None:
         """Changes the font of the colour patch of the title font text when the font
         selection changes
@@ -537,41 +547,8 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
         if event.container_tag in ("dvd_label_text", "case_insert_text"):
             if event.container_tag == "dvd_label_text":
                 example_text = " Disk Text "
-                title_text: bool = cast(
-                    bool,
-                    event.value_get(
-                        container_tag=event.container_tag,
-                        tag="title_text",
-                    ),
-                )
-                menu_text: bool = cast(
-                    bool,
-                    event.value_get(
-                        container_tag=event.container_tag,
-                        tag="menu_text",
-                    ),
-                )
             else:
                 example_text = " Insert Text "
-                title_text: bool = cast(
-                    bool,
-                    event.value_get(
-                        container_tag=event.container_tag,
-                        tag="title_text",
-                    ),
-                )
-                menu_text: bool = cast(
-                    bool,
-                    event.value_get(
-                        container_tag=event.container_tag,
-                        tag="menu_text",
-                    ),
-                )
-
-            font_size: qtg.Spinbox = cast(
-                qtg.Spinbox,
-                event.widget_get(container_tag=event.container_tag, tag="font_size"),
-            )
 
             image: qtg.Image = cast(
                 qtg.Image,
@@ -620,7 +597,8 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                         " Not Be Rendered!"
                     ),
                 ).show()
-            return None
+
+        return None
 
     def _print_folder_select(self, event: qtg.Action) -> None:
         """Selects a print folder and updates the settings in the database with the selected folder.
@@ -676,6 +654,7 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
         print_file = ""
         if self._db_settings.setting_exist(sys_consts.PRINT_FILE_DBK):
             print_file = self._db_settings.setting_get(sys_consts.PRINT_FILE_DBK)
+
         print_file = popups.PopTextGet(
             title="Enter A Print File Name....",
             default_txt=print_file,
@@ -700,6 +679,7 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                     message=error_msg,
                     width=80,
                 ).show()
+
         return None
 
     def _printer_settings(self, event: qtg.Action) -> None:
@@ -836,9 +816,6 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
             isinstance(selected_printer, str) and selected_printer.strip() != ""
         ), f"{selected_printer=}. Must be a non-empty string"
 
-        if self._startup:
-            return None
-
         printer_info = self._printer_info.printerInfo(selected_printer)
 
         if printer_info.state() == QPrinter.Idle:
@@ -852,16 +829,23 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
         else:
             self._printer_status = "Unknown"
 
-        event.value_set(
+        if event.widget_exist(
             container_tag="printer_controls",
             tag="printer_info",
-            value=self._printer_status,
-        )
+        ):
+            event.value_set(
+                container_tag="printer_controls",
+                tag="printer_info",
+                value=self._printer_status,
+            )
 
         if self._printer_status in ("Error", "Unknown"):
-            event.value_set(
-                container_tag="printer_controls", tag="print_to_file", value=True
-            )
+            if event.widget_exist(
+                container_tag="printer_controls", tag="print_to_file"
+            ):
+                event.value_set(
+                    container_tag="printer_controls", tag="print_to_file", value=True
+                )
 
         return None
 
@@ -938,12 +922,18 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                     resolution=printer.logicalDpiX(),
                 )
             else:
-                result = 1
-
-                popups.PopError(
-                    title="Not Implemented...", message="Not Implemented Yet"
-                ).show()
-                return None
+                result, png_bytes = Create_DVD_Case_Insert(
+                    title=self.disk_title,
+                    menu_pages=self.dvd_menu_pages,
+                    resolution=printer.logicalDpiX(),
+                    title_font_path=print_settings.insert_title_font,
+                    title_font_colour=print_settings.insert_title_font_color,
+                    title_font_size=print_settings.insert_title_font_point_size,
+                    menu_font_path=print_settings.insert_font,
+                    menu_font_colour=print_settings.insert_font_color,
+                    insert_colour=print_settings.insert_background_color,
+                    menu_font_size=print_settings.insert_font_point_size,
+                )
 
         if result == -1:
             popups.PopError(
@@ -1091,27 +1081,6 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                 qtg.Spacer(width=1),
                 qtg.Label(tag="printer_info", width=10, label="Status:"),
             ),
-        )
-
-        printer_target = qtg.Spacer(
-            label="Print Target",
-            label_pad=5,
-            tag="printer_target",
-            width=1,
-            buddy_control=qtg.Switch(label="Case Insert", text="DVD Disk"),
-            # qtg.HBoxContainer().add_row(
-            #     qtg.RadioButton(
-            #         text="Case Insert",
-            #         tag="dvd_insert",
-            #         callback=self.event_handler,
-            #         checked=True,
-            #     ),
-            #     qtg.RadioButton(
-            #         text="DVD Disk",
-            #         tag="dvd_disk",
-            #         callback=self.event_handler,
-            #     ),
-            # ),
         )
 
         print_settings_container = qtg.FormContainer(text="Options").add_row(
