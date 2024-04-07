@@ -889,7 +889,12 @@ def Set_Shelved_DVD_Layout(
     if result == -1:
         return -1, message
 
-    shelf_dict = {f"{project_name}.{dvd_layout_name}": dvd_menu_layout}
+    shelf_dict = sql_shelf.open(shelf_name=sys_consts.DVD_MENU_SHELF)
+    if sql_shelf.error.code == -1:
+        return -1, sql_shelf.error.message
+
+    shelf_dict[f"{project_name}.{dvd_layout_name}"] = dvd_menu_layout
+
     result, message = sql_shelf.update(
         shelf_name=sys_consts.DVD_MENU_SHELF, shelf_data=shelf_dict
     )
