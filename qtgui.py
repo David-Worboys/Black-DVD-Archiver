@@ -482,7 +482,7 @@ class Combo_Item:
     display: str
     data: None | str | int | float | bytes | bool
     icon: None | str | qtG.QPixmap | qtG.QIcon
-    user_data: None | str | int | float | bytes | bool | tuple | list
+    user_data: None | str | int | float | bytes | bool | tuple | list | dict
 
     def _post_init(self):
         # Checking the arguments passed to the constructor are of the correct type.
@@ -494,9 +494,11 @@ class Combo_Item:
             isinstance(self.icon, (str, qtG.QPixmap, qtG.QIcon)) or self.icon is None
         ), f"{self.icon=}. Must be None | str | qtG.QPixmap | qtG.QIcon"
         assert (
-            isinstance(self.user_data, (str, int, float, bytes, bool, tuple, list))
+            isinstance(
+                self.user_data, (str, int, float, bytes, bool, tuple, list, dict)
+            )
             or self.user_data is None
-        ), f"{self.user_data=}. Must be None | str | int | float | bytes | bool"
+        ), f"{self.user_data=}. Must be None | str | int | float | bytes | bool | dict"
 
 
 @dataclasses.dataclass(slots=True)
@@ -2263,7 +2265,7 @@ class _qtpyBase_Control(_qtpyBase):
             pass
 
     def _install_event_handlers(self, use_lambda: bool = USE_LAMBDA):
-        """Attaches events to the low-level GUI object created in _Create_Widger"""
+        """Attaches events to the low-level GUI object created in _Create_Widget"""
 
         if callable(self.callback) and hasattr(self._widget, "connect"):
             if hasattr(self._event_filter, "focusIn") and hasattr(
@@ -2408,9 +2410,7 @@ class _qtpyBase_Control(_qtpyBase):
                     self._widget = qtW.QLCDNumber(parent)
                     self._widget.setStyleSheet(Align_SS_Text[self.txt_align])
                 case LineEdit():
-                    self._widget = _Line_Edit(
-                        parent, self
-                    )  # qtW.QLineEdit(parent) #_Line_Edit(parent_app, parent, self, container_tag)
+                    self._widget = _Line_Edit(parent, self)  
                 case ProgressBar():
                     self._widget = qtW.QProgressBar(parent)
                 case RadioButton():
@@ -2424,7 +2424,7 @@ class _qtpyBase_Control(_qtpyBase):
                 case Switch():
                     self._widget = _Switch(parent)
                 case Tab():
-                    self._widget: qtW.QTabWidget = qtW.QTabWidget(parent)
+                    self._widget = qtW.QTabWidget(parent)
                     self._widget.setUsesScrollButtons(True)
                 case TextEdit():
                     self._widget = qtW.QTextEdit(self.text.strip("*"), parent)
@@ -4462,20 +4462,36 @@ class _Container(_qtpyBase_Control):
                         col_control.width = max_text_len
 
                     if isinstance(layout, qtW.QFormLayout):
-                        if hasattr(col_control, "label") and col_control.label != "":
+                        # Controls with labels are contained in HboxContainers
+                        # and these need unpacking for the labels to align properly
+                        if isinstance(col_control, HBoxContainer):
+                            for control_row in col_control.control_list_get:
+                                for container_control in control_row:
+                                    if (
+                                        hasattr(container_control, "label")
+                                        and container_control.label != ""
+                                    ):
+                                        form_labels[container_control.tag] = (
+                                            self.trans_str(
+                                                container_control.label.strip()
+                                            )
+                                        )
+                                        container_control.label = ""
+                                        container_control.label_pad = -1
+
+                        elif hasattr(col_control, "label") and col_control.label != "":
                             form_labels[col_control.tag] = self.trans_str(
                                 col_control.label.strip()
                             )
 
                             col_control.label = ""
                             col_control.label_pad = -1
-                    elif hasattr(col_control, "label") and col_control.label_pad != -1:
+                    elif hasattr(col_control, "label") and col_control.label_pad != -1:                        
                         col_control.label_pad = (
                             max_text_len - 1
-                            if not isinstance(layout, qtW.QHBoxLayout)
-                            and not isinstance(layout, qtW.QVBoxLayout)
-                            and row_list.index(col_control) == 0
+                            if row_list.index(col_control) == 0                                                        
                             else col_control.label_pad - 1
+                            
                         )
 
             return form_labels
@@ -4547,30 +4563,43 @@ class _Container(_qtpyBase_Control):
                         ), f"{parent=}. Menu parent must be an instance of _qtpyFrame"
                         parent.setMenuWidget(widget)
                         widget.resize(widget.minimumSizeHint())
-                    else:
-                        if isinstance(layout, qtW.QFormLayout):
-                            if col_control.tag in form_labels:
-                                layout.addRow(form_labels[col_control.tag], widget)
-                                form_labels.pop(col_control.tag)
-                            else:
-                                layout.addRow(" ", widget)
-                        elif isinstance(layout, qtW.QGridLayout):
-                            if isinstance(col_control, _Container):
-                                layout.setHorizontalSpacing(
-                                    10
-                                )  # TODO Add setting Container spacing
-                            col_span = (controls_across - len(row_list)) + 1
-                            row_span = 1
-                            layout.addWidget(
-                                widget, row_ptr, col_ptr, row_span, col_span, alignment
-                            )
+                    elif isinstance(layout, qtW.QFormLayout):
+                        # Controls with labels are contained in HboxContainers
+                        # and these need unpacking for the labels to align properly
+                        if isinstance(col_control, HBoxContainer):                            
+                            for control_row in col_control.control_list_get:
+                                for container_control in control_row:
+                                    if container_control.tag in form_labels:
+                                        layout.addRow(
+                                            form_labels[container_control.tag],
+                                            container_control.guiwidget_get
+                                        )
+
+                                        form_labels.pop(container_control.tag)
+                                        
+
+                        elif col_control.tag in form_labels:
+                            layout.addRow(form_labels[col_control.tag], widget)
+                            form_labels.pop(col_control.tag)
                         else:
-                            layout.addWidget(widget, alignment=self.align.value)
+                            layout.addRow(" ", widget)
+                    elif isinstance(layout, qtW.QGridLayout):
+                        if isinstance(col_control, _Container):
+                            layout.setHorizontalSpacing(
+                                10
+                            )  # TODO Add setting Container spacing
+                        col_span = (controls_across - len(row_list)) + 1
+                        row_span = 1
+                        layout.addWidget(
+                            widget, row_ptr, col_ptr, row_span, col_span, alignment
+                        )                    
+                    else:
+                        layout.addWidget(widget, alignment=self.align.value)
 
-                        if col_ptr == len(row_list) - 1:
-                            row_ptr += 1
+                    if col_ptr == len(row_list) - 1:
+                        row_ptr += 1
 
-                        col_ptr += 1
+                    col_ptr += 1
 
         # ===== Main
         window_id = Get_Window_ID(parent_app, parent, self)
@@ -4677,6 +4706,7 @@ class _Container(_qtpyBase_Control):
             margin_right = 9 if self.margin_right == -1 else self.margin_right
             margin_top = 4 if self.margin_top == -1 else self.margin_top
             margin_bottom = 4 if self.margin_bottom == -1 else self.margin_bottom
+            
 
         # layout.setContentsMargins(0, 0, 0, 0) #Debug
 
@@ -6057,13 +6087,16 @@ class _Container(_qtpyBase_Control):
                     continue
 
                 if hasattr(col_control, "label"):
-                    if col_control.label == "":
+                    if col_control.label.strip() == "":
                         txt_len = len(col_control.text)
                     else:
-                        txt_len = len(col_control.label) + len(col_control.text)
+                        txt_len = len(col_control.label) #+ len(col_control.text)
 
                         if "&" in col_control.label:  # Ignore accelerator keys
                             txt_len = amper_length(col_control.label)
+                            txt_len = amper_length(col_control.label)
+                            # txt_len -= 1
+                            txt_len = amper_length(col_control.label)                            
                             # txt_len -= 1
                 else:
                     txt_len = len(col_control.text)
@@ -6071,7 +6104,7 @@ class _Container(_qtpyBase_Control):
                 if txt_len > max_text_len:
                     max_text_len = txt_len
 
-        return max_text_len
+        return max_text_len 
 
     def print_container(
         self, container: _qtpyBase_Control = None, leader: str = "*"
