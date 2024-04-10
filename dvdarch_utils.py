@@ -807,6 +807,7 @@ def Create_DVD_Case_Insert(
     menu_font_size=24,
     menu_font_path="",
     menu_font_colour="black",
+    opacity: float = 1.0,
 ) -> tuple[int, bytes]:
     """
     Creates a DVD case insert image with DVD title, menu titles, and using ImageMagick.
@@ -824,6 +825,8 @@ def Create_DVD_Case_Insert(
         menu_font_size (int): Font size.
         menu_font_path (str): Path to the font file.
         menu_font_colour (str): Color of the text.
+        opacity (float): The opacity level to be set for the color,
+                        where 0.0 is fully transparent and 1.0 is fully opaque.
 
     Returns:
         - arg 1 : Status code. Returns 1 if the iso image was created, -1 otherwise.
@@ -859,6 +862,10 @@ def Create_DVD_Case_Insert(
     assert (
         isinstance(menu_font_colour, str) and menu_font_colour.strip() != ""
     ), f"{menu_font_colour=}. Must be a non-empty str"
+
+    assert (
+        isinstance(opacity, float) and 0 <= int(opacity) <= 1
+    ), f"{opacity=}. Must be a float between 0.0 and 1.0"
 
     MAX_TITLE_LINES: Final[int] = 4
 
@@ -932,13 +939,18 @@ def Create_DVD_Case_Insert(
         if len(line) > max_menu_length:
             max_menu_length = len(line)
 
+    result, insert_hex = Make_Opaque(color=insert_colour, opacity=opacity)
+
+    if result == -1:
+        return -1, f"Invalid System Color {insert_colour}".encode("utf-8")
+
     command = [
         sys_consts.CONVERT,
         "-size",
         f"{background_canvas_width}x{background_canvas_height}",
         "xc:none",
         "-fill",
-        insert_colour,
+        insert_hex,
         "-draw",
         f"'rectangle' 0,0 {background_canvas_width},{background_canvas_height}'",
         "PNG:-",  # Output to standard output (pipe)
@@ -1076,6 +1088,7 @@ def Create_DVD_Label(
     menu_font_colour: str = "black",
     menu_font_size: int = 24,
     spindle_diameter: float = 36,  # 15mm standard make a little larger (Verbatim guide 36)
+    opacity: float = 1.0,
 ) -> tuple[int, bytes]:
     """
     Creates a DVD label image with menu titles and a central hole.
@@ -1098,6 +1111,8 @@ def Create_DVD_Label(
         menu_font_size (int): Font size.
         menu_font_path (str): Path to the menu font file.
         spindle_diameter (float): diameter of the central hole.
+        opacity (float): The opacity level to be set for the color,
+                        where 0.0 is fully transparent and 1.0 is fully opaque.
 
     Returns:
         tuple[int, bytes]
@@ -1135,6 +1150,9 @@ def Create_DVD_Label(
     assert (
         isinstance(spindle_diameter, (int, float)) and 21 <= spindle_diameter <= 36
     ), f"{spindle_diameter=}. Must be a float >= 21 and <= 36"
+    assert (
+        isinstance(opacity, float) and 0 <= int(opacity) <= 1
+    ), f"{opacity=}. Must be a float between 0.0 and 1.0"
 
     assert disk_colour in [
         colour for colour in colors.keys()
@@ -1148,6 +1166,10 @@ def Create_DVD_Label(
 
     debug = True
     MAX_TITLE_LINES: Final[int] = 4
+    result, disk_hex = Make_Opaque(color=disk_colour, opacity=opacity)
+
+    if result == -1:
+        return -1, f"Invalid System Color {disk_colour}".encode("utf-8")
 
     if title_font_path.strip() == "":
         fonts = Get_Fonts()
@@ -1199,7 +1221,7 @@ def Create_DVD_Label(
         f"{background_canvas_width}x{background_canvas_height}",
         "xc:none",
         "-fill",
-        disk_colour,
+        disk_hex,
         "-draw",
         f"'circle' {label_x - 0.5},{label_y - 0.5} {disk_radius - 0.5},{0}'",
         "(",
@@ -2616,6 +2638,127 @@ def Transcode_H26x(
     return 1, output_file
 
 
+def Convert_To_PNG_Stream(
+    image_filename: str, width: int, height: int, keep_aspect_ratio: bool = True
+) -> (int, bytes):
+    """
+    Converts an image file to PNG format,  resizing it, and returns the PNG data as bytes.
+
+    Args:
+        image_filename (str): The filename of the input image.
+        width (int): The width for resizing.
+        height (int): The height for resizing.
+        keep_aspect_ratio (bool): Whether to keep the aspect ratio.
+
+    Returns:
+        tuple(int, bytes):
+            - arg1: 1 (ok) or -1 (error)
+            - arg2: The image data as a byte string (PNG format) on success, empty bytes on error
+    """
+    assert (
+        isinstance(image_filename, str) and image_filename.strip() != ""
+    ), f"{image_filename=}. Must be a non-empty str"
+    assert isinstance(width, int) and width > 0, f"{width=} . Must be an int > 0"
+    assert isinstance(height, int) and height > 0, f"{height=} . Must be an int > 0"
+    assert isinstance(keep_aspect_ratio, bool), f"{keep_aspect_ratio=}. Must be a bool"
+
+    file_handler = file_utils.File()
+
+    if not file_handler.file_exists(image_filename):
+        return -1, f"File not found: {image_filename}".encode("utf-8")
+
+    command = [
+        sys_consts.CONVERT,
+        image_filename,
+        "-resize",
+        f"{width}x{height} {'>' if keep_aspect_ratio else ''}>",
+        "png:-",
+    ]
+    print(f"DBG {' '.join(command)} ")
+    try:
+        with subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ) as process:
+            stdout, stderr = process.communicate()
+
+            if process.returncode == 0:
+                return 1, stdout
+            else:
+                print(f"Error converting image: {stderr.decode()}")
+                return -1, f"Error converting image: {stderr.decode()}".encode("utf-8")
+    except Exception as e:
+        return -1, f"Unexpected error: {e}".encode("utf-8")
+
+
+def Write_Image_On_Image(
+    base_image_data: bytes,
+    overlay_image_data: bytes,
+    x: int,
+    y: int,
+    gravity: str = "northwest",
+) -> (int, bytes):
+    """
+    Overlays an image (provided as bytes) onto another base image (provided as bytes)
+    using ImageMagick and returns the modified image as a byte string (PNG format).
+
+    Args:
+        base_image_data (bytes): The base image data in bytes format
+        overlay_image_data (bytes): The overlay image data in bytes format
+        x (int): The x-coordinate
+        y (int): The y-coordinate
+        gravity (str): The gravity positioning of the overlay image ('northwest', 'center', etc.)
+
+    Returns:
+        tuple(int, bytes):
+            - arg1: 1 (ok) or -1 (error)
+            - arg2: The modified image data as a byte string (PNG format) on success, empty bytes on error
+    """
+    assert (
+        isinstance(base_image_data, bytes) and base_image_data.strip() != ""
+    ), f"{base_image_data=}. Must be a non-empty bytes"
+    assert (
+        isinstance(overlay_image_data, bytes) and base_image_data.strip() != ""
+    ), f"{base_image_data=}. Must be a non-empty bytes"
+    assert isinstance(x, int) and x >= 0, f"{x=}. Must be a non-negative int"
+    assert isinstance(y, int) and y >= 0, f"{y=}. Must be a non-negative int"
+    assert (
+        isinstance(gravity.lower(), str) and gravity.lower() in valid_gravities
+    ), f"{gravity=} must be a gravity str"
+
+    try:
+        SEPARATOR: Final[bytes] = b"##ImageSeparator##"
+
+        stdin_data = base_image_data + SEPARATOR + overlay_image_data
+
+        command = [
+            sys_consts.CONVERT,
+            "-gravity",
+            gravity,
+            "-page",
+            f"+{x}+{y}",
+            "-",
+            "png:-",
+        ]
+
+        # Execute the command with input and output pipes
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, stderr = process.communicate(input=stdin_data)
+
+        if process.returncode == 0:
+            return 1, stdout
+        else:
+            return -1, f"Failed To Overlay An Image (Err 1) {stderr.decode()}".encode(
+                "utf-8"
+            )
+    except Exception as e:
+        return -1, f"Failed To Overlay An Image (Err 2) {e}".encode("utf-8")
+
+
 def Write_Text_On_Image(
     image_data: bytes,
     text: str,
@@ -2664,11 +2807,6 @@ def Write_Text_On_Image(
     assert isinstance(color, str) and color in colors, f"{color=} must be a string"
 
     try:
-        # Escape special characters in text for safe command construction
-        # escaped_text = text.replace("\\", "\\\\").replace(
-        #    "'", "\\'"
-        # )  # Escape backslashes and single quotes
-
         # Construct ImageMagick command (pipe image data as input)
         command = [
             sys_consts.CONVERT,
@@ -4199,6 +4337,32 @@ def Resize_Image(
             - arg2: Error message ot "" if ok
 
     """
+    assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
+    assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
+    assert (
+        isinstance(input_file, str) and input_file.strip() != ""
+    ), f"{input_file=}. Must be a path to a file"
+    assert (
+        isinstance(out_file, str) and out_file.strip() != ""
+    ), f"{out_file=}. Must be a path to a file"
+    assert isinstance(ignore_aspect, bool), f"{ignore_aspect=}. Must be bool"
+    assert isinstance(no_antialias, bool), f"{no_antialias=}. Must be bool"
+    assert isinstance(no_dither, bool), f"{no_dither=}. Must be bool"
+    assert isinstance(colors, str), f"{colors=}. Must be str"
+    assert isinstance(remap, bool), f"{remap=}. Must be bool"
+
+    file_handler = file_utils.File()
+    if not file_handler.file_exists(input_file):
+        return -1, f"{input_file=} does not exist"
+
+    file_path, _, _ = file_handler.split_file_path(out_file)
+
+    if not file_handler.path_exists(file_path):
+        return -1, f"{file_path=} does not exist"
+
+    if not file_handler.path_writeable(file_path):
+        return -1, f"{file_path=} not writeable"
+
     flags = ""
     if ignore_aspect:
         flags = "!"
@@ -4481,3 +4645,9 @@ class Video_File_Copier:
 
         except Exception as e:
             return -1, f"Error copying folder into sub-folders: {e}"
+
+    def write_checksum_file(self, checksum_file_path, checksum):
+        checksum_file = open(checksum_file_path, "w")
+        checksum_file.write(checksum)
+        checksum_file.close()
+        return 1, ""

@@ -27,7 +27,7 @@ import platformdirs
 
 import file_utils
 import popups
-import qtgui as qtg
+import qtpygui as qtg
 import sqldb
 import sys_consts
 from dvdarch_utils import DVD_Percent_Used

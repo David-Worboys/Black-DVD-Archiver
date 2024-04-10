@@ -28,7 +28,7 @@ from PySide6.QtPrintSupport import QPrinterInfo, QPrinter, QPrintDialog, QAbstra
 import dvdarch_utils
 import file_utils
 import popups
-import qtgui as qtg
+import qtpygui as qtg
 import sqldb
 import sys_consts
 from dvdarch_utils import Create_DVD_Case_Insert, Create_DVD_Label
@@ -483,13 +483,13 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                 font_color = dvd_print_settings.insert_font_color
                 font = dvd_print_settings.insert_font
                 font_point_size = dvd_print_settings.insert_font_point_size
-                transparency = dvd_print_settings.insert_title_background_transparency
+                transparency = dvd_print_settings.insert_background_transparency
             elif menu_text and item == "dvd_label_text":
                 background_color = dvd_print_settings.disk_background_color
                 font_color = dvd_print_settings.disk_font_color
                 font = dvd_print_settings.disk_font
                 font_point_size = dvd_print_settings.disk_font_point_size
-                transparency = dvd_print_settings.disk_title_background_transparency
+                transparency = dvd_print_settings.disk_background_transparency
             else:
                 raise AssertionError(f"Unknown item {item=} {title_text=} {menu_text=}")
 
@@ -857,7 +857,7 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
         with qtg.sys_cursor(qtg.Cursor.hourglass):
             print_settings = DVD_Print_Settings()
             self._save_to_db(event)
-            switch_setting = event.value_get(
+            print_disk_label = event.value_get(
                 container_tag="printer_controls", tag="print_disk_label"
             )  # Bool as Switch
 
@@ -908,7 +908,11 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
             printer.setResolution(300)
             printer.setColorMode(QPrinter.Color)
 
-            if switch_setting:
+            if print_disk_label:
+                disk_transparency: int = event.value_get(
+                    container_tag="dvd_label_text", tag="transparency"
+                )
+
                 result, png_bytes = Create_DVD_Label(
                     title=self.disk_title,
                     title_font_path=print_settings.disk_title_font,
@@ -920,11 +924,24 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                     menu_font_colour=print_settings.disk_font_color,
                     menu_font_size=print_settings.disk_font_point_size,
                     resolution=printer.logicalDpiX(),
+                    opacity=disk_transparency / 100,
                 )
-            else:
+            else:  # Print Case Insert
+                insert_size: qtg.Combo_Data = event.value_get(
+                    container_tag="printer_controls", tag="insert_size"
+                )
+                insert_transparency: int = event.value_get(
+                    container_tag="case_insert_text", tag="transparency"
+                )
+
+                insert_width: int = insert_size.user_data["width"]
+                insert_height: int = insert_size.user_data["height"]
+
                 result, png_bytes = Create_DVD_Case_Insert(
                     title=self.disk_title,
                     menu_pages=self.dvd_menu_pages,
+                    insert_width=insert_width,
+                    insert_height=insert_height,
                     resolution=printer.logicalDpiX(),
                     title_font_path=print_settings.insert_title_font,
                     title_font_colour=print_settings.insert_title_font_color,
@@ -933,6 +950,7 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                     menu_font_colour=print_settings.insert_font_color,
                     insert_colour=print_settings.insert_background_color,
                     menu_font_size=print_settings.insert_font_point_size,
+                    opacity=insert_transparency / 100,
                 )
 
         if result == -1:
@@ -954,6 +972,7 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
         """Generate the form UI layout"""
 
         def text_settings_container(tag: str, text: str) -> qtg.HBoxContainer:
+            """Generate the text settings container"""
             assert isinstance(tag, str), f"{tag=}. Must be a string"
             assert isinstance(text, str), f"{text=}. Must be a string"
 
@@ -966,22 +985,46 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                 qtg.Combo_Item(display=font[0], data=font[1], icon=None, user_data=font)
                 for font in dvdarch_utils.Get_Fonts()
             ]
-            title_text_container = qtg.HBoxContainer(tag=f"{tag}_rb").add_row(
-                qtg.RadioButton(
-                    text="Title Text",
-                    tag="title_text",
-                    callback=self.event_handler,
-                ),
-                qtg.RadioButton(
+            title_text_radiobuttons = qtg.RadioButton(
+                text="Title Text",
+                tag="title_text",
+                label="Text Select",
+                callback=self.event_handler,
+                buddy_control=qtg.RadioButton(
                     text="Menu Text",
                     tag="menu_text",
                     callback=self.event_handler,
                     checked=True,
                 ),
             )
+
+            insert_size_combo = qtg.ComboBox(
+                tag="insert_size",
+                label="Insert Size",
+                width=30,
+                callback=self.event_handler,
+                items=[
+                    qtg.Combo_Item(
+                        display="DVD Jewel Box 120 mm X 120 mm",
+                        data=0,
+                        icon=None,
+                        user_data={"width": 120, "height": 120},
+                    ),
+                    qtg.Combo_Item(
+                        display="DVD Cover 130 mm X 184 mm",
+                        data=1,
+                        icon=None,
+                        user_data={"width": 130, "height": 184},
+                    ),
+                ],
+                display_na=False,
+                translate=True,
+            )
+
             return qtg.HBoxContainer(margin_left=0).add_row(
                 qtg.FormContainer(tag=tag, text=text).add_row(
-                    title_text_container,
+                    title_text_radiobuttons,
+                    insert_size_combo if tag == "case_insert_text" else qtg.Spacer(),
                     qtg.ComboBox(
                         tag="text_color",
                         label="Text Color",
@@ -1018,13 +1061,13 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                         callback=self.event_handler,
                         buddy_control=(
                             qtg.HBoxContainer().add_row(
-                                qtg.Spacer(width=4),
+                                qtg.Spacer(width=8),
                                 qtg.Spinbox(
-                                    label="Transparency",
+                                    label="Opacity",
                                     tag="transparency",
                                     range_min=0,
                                     range_max=100,
-                                    width=3,
+                                    width=5,
                                     callback=self.event_handler,
                                     buddy_control=qtg.Label(text="%", width=1),
                                 ),
@@ -1087,8 +1130,17 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
             printer_combo,
             qtg.Spacer(),
             # printer_target,
-            qtg.Switch(
-                tag="print_disk_label", label="Print Case Insert", text="Print DVD Disk"
+            qtg.RadioButton(
+                tag="print_case_insert",
+                label="Print Target",
+                text="Print Case Insert",
+                callback=self.event_handler,
+                checked=True,
+                buddy_control=qtg.RadioButton(
+                    tag="print_disk_label",
+                    text="Print DVD Disk",
+                    callback=self.event_handler,
+                ),
             ),
             qtg.Spacer(),
             qtg.Checkbox(

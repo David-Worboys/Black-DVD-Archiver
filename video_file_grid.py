@@ -28,7 +28,7 @@ import platformdirs
 import dvdarch_utils
 import file_utils
 import popups
-import qtgui as qtg
+import qtpygui as qtg
 import sqldb
 import sys_consts
 import utils

@@ -942,7 +942,7 @@ class SQL_Shelf:
 
         return None
 
-    def _db_init(self) -> [int, str]:
+    def _db_init(self) -> tuple[int, str]:
         """Initialises the database
 
         Returns:

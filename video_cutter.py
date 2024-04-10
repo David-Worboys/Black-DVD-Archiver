@@ -31,7 +31,7 @@ import PySide6.QtGui as qtG
 import dvdarch_utils
 import file_utils
 import popups
-import qtgui as qtg
+import qtpygui as qtg
 import sqldb
 import sys_consts
 import utils
@@ -2064,7 +2064,7 @@ class Video_Editor(DVD_Archiver_Base):
 
     def _populate_edit_cuts(
         self,
-        edit_cuts: tuple[tuple[int, int, str], ...] | list[tuple[int, int, str], ...],
+        edit_cuts: tuple[tuple[int, int, str], ...] | list[tuple[int, int, str]],
     ):
         assert isinstance(
             edit_cuts, (list, tuple)

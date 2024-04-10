@@ -447,10 +447,10 @@ def Pack_Rational(
         denominator: int = number_pair[1]
 
         out_bytes += numerator.to_bytes(
-            length=word_width, byteorder=cast(Literal, byte_order), signed=signed
+            length=word_width, byteorder=byte_order, signed=signed
         )
         out_bytes += denominator.to_bytes(
-            length=word_width, byteorder=cast(Literal, byte_order), signed=signed
+            length=word_width, byteorder=byte_order, signed=signed
         )
 
     return out_bytes

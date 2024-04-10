@@ -40,7 +40,7 @@ import file_utils
 import sqldb
 import sys_consts
 from file_utils import App_Path
-from qtpygui import (Action, Align, Button, Col_Def, Combo_Data, Combo_Item,
+from qtgui import (Action, Align, Button, Col_Def, Combo_Data, Combo_Item,
                    ComboBox, Command_Button_Container, Cursor, FolderView,
                    Font, Frame, Frame_Style, Grid, Grid_Col_Value,
                    GridContainer, HBoxContainer, Image, Label, LineEdit,
@@ -727,7 +727,7 @@ class PopOKCancelApply(PopOKCancel):
         """
         if self.buttons is None:
             self.buttons = (
-                Button(text="&Ok", tag="ok", callback=self.event_handler),
+                Button(text="&Ok", tag="ok"),
                 Button(text="&Cancel", tag="cancel", callback=self.cancel_callback),
                 Button(text="&Apply", tag="apply", callback=self.apply_callback),
             )
@@ -971,8 +971,8 @@ class PopYesNo(PopMessage):
         # Add  Yes and No Buttons to the  GUI if none supplied.
         if self.buttons is None:
             self.buttons = (
-                Button(text="&Yes", tag="yes", callback=self.event_handler),
-                Button(text="&No", tag="no", callback=self.event_handler),
+                Button(text="&Yes", tag="yes"),
+                Button(text="&No", tag="no"),
             )
         super().__post_init__()
 
@@ -984,14 +984,11 @@ class PopYesNo(PopMessage):
         Args:
             event (Action): Action
         """
-        assert isinstance(event, Action), f"{event=}. Must be Action"
-
         match int(event.event):
             case int(Sys_Events.CLICKED):
                 match event.tag:
                     case "yes":
                         self._result = event.tag
-
                         self.close()
                     case "no":
                         self._result = event.tag

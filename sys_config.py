@@ -31,7 +31,7 @@ import popups
 import sqldb
 import sys_consts
 import utils
-from qtgui import Action
+from qtpygui import Action
 
 # fmt: on
 
@@ -561,7 +561,7 @@ def Remove_Project_Files(project_name: str, file_paths: list[str]) -> tuple[int,
                     for button_index, button_item in reversed(
                         dvd_page.get_button_titles.copy().items()
                     ):
-                        button_item[1]: Video_Data
+                        # button_item[1]: Video_Data
                         if button_item[1].video_path == file_path:
                             dvd_page.get_button_titles.pop(button_index)
 
@@ -1441,7 +1441,7 @@ class DVD_Print_Settings:
             sys_consts.DVD_INSERT_TITLE_BACKGROUND_TRANSPARENCY_DBK
         ):
             self._db_settings.setting_set(
-                sys_consts.DVD_INSERT_TITLE_BACKGROUND_TRANSPARENCY_DBK, 0
+                sys_consts.DVD_INSERT_TITLE_BACKGROUND_TRANSPARENCY_DBK, 100
             )
         return cast(
             int,
@@ -1621,7 +1621,7 @@ class DVD_Print_Settings:
             sys_consts.DVD_INSERT_BACKGROUND_TRANSPARENCY_DBK
         ):
             self._db_settings.setting_set(
-                sys_consts.DVD_INSERT_BACKGROUND_TRANSPARENCY_DBK, 0
+                sys_consts.DVD_INSERT_BACKGROUND_TRANSPARENCY_DBK, 100
             )
         return cast(
             int,

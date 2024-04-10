@@ -28,7 +28,7 @@ from time import sleep
 from typing import Callable, Optional, cast
 
 import popups
-import qtgui as qtg
+import qtpygui as qtg
 import sqldb
 import sys_consts
 

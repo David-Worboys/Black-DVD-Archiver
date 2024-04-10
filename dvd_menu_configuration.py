@@ -26,7 +26,7 @@ from typing import cast
 import dvdarch_utils
 import file_utils
 import popups
-import qtgui as qtg
+import qtpygui as qtg
 import sqldb
 import sys_consts
 from sys_config import DVD_Menu_Settings
