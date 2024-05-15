@@ -1,7 +1,7 @@
 # The Black DVD Archiver—Developer Notes (Preliminary)
 ### Author: David Worboys 
 * Original 2023-09-01 
-* Update 2023=10-22 (Removed apps that are no longer used)
+* Update 2024-05-16 (Removed apps that are no longer used)
 
 ## Introduction
 The Black DVD Archiver comprises source code written in python (3.11) and a number of open source applications used for 
@@ -22,6 +22,9 @@ The **build.sh** script performs this compilation
 
 **Note:** the folder paths might need updating to work in other dev 
 environments
+
+## QTPYGUI
+The QTPYGUI package (https://github.com/David-Worboys/QTPYGUI) is used to generate the user interface layer. 
 
 ## Tool Apps
 To perform a range of tasks in preparing a DVD the following open source software is used (refer to the links as a 
