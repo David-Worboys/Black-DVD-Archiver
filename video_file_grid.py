@@ -26,12 +26,12 @@ from typing import cast, Final
 import platformdirs
 
 import dvdarch_utils
-import file_utils
-import popups
-import qtpygui as qtg
-import sqldb
+import QTPYGUI.file_utils as file_utils
+import QTPYGUI.popups as popups
+import QTPYGUI.qtpygui as qtg
+import QTPYGUI.sqldb as sqldb
 import sys_consts
-import utils
+import QTPYGUI.utils as utils
 from dvd_menu_configuration import DVD_Menu_Config_Popup
 from sys_config import (DVD_Archiver_Base, Get_Video_Editor_Folder, Video_Data, Get_Project_Files, 
                         Get_Project_Layout_Names, Remove_Project_Files)
@@ -2003,7 +2003,6 @@ class Video_File_Grid(DVD_Archiver_Base):
         Returns:
             qtg.VBoxContainer: The container that houses the file handler ui layout
         """
-
         button_container = qtg.HBoxContainer(
             tag="control_buttons", align=qtg.Align.BOTTOMRIGHT, margin_right=0
         ).add_row(

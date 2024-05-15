@@ -24,10 +24,10 @@ import dataclasses
 from typing import cast
 
 import dvdarch_utils
-import file_utils
-import popups
-import qtpygui as qtg
-import sqldb
+import QTPYGUI.file_utils as file_utils
+import QTPYGUI.popups as popups
+import QTPYGUI.qtpygui as qtg
+import QTPYGUI.sqldb as sqldb
 import sys_consts
 from sys_config import DVD_Menu_Settings
 

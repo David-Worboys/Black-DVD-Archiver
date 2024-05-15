@@ -36,10 +36,10 @@ from typing import Final
 
 import psutil
 
-import file_utils
-import popups
+import QTPYGUI.file_utils as file_utils
+import QTPYGUI.popups as popups
 import sys_consts
-import utils
+import QTPYGUI.utils as utils
 from sys_config import Encoding_Details, DVD_Menu_Page
 
 # fmt: on
@@ -774,21 +774,23 @@ def Create_DVD_Iso(input_dir: str, output_file: str) -> tuple[int, str]:
     assert (
         isinstance(output_file, str) and output_file.strip() != ""
     ), f"{output_file}. Must be a non-empty str"
-
+    # ffmpeg -i VIDEO_TS -i AUDIO_TS -c copy -map 0:0 -map 1:0 "-dvd-video",
     command = [
-        sys_consts.XORRISO,
-        "-as",
-        "mkisofs",
+        sys_consts.GENISOIMAGE,
+        # "-dvd-video",
+        "-udf",
         "-o",
         output_file,
+        "-V",
+        "DVD_VIDEO",
+        "-volset",
+        "DVD_VIDEO",
         "-J",
         "-r",
         "-v",
-        "-V",
-        "DVD_VIDEO",
         "-graft-points",
         f"AUDIO_TS={input_dir}/AUDIO_TS",
-        "VIDEO_TS=" + input_dir,
+        f"VIDEO_TS={input_dir}/VIDEO_TS",
     ]
 
     return Execute_Check_Output(command)

@@ -29,12 +29,12 @@ import PySide6.QtCore as qtC
 import PySide6.QtGui as qtG
 
 import dvdarch_utils
-import file_utils
-import popups
-import qtpygui as qtg
-import sqldb
+import QTPYGUI.file_utils as file_utils
+import QTPYGUI.popups as popups
+import QTPYGUI.qtpygui as qtg
+import QTPYGUI.sqldb as sqldb
 import sys_consts
-import utils
+import QTPYGUI.utils as utils
 from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
 from file_renamer_popup import File_Renamer_Popup

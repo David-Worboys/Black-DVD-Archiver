@@ -11,15 +11,20 @@
 #                          Added --include-module=dbm.gnu --include-module=dbm.ndbm --include-module=dbm.dumb
 # 31/01/2024 David Worboys Ensured only LICENSE.md would be included in the build
 # 03/02/2024 David Worboys Made command neater and easy to read
-
+# 27/02/2024 David Worboys Added data-file copy from add lib because Nuitka 1.9+ series no longer included some required
+#                          video library shared object files
 python -m nuitka                                                                            \
 --report=build_report                                                                       \
 --show-anti-bloat-changes                                                                   \
 --assume-yes-for-downloads                                                                  \
 --lto=yes                                                                                   \
 --python-flag=-OO                                                                           \
+--python-flag=-O                                                                            \
 --python-flag=no_warnings                                                                   \
 --python-flag=isolated                                                                      \
+--enable-plugin=pyside6                                                                     \
+--include-qt-plugins=sensible,multimedia                                                    \
+--include-data-files=/home/david/PycharmProjects/dvdarch/pycode/add_lib/*.*=./              \
 --verbose                                                                                   \
 --verbose-output=./release/verbose.txt                                                      \
 --disable-console                                                                           \
@@ -31,9 +36,7 @@ python -m nuitka                                                                
 --include-module=dbm.gnu                                                                    \
 --include-module=dbm.ndbm                                                                   \
 --include-module=dbm.dumb                                                                   \
---include-qt-plugins=sensible,multimedia                                                    \
 --show-anti-bloat-changes                                                                   \
---enable-plugin=pyside6                                                                     \
 --output-filename=black-dvd-archiver                                                        \
 --output-dir=./release                                                                      \
 --linux-icon=/home/david/PycharmProjects/dvdarch/pycode/logo.jpg                            \
@@ -42,5 +45,5 @@ python -m nuitka                                                                
 --include-data-files=LICENSE.md=./                                                          \
 --include-data-dir=/home/david/PycharmProjects/dvdarch/pycode/tool_apps=./tool_apps         \
 --include-data-dir=/home/david/PycharmProjects/dvdarch/pycode/icons=./icons                 \
---include-data-dir=/home/david/PycharmProjects/dvdarch/pycode/IBM-Plex-Mono=./IBM-Plex-Mono \
+--include-package-data=QTPYGUI \
  dvdarchiver.py

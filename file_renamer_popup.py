@@ -22,10 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import dataclasses
 from typing import cast
 
-import file_utils
-import popups
-import qtpygui as qtg
-import sqldb
+import QTPYGUI.file_utils as file_utils
+import QTPYGUI.popups as popups
+import QTPYGUI.qtpygui as qtg
+import QTPYGUI.sqldb as sqldb
 import sys_consts
 from sys_config import Video_Data
 

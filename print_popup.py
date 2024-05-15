@@ -26,10 +26,10 @@ from PySide6.QtGui import QImage, QPainter
 from PySide6.QtPrintSupport import QPrinterInfo, QPrinter, QPrintDialog, QAbstractPrintDialog
 
 import dvdarch_utils
-import file_utils
-import popups
-import qtpygui as qtg
-import sqldb
+import QTPYGUI.file_utils as file_utils
+import QTPYGUI.popups as popups
+import QTPYGUI.qtpygui as qtg
+import QTPYGUI.sqldb as sqldb
 import sys_consts
 from dvdarch_utils import Create_DVD_Case_Insert, Create_DVD_Label
 from sys_config import DVD_Menu_Page, DVD_Print_Settings

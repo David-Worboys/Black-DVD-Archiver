@@ -26,12 +26,12 @@ from typing import cast
 
 import platformdirs
 
-import file_utils
-import popups
-import sqldb
+import QTPYGUI.file_utils as file_utils
+import QTPYGUI.popups as popups
+import QTPYGUI.sqldb as sqldb
 import sys_consts
-import utils
-from qtpygui import Action
+import QTPYGUI.utils as utils
+from QTPYGUI.qtpygui import Action
 
 # fmt: on
 

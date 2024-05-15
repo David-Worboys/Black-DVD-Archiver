@@ -30,9 +30,9 @@ from typing import Final, Literal
 import xmltodict
 
 import dvdarch_utils
-import file_utils
+import QTPYGUI.file_utils as file_utils
 import sys_consts
-import utils
+import QTPYGUI.utils as utils
 from archive_management import Archive_Manager
 from sys_config import Video_Data
 

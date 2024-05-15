@@ -25,10 +25,10 @@ from typing import Optional, cast
 
 import platformdirs
 
-import file_utils
-import popups
-import qtpygui as qtg
-import sqldb
+import QTPYGUI.file_utils as file_utils
+import QTPYGUI.popups as popups
+import QTPYGUI.qtpygui as qtg
+import QTPYGUI.sqldb as sqldb
 import sys_consts
 from dvdarch_utils import DVD_Percent_Used
 from print_popup import Print_DVD_Label_Popup

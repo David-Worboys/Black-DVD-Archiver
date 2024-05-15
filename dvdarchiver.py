@@ -26,12 +26,12 @@ from typing import cast
 
 import platformdirs
 
-import file_utils
-import popups
-import qtpygui as qtg
-import sqldb
+import QTPYGUI.file_utils as file_utils
+import QTPYGUI.popups as popups
+import QTPYGUI.qtpygui as qtg
+import QTPYGUI.utils as utils
+import QTPYGUI.sqldb as sqldb
 import sys_consts
-import utils
 from background_task_manager import Task_Manager_Popup
 from dvd import DVD, DVD_Config
 from menu_page_title_popup import Menu_Page_Title_Popup
@@ -39,7 +39,7 @@ from sys_config import (DVD_Archiver_Base, DVD_Menu_Settings,
                         Get_Video_Editor_Folder, Get_Project_Layout_Names,
                         Set_Shelved_DVD_Layout, Video_Data, Migrate_Shelves_To_DB, Set_Shelved_Project, Delete_Project,
                         Delete_DVD_Layout)
-from utils import Countries, Text_To_File_Name
+from QTPYGUI.utils import Countries, Text_To_File_Name
 from video_cutter import Video_Editor
 from video_file_grid import Video_File_Grid
 
@@ -148,7 +148,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             display_name=program_name if program_name else sys_consts.PROGRAM_NAME,
             callback=self.event_handler,
             height=900,
-            icon=file_utils.App_Path("gitlogo.jpg"),
+            icon=file_utils.App_Path("logo.jpg"),
             width=1200,
         )
 
@@ -1445,7 +1445,6 @@ class DVD_Archiver(DVD_Archiver_Base):
             ),
             qtg.LineEdit(
                 text=f"{sys_consts.SDELIM}{archive_folder}{sys_consts.SDELIM}",
-                action="edit_action",
                 tag="archive_path",
                 label="Archive Folder",
                 width=66,
@@ -1462,7 +1461,6 @@ class DVD_Archiver(DVD_Archiver_Base):
             ),
             qtg.LineEdit(
                 text=f"{sys_consts.SDELIM}{streaming_folder}{sys_consts.SDELIM}",
-                action="edit_action",
                 tag="streaming_path",
                 label="Streaming Folder",
                 width=66,
@@ -1479,7 +1477,6 @@ class DVD_Archiver(DVD_Archiver_Base):
             ),
             qtg.LineEdit(
                 text=f"{sys_consts.SDELIM}{dvd_build_folder}{sys_consts.SDELIM}",
-                action="edit_action",
                 tag="dvd_path",
                 label="DVD Build Folder",
                 width=66,
@@ -1509,7 +1506,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         self._video_editor = Video_Editor(
             processed_files_callback=self._processed_files_handler
         )
-        self._control_tab = qtg.Tab(height=47, width=143, callback=self.event_handler)
+        self._control_tab = qtg.Tab(height=47, width=146, callback=self.event_handler)
         self._control_tab.page_add(
             tag="control_tab", title="Files", control=main_control_container
         )

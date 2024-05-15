@@ -24,10 +24,10 @@ from datetime import datetime
 from typing import Final
 
 import dvdarch_utils
-import file_utils
+import QTPYGUI.file_utils as file_utils
 import sys_consts
 from sys_config import Video_Data
-from utils import Is_Complied, Text_To_File_Name
+from QTPYGUI.utils import Is_Complied, Text_To_File_Name
 
 # fmt: on
 

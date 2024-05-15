@@ -27,9 +27,9 @@ from multiprocessing.shared_memory import SharedMemory
 from time import sleep
 from typing import Callable, Optional, cast
 
-import popups
-import qtpygui as qtg
-import sqldb
+import QTPYGUI.popups as popups
+import QTPYGUI.qtpygui as qtg
+import QTPYGUI.sqldb as sqldb
 import sys_consts
 
 # fmt: on

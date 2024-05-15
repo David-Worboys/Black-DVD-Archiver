@@ -1,7 +1,7 @@
-# The Black DVD Archiver — βeta 4.0 Release
+# The Black DVD Archiver — βeta 5.0 Release
 ### Author: David Worboys 
 ##### 2023-10-01 - Initial Draft
-##### Update 2024-01-15
+##### Update 2024-03-11
 The Black DVD Archiver is an application that will place user selected video files on a DVD and the source files in an 
 archive folder, specified by the user, that houses the preservation master folder.
 
@@ -19,7 +19,7 @@ have any DVD/Video settings you want in The Black DVD Archiver as long as they a
 These settings are optimised at getting VHS, Beta and 8mm analogue video onto a DVD at the best possible quality that 
 allows 2 hours to fit on a 4.7 GB disk.
 
-Hi-definition video will be down scaled to DVD resolution for the DVD image but the original resolution will be 
+Hi-definition video will be downscaled to DVD resolution for the DVD image, but the original resolution will be 
 maintained in the preservation master and streaming folders.
 
 The Black DVD Archiver is designed to do this task with the least amount of work by the user and to produce a DVD with 
@@ -30,7 +30,7 @@ Can the author be persuaded to be more flexible and add additional features? Pos
 ## Features
 * Selection Of Input Files In A Variety Of Container Formats
 * A Simple Video Editor with frame accurate editing on compressed video files with closed GOPs (Group of Pictures)
-  * Only the GOP containing the edit cut is re-encoded, the rest of the file is copied so there is no visible quality 
+  * Only the GOP containing the edit cut is re-encoded, the rest of the file is copied, so there is no visible quality 
   loss and the video edit is faster
 * Limited Video Filters With Fixed Settings
 * DVDs Have A Simplified Menu Structure
@@ -103,7 +103,7 @@ Source: https://ia801503.us.archive.org/7/items/nist-ir-8387/NIST.IR.8387.pdf
 
 ## Points To Note
 * Hi-Definition video is maintained as such in archive and streaming folders
-  * Hi-Defintion files have a vertical resolution greater than the respective PAL/NTSC DVD height
+  * Hi-Definition files have a vertical resolution greater than the respective PAL/NTSC DVD height
   * A lower resolution DVD compliant disk image is produced by the DVD building process 
 * PAL Specs — 720 W * 576 H, Aspect Ratio 4:3, 25 frames a second interlaced (50 fields a second)
 * NTSC Specs — 720 W * 480 H, Aspect Ratio 4:3, ~30 (29.97) frames a second interlaced (~60 fields a second)
@@ -158,21 +158,21 @@ The DVD Properties panel displays:
  * _Video Standard_ - PAL/NTSC. This is set by the videos displayed in the "DVD Input Files" 
 panel
    * A DVD is permitted to only be PAL or NTSC
-   * Hi-Definition video files (e,g 720p, 1080i, 1080p) are allocated a PAL or NTSC designation based on their properties 
-   although they do not conform to the established defitions of PAL/NTSC
+   * Hi-Definition video files (e,g 720p, 1080i, 1080p) are allocated a PAL or NTSC designation based on their properties,  
+   although they do not conform to the established definitions of PAL/NTSC
  * _Duration_ - This is set by the videos selected in the "DVD Input Files" panel.
    * Maximum 2 hours
  * _Avg Bitrate_ - The bit rate used to encode the DVD. 
    * Fixed and set to 5.5 Mb/s. This allows 2 hours of video on a DVD in high quality
  * _DVD_Used_ - The percent of the DVD used by the selected files.
-   * Only 99% is available this allows 1% to cover for any time overruns.
+   * Only 95% is available this allows 5% to cover for any time overruns.
      * The added benefit of providing a small buffer on the outer edge of the DVD is to protect the DVD from edge damage 
  * #### _Archive Folder_ 
    * This is set by the user — refer to  [Archive Folder Structure](#archive-folder-structure) for a detailed discussion
    * The Archive Folder is where the DVD image, ISO image (used to burn a DVD) and 
    video source files are stored
    * The Archive Folder is best placed on a NAS (Network Attached Storage) device which is properly backed-up
-   * The DVD file folder is comprised of a unique code and descriptiion: e.g., **_DVD-000743_-_Userguide_Example_** 
+   * The DVD file folder is comprised of a unique code and description: e.g., **_DVD-000743_-_Userguide_Example_** 
      * **000743** - Automatically allocated sequential folder number
      * **Userguide_Example** - Either the _Project Name_ or the _Disk Title Name_ . Refer to 
      [DVD Layout](#dvd-layout-window) for details
@@ -195,6 +195,12 @@ panel
 ![](./userguide_images/dvd_input_files_panel_a.png)
 
 Displays the list of video files selected to comprise a DVD project
+  * **Note: If the _Video File_ name is italic, then it is sourced from a DVD layout.**
+    *  Hovering over the file name will open a tooltip with the DVD layout and file name
+    *  Deleted _Video File_'s may reappear when the application is reopened as Project DVD Layouts are scanned for 
+    project video files.
+      *  To delete a _Video File_ permanently from the grid the video file must also be manually removed from all Project
+    DVD Layouts
 * _Select All_ - Checking this selects all video files in the grid. Unchecking deselects all files in te grid
 * ![](./userguide_images/settings_button.png) — Enables and selects the [Video Editor Tab](#video-editor-tab)
 * _Grp_ - Displays the group a video file belongs to (optional)
@@ -292,21 +298,21 @@ When only one file is selected (checked) then that file can be transcoded to a d
   * _Make Edit File_ - produces a very high quality intermediate (mezzanine) video file suitable for frame accurate 
 editing
     * Use this option if frame accurate editing fails on the source video file.
-      * Hi-Defintion video files have proved problematic for  frame accurate editing and this is the recommended editing
+      * Hi-Defintion video files have proved problematic for  frame accurate editing, and this is the recommended editing
       option for them.
     * The format used is MJPEG and utilises an avi container file.
-    * Although it is labeled as _Slow_ it is actually reasonably fast as far as transcodes go although it does produce 
+    * Although it is labeled as _Slow_ it is actually reasonably fast as far as transcodes go, although it does produce 
     large video files
   * _Re-Encode H264_ -  produces an H264 (mp4) vidoe file that has closed GOP's which should allow for frame accurate 
-  editng, alhough this is not recommended. Use the _Make Edit File_ option if the file needs to be edited 
-       * Use this option for creating video files sutiable for streaming in media players
+  editing, although this is not recommended. Use the _Make Edit File_ option if the file needs to be edited 
+       * Use this option for creating video files suitable for streaming in media players
        * Selecting this option will markedly slow down the transcode time but will produce smaller video files
   *  _Re-Encode H265_ produces an H265 encoded video file in an mp4 container that has closed GOP's which should allow 
-for frame accurate editng, alhough this is not recommended. Use the _Make Edit File_ option if the file needs to be 
+for frame accurate editng, although this is not recommended. Use the _Make Edit File_ option if the file needs to be 
 edited
       * This is a newer file format than H264 and is gaining popularity although it is not as widely supported.
-      * The video file produced is smaller in size than an H264 encoded video file and will likely show less compression 
-     aretefacts in a smaller video file
+      * The video file produced is smaller than an H264 encoded video file and will likely show fewer compression 
+     artefacts in a smaller video file
       * Selecting this option will result in transcodes that take a considerable time to produce
 
 **Two Or More Files Selected**
@@ -317,17 +323,17 @@ When two or more files are selected (checked) the files will be joined together.
 becomes the joined video file and the other selected video files are removed from the grid.
 
 With the exception of _Stream Copy_ , the optoins presented to join files are the same as for re-encoding a single file,
-as detailed in greated detail in the abovie **One File Selected** section. 
+as detailed in greater detail in the above **One File Selected** section. 
 
   * _Stream Copy_ - This option only appears if the selected files are the same type of video file in the same container
 file format. 
-    * This is a very fast operation and there is no quality loss in performing the join.
+    * This is a very fast operation, and there is no quality loss in performing the join.
   * _Make Edit File_ - Joins the video files into a very high quality intermediate (mezzanine) video file suitable for 
 frame accurate editing. 
-  * _Re-Encode H264_ - Joins the video files into a H264 (mp4) vidoe file that has closed GOP's which should allow for 
-frame accurate editng, alhough this is not recommended. Use the _Make Edit File_ option if the file needs to be edited
+  * _Re-Encode H264_ - Joins the video files into a H264 (mp4) video file that has closed GOP's which should allow for 
+frame accurate editing, although this is not recommended. Use the _Make Edit File_ option if the file needs to be edited
   * _Re-Encode H265_ - Joins the video files into a H265 encoded video file in an mp4 container that has closed GOP's 
-which should allow for frame accurate editng, alhough this is not recommended. Use the _Make Edit File_ option if the 
+which should allow for frame accurate editing, although this is not recommended. Use the _Make Edit File_ option if the 
 file needs to be edited
 
 ## DVD Menu Configuration Window
@@ -442,12 +448,19 @@ edit point.
 
 The edit list panel displays the list of edit points for the selected video clip. The user may also enter a clip name 
 
+* _Visible To_ These two radio buttons determine the visibility of the edit list 
+  * _All Projects_ The edit list is visible to all projects
+  * _This Project Only_ The edit list is visible to only this project.
+  * **Note: Once a file is cut it is owned by the selected Project, and the edit list selects _This Project Only_ and the
+  _Visible To_ radio buttons become greyed out and un-selectable**
 * _Select All_ - Checking this selects all the edit points in the grid. Unchecking deselects all the edit points in te 
 grid
-* _'To Cut' Bar Graph_ -  On the top right a bar graph indicates the percentage of files 'To Cut' during the 
+* _To Cut_ Bar Graph -  On the top right a bar graph indicates the percentage of files 'To Cut' during the 
 file cutting process. The cutting process starts at 100% and counts down to 0%
   * The cutting process can be slow on lower end machines, as frame accurate cutting of compressed video files, like
-  H265, H264 and MPEG2, requires additional file analysis. 
+  H265, H264 and MPEG2, requires additional file analysis.
+  * The cutting process can be slow on video files that are Hi-Definition or are minimally compressed (e.g. DV, FFV1) as 
+  file sizes are so large 
   * Compressed video files must have closed GOPS (Group of Pictures) for a frame accurate cut.
 * _Clip Name_ - Double-clicking in this field allows the user to enter a clip name
   * This is of most use if the video is to be cut into multiple clips
@@ -483,7 +496,7 @@ This window opens in response to clicking on ![](./userguide_images/make_dvd_but
 The layout displayed in this example reflects the use of grouping displayed in the main window and visible in the 
 background
 * _Disk Title_ - Defaults to the project name combined with the DVD Layout name
-  * In this release this is used as the trailing part of the archive folder name (xxx) - DVD-nnn_-_xxx . Refer to  
+  * In this release, this is used as the trailing part of the archive folder name (xxx) - DVD-nnn_-_xxx . Refer to  
   [Archive Folder Structure](#archive-folder-structure) for a detailed discussion. 
 * Each row in the grid is a DVD menu page
   * By double-clicking in the _Menu Title_ field a title can be entered for a DVD menu page
@@ -499,6 +512,7 @@ generation process as fast as possible
 * ![](./userguide_images/down_arrow.png) — Moves the checked (selected) DVD menu page(s) down
 * ![](./userguide_images/delete_button.png) — Delete the checked (selected) DVD menu page(s)
 * ![](./userguide_images/save_button.png) — Save the DVD layout under the selected layout name (_DVD 2_ in this example)
+* ![](./userguide_images/print_button.png)  —  Opens the DVD Insert/Label [Print Pop-up](#print-pop-up-window) Window  
 * ![](./userguide_images/make_dvd_button.png) — Starts the DVD generation and archive process
 
 #### Button Title Grid
@@ -510,6 +524,40 @@ field and change the button title for the video clip
 * ![](./userguide_images/up_arrow.png) — Move the checked (selected) button title(s) up
 * ![](./userguide_images/down_arrow.png) — Move the checked (selected) button title(s) down
 * ![](./userguide_images/delete_button_2.png) — Delete the checked (selected) button title(s)
+
+## Print Pop-up Window
+![](./userguide_images/print-pop-up.png)
+The print pop-up windows opens when the [Print Button](#dvd-layout-window) is clicked on by the user. This window allows
+the user to print DVD case inserts or print on the DVD itself if the printer is designed for this.
+
+### Print Settings Panel
+The print settings panel controls the selecting and setting of various print options via the controls in the embedded 
+panels
+
+1. #### Options Panel
+- The options panel controls printer settings and has the following controls
+   - "Available Printers" Combo Box — This dropdown control allows the user to select which printer to use.
+     - There is a "tool settings" button to the right, click this to open the system print settings dialogue box
+     - The printer "Status" is shown to the right of "tool settings" button
+       - If "Status: Error" is displayed, then the "print to file" checkbox is automatically checked.
+  - "Print Target" Radio Buttons — These allow the user to select what they are printing out
+    - "Print Case Insert" will print a DVD jewel box insert or a cover insert depending on the "Insert Size" selected in
+    the "DVD Insert Properties Panel"
+    - "Print DVD Disk" will print on the DVD disk if that option is supported by the selected printer.
+  - "Print To file" Check Box - Allows the user to print the selected "Print Target" to a PDF file
+  - "Folder" Line Edit — Displays the folder the PDF will be saved in. This is selected by clicking the button to the 
+  right
+  - "File Name" Line Edit — Displays the PDF file name. This is entered by clicking the button to the right
+2. #### DVD Insert Properties Panel
+- The DVD Insert Properties Panel controls the "look and feel" of the text printed on the DVD jewel box insert or a cover
+  - "Text Select" Radio Buttons — Allows the user to select which text settings they are configuring
+    - "Title Text" is the DVD menu header (title) text
+    - "Menu Text" is the DVD menu text displayed under the title text
+  - "Insert Size"
+
+
+
+
 
 ## About/System Tab
 ![](./userguide_images/about_system_tab.png)
@@ -551,7 +599,7 @@ created and named automatically by the "Black DVD Archiver"
 * Under [DVD Properties](#the-dvd-properties-panel), the user selects the [Archive Folder](#archive-folder) location as 
 a permanent place to store the archived files associated with producing a DVD image. 
 
-  * Ideally the [Archive Folder](#archive-folder) would be on a backed-up NAS (Network Attached Storage) but could be 
+  * Ideally, the [Archive Folder](#archive-folder) would be on a backed-up NAS (Network Attached Storage) but could be 
   any old drive, internal or external, particularly if the plan is to use the folder as a temporary source for burning 
   off the DVD and video source archive files to optical disc 
     
@@ -638,7 +686,7 @@ the streaming folder structure will take the form below:
       * The file **02_Kondrook Farm.mp4** is image button **Kondrook Farm** on the second DVD Menu  
       **Kondrook_Market - Late_1981**
     
-* Ideally the [Streaming Folder](#streaming-folder) would be located on a backed-up NAS (Network Attached Storage) device but it 
+* Ideally, the [Streaming Folder](#streaming-folder) would be located on a backed-up NAS (Network Attached Storage) device, but it 
 could just as easily be placed on any old drive, internal or external that is easily accessed by a media player
 (I am a fan of Serviio https://www.serviio.org ) for playback of the video on a TV.
 #### Transcode Source
@@ -649,8 +697,8 @@ The "Transcode Source" panel allows the user to archive the source video as foll
 * _No Transcode_ — This is the preferred option as the source video is archived in the original, untouched, video format. 
   * The fastest option as the source video is copied into the appropriate archive folders and will not slow 
   down the [Make DVD Process](#dvd-layout-window).
-  * **There is a risk in archiving video files in the orginal format** 
-    * if that format is proprietry or not widely supported then the source video may prove hard to view/edit at a later 
+  * **There is a risk in archiving video files in the original format** 
+    * if that format is proprietary or not widely supported, then the source video may prove hard to view/edit at a later 
     date 
 * _FFV1 (Archival)_ — This is a preferred method of archiving video files by the Library of Congress and other 
 leading video preservation organisations. 
@@ -675,7 +723,7 @@ artefacts in return for much smaller file sizes
   * **_It is not recommended to use this option unless disk space is at a premium._**
 
 Choosing to transcode the source video into FFV1, H264 or H265 will result in an extended [Make DVD Process](#dvd-layout-window) and 
-the user will have to leave the "Black DVD Arciver" open to allow this process to complete. 
+the user will have to leave the "Black DVD Archiver" open to allow this process to complete. 
  * To check if the [Make DVD Process](#dvd-layout-window) is complete, the user opens the [Task Manager](#file-command-buttons) popup 
 window
  * The H264/H256 transcode process closes all GOPs (Group of Pictures) to make then suitable for editing. GOP size is
@@ -683,7 +731,7 @@ currently 15 which matches the DVD spec but will result in larger compressed fil
    * Video source files that are already in H264/H265 format will not be transcoded and will retain their current GOP 
 settings
      * These files will be copied and the [Make DVD Process](#dvd-layout-window) will be much faster as a result
- * FFV1 video source fies will be copied and the [Make DVD Process](#dvd-layout-window) will be much faster as a result
+ * FFV1 video source fies will be copied, and the [Make DVD Process](#dvd-layout-window) will be much faster as a result
 
 #### Black DVD Archiver Language
 ![](./userguide_images/archiver_language.png)
@@ -719,7 +767,7 @@ performing the translation for.
 
 ![](./userguide_images/title_button.png) — This grid button copies the corresponding English (Base) phrase to the 
 clipboard. 
-* This can be used to paste into Google translate or a similar website.
+* This can be used to paste into Google Translate or a similar website.
 * Double-clicking in the corresponding "Language Phase" column allows the user to type or paste the translated phrase.
 
 ![](./userguide_images/save_button_translate.png) — This button saves the entered translation phrases into the database

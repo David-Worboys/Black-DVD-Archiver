@@ -25,8 +25,8 @@ from typing import Final
 
 import platformdirs
 
-import file_utils
-import utils
+import QTPYGUI.file_utils as file_utils
+import QTPYGUI.utils as utils
 
 # fmt: on
 
@@ -120,7 +120,7 @@ FFPROBE: Final[str] = f"{tool_app_folder}ffprobe"
 IDENTIFY: Final[str] = f"{tool_app_folder}identify"
 MPLEX: Final[str] = f"{tool_app_folder}mplex"
 SPUMUX: Final[str] = f"{tool_app_folder}spumux"
-XORRISO: Final[str] = f"{tool_app_folder}xorriso"
+GENISOIMAGE: Final[str] = f"{tool_app_folder}genisoimage"
 
 ICON_PATH: Final[str] = f"{executable_folder}{file_sep}icons"
 
