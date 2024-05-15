@@ -32,10 +32,10 @@ starting point to find the relevant licensing details):
 * dvdauthor (https://sourceforge.net/projects/dvdauthor/files/)
 * ffmpeg  (https://ffmpeg.org/download.html)
 * ffprobe (https://ffmpeg.org/download.html)
+* * genisoimage (https://www.gnu.org/software/xorriso/)
 * identify (https://imagemagick.org/script/download.php)
 * mplex (https://www.linuxtv.org/wiki/index.php/Mplex)
 * spumux (https://sourceforge.net/projects/dvdauthor/files/)
-* xorriso (https://www.gnu.org/software/xorriso/)
 
 **Note:** composite is an older version of magick, but it behaves differently and gets the results I want and that is why
 it is included. In theory magick alone can be used and this should be tested with future releases.
@@ -65,10 +65,10 @@ project folder
    │ dvdauthor
    │ ffmpeg 
    │ ffprobe
+   | genisoimage
    │ identify         
    │ mplex
-   │ spumux
-   │ xorriso
+   │ spumux   
    │
    └───tool_apps
 ```   
@@ -83,7 +83,7 @@ The tool_apps folder can now be copied into the root of the Black DVD Archiver s
 **Note:**
 The paths will need to be changed to reflect the actual tools folder structure above:
 ```
-~/Programs/linuxdeploy-x86_64.AppImage --appdir /home/david/PycharmProjects/dvdarch/tools/tool_apps --executable /home/david/PycharmProjects/dvdarch/tools/composite   --executable /home/david/PycharmProjects/dvdarch/tools/dvdauthor   --executable /home/david/PycharmProjects/dvdarch/tools/ffmpeg --executable /home/david/PycharmProjects/dvdarch/tools/ffprobe --executable /home/david/PycharmProjects/dvdarch/tools/identify  --executable /home/david/PycharmProjects/dvdarch/tools/magick --executable /home/david/PycharmProjects/dvdarch/tools/mplex  --executable /home/david/PycharmProjects/dvdarch/tools/spumux   --executable /home/david/PycharmProjects/dvdarch/tools/xorriso
+~/Programs/linuxdeploy-x86_64.AppImage --appdir /home/david/PycharmProjects/dvdarch/tools/tool_apps --executable /home/david/PycharmProjects/dvdarch/tools/composite   --executable /home/david/PycharmProjects/dvdarch/tools/dvdauthor   --executable /home/david/PycharmProjects/dvdarch/tools/ffmpeg --executable /home/david/PycharmProjects/dvdarch/tools/ffprobe --executable /home/david/PycharmProjects/dvdarch/tools/identify  --executable /home/david/PycharmProjects/dvdarch/tools/magick --executable /home/david/PycharmProjects/dvdarch/tools/mplex  --executable /home/david/PycharmProjects/dvdarch/tools/spumux   --executable /home/david/PycharmProjects/dvdarch/tools/genisoimage
 ```
 
 
