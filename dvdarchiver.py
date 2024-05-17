@@ -1761,7 +1761,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     ),
                 ),
             ),
-            qtg.Spacer(width=1),
+            qtg.Spacer(width=4),
             qtg.Button(
                 tag="exit_app",
                 text="Exit",

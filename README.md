@@ -308,7 +308,7 @@ editing
        * Use this option for creating video files suitable for streaming in media players
        * Selecting this option will markedly slow down the transcode time but will produce smaller video files
   *  _Re-Encode H265_ produces an H265 encoded video file in an mp4 container that has closed GOP's which should allow 
-for frame accurate editng, although this is not recommended. Use the _Make Edit File_ option if the file needs to be 
+for frame accurate editing, although this is not recommended. Use the _Make Edit File_ option if the file needs to be 
 edited
       * This is a newer file format than H264 and is gaining popularity although it is not as widely supported.
       * The video file produced is smaller than an H264 encoded video file and will likely show fewer compression 
@@ -501,10 +501,10 @@ background
 * Each row in the grid is a DVD menu page
   * By double-clicking in the _Menu Title_ field a title can be entered for a DVD menu page
 * The videos on each DVD page are displayed in the _Videos On Menu_ column
-* _Menu Aspect Ratio_ - Select 16:9 for wide screen menus and 4:3 for the traditional squarish menus.
+* _Menu Aspect Ratio_ - Select 16:9 for wide-screen menus and 4:3 for the traditional squarish menus.
     *  Each DVD menu page is either all 4:3 videos or all 16:9 videos as per the DVD spec. THe 'Black DVD Archiver' 
   automatically enforces this, and it is not possible to produce a mixed aspect ratio menu page.
-    * If a 16:9 wide screen menu is chosen and there are 4:3 videos on the DVD then the 4:3 image buttons will be 
+    * If a 16:9 wide-screen menu is chosen and there are 4:3 videos on the DVD then the 4:3 image buttons will be 
   stretched to 16:9 and will look 'wrong'.
 * _Deactivate Filters_ - Select this to test the layout generation of the DVD. Filters are slow and this makes the DVD 
 generation process as fast as possible
@@ -553,11 +553,29 @@ panels
   - "Text Select" Radio Buttons — Allows the user to select which text settings they are configuring
     - "Title Text" is the DVD menu header (title) text
     - "Menu Text" is the DVD menu text displayed under the title text
-  - "Insert Size"
+  - "Insert Size" - Determines the size of the printer insert. There are two options:
+    - DVD Jewel Box for the smaller clear plastic cases that house DVD and Blu-ray disks
+    - DVD Cover for the larger plastic covers that house DVD and Blu-ray disks
+  - "Text Color"—The colour of the text printed on the DVD insert
+  - "Background Color"—The colour of the background on which the menu text is printed
+  - "Font"- The text font
+  - "Font Size"—The point size of the text font
+  - "Opacity" - Sets how opaque the background is: 100% solid colour, 0% fully transparent 
 
+3. #### DVD Disk Properties Panel
+- The DVD Disk Properties Panel controls the "look and feel" of the text printed on the DVD Disk 
+(Note: The Printer and Disks must support this)
+  - "Text Select" Radio Buttons — Allows the user to select which text settings they are configuring
+    - "Title Text" is the DVD menu header (title) text
+    - "Menu Text" is the DVD menu text displayed under the title text
+  - "Text Color"—The colour of the text printed on the DVD insert
+  - "Background Color"—The colour of the background on which the menu text is printed
+  - "Font"- The text font
+  - "Font Size"—The point size of the text font
+  - "Opacity" - Sets how opaque the background is: 100% solid colour, 0% fully transparent
 
-
-
+4. #### The Print Button
+- Prints to a file or printer depending on user selected settings.
 
 ## About/System Tab
 ![](./userguide_images/about_system_tab.png)
@@ -574,7 +592,7 @@ This tab:
 ![](./userguide_images/archive_disk_size.png)
 
 The "Disk Size" panel allows the user to select the archive video optical disc size. This allows the user to 
-burn off the **_preservation_master_xxx_** folder **nn_xxx_Disk_nn_** sub-folders onto backup optical discs for offline 
+burn off the **_preservation_master_xxx_** folder **nn_xxx_Disk_nn_** subfolders onto backup optical discs for offline 
 long-term archival storage of the source video files.
 
 Note: The **_preservation_master_xxx_** folder name can take the following forms depending on the [Transcode Source](#transcode-source) 
@@ -590,7 +608,7 @@ discs and these are assumed to have better long-term archival longevity.**
 The source video of the DVD is backed-up into the [Archive Folder](#archive_folder) and is stored in the 
 [Transcode Source](#transcode-source) video format.
 These source files may be much larger than the DVD compressed video. 
-  * In the examples here DV compression of the captured video stored in an avi file container consume 13GB per hour!
+  * In the examples here, DV compression of the captured video stored in an avi file container consumes 13GB per hour!
 
 ##### Archive Folder Structure
 Under the [Archive Folder](#archive-folder) selected by the user, each DVD build results in a new archive folder being 
