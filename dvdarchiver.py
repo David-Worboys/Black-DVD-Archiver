@@ -141,9 +141,9 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         """
         assert isinstance(program_name, str), f"{program_name=}. Must be str"
-
+        print(f"DBG SS Init {program_name=}")
         super().__init__()
-
+        print(f"DBG S Init {program_name=}")
         self._DVD_Arch_App = qtg.QtPyApp(
             display_name=program_name if program_name else sys_consts.PROGRAM_NAME,
             callback=self.event_handler,
@@ -170,7 +170,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         self._app_db = self.db_init()
         self._db_tables_create()
 
-        if self._db_settings.setting_get(sys_consts.FIRST_RUN_DBK):
+        if self._db_settings.new_cfg:
             # Do stuff that the application only ever needs to do once on first
             # startup of a new installation
             Set_Shelved_DVD_Layout(
@@ -178,8 +178,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 dvd_layout_name=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
                 dvd_menu_layout=[],
             )
-
-            self._db_settings.setting_set(sys_consts.FIRST_RUN_DBK, False)
+            self._db_settings.new_cfg = False
 
         self._menu_title_font_size = 24
         self._timestamp_font_point_size = 9
@@ -188,6 +187,8 @@ class DVD_Archiver(DVD_Archiver_Base):
         self._video_editor: Video_Editor | None = None
         self._save_existing_project = True
         self._task_stack = {}  # Used to keep track of running tasks
+
+        print(f"DBG E Init {program_name=}")
 
     def db_init(self) -> sqldb.SQLDB:
         """
@@ -1786,8 +1787,10 @@ class DVD_Archiver(DVD_Archiver_Base):
 
     def run(self) -> None:
         """Starts the application and gets the show on the road"""
+        print("DBG Kicking it")
         self._DVD_Arch_App.run(layout=self.layout(), windows_ui=False)
 
 
 if __name__ == "__main__":
+    print("DBG Away we go")
     DVD_Archiver().run()
