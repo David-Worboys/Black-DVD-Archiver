@@ -17,8 +17,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import dataclasses
 import datetime
 import locale
@@ -36,11 +34,11 @@ import QTPYGUI.utils as utils
 from archive_management import Archive_Manager
 from sys_config import Video_Data
 
-# fmt: on
-
 
 @dataclasses.dataclass
 class DVD_Config:
+    """Configuration for the DVD archiver"""
+
     _archive_folder: str = ""
     _archive_size: str = sys_consts.DVD_ARCHIVE_SIZE
     _input_videos: list[Video_Data] | tuple[Video_Data] = dataclasses.field(
@@ -72,6 +70,10 @@ class DVD_Config:
     _video_standard: str = sys_consts.PAL
 
     def __post_init__(self):
+        """
+        Set the defaults
+        """
+        # Set the default values
         if self.menu_background_color.strip() == "":
             self.menu_background_color = "wheat"
 
@@ -91,20 +93,40 @@ class DVD_Config:
 
     @property
     def archive_folder(self) -> str:
+        """
+            Gets the archive folder
+        Returns:
+            str: The archive folder
+        """
         return self._archive_folder
 
     @archive_folder.setter
     def archive_folder(self, value: str):
+        """
+            Sets the archive folder
+        Args:
+            value (str): The path to the archive folder
+        """
         assert isinstance(value, str), f"{value=}. Must be str"
 
         self._archive_folder = value
 
     @property
     def archive_size(self) -> str:
+        """
+            Gets the archive size
+        Returns:
+            str: The archive size ( BLUERAY_ARCHIVE_SIZE | DVD_ARCHIVE_SIZE )
+        """
         return self._archive_size
 
     @archive_size.setter
     def archive_size(self, value: str):
+        """
+            Sets the archive size
+        Args:
+            value (str): The archive size ( BLUERAY_ARCHIVE_SIZE | DVD_ARCHIVE_SIZE )
+        """
         assert isinstance(value, str) and value in (
             sys_consts.BLUERAY_ARCHIVE_SIZE,
             sys_consts.DVD_ARCHIVE_SIZE,
@@ -113,54 +135,94 @@ class DVD_Config:
 
     @property
     def input_videos(self) -> list[Video_Data] | tuple[Video_Data]:
+        """
+            Gets the input videos
+        Returns:
+            list[Video_Data] | tuple[Video_Data]: The input videos
+        """
         return self._input_videos
 
     @input_videos.setter
     def input_videos(self, value: list[Video_Data] | tuple[Video_Data]) -> None:
-        assert isinstance(
-            value, (list, tuple)
-        ), f"{value=}. Must be a list | tuple of File_Def"
+        """
+            Sets the input videos
+        Args:
+            value (list[Video_Data] | tuple[Video_Data]): The input videos
+        """
+        assert isinstance(value, (list, tuple)), (
+            f"{value=}. Must be a list | tuple of Video_Data"
+        )
 
         for video_file in value:
-            assert isinstance(
-                video_file, Video_Data
-            ), f"{video_file=}. Must be a File_Def"
+            assert isinstance(video_file, Video_Data), (
+                f"{video_file=}. Must be a File_Def"
+            )
 
-            assert file_utils.File().path_exists(
-                video_file.video_folder
-            ), f"{video_file.video_folder=}. Must be a valid file folder"
+            assert file_utils.File().path_exists(video_file.video_folder), (
+                f"{video_file.video_folder=}. Must be a valid file folder"
+            )
 
         self._input_videos = value
 
     @property
     def menu_background_color(self) -> str:
+        """
+            Gets the menu background color
+        Returns:
+            str: The menu background color
+        """
         return self._menu_background_color
 
     @menu_background_color.setter
     def menu_background_color(self, value: str) -> None:
+        """
+            Sets the menu background color
+        Args:
+            value (str): The menu background color
+        """
         assert isinstance(value, str), f"{value=}. Must be a string"
 
         self._menu_background_color = value
 
     @property
     def menu_title(self) -> list[str] | tuple[str]:
+        """
+            Gets the menu title
+        Returns:
+            list[str] | tuple[str]: The menu title
+        """
         return self._menu_title
 
     @menu_title.setter
     def menu_title(self, value: list[str] | tuple[str]) -> None:
+        """
+            Sets the menu title
+        Args:
+            value (list[str] | tuple[str]): The menu title
+        """
         assert isinstance(value, (list, tuple)), f"{value=}. Must be a list | tuple str"
-        assert all(
-            isinstance(title, str) for title in value
-        ), f"{value=} must be list | tuple of str"
+        assert all(isinstance(title, str) for title in value), (
+            f"{value=} must be list | tuple of str"
+        )
 
         self._menu_title = value
 
     @property
     def menu_aspect_ratio(self) -> str:
+        """
+            Gets the menu aspect ratio
+        Returns:
+            str: The menu aspect ratio (AR169 | AR43)
+        """
         return self._menu_aspect_ratio
 
     @menu_aspect_ratio.setter
     def menu_aspect_ratio(self, value: str) -> None:
+        """
+            Sets the menu aspect ratio
+        Args:
+            value (str): The menu aspect ratio (AR169 | AR43)
+        """
         assert isinstance(value, str), f"{value=}. Must be a string"
         assert value.upper() in (
             sys_consts.AR169,
@@ -171,13 +233,26 @@ class DVD_Config:
 
     @property
     def menu_font(self) -> str:
+        """
+            Gets the menu font
+        Returns:
+            str: The menu font
+        """
         return self._menu_font
 
     @menu_font.setter
     def menu_font(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a non-empty string"
+        """
+            Sets the menu font
+        Args:
+            value (str): The menu font
+
+        Returns:
+
+        """
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be a non-empty string"
+        )
 
         file_handler = file_utils.File()
 
@@ -185,13 +260,14 @@ class DVD_Config:
             self._menu_font = value
 
             return
-        else:
+        else:  # Try to find a default system font
             for font in dvdarch_utils.Get_Fonts():
                 if font[0] == value:
                     self._menu_font = font[1]
 
                     return
 
+        # Try to use the supplied app font if we can't find a default font
         if file_handler.file_exists(
             file_utils.App_Path(
                 f"IBM-Plex-Mono{file_handler.ossep}{sys_consts.DEFAULT_FONT}"
@@ -215,7 +291,6 @@ class DVD_Config:
 
         Returns:
             str: The left page pointer file
-
         """
 
         return self._page_pointer_left_file
@@ -227,13 +302,10 @@ class DVD_Config:
 
         Args:
             value (str): The left page pointer file
-
-        Returns:
-
         """
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be non-empty str"
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be non-empty str"
+        )
 
         self._page_pointer_left_file = value
 
@@ -257,64 +329,121 @@ class DVD_Config:
 
         Args:
             value (str): The right page pointer file
-
-        Returns:
-
         """
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be non-empty str"
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be non-empty str"
+        )
 
         self._page_pointer_right_file = value
 
     @property
     def button_background_color(self) -> str:
+        """
+        Returns the button background color
+
+        Returns:
+            str: The button background color
+
+        """
         return self._button_background_color
 
     @button_background_color.setter
     def button_background_color(self, value: str):
+        """
+        Sets the button background color
+
+        Args:
+            value (str): The button background color
+
+        """
         assert isinstance(value, str), "Button background color must be a string."
         self._button_background_color = value
 
     @property
     def button_background_transparency(self) -> float:
+        """
+        Returns the button background transparency
+
+        Returns:
+            float: The button background transparency
+
+        """
         return self._button_background_transparency
 
     @button_background_transparency.setter
     def button_background_transparency(self, value: float):
-        assert (
-            isinstance(value, float) and 0 <= value <= 1
-        ), f"{value=}.  0 <= Must be float <= 1"
+        """
+            Sets the button background transparency
+        Args:
+            value (float): The button background transparency <= 1.0
+        """
+        assert isinstance(value, float) and 0 <= value <= 1, (
+            f"{value=}.  0 <= Must be float <= 1"
+        )
 
         self._button_background_transparency = value
 
     @property
     def button_font_color(self) -> str:
+        """
+        Returns the button font color
+
+        Returns:
+            str: The button font color
+
+        """
         return self._button_font_color
 
     @button_font_color.setter
     def button_font_color(self, value: str):
+        """
+        Sets the button font color
+
+        Args:
+            value (str): The button font color
+
+        """
         assert isinstance(value, str), "Button font color must be a string."
         self._button_font_color = value
 
     @property
     def button_font_point_size(self) -> int:
+        """
+            Returns the button font point size
+        Returns:
+            int: The button font point size
+        """
         return self._button_font_point_size
 
     @button_font_point_size.setter
     def button_font_point_size(self, value: int):
+        """
+            Sets the button font point size
+        Args:
+            value (int): The button font point size
+        """
         assert isinstance(value, int), "Button font point size must be an integer."
         self._button_font_point_size = value
 
     @property
     def button_font(self) -> str:
+        """
+            Returns the button font
+        Returns:
+            str: The button font
+        """
         return self._button_font
 
     @button_font.setter
     def button_font(self, value: str):
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a non-empty string"
+        """
+            Sets the button font
+        Args:
+            value (str): The button font
+        """
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be a non-empty string"
+        )
         file_handler = file_utils.File()
 
         if file_handler.file_exists(value):
@@ -341,88 +470,168 @@ class DVD_Config:
 
     @property
     def menu_font_color(self) -> str:
+        """
+            Returns the menu font color
+        Returns:
+            str: The menu font color
+        """
         return self._menu_font_color
 
     @menu_font_color.setter
     def menu_font_color(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a non-empty string"
+        """
+            Sets the menu font color
+        Args:
+            value (str): The menu font color
+        """
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be a non-empty string"
+        )
 
         self._menu_font_color = value
 
     @property
     def menu_font_point_size(self) -> int:
+        """
+            Returns the menu font point size
+        Returns:
+            int: The menu font point size
+        """
         return self._menu_font_point_size
 
     @menu_font_point_size.setter
     def menu_font_point_size(self, value: int) -> None:
+        """
+            Sets the menu font point size
+        Args:
+            value (int): The menu font point size
+        """
         assert isinstance(value, int) and value > 1, f"{value=}. Must be an int > 1"
 
         self._menu_font_point_size = value
 
     @property
     def menu_buttons_across(self) -> int:
+        """
+            Returns the menu buttons across
+        Returns:
+            int: The menu buttons across
+        """
         return self._menu_buttons_across
 
     @menu_buttons_across.setter
     def menu_buttons_across(self, value: int) -> None:
+        """
+            Sets the menu buttons across
+        Args:
+            value (int): The menu buttons across
+        """
         assert isinstance(value, int) and value > 0, f"{value=}. Must be an int > 0"
 
         self._menu_buttons_across = value
 
     @property
     def menu_buttons_per_page(self) -> int:
+        """
+            Returns the menu buttons per page
+        Returns:
+            int: The menu buttons per page
+        """
         return self._menu_buttons_per_page
 
     @menu_buttons_per_page.setter
     def menu_buttons_per_page(self, value: int) -> None:
+        """
+            Sets the menu buttons per page
+        Args:
+            value (int): The menu buttons per page
+        """
         assert isinstance(value, int) and value > 0, f"{value=}. Must be an int > 0"
 
         self._menu_buttons_per_page = value
 
     @property
     def project_name(self) -> str:
+        """
+            Returns the project name
+        Returns:
+            str: The project name
+        """
         return self._project_name
 
     @project_name.setter
     def project_name(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a non_empty str"
+        """
+            Sets the project name
+        Args:
+            value (str): The project name
+        """
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be a non_empty str"
+        )
         self._project_name = value
 
     @property
     def serial_number(self) -> str:
+        """
+            Returns the serial number
+        Returns:
+            str: The serial number
+        """
         return self._serial_number
 
     @serial_number.setter
     def serial_number(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a non-empty string"
+        """
+            Sets the serial number
+        Args:
+            value (str): The serial number
+        """
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be a non-empty string"
+        )
 
         self._serial_number = value
 
     @property
     def streaming_folder(self) -> str:
+        """
+            Returns the streaming folder
+        Returns:
+            str: The streaming folder
+        """
         return self._streaming_folder
 
     @streaming_folder.setter
     def streaming_folder(self, value: str):
+        """
+            Sets the streaming folder
+        Args:
+            value (str): The streaming folder
+        """
         assert isinstance(value, str), f"{value=}. Must be str"
 
         self._streaming_folder = value
 
     @property
     def timestamp_font(self) -> str:
+        """
+            Returns the timestamp font
+        Returns:
+            str: The timestamp font
+        """
         return self._timestamp_font
 
     @timestamp_font.setter
     def timestamp_font(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a non-empty string"
+        """
+            Sets the timestamp font
+        Args:
+            value (str): The timestamp font
+        """
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be a non-empty string"
+        )
 
         file_handler = file_utils.File()
 
@@ -452,44 +661,84 @@ class DVD_Config:
 
     @property
     def timestamp_font_point_size(self) -> int:
+        """
+            Returns the timestamp font point size
+        Returns:
+            int: The timestamp font point size
+        """
         return self._timestamp_font_point_size
 
     @timestamp_font_point_size.setter
     def timestamp_font_point_size(self, value: int) -> None:
+        """
+            Sets the timestamp font point size
+        Args:
+            value (int): The timestamp font point size
+        """
         assert isinstance(value, int) and value > 1, f"{value=}. Must be an int > 1"
 
         self._timestamp_font_point_size = value
 
     @property
     def timestamp_prefix(self) -> str:
+        """
+            Returns the timestamp prefix
+        Returns:
+            str: The timestamp prefix
+        """
         return self._timestamp_prefix
 
     @timestamp_prefix.setter
     def timestamp_prefix(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a non-empty string"
+        """
+            Sets the timestamp prefix
+        Args:
+            value (str): The timestamp prefix
+        """
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be a non-empty string"
+        )
 
         self._timestamp_prefix = value
 
     @property
     def timestamp(self) -> str:
+        """
+            Returns the timestamp
+        Returns:
+            str: The timestamp
+        """
         return self._timestamp
 
     @timestamp.setter
     def timestamp(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a non-empty string"
+        """
+            Sets the timestamp
+        Args:
+            value (str): The timestamp
+        """
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be a non-empty string"
+        )
 
         self._timestamp = value
 
     @property
     def transcode_type(self) -> str:
+        """
+            Returns the transcode type
+        Returns:
+            str: The transcode type (sys_consts.TRANSCODE_NONE | TRANSCODE_FFV1ARCHIVAL | TRANSCODE_H264 | TRANSCODE_H265)
+        """
         return self._transcode_type
 
     @transcode_type.setter
     def transcode_type(self, value: str):
+        """
+            Sets the transcode type
+        Args:
+            value (str): The transcode type (sys_consts.TRANSCODE_NONE | TRANSCODE_FFV1ARCHIVAL | TRANSCODE_H264 | TRANSCODE_H265)
+        """
         assert isinstance(value, str) and value in (
             sys_consts.TRANSCODE_NONE,
             sys_consts.TRANSCODE_FFV1ARCHIVAL,
@@ -503,10 +752,20 @@ class DVD_Config:
 
     @property
     def video_standard(self):
+        """
+            Returns the video standard
+        Returns:
+            str: The video standard
+        """
         return self._video_standard
 
     @video_standard.setter
     def video_standard(self, value: str) -> None:
+        """
+            Sets the video standard
+        Args:
+            value (str): The video standard (sys_consts.PAL | sys_consts.NTSC)
+        """
         assert isinstance(value, str), f"{value=}. Must be a string"
 
         self._video_standard = value.upper()
@@ -518,7 +777,8 @@ class DVD_Config:
 
 
 @dataclasses.dataclass(slots=True)
-class _Cell_Coords:
+class _Cell_Coord:
+    name: str = ""
     x0: int = 0
     y0: int = 0
     x1: int = 0
@@ -526,7 +786,36 @@ class _Cell_Coords:
     width: int = 0
     height: int = 0
     page: int = 0
-    video_data: Video_Data = dataclasses.field(default_factory=Video_Data)
+    video_data: Video_Data | None = dataclasses.field(default_factory=Video_Data)
+    cargo: dict = dataclasses.field(default_factory=dict)
+
+    def __post_init__(self):
+        assert isinstance(self.name, str), f"{self.name=}. Must be str"
+        assert isinstance(self.x0, int) and self.x0 >= 0, (
+            f"{self.x0=}. Must be int >= 0"
+        )
+        assert isinstance(self.y0, int) and self.y0 >= 0, (
+            f"{self.y0=}. Must be int >= 0"
+        )
+        assert isinstance(self.x1, int) and self.x1 >= 0, (
+            f"{self.x1=}. Must be int >= 0"
+        )
+        assert isinstance(self.y1, int) and self.y1 >= 0, (
+            f"{self.y1=}. Must be int >= 0"
+        )
+        assert isinstance(self.width, int) and self.width >= 0, (
+            f"{self.width=}. Must be int >=0"
+        )
+        assert isinstance(self.height, int) and self.height >= 0, (
+            f"{self.height=}. Must be int >= 0"
+        )
+        assert isinstance(self.page, int) and self.page >= 0, (
+            f"{self.page=}. Must be int >= 0"
+        )
+        assert isinstance(self.video_data, Video_Data) or self.video_data is None, (
+            f"{self.video_data=}. Must be Video_Data Or None"
+        )
+        assert isinstance(self.cargo, dict), f"{self.cargo=}. Must be dict"
 
     def get_mask_filenames(self, alternate_file_path: str = "") -> tuple[str, ...]:
         """Generate the file names for overlay, highlight, select, and text masks.
@@ -542,7 +831,6 @@ class _Cell_Coords:
             - select_file: A PNG file containing the select mask.
             - text_file: A file containing the text (with extension specified by file_extn).
         """
-
         file_handler = file_utils.File()
 
         if alternate_file_path:
@@ -550,6 +838,9 @@ class _Cell_Coords:
                 alternate_file_path
             )
         else:
+            if self.video_data is None:
+                return ("", "", "", "")
+
             path_name, file_name, file_extn = file_handler.split_file_path(
                 self.video_data.menu_image_file_path
             )
@@ -606,6 +897,343 @@ class DVD:
     def __post_init__(self) -> None:
         pass
 
+    @dataclasses.dataclass(slots=True)
+    class _Menu_Pointer_Data:
+        """Dataclass to hold data for the menu pointer icon"""
+
+        # public
+        background_canvas_file: str
+        dvd_config: DVD_Config
+        spumux_buffer: int
+
+        # private
+        _width: int = -1
+        _height: int = -1
+        _left_icon_path: str = ""
+        _left_x_offset: int = -1
+        _left_y_offset: int = -1
+        _right_icon_path: str = ""
+        _right_x_offset: int = -1
+        _right_y_offset: int = -1
+        _error_code: int = 1
+        _error_message: str = ""
+
+        def __post_init__(self):
+            """Initialize the class"""
+            assert (
+                isinstance(self.background_canvas_file, str)
+                and self.background_canvas_file.strip() != ""
+            ), f"{self.background_canvas_file=}. Must be a str"
+            assert isinstance(self.dvd_config, DVD_Config), (
+                f"{self.dvd_config=}. Must be a DVD_Config"
+            )
+            assert isinstance(self.spumux_buffer, int) and self.spumux_buffer > 0, (
+                f"{self.spumux_buffer=}. Must be an int > 0"
+            )
+
+            file_handler = file_utils.File()
+
+            # TODO Make sys_consts.ICON_PATH user configurable
+            page_pointer_left_file = file_handler.file_join(
+                sys_consts.ICON_PATH, self.dvd_config.page_pointer_left_file
+            )
+            page_pointer_right_file = file_handler.file_join(
+                sys_consts.ICON_PATH, self.dvd_config.page_pointer_right_file
+            )
+
+            _, left_file, left_extn = file_handler.split_file_path(
+                page_pointer_left_file
+            )
+            _, right_file, _ = file_handler.split_file_path(page_pointer_right_file)
+
+            right_pointer_file = right_file
+            left_pointer_file = left_file
+            pointer_file_extn = left_extn
+
+            self.left_icon_path = file_handler.file_join(
+                sys_consts.ICON_PATH,
+                left_pointer_file,
+                pointer_file_extn,
+            )
+
+            self.right_icon_path = file_handler.file_join(
+                sys_consts.ICON_PATH,
+                right_pointer_file,
+                pointer_file_extn,
+            )
+
+            self.width, self.height, message = dvdarch_utils.Get_Image_Size(
+                self.left_icon_path
+            )  # Assume left and right are the same size
+
+            if self.width == -1 and self.height == -1:
+                self.error_code = -1
+                self.error_message = message
+
+            canvas_width, canvas_height, message = dvdarch_utils.Get_Image_Size(
+                self.background_canvas_file
+            )
+
+            if canvas_width == -1 and canvas_height == -1:
+                self.error_code = -1
+                self.error_message = message
+
+            self.left_x_offset = self.spumux_buffer
+            self.left_y_offset = canvas_height - (self.height + self.spumux_buffer)
+            self.right_x_offset = canvas_width - (self.width + self.spumux_buffer)
+            self.right_y_offset = canvas_height - (self.height + self.spumux_buffer)
+
+        @property
+        def error_code(self) -> int:
+            """
+                Gets the error code
+            Returns:
+                int: The error code
+            """
+            return self._error_code
+
+        @error_code.setter
+        def error_code(self, value: int):
+            """
+                Sets the error code
+            Args:
+                value(int): The error code
+
+            Returns:
+
+            """
+            assert isinstance(value, int) and value in (-1, 0), (
+                f"{value=} must be -1 or 0"
+            )
+
+            self._error_code = value
+
+        @property
+        def error_message(self) -> str:
+            """
+                Gets the error message
+            Returns:
+                str: The error message
+            """
+            return self._error_message
+
+        @error_message.setter
+        def error_message(self, value: str):
+            """
+                Sets the error message
+            Args:
+                value(str): The error message
+
+            Returns:
+
+            """
+            assert isinstance(value, str), f"{value=} must be str"
+
+            self._error_message = value
+
+        @property
+        def width(self) -> int:
+            """
+                Gets the width of the pointer icon
+            Returns:
+                int: The width of the pointer icon
+            """
+            return self._width
+
+        @width.setter
+        def width(self, value: int):
+            """
+                Sets the width of the pointer icon
+            Args:
+                value(int): The width of the pointer icon
+
+            Returns:
+
+            """
+            assert isinstance(value, int) and value > 0, f"{value=} must  > 0"
+
+            self._width = value
+
+        @property
+        def height(self) -> int:
+            """
+                Gets the height of the pointer icon
+            Returns:
+                int: The height of the pointer icon
+            """
+            return self._height
+
+        @height.setter
+        def height(self, value: int):
+            """
+                Sets the height of the pointer icon
+            Args:
+                value(int): The height of the pointer icon
+
+            Returns:
+
+            """
+            assert isinstance(value, int) and value > 0, f"{value=} must  > 0"
+
+            self._height = value
+
+        @property
+        def left_icon_path(self) -> str:
+            """
+                Gets the path of the left pointer icon.
+
+            Returns:
+                str: The path of the left pointer icon
+
+            """
+            return self._left_icon_path
+
+        @left_icon_path.setter
+        def left_icon_path(self, value: str):
+            """
+                Sets the path of the left pointer icon.
+            Args:
+                value(str): The path of the left pointer icon
+
+            Returns:
+
+            """
+            assert isinstance(value, str) and value.strip() != "", (
+                f"{value=} must be a non-empty str"
+            )
+
+            self._left_icon_path = value
+
+        @property
+        def left_x_offset(self) -> int:
+            """
+                Gets the x offset of the left pointer.
+
+            Returns:
+                int: The x offset of the left pointer
+
+            """
+            return self._left_x_offset
+
+        @left_x_offset.setter
+        def left_x_offset(self, value: int):
+            """
+                Sets the x offset of the left pointer.
+
+            Args:
+                value(int): The x offset of the left pointer
+
+            Returns:
+
+            """
+            assert isinstance(value, int) and value > 0, f"{value=} must be > 0"
+
+            self._left_x_offset = value
+
+        @property
+        def left_y_offset(self) -> int:
+            """
+                Gets the y offset of the left pointer.
+
+            Returns:
+                int: The y offset of the left pointer
+
+            """
+            return self._left_y_offset
+
+        @left_y_offset.setter
+        def left_y_offset(self, value: int):
+            """
+            Sets the y offset of the left pointer.
+
+            Args:
+                value(int): The y offset of the left pointer
+
+            Returns:
+
+            """
+            assert isinstance(value, int) and value > 0, f"{value=} must be > 0"
+
+            self._left_y_offset = value
+
+        @property
+        def right_icon_path(self) -> str:
+            """
+                Gets the path of the right pointer icon.
+
+            Returns:
+                str: The path of the right pointer icon
+            """
+            return self._right_icon_path
+
+        @right_icon_path.setter
+        def right_icon_path(self, value: str):
+            """
+
+            Sets the path of the right pointer icon.
+            Args:
+                value (str): The path of the right pointer icon
+
+            Returns:
+
+            """
+            assert isinstance(value, str) and value.strip() != "", (
+                f"{value=} must be a non-empty str"
+            )
+
+            self._right_icon_path = value
+
+        @property
+        def right_x_offset(self) -> int:
+            """
+                Gets the x offset of the right pointer.
+
+            Returns:
+                int: The x offset of the right pointer
+
+            """
+            return self._right_x_offset
+
+        @right_x_offset.setter
+        def right_x_offset(self, value: int):
+            """
+            Sets the x offset of the right pointer.
+
+            Args:
+                value (int): The x offset of the right pointer
+
+            Returns:
+                int: The x offset of the right pointer.
+
+            """
+            assert isinstance(value, int) and value > 0, f"{value=} must be > 0"
+
+            self._right_x_offset = value
+
+        @property
+        def right_y_offset(self) -> int:
+            """
+            Gets the y offset of the right pointer.
+
+            Returns:
+                int: The y offset of the right pointer.
+
+            """
+            return self._right_y_offset
+
+        @right_y_offset.setter
+        def right_y_offset(self, value: int):
+            """
+            Sets the y offset of the right pointer.
+
+            Args:
+                value (int): The y offset of the right pointer
+            """
+
+            assert isinstance(value, int) and value > 0, f"{value=} must be > 0"
+
+            self._right_y_offset = value
+
     @property
     def dvd_config(self) -> DVD_Config:
         return self._dvd_config
@@ -634,9 +1262,9 @@ class DVD:
 
     @working_folder.setter
     def working_folder(self, value: str) -> None:
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a non-empty string"
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be a non-empty string"
+        )
 
         self._working_folder = value
 
@@ -656,9 +1284,9 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        assert (
-            len(self.dvd_config.input_videos) > 0
-        ), "Must have at least one input video"
+        assert len(self.dvd_config.input_videos) > 0, (
+            "Must have at least one input video"
+        )
 
         error_no, error_message = self._build_working_folders()
 
@@ -682,12 +1310,12 @@ class DVD:
 
         return 1, ""
 
-    def _archive_dvd_files(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
+    def _archive_dvd_files(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:
         """
         Archives the specified video files into a DVD image and saves the ISO image to the specified folder.
 
         Args:
-            cell_coords (list[_Cell_Coords]): The calculated grid layout
+            cell_coords (list[_Cell_Coord]): The calculated grid layout
             representing the video files to be archived.
 
         Returns:
@@ -697,12 +1325,12 @@ class DVD:
 
         """
 
-        assert isinstance(
-            cell_coords, list
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
-        assert all(
-            isinstance(item, _Cell_Coords) for item in cell_coords
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert isinstance(cell_coords, list), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
+        assert all(isinstance(item, _Cell_Coord) for item in cell_coords), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
 
         if (
             self.dvd_config.archive_folder and cell_coords
@@ -719,6 +1347,9 @@ class DVD:
             page_index = cell_coords[0].page
 
             for cell_coord in cell_coords:
+                if cell_coord.video_data is None:
+                    continue
+
                 if page_index != cell_coord.page:  # page break
                     if video_list:
                         menu_layout.append((
@@ -1165,6 +1796,12 @@ class DVD:
         if dvd_dims.display_height == -1:
             return -1, "Failed To Get DVD Dimensions"
 
+        result, message = self._create_canvas_image(
+            width=dvd_dims.storage_width, height=dvd_dims.storage_height
+        )
+        if result == -1:
+            return result, message
+
         if all(
             file_def.dvd_page >= 0 for file_def in self.dvd_config.input_videos
         ):  # Manual Layout
@@ -1196,24 +1833,6 @@ class DVD:
         if not cell_coords:
             return -1, message
 
-        result, message = self._create_canvas_image(
-            width=dvd_dims.storage_width, height=dvd_dims.storage_height
-        )
-        if result == -1:
-            return result, message
-
-        canvas_height, message = dvdarch_utils.Get_Image_Height(
-            self._background_canvas_file
-        )
-        if canvas_height == -1:
-            return -1, message
-
-        canvas_width, message = dvdarch_utils.Get_Image_Width(
-            self._background_canvas_file
-        )
-        if canvas_width == -1:
-            return -1, message
-
         result, message = self._resize_menu_button_images(cell_coords=cell_coords)
 
         if result == -1:
@@ -1223,13 +1842,6 @@ class DVD:
 
         if result == -1:
             return -1, message
-
-        if debug and not utils.Is_Complied():
-            print("=============================")
-            print(f"DBG  {canvas_height=} {canvas_width=} ")
-            print(f"DBG {dvd_dims=}")
-            print(f"DBG {cell_coords=}")
-            print("=============================")
 
         result, message = self._prepare_buttons(
             cell_coords=cell_coords,
@@ -1268,14 +1880,33 @@ class DVD:
         if result == -1:
             return -1, message
 
+        if debug and not utils.Is_Complied():
+            canvas_height, message = dvdarch_utils.Get_Image_Height(
+                self._background_canvas_file
+            )
+            if canvas_height == -1:
+                return -1, message
+
+            canvas_width, message = dvdarch_utils.Get_Image_Width(
+                self._background_canvas_file
+            )
+            if canvas_width == -1:
+                return -1, message
+
+            print("=============================")
+            print(f"DBG  {canvas_height=} {canvas_width=} ")
+            print(f"DBG {dvd_dims=}")
+            print(f"DBG {cell_coords=}")
+            print("=============================")
+
         return 1, ""
 
-    def _create_labels(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
+    def _create_labels(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:
         """
         Create images for each label to be placed on the button images.
 
         Args:
-            cell_coords (list[_Cell_Coords]): The list of cell coordinates.
+            cell_coords (list[_Cell_Coord]): The list of cell coordinates.
 
         Returns:
             tuple[int,str]:
@@ -1303,21 +1934,24 @@ class DVD:
 
         file_handler = file_utils.File()
 
-        for cell_cord in cell_coords:
+        for cell_coord in cell_coords:
+            if cell_coord.video_data is None:
+                continue
+
             path_name, file_name, file_extn = file_handler.split_file_path(
-                cell_cord.video_data.menu_image_file_path
+                cell_coord.video_data.menu_image_file_path
             )
 
             # Setup required files
             menu_button_file = file_handler.file_join(path_name, file_name, file_extn)
             menu_button_text_file = file_handler.file_join(
-                path_name, f"{file_name}_text_{cell_cord.page}", file_extn
+                path_name, f"{file_name}_text_{cell_coord.page}", file_extn
             )
 
             if not file_handler.file_exists(menu_button_file):
                 return -1, f"Video File Does Not Exist : {menu_button_file}"
 
-            menu_text = cell_cord.video_data.video_file_settings.button_title
+            menu_text = cell_coord.video_data.video_file_settings.button_title
 
             result, message = dvdarch_utils.Overlay_Text(
                 in_file=menu_button_file,
@@ -1358,15 +1992,15 @@ class DVD:
             - arg 2: Number of rows in the page grid.
             - arg 3: Number of columns in the page grid.
         """
-        assert (
-            isinstance(num_buttons, int) and num_buttons > 0
-        ), f"{num_buttons=}. Must be int > 0"
-        assert (
-            isinstance(buttons_per_page, int) and buttons_per_page > 0
-        ), f"{buttons_per_page=}. Must be int > 0"
-        assert (
-            isinstance(buttons_across, int) and buttons_across > 0
-        ), f"{buttons_across=}. Must be int > 0"
+        assert isinstance(num_buttons, int) and num_buttons > 0, (
+            f"{num_buttons=}. Must be int > 0"
+        )
+        assert isinstance(buttons_per_page, int) and buttons_per_page > 0, (
+            f"{buttons_per_page=}. Must be int > 0"
+        )
+        assert isinstance(buttons_across, int) and buttons_across > 0, (
+            f"{buttons_across=}. Must be int > 0"
+        )
 
         pages = []
         button_count = 0
@@ -1415,7 +2049,7 @@ class DVD:
         border_left: int = 0,
         border_bottom: int = 15,
         border_right: int = 0,
-    ) -> tuple[list[_Cell_Coords], str]:
+    ) -> tuple[list[_Cell_Coord], str]:
         """
         Generates a layout of rectangles with fixed size borders on each edge,
         arranged to fit within a canvas of fixed aspect ratio.
@@ -1432,36 +2066,38 @@ class DVD:
             border_right (int): The width of the border at the right edge of the canvas.
 
         Returns:
-            tuple[list[_Cell_Coords], str]:
+            tuple[list[_Cell_Coord], str]:
             - arg 1: A list of _Cell_Coords objects representing the layout of the rectangles within the canvas.
             - arg 2 : An error message if there is an error.
 
         """
-        assert (
-            isinstance(num_buttons, int) and num_buttons > 0
-        ), f"{num_buttons=}. Must be int > than zero"
-        assert (
-            isinstance(button_aspect_ratio, float) and button_aspect_ratio > 0
-        ), f"{button_aspect_ratio=}. Must be float > than zero"
-        assert isinstance(
-            dvd_dims, dvdarch_utils.Dvd_Dims
-        ), f"{dvd_dims=}. Must be a valid dvd_dims object"
-        assert (
-            isinstance(border_top, int) and border_top >= 0
-        ), f"{border_top=}. Must be int >= than zero"
-        assert (
-            isinstance(border_left, int) and border_left >= 0
-        ), f"{border_left=}. Must be int >= than zero"
-        assert (
-            isinstance(border_bottom, int) and border_bottom >= 0
-        ), f"{border_bottom=}. Must be int >= than zero"
-        assert (
-            isinstance(border_right, int) and border_right >= 0
-        ), f"{border_right=}. Must be int >= than zero"
+        assert isinstance(num_buttons, int) and num_buttons > 0, (
+            f"{num_buttons=}. Must be int > 0"
+        )
+        assert isinstance(button_aspect_ratio, float) and button_aspect_ratio > 0, (
+            f"{button_aspect_ratio=}. Must be float > 0"
+        )
+        assert isinstance(dvd_dims, dvdarch_utils.Dvd_Dims), (
+            f"{dvd_dims=}. Must be a valid dvd_dims object"
+        )
+        assert isinstance(border_top, int) and border_top >= 0, (
+            f"{border_top=}. Must be int >= 0"
+        )
+        assert isinstance(border_left, int) and border_left >= 0, (
+            f"{border_left=}. Must be int >= 0"
+        )
+        assert isinstance(border_bottom, int) and border_bottom >= 0, (
+            f"{border_bottom=}. Must be int >= 0"
+        )
+        assert isinstance(border_right, int) and border_right >= 0, (
+            f"{border_right=}. Must be int >= 0"
+        )
 
         # TODO Make these values configurable
         header_pad = 10  # Feel good thing
         button_padding = 20  # Min value that works with spumux
+
+        pointer_path_data: "_Menu_Pointer_Data" = None
 
         # This keeps spumux happy
         if border_right < self._SPUMUX_BUFFER:
@@ -1480,6 +2116,19 @@ class DVD:
         )
 
         num_pages = math.ceil(num_buttons / buttons_per_page)
+
+        if num_pages > 1:
+            pointer_path_data = self._Menu_Pointer_Data(
+                background_canvas_file=self._background_canvas_file,
+                dvd_config=self.dvd_config,
+                spumux_buffer=self._SPUMUX_BUFFER,
+            )
+
+            if pointer_path_data.error_code == -1:
+                return (
+                    [],
+                    "Failed To Get Page Pointer Path & Size",
+                )
 
         pages, num_rows, num_cols = self._build_page_grid(
             num_buttons=num_buttons,
@@ -1573,7 +2222,8 @@ class DVD:
                         )
 
                     cell_cords.append(
-                        _Cell_Coords(
+                        _Cell_Coord(
+                            name=f"button_{file_index}",
                             x0=x,
                             y0=y,
                             x1=x + rect_width,
@@ -1588,6 +2238,50 @@ class DVD:
                     )
                     file_index += 1
                     col_index += 1
+            if pointer_path_data:  # Add page pointers
+                # Left Pointer
+                cell_cords.append(
+                    _Cell_Coord(
+                        name=f"left_pointer_{file_index + 1}",
+                        x0=pointer_path_data.left_x_offset,
+                        y0=pointer_path_data.left_y_offset,
+                        x1=pointer_path_data.left_x_offset + pointer_path_data.width,
+                        y1=pointer_path_data.left_y_offset + pointer_path_data.height,
+                        width=pointer_path_data.width
+                        + button_padding,  # Provide space between buttons
+                        height=pointer_path_data.height
+                        + button_padding,  # Provide space between buttons
+                        page=page_index,
+                        video_data=None,
+                        cargo={
+                            "pointer_data": pointer_path_data,
+                            "left": page_index - 1 if page_index > 0 else num_pages,
+                        },
+                    )
+                )
+
+                # Right Pointer
+                cell_cords.append(
+                    _Cell_Coord(
+                        name=f"right_pointer_{file_index + 2}",
+                        x0=pointer_path_data.right_x_offset,
+                        y0=pointer_path_data.right_y_offset,
+                        x1=pointer_path_data.right_x_offset + pointer_path_data.width,
+                        y1=pointer_path_data.right_y_offset + pointer_path_data.height,
+                        width=pointer_path_data.width
+                        + button_padding,  # Provide space between buttons
+                        height=pointer_path_data.height
+                        + button_padding,  # Provide space between buttons
+                        page=page_index,
+                        video_data=None,
+                        cargo={
+                            "pointer_data": pointer_path_data,
+                            "right": page_index + 1
+                            if page_index < num_pages - 1
+                            else 0,
+                        },
+                    )
+                )
 
         return cell_cords, ""
 
@@ -1601,7 +2295,7 @@ class DVD:
         border_left: int = 0,
         border_bottom: int = 15,
         border_right: int = 0,
-    ) -> tuple[list[_Cell_Coords], str]:
+    ) -> tuple[list[_Cell_Coord], str]:
         """
         Generates a layout of rectangles with fixed size borders on each edge,
         arranged to fit, according to assigned dvd pages.
@@ -1616,14 +2310,44 @@ class DVD:
             border_bottom (int): The width of the border at the bottom edge of the canvas.
             border_right (int): The width of the border at the right edge of the canvas.
         Returns:
-            tuple[list[_Cell_Coords], str]:
+            tuple[list[_Cell_Coord], str]:
             - arg 1: A list of _Cell_Coords objects representing the layout of the rectangles within the canvas.
             - arg 2 : An error message if there is an error.
 
         """
+        assert isinstance(buttons_per_page, int) and buttons_per_page > 0, (
+            f"{buttons_per_page=}. Must be int > 0"
+        )
+        assert isinstance(buttons_across, int) and buttons_across > 0, (
+            f"{buttons_across=}. Must be int > 0"
+        )
+        assert isinstance(button_aspect_ratio, float) and button_aspect_ratio > 0, (
+            f"{button_aspect_ratio=}. Must be float > 0"
+        )
+        assert isinstance(button_aspect_ratio, float) and button_aspect_ratio > 0, (
+            f"{button_aspect_ratio=}. Must be float > 0"
+        )
+        assert isinstance(dvd_dims, dvdarch_utils.Dvd_Dims), (
+            f"{dvd_dims=}. Must be a valid dvd_dims object"
+        )
+        assert isinstance(border_top, int) and border_top >= 0, (
+            f"{border_top=}. Must be int >= 0"
+        )
+        assert isinstance(border_left, int) and border_left >= 0, (
+            f"{border_left=}. Must be int >= 0"
+        )
+        assert isinstance(border_bottom, int) and border_bottom >= 0, (
+            f"{border_bottom=}. Must be int >= 0"
+        )
+        assert isinstance(border_right, int) and border_right >= 0, (
+            f"{border_right=}. Must be int >= 0"
+        )
+
         # TODO Make these values configurable
         header_pad = 10  # Feel good thing
         button_padding = 20  # Min value that works with spumux
+
+        pointer_path_data: "_Menu_Pointer_Data" = None
 
         # This keeps spumux happy
         if border_right < self._SPUMUX_BUFFER:
@@ -1644,6 +2368,19 @@ class DVD:
         num_pages = (
             self.dvd_config.input_videos[-1].dvd_page + 1
         )  # dvd_page is zero based
+
+        if num_pages > 1:
+            pointer_path_data = self._Menu_Pointer_Data(
+                background_canvas_file=self._background_canvas_file,
+                dvd_config=self.dvd_config,
+                spumux_buffer=self._SPUMUX_BUFFER,
+            )
+
+            if pointer_path_data.error_code == -1:
+                return (
+                    [],
+                    "Failed To Get Page Pointer Path & Size",
+                )
 
         if buttons_per_page == 1:
             buttons_down = 1
@@ -1761,7 +2498,8 @@ class DVD:
                         )
 
                     cell_cords.append(
-                        _Cell_Coords(
+                        _Cell_Coord(
+                            name=f"button_{file_index}",
                             x0=x,
                             y0=y,
                             x1=x + rect_width,
@@ -1776,6 +2514,48 @@ class DVD:
                     )
                     file_index += 1
                     col_index += 1
+            if pointer_path_data:  # Add page pointers
+                # Left Pointer
+                cell_cords.append(
+                    _Cell_Coord(
+                        name=f"left_pointer_{file_index + 1}",
+                        x0=pointer_path_data.left_x_offset,
+                        y0=pointer_path_data.left_y_offset,
+                        x1=pointer_path_data.left_x_offset + pointer_path_data.width,
+                        y1=pointer_path_data.left_y_offset + pointer_path_data.height,
+                        width=pointer_path_data.width,
+                        height=pointer_path_data.height
+                        + button_padding,  # Provide space between buttons
+                        page=page_index,
+                        video_data=None,
+                        cargo={
+                            "pointer_data": pointer_path_data,
+                            "left": page_index - 1 if page_index > 0 else num_pages,
+                        },
+                    )
+                )
+
+                # Right Pointer
+                cell_cords.append(
+                    _Cell_Coord(
+                        name=f"right_button_{file_index + 2}",
+                        x0=pointer_path_data.right_x_offset,
+                        y0=pointer_path_data.right_y_offset,
+                        x1=pointer_path_data.right_x_offset + pointer_path_data.width,
+                        y1=pointer_path_data.right_y_offset + pointer_path_data.height,
+                        width=pointer_path_data.width,
+                        height=pointer_path_data.height
+                        + button_padding,  # Provide space between buttons
+                        page=page_index,
+                        video_data=None,
+                        cargo={
+                            "pointer_data": pointer_path_data,
+                            "right": page_index + 1
+                            if page_index < num_pages - 1
+                            else 0,
+                        },
+                    )
+                )
 
         return cell_cords, ""
 
@@ -1882,11 +2662,11 @@ class DVD:
 
         return 1, ""
 
-    def _prepare_buttons(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
+    def _prepare_buttons(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:
         """Prepares the buttons and places them on the requisite image files required to build a dvd menu.
 
         Args:
-            cell_coords (list[_Cell_Coords]): The list of cell coordinates.
+            cell_coords (list[_Cell_Coord]): The list of cell coordinates.
 
         Returns:
             tuple[int, str]: A tuple containing the following values:
@@ -1921,9 +2701,9 @@ class DVD:
                 isinstance(background_file_name, str)
                 and background_file_name.strip() != ""
             ), f"{background_file_name=}. Must be non-empty str"
-            assert (
-                isinstance(page_no, int) and page_no >= 0
-            ), f"{page_no=}. Must be int >= 0"
+            assert isinstance(page_no, int) and page_no >= 0, (
+                f"{page_no=}. Must be int >= 0"
+            )
 
             canvas_overlay_file = file_handler.file_join(
                 background_path_name,
@@ -1988,9 +2768,9 @@ class DVD:
             """
             # Check that the width and height are positive integers
             assert isinstance(width, int) and width > 0, f"{width=}. Must be int >= 0 "
-            assert (
-                isinstance(height, int) and height > 0
-            ), f"{height=}. Must be int >= 0 "
+            assert isinstance(height, int) and height > 0, (
+                f"{height=}. Must be int >= 0 "
+            )
             assert (
                 isinstance(canvas_overlay_file, str)
                 and canvas_overlay_file.strip() != ""
@@ -2045,15 +2825,15 @@ class DVD:
             """
             assert isinstance(width, int), f"{width=}. Must be int >= 0"
             assert isinstance(height, int), f"{height=} . Must be int >= 0"
-            assert (
-                isinstance(overlay_file, str) and overlay_file.strip() != ""
-            ), f"{overlay_file=}. Must be non-empty str"
-            assert (
-                isinstance(highlight_file, str) and highlight_file.strip() != ""
-            ), f"{highlight_file} . Must be non-empty str"
-            assert (
-                isinstance(selected_file, str) and selected_file.strip() != ""
-            ), f"{selected_file} . Must be non-empty str"
+            assert isinstance(overlay_file, str) and overlay_file.strip() != "", (
+                f"{overlay_file=}. Must be non-empty str"
+            )
+            assert isinstance(highlight_file, str) and highlight_file.strip() != "", (
+                f"{highlight_file} . Must be non-empty str"
+            )
+            assert isinstance(selected_file, str) and selected_file.strip() != "", (
+                f"{selected_file} . Must be non-empty str"
+            )
             assert (
                 isinstance(highlight_border_colour, str)
                 and highlight_border_colour.strip() != ""
@@ -2065,7 +2845,7 @@ class DVD:
 
             # Create the 3 outline files we will need - highlight, select, overlay
             for file in (
-                (overlay_file, ""),
+                (overlay_file, "transparent"),
                 (highlight_file, highlight_border_colour),
                 (selected_file, select_border_colour),
             ):
@@ -2127,19 +2907,15 @@ class DVD:
 
         def _write_spumux_xml(
             page: int,
-            prev_page: int,
-            canvas_highlight_file: str,
-            canvas_select_file: str,
+            spu_buttons: list[dict[str, str]],
             background_path_name: str,
         ) -> tuple[int, str]:
             """
-            Write spumux xml file for a new page.
+            Writes a spumux xml file for the page.
 
             Args:
                 page (int): The current page number.
-                prev_page (int): The previous page number.
-                canvas_highlight_file (str): The filename of the highlight overlay file.
-                canvas_select_file (str): The filename of the select overlay file.
+                spu_buttons (list[dict[str, str]]): A list of dictionaries defining the spu buttons.
                 background_path_name (str): The path name for the background file.
 
             Returns:
@@ -2147,46 +2923,56 @@ class DVD:
 
             """
             assert isinstance(page, int), f"{page=}. Must be int"
-            assert isinstance(prev_page, int), f"{prev_page}. Must be int"
-            assert (
-                isinstance(canvas_highlight_file, str)
-                and canvas_highlight_file.strip() != ""
-            ), f"{canvas_highlight_file=}. Must be str"
-            assert (
-                isinstance(canvas_select_file, str) and canvas_select_file.strip() != ""
-            ), f"{canvas_select_file}. Must be str"
+
             assert (
                 isinstance(background_path_name, str)
                 and background_path_name.strip() != ""
             ), f"{background_path_name}. Must be str"
 
-            spumux_dict = {
-                "subpictures": {
-                    "@format": self.dvd_config.video_standard,
-                    "stream": {
-                        "spu": {
-                            "@force": "yes" if prev_page == 0 else "no",
-                            "@start": "00:00:00.00",
-                            "@image": canvas_highlight_file,  # canvas_overlay_file,
-                            "@highlight": canvas_highlight_file,
-                            "@select": canvas_select_file,
-                            "@autooutline": "infer",
-                            "@outlinewidth": "6",
-                            "@autoorder": "rows",
-                            # "button": spu_buttons #TODO For Later
-                        }
-                    },
-                }
-            }
+            file_handler = file_utils.File()
+
+            (
+                result,
+                canvas_overlay_file,
+                canvas_highlight_file,
+                canvas_select_file,
+                _,
+            ) = _get_canvas_overlay_files(
+                background_path_name=background_path_name,
+                background_file_name=background_file_name,
+                page_no=page_number,
+            )
+
+            if result == -1:
+                return (
+                    -1,
+                    canvas_overlay_file,
+                )  # Holds error message if result is -1
 
             spumux_xml = file_handler.file_join(
-                background_path_name, f"spumux_{page}", "xml"
+                background_path_name, f"spumux_{page_number}", "xml"
             )
 
             try:
                 with open(spumux_xml, "w") as result_file:
                     xmltodict.unparse(
-                        input_dict=spumux_dict, output=result_file, pretty=True
+                        input_dict={
+                            "subpictures": {
+                                "@format": self.dvd_config.video_standard,
+                                "stream": {
+                                    "spu": {
+                                        "@force": "yes",
+                                        "@start": "00:00:00.00",
+                                        "@image": canvas_overlay_file,
+                                        "@highlight": canvas_highlight_file,
+                                        "@select": canvas_select_file,
+                                        "button": spu_buttons,
+                                    }
+                                },
+                            }
+                        },
+                        output=result_file,
+                        pretty=True,
                     )
             except IOError:
                 return -1, f"Sys Error: Could Not Write {spumux_xml}"
@@ -2194,340 +2980,267 @@ class DVD:
             return 1, ""
 
         # ===== Main
-        assert isinstance(
-            cell_coords, list
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
-        assert all(
-            isinstance(item, _Cell_Coords) for item in cell_coords
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
-
+        assert isinstance(cell_coords, list), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
+        assert all(isinstance(item, _Cell_Coord) for item in cell_coords), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
         file_handler = file_utils.File()
 
-        pointer_left = "pointer_left"
-        pointer_right = "pointer_right"
-
-        # TODO Make sys_consts.ICON_PATH user configurable
-        page_pointer_left_file = file_handler.file_join(
-            sys_consts.ICON_PATH, self.dvd_config.page_pointer_left_file
-        )
-        page_pointer_right_file = file_handler.file_join(
-            sys_consts.ICON_PATH, self.dvd_config.page_pointer_right_file
+        background_path_name, background_file_name, _ = file_handler.split_file_path(
+            self._background_canvas_file
         )
 
-        left_path, left_file, left_extn = file_handler.split_file_path(
-            page_pointer_left_file
-        )
-        right_path, right_file, right_extn = file_handler.split_file_path(
-            page_pointer_right_file
-        )
-
-        right_pointer_file = right_file
-        left_pointer_file = left_file
-        pointer_file_extn = left_extn
-
-        left_pointer_icon_path = file_handler.file_join(
-            sys_consts.ICON_PATH,
-            left_pointer_file,
-            pointer_file_extn,
-        )
-
-        right_pointer_icon_path = file_handler.file_join(
-            sys_consts.ICON_PATH,
-            right_pointer_file,
-            pointer_file_extn,
-        )
-
-        pointer_width, pointer_height, message = dvdarch_utils.Get_Image_Size(
-            left_pointer_icon_path
-        )  # Assume left and right are the same size
-
-        if pointer_width == -1 and pointer_height == -1:
-            return -1, message
-
-        (
-            background_path_name,
-            background_file_name,
-            _,
-        ) = file_handler.split_file_path(self._background_canvas_file)
+        # ----- Write out spumux files #
+        spu_pages = {}
 
         canvas_width, canvas_height, message = dvdarch_utils.Get_Image_Size(
             self._background_canvas_file
         )
 
-        if canvas_width == -1 and canvas_height == -1:
+        if canvas_width == -1:  # Error
             return -1, message
 
-        max_page_no = cell_coords[-1].page + 1  # Zero based
-        prev_page = -1
-
-        left_x = self._SPUMUX_BUFFER
-        left_y = canvas_height - (pointer_height + self._SPUMUX_BUFFER)
-        right_x = canvas_width - (pointer_width + self._SPUMUX_BUFFER)
-        right_y = canvas_height - (pointer_height + self._SPUMUX_BUFFER)
-
-        # ----- Write out spumux files # TODO Enhance with button name/pos/action, split out to another method then
-        prev_page = -1
-
         for cell_index, cell_coord in enumerate(cell_coords):
-            if (
-                prev_page != cell_coord.page
-                or cell_index == 0
-                or cell_index == len(cell_coords) - 1
-            ):  # Page break
-                prev_page = cell_coord.page
+            page_number = cell_coord.page  # Get the page number from the cell
 
-                (
-                    result,
-                    canvas_overlay_file,
-                    canvas_highlight_file,
-                    canvas_select_file,
-                    canvas_images_file,
-                ) = _get_canvas_overlay_files(
-                    background_path_name=background_path_name,
-                    background_file_name=background_file_name,
-                    page_no=cell_coord.page,
+            if page_number not in spu_pages:
+                spu_pages[page_number] = []
+
+            spu_pages[page_number].append(cell_coord)
+
+        button_index = 0
+
+        for page_number in spu_pages:
+            spu_buttons = []
+            for cell_coord in spu_pages[page_number]:
+                button_x0 = cell_coord.x0
+                button_y0 = cell_coord.y0
+                button_x1 = cell_coord.x0 + cell_coord.width
+                button_y1 = cell_coord.y0 + cell_coord.height
+
+                # Need to ensure y co-ordinates are even to keep some DVD players happy
+                if button_y0 % 2 != 0:
+                    button_y0 = button_y0 - 1 if button_y0 > 0 else button_y0 + 1
+
+                if button_y1 % 2 != 0:
+                    button_y1 += 1
+
+                spu_buttons.append(
+                    {
+                        "@name": f"{cell_coord.name}",
+                        "@x0": button_x0,
+                        "@y0": button_y0,
+                        "@x1": button_x1,
+                        "@y1": button_y1,
+                    },
                 )
 
-                if result == -1:
-                    return (
-                        -1,
-                        canvas_overlay_file,
-                    )  # Holds error message if result is -1
+                button_index += 1
 
-                result, message = _write_spumux_xml(
-                    page=cell_coord.page,
-                    prev_page=-prev_page,
-                    canvas_highlight_file=canvas_highlight_file,
-                    canvas_select_file=canvas_select_file,
+            if spu_buttons:  # Write out spumux file
+                resut, message = _write_spumux_xml(
+                    page=page_number,
+                    spu_buttons=spu_buttons,
                     background_path_name=background_path_name,
+                )
+
+                if resut == -1:
+                    return -1, message
+
+            # Now generate required image files
+            (
+                result,
+                canvas_overlay_file,
+                canvas_highlight_file,
+                canvas_select_file,
+                canvas_images_file,
+            ) = _get_canvas_overlay_files(
+                background_path_name=background_path_name,
+                background_file_name=background_file_name,
+                page_no=page_number,
+            )
+
+            if result == -1:
+                return (
+                    -1,
+                    canvas_overlay_file,
+                )  # Holds error message if result is -1
+
+            command = [
+                sys_consts.CONVERT,
+                self._background_canvas_file,
+                canvas_images_file,
+            ]
+
+            result, message = dvdarch_utils.Execute_Check_Output(commands=command)
+
+            if result == -1:
+                return -1, message
+
+            menu_title = self.dvd_config.menu_title[page_number]
+
+            if menu_title.strip() != "":
+                result, message = dvdarch_utils.Overlay_Text(
+                    in_file=canvas_images_file,
+                    text=menu_title,
+                    text_font=self.dvd_config.menu_font,
+                    text_pointsize=self.dvd_config.menu_font_point_size,
+                    text_color=self.dvd_config.menu_font_color,
+                    position="top",
+                    background_color=self.dvd_config.menu_background_color,
+                    opacity=0.9,
                 )
 
                 if result == -1:
                     return -1, message
 
-        else:
-            result, message = _write_spumux_xml(
-                page=cell_coord.page,
-                prev_page=-prev_page,
+            result, message = _create_canvas_files(
+                width=canvas_width,
+                height=canvas_height,
+                canvas_overlay_file=canvas_overlay_file,
                 canvas_highlight_file=canvas_highlight_file,
                 canvas_select_file=canvas_select_file,
-                background_path_name=background_path_name,
             )
 
             if result == -1:
                 return -1, message
 
-        # ---------- Write Out Required graphics Files
-        prev_page = -1
+            for cell_coord in spu_pages[page_number]:
+                if cell_coord.video_data is None:  # Menu pointer images
+                    if "pointer_data" not in cell_coord.cargo:
+                        return -1, "Error: pointer_data not in cell_coord.cargo"
 
-        for cell_index, cell_coord in enumerate(cell_coords):
-            (
-                button_overlay_file,
-                button_highlight_file,
-                button_select_file,
-                button_text_file,
-            ) = cell_coord.get_mask_filenames()
+                    pointer_data: "_Menu_Pointer_Data" = cell_coord.cargo[
+                        "pointer_data"
+                    ]
 
-            width, height, message = dvdarch_utils.Get_Image_Size(button_text_file)
+                    (
+                        left_pointer_overlay_file,
+                        left_pointer_highlight_file,
+                        left_pointer_select_file,
+                        _,
+                    ) = cell_coord.get_mask_filenames(pointer_data.left_icon_path)
 
-            if width == -1 and height == -1:
-                return -1, message
+                    (
+                        right_pointer_overlay_file,
+                        right_pointer_highlight_file,
+                        right_pointer_select_file,
+                        _,
+                    ) = cell_coord.get_mask_filenames(pointer_data.right_icon_path)
 
-            x_padding = math.floor((cell_coord.width - width) / 2)
-            y_padding = math.floor((cell_coord.height - height) / 2)
-
-            button_x = cell_coord.x0 + x_padding
-            button_y = cell_coord.y0 + y_padding
-
-            if (
-                prev_page != cell_coord.page or cell_index > len(cell_coords) - 1
-            ):  # Page break
-                prev_page = cell_coord.page
-
-                (
-                    result,
-                    canvas_overlay_file,
-                    canvas_highlight_file,
-                    canvas_select_file,
-                    canvas_images_file,
-                ) = _get_canvas_overlay_files(
-                    background_path_name=background_path_name,
-                    background_file_name=background_file_name,
-                    page_no=cell_coord.page,
-                )
-
-                if result == -1:
-                    return (
-                        -1,
-                        canvas_overlay_file,
-                    )  # Holds error message if result is -1
-
-                command = [
-                    sys_consts.CONVERT,
-                    self._background_canvas_file,
-                    canvas_images_file,
-                ]
-
-                result, message = dvdarch_utils.Execute_Check_Output(commands=command)
-
-                if result == -1:
-                    return -1, message
-
-                if cell_coord.page <= len(self.dvd_config.menu_title) - 1:
-                    menu_title = self.dvd_config.menu_title[cell_coord.page]
-                else:
-                    menu_title = ""
-
-                if menu_title.strip() != "":
-                    result, message = dvdarch_utils.Overlay_Text(
-                        in_file=canvas_images_file,
-                        text=menu_title,
-                        text_font=self.dvd_config.menu_font,
-                        text_pointsize=self.dvd_config.menu_font_point_size,
-                        text_color=self.dvd_config.menu_font_color,
-                        position="top",
-                        background_color=self.dvd_config.menu_background_color,
-                        opacity=0.9,
+                    result, message = _create_outline_files(
+                        width=pointer_data.width,
+                        height=pointer_data.height,
+                        overlay_file=left_pointer_overlay_file,
+                        highlight_file=left_pointer_highlight_file,
+                        selected_file=left_pointer_select_file,
+                        highlight_border_colour="gold",
+                        select_border_colour="white",
                     )
 
                     if result == -1:
                         return -1, message
 
-                result, message = _create_canvas_files(
-                    width=canvas_width,
-                    height=canvas_height,
-                    canvas_overlay_file=canvas_overlay_file,
-                    canvas_highlight_file=canvas_highlight_file,
-                    canvas_select_file=canvas_select_file,
-                )
+                    result, message = _create_outline_files(
+                        width=pointer_data.width,
+                        height=pointer_data.height,
+                        overlay_file=right_pointer_overlay_file,
+                        highlight_file=right_pointer_highlight_file,
+                        selected_file=right_pointer_select_file,
+                        highlight_border_colour="gold",
+                        select_border_colour="white",
+                    )
 
-                if result == -1:
-                    return -1, message
+                    if result == -1:
+                        return -1, message
 
-            # Create button outline files
-            result, message = _create_outline_files(
-                width=width,
-                height=height,
-                overlay_file=button_overlay_file,
-                highlight_file=button_highlight_file,
-                selected_file=button_select_file,
-                highlight_border_colour="gold",
-                select_border_colour="white",
-            )
+                    # Overlay the pointer outline files on the canvas
+                    left_overlay_files = (
+                        (canvas_overlay_file, left_pointer_overlay_file),
+                        (canvas_select_file, left_pointer_select_file),
+                        (canvas_highlight_file, left_pointer_highlight_file),
+                        (canvas_images_file, pointer_data.left_icon_path),
+                    )
 
-            if result == -1:
-                return -1, message
+                    right_overlay_files = (
+                        (canvas_overlay_file, right_pointer_overlay_file),
+                        (canvas_select_file, right_pointer_select_file),
+                        (canvas_highlight_file, right_pointer_highlight_file),
+                        (canvas_images_file, pointer_data.right_icon_path),
+                    )
 
-            # Overlay the button outline files on the canvas
-            overlay_files = (
-                (canvas_overlay_file, button_overlay_file),
-                (canvas_select_file, button_select_file),
-                (canvas_highlight_file, button_highlight_file),
-                (canvas_images_file, button_text_file),
-            )
+                    result, message = _overlay_files(
+                        x=pointer_data.left_x_offset,
+                        y=pointer_data.left_y_offset,
+                        files=left_overlay_files,
+                    )
 
-            result, message = _overlay_files(
-                x=button_x, y=button_y, files=overlay_files
-            )
+                    if result == -1:
+                        return -1, message
 
-            if result == -1:
-                return -1, message
+                    result, message = _overlay_files(
+                        x=pointer_data.right_x_offset,
+                        y=pointer_data.right_y_offset,
+                        files=right_overlay_files,
+                    )
 
-            if max_page_no > 1:  # Need pointers to access pages
-                path_name, _, _ = file_handler.split_file_path(
-                    cell_coord.video_data.menu_image_file_path
-                )
-                left_pointer_path = file_handler.file_join(
-                    path_name,
-                    f"{pointer_left}_{cell_coord.page}",
-                    pointer_file_extn,
-                )
+                    if result == -1:
+                        return -1, message
 
-                right_pointer_path = file_handler.file_join(
-                    path_name,
-                    f"{pointer_right}_{cell_coord.page}",
-                    pointer_file_extn,
-                )
+                else:  # Vido Button images
+                    (
+                        button_overlay_file,
+                        button_highlight_file,
+                        button_select_file,
+                        button_text_file,
+                    ) = cell_coord.get_mask_filenames()
 
-                (
-                    left_pointer_overlay_file,
-                    left_pointer_highlight_file,
-                    left_pointer_select_file,
-                    _,
-                ) = cell_coord.get_mask_filenames(left_pointer_path)
+                    width, height, message = dvdarch_utils.Get_Image_Size(
+                        button_text_file
+                    )
 
-                (
-                    right_pointer_overlay_file,
-                    right_pointer_highlight_file,
-                    right_pointer_select_file,
-                    _,
-                ) = cell_coord.get_mask_filenames(right_pointer_path)
+                    if width == -1 or height == -1:
+                        return -1, message
 
-                # Create pointer outline files
-                result, message = _create_outline_files(
-                    width=pointer_width,
-                    height=pointer_height,
-                    overlay_file=left_pointer_overlay_file,
-                    highlight_file=left_pointer_highlight_file,
-                    selected_file=left_pointer_select_file,
-                    highlight_border_colour="gold",
-                    select_border_colour="white",
-                )
+                    # Create button outline files
+                    result, message = _create_outline_files(
+                        width=cell_coord.width,
+                        height=cell_coord.height,
+                        overlay_file=button_overlay_file,
+                        highlight_file=button_highlight_file,
+                        selected_file=button_select_file,
+                        highlight_border_colour="gold",
+                        select_border_colour="white",
+                    )
 
-                if result == -1:
-                    return -1, message
+                    if result == -1:
+                        return -1, message
 
-                result, message = _create_outline_files(
-                    width=pointer_width,
-                    height=pointer_height,
-                    overlay_file=right_pointer_overlay_file,
-                    highlight_file=right_pointer_highlight_file,
-                    selected_file=right_pointer_select_file,
-                    highlight_border_colour="gold",
-                    select_border_colour="white",
-                )
+                    # Overlay the button outline files on the canvas
+                    overlay_files = (
+                        (canvas_overlay_file, button_overlay_file),
+                        (canvas_select_file, button_select_file),
+                        (canvas_highlight_file, button_highlight_file),
+                        (canvas_images_file, button_text_file),
+                    )
 
-                if result == -1:
-                    return -1, message
+                    result, message = _overlay_files(
+                        x=cell_coord.x0, y=cell_coord.y0, files=overlay_files
+                    )
 
-                # Overlay the pointer outline files on the canvas
-                left_overlay_files = (
-                    (canvas_overlay_file, left_pointer_overlay_file),
-                    (canvas_select_file, left_pointer_select_file),
-                    (canvas_highlight_file, left_pointer_highlight_file),
-                    (canvas_images_file, left_pointer_icon_path),
-                )
-
-                right_overlay_files = (
-                    (canvas_overlay_file, right_pointer_overlay_file),
-                    (canvas_select_file, right_pointer_select_file),
-                    (canvas_highlight_file, right_pointer_highlight_file),
-                    (canvas_images_file, right_pointer_icon_path),
-                )
-
-                result, message = _overlay_files(
-                    x=left_x, y=left_y, files=left_overlay_files
-                )
-
-                if result == -1:
-                    return -1, message
-
-                result, message = _overlay_files(
-                    x=right_x, y=right_y, files=right_overlay_files
-                )
-
-                if result == -1:
-                    return -1, message
-
+                    if result == -1:
+                        return -1, message
         return 1, ""
 
     def _resize_menu_button_images(
-        self, cell_coords: list[_Cell_Coords]
+        self, cell_coords: list[_Cell_Coord]
     ) -> tuple[int, str]:
         """Resize the menu buttons to fit on the grid layout
 
         Args:
-            cell_coords (list[_Cell_Coords]): The calculated grid layout
+            cell_coords (list[_Cell_Coord]): The calculated grid layout
 
         Returns:
             tuple[int,str]:
@@ -2535,15 +3248,18 @@ class DVD:
             - arg2: error message or "" if ok
 
         """
-        assert isinstance(
-            cell_coords, list
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
-        assert all(
-            isinstance(item, _Cell_Coords) for item in cell_coords
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert isinstance(cell_coords, list), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
+        assert all(isinstance(item, _Cell_Coord) for item in cell_coords), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
 
         for cell_coord in cell_coords:
-            if cell_coord.video_data.menu_image_file_path == "":
+            if (
+                cell_coord.video_data is None
+                or cell_coord.video_data.menu_image_file_path == ""
+            ):
                 continue
 
             result, message = dvdarch_utils.Resize_Image(
@@ -2606,12 +3322,12 @@ class DVD:
         return 1, ""
 
     def _convert_to_m2v(
-        self, cell_coords: list[_Cell_Coords], frames: int = 300
+        self, cell_coords: list[_Cell_Coord], frames: int = 300
     ) -> tuple[int, str]:
         """Converts the background_canvas_images_file into a short video stream for the DVD menu
 
         Args:
-            cell_coords (list[_Cell_Coords]): The calculated grid layout
+            cell_coords (list[_Cell_Coord]): The calculated grid layout
             frames (int, optional): Number of video frames in stream. Defaults to 300
 
         Returns:
@@ -2619,12 +3335,12 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        assert isinstance(
-            cell_coords, list
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
-        assert all(
-            isinstance(item, _Cell_Coords) for item in cell_coords
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert isinstance(cell_coords, list), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
+        assert all(isinstance(item, _Cell_Coord) for item in cell_coords), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
 
         file_handler = file_utils.File()
 
@@ -2634,20 +3350,23 @@ class DVD:
 
         prev_page = -1
 
-        for coord in cell_coords:
-            if prev_page != coord.page:
-                prev_page = coord.page
+        for cell_coord in cell_coords:
+            if cell_coord.video_data is None:
+                continue
+
+            if prev_page != cell_coord.page:
+                prev_page = cell_coord.page
 
                 background_canvas_images_file = file_handler.file_join(
-                    path_name, f"{file_name}_images_{coord.page}", file_extn
+                    path_name, f"{file_name}_images_{cell_coord.page}", file_extn
                 )
 
                 jpg_file = file_handler.file_join(
-                    path_name, f"{file_name}_jpgcvrt_{coord.page}", "jpg"
+                    path_name, f"{file_name}_jpgcvrt_{cell_coord.page}", "jpg"
                 )
 
                 m2v_file = file_handler.file_join(
-                    path_name, f"{file_name}_menu_video_{coord.page}", "m2v"
+                    path_name, f"{file_name}_menu_video_{cell_coord.page}", "m2v"
                 )
 
                 if not file_handler.file_exists(background_canvas_images_file):
@@ -2709,13 +3428,13 @@ class DVD:
         return 1, ""
 
     def _convert_audio(
-        self, cell_coords: list[_Cell_Coords], frames: int = 300
+        self, cell_coords: list[_Cell_Coord], frames: int = 300
     ) -> tuple[int, str]:
         """Generates the audio for the DVD menu. By default it is a empty soundtrack
         TODO Allow user selection of an audio file
 
         Args:
-            cell_coords (list[_Cell_Coords]): The calculated grid layout
+            cell_coords (list[_Cell_Coord]): The calculated grid layout
             frames (int, optional): Number of video frames - determines length of
             audio. Defaults to 300.
 
@@ -2724,12 +3443,12 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        assert isinstance(
-            cell_coords, list
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
-        assert all(
-            isinstance(item, _Cell_Coords) for item in cell_coords
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert isinstance(cell_coords, list), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
+        assert all(isinstance(item, _Cell_Coord) for item in cell_coords), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
 
         file_handler = file_utils.File()
 
@@ -2739,12 +3458,15 @@ class DVD:
 
         prev_page = -1
 
-        for coord in cell_coords:
-            if prev_page != coord.page:
-                prev_page = coord.page
+        for cell_coord in cell_coords:
+            if cell_coord.video_data is None:
+                continue
+
+            if prev_page != cell_coord.page:
+                prev_page = cell_coord.page
 
                 ac3_file = file_handler.file_join(
-                    path_name, f"{file_name}_menu_video_{coord.page}", "ac3"
+                    path_name, f"{file_name}_menu_video_{cell_coord.page}", "ac3"
                 )
 
                 if self._dvd_config.video_standard == sys_consts.PAL:
@@ -2778,25 +3500,23 @@ class DVD:
 
         return 1, ""
 
-    def _multiplex_audio_video(
-        self, cell_coords: list[_Cell_Coords]
-    ) -> tuple[int, str]:
+    def _multiplex_audio_video(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:
         """Multiplexes the menu m2v file and the menu ac3 file to produce the menu mgp file
 
         Args:
-            cell_coords (list[_Cell_Coords]): The calculated grid layout
+            cell_coords (list[_Cell_Coord]): The calculated grid layout
 
         Returns:
             tuple[int,str]:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        assert isinstance(
-            cell_coords, list
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
-        assert all(
-            isinstance(item, _Cell_Coords) for item in cell_coords
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert isinstance(cell_coords, list), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
+        assert all(isinstance(item, _Cell_Coord) for item in cell_coords), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
 
         file_handler = file_utils.File()
 
@@ -2806,18 +3526,21 @@ class DVD:
 
         prev_page = -1
 
-        for coord in cell_coords:
-            if prev_page != coord.page:
-                prev_page = coord.page
+        for cell_coord in cell_coords:
+            if cell_coord.video_data is None:
+                continue
+
+            if prev_page != cell_coord.page:
+                prev_page = cell_coord.page
 
                 ac3_file = file_handler.file_join(
-                    path_name, f"{file_name}_menu_video_{coord.page}", "ac3"
+                    path_name, f"{file_name}_menu_video_{cell_coord.page}", "ac3"
                 )
                 m2v_file = file_handler.file_join(
-                    path_name, f"{file_name}_menu_video_{coord.page}", "m2v"
+                    path_name, f"{file_name}_menu_video_{cell_coord.page}", "m2v"
                 )
                 menu_video_file = file_handler.file_join(
-                    path_name, f"{file_name}_menu_video_{coord.page}", "mpg"
+                    path_name, f"{file_name}_menu_video_{cell_coord.page}", "mpg"
                 )
 
                 commands = [
@@ -2836,23 +3559,23 @@ class DVD:
                     return -1, message
         return 1, ""
 
-    def _create_menu_mpg(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
+    def _create_menu_mpg(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:
         """Creates the DVD menu mpg file via the dvdauthor application spumux
 
         Args:
-            cell_coords (list[_Cell_Coords]): The calculated grid layout
+            cell_coords (list[_Cell_Coord]): The calculated grid layout
 
         Returns:
             tuple[int,str]:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        assert isinstance(
-            cell_coords, list
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
-        assert all(
-            isinstance(item, _Cell_Coords) for item in cell_coords
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert isinstance(cell_coords, list), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
+        assert all(isinstance(item, _Cell_Coord) for item in cell_coords), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
 
         file_handler = file_utils.File()
 
@@ -2911,21 +3634,21 @@ class DVD:
 
         return 1, ""
 
-    def _create_dvd_image(self, cell_coords: list[_Cell_Coords]) -> tuple[int, str]:
+    def _create_dvd_image(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:
         """Creates the DVD Folder/File structure via the dvdauthor application
 
         Args:
-            cell_coords (list[_Cell_Coords]): The calculated grid layout
+            cell_coords (list[_Cell_Coord]): The calculated grid layout
 
         Returns:
             tuple[int, str]: arg 1 : 1 Ok, -1 Fail, arg 2 : "" if Ok otherwise Error Message
         """
-        assert isinstance(
-            cell_coords, list
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
-        assert all(
-            isinstance(item, _Cell_Coords) for item in cell_coords
-        ), f"{cell_coords=}. Must be a list of _Cell_Coords"
+        assert isinstance(cell_coords, list), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
+        assert all(isinstance(item, _Cell_Coord) for item in cell_coords), (
+            f"{cell_coords=}. Must be a list of _Cell_Coord"
+        )
 
         file_handler = file_utils.File()
         path_name, file_name, _ = file_handler.split_file_path(
@@ -2942,54 +3665,69 @@ class DVD:
             }
         }
 
-        page_max = cell_coords[-1].page + 1  # zero based
-        page_count = 0
-        button_count = 1
-        pgc = {"button": [], "vob": {"@pause": "inf"}}
+        spu_pages = {}
         pgcs = []
-        button_index = 0
-        arrow_index = 0
+        title_set_index = 0
 
-        # Build menu pass
-        for menu_index, coord in enumerate(cell_coords):
-            coord: _Cell_Coords
+        # Create the DVD menu spu pages dictionary
+        for cell_index, cell_coord in enumerate(cell_coords):
+            page_number = cell_coord.page
 
-            button_index += 1
-            # TODO Specifically use buttons indices rather than relying on the auto feature of spumux
-            # pgc["button"].append({"@name":f"btn-{button_index}","#text":f"jump title {menu_index + 1};"})
-            pgc["button"].append(f"jump title {menu_index + 1};")
+            if page_number not in spu_pages:
+                spu_pages[page_number] = []
 
-            if (
-                button_count
-                == len([item for item in cell_coords if item.page == coord.page])
-                or menu_index == len(cell_coords) - 1
-            ):
-                page_count += 1
+            spu_pages[page_number].append(cell_coord)
 
-                if page_max > 1:
-                    prev_index = page_count - 1 if page_count > 1 else page_max
-                    next_index = page_count + 1 if page_count < page_max else 1
+        # Build dictionary of menu/button/title entries
+        for page_index, spu_page in enumerate(spu_pages):
+            prev_index = page_index - 1 if page_index > 0 else len(spu_pages) - 1
+            next_index = page_index + 1 if page_index < len(spu_pages) - 1 else 0
 
-                    arrow_index += 1
-                    # pgc["button"].append({"@name":f"ar-{arrow_index}","#text":f"jump vmgm menu {prev_index};"})
-                    pgc["button"].append(f"jump vmgm menu {prev_index};")
+            # Note: The buttons. titles and menu indicies are 1 based so need to add 1
+            menu_video_file = file_handler.file_join(
+                path_name, f"{file_name}_menu_video_buttons_{page_index}.mpg"
+            )
+            pgc = {"vob": {"@pause": "inf"}, "button": []}
 
-                    arrow_index += 1
-                    # pgc["button"].append({"@name":f"ar-{arrow_index}","#text":f"jump vmgm menu {next_index};"})
-                    pgc["button"].append(f"jump vmgm menu {next_index};")
-
-                menu_video_file = file_handler.file_join(
-                    path_name, f"{file_name}_menu_video_buttons_{page_count - 1}.mpg"
-                )
-
+            for cell_coord in spu_pages[spu_page]:
                 pgc["vob"]["@file"] = menu_video_file
+                if cell_coord.name.startswith("button"):
+                    pgc["button"].append({
+                        "@name": f"{cell_coord.name}",  # cell_coord.name,
+                        "#text": f"jump title {title_set_index + 1};",
+                    })
+                elif cell_coord.name.startswith("left"):
+                    pgc["button"].append({
+                        "@name": f"{cell_coord.name}",  # cell_coord.name,
+                        "#text": f"jump vmgm menu {prev_index + 1};",
+                    })
+                elif cell_coord.name.startswith("right"):
+                    pgc["button"].append({
+                        "@name": f"{cell_coord.name}",  # cell_coord.name,
+                        "#text": f"jump vmgm menu {next_index + 1};",
+                    })
 
-                pgcs.append(pgc)
+                if cell_coord.video_data is not None:
+                    vob_file = file_handler.file_join(
+                        self._vob_folder, cell_coord.video_data.video_file, "vob"
+                    )
 
-                pgc = {"button": [], "vob": {"@pause": "inf"}}
-                button_count = 0
+                    dvd_author_dict["dvdauthor"]["titleset"].append({
+                        "titles": {
+                            "video": {
+                                "@format": self.dvd_config.video_standard,
+                                "@aspect": cell_coord.video_data.encoding_info.video_ar,
+                            },
+                            "pgc": {
+                                "vob": {"@file": vob_file},
+                                "post": {f"call vmgm menu {page_index + 1};"},
+                            },
+                        }
+                    })
 
-            button_count += 1
+                    title_set_index += 1
+
+            pgcs.append(pgc)
 
         dvd_author_dict["dvdauthor"]["vmgm"]["menus"] = {
             "video": {
@@ -2999,26 +3737,7 @@ class DVD:
             "pgc": pgcs,
         }
 
-        # Build titleset pass
-        for coord in cell_coords:
-            vob_file = file_handler.file_join(
-                self._vob_folder, coord.video_data.video_file, "vob"
-            )
-
-            pgc: dict[str, dict[str, str]] = {"vob": {"@file": vob_file}}
-
-            pgc["vob"]["@pause"] = "inf"
-
-            dvd_author_dict["dvdauthor"]["titleset"].append({
-                "titles": {
-                    "video": {
-                        "@format": self.dvd_config.video_standard,
-                        "@aspect": coord.video_data.encoding_info.video_ar,
-                    },
-                    "pgc": pgc,
-                }
-            })
-
+        # Generate the DVDAuthor XML file
         dvd_author_file = file_handler.file_join(path_name, "dvd_author", "xml")
 
         try:
