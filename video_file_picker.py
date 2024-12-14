@@ -68,9 +68,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                 )
 
                 if video_folder is None or video_folder.strip() == "":
-                    video_folder = file_utils.Special_Path(
-                        sys_consts.SPECIAL_PATH.VIDEOS
-                    )
+                    video_folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
                     self._db_settings.setting_set(
                         sys_consts.VIDEO_IMPORT_FOLDER_DBK, video_folder
                     )
@@ -146,7 +144,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         if not file_handler.path_exists(
             video_folder
         ):  # Catch case where folder is not accessible
-            video_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            video_folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
 
         if video_folder.strip() != "":
             with qtg.sys_cursor(qtg.Cursor.hourglass):
