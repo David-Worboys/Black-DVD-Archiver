@@ -17,27 +17,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import datetime
 from collections import namedtuple
 from typing import Final
 
-import platformdirs
-
 import QTPYGUI.file_utils as file_utils
-import QTPYGUI.utils as utils
-
-# fmt: on
-
-executable_folder = file_utils.App_Path()
-
-file_sep = file_utils.File().ossep
-
-PROGRAM_NAME: Final[str] = "Black DVD Archiver"
-PROGRAM_VERSION: Final[str] = "β4.0.0"
-AUTHOR: Final[str] = "David Worboys"
-LICENCE: Final[str] = "GNU V3 GPL"
 
 
 def COPYRIGHT_YEAR() -> str:
@@ -52,12 +36,20 @@ def COPYRIGHT_YEAR() -> str:
     return f"{'2022' if str(datetime.date.today().year) == '2022' else '2022-' + str(datetime.date.today().year)}"
 
 
+executable_folder = file_utils.App_Path()
+
+file_sep = file_utils.File().ossep
+
+PROGRAM_NAME: Final[str] = "Black DVD Archiver"
+PROGRAM_VERSION: Final[str] = "β4.0.0"
+AUTHOR: Final[str] = "David Worboys"
+LICENCE: Final[str] = "GNU V3 GPL"
+
 VERSION_TAG = (
     f"{PROGRAM_VERSION} {LICENCE} (c){COPYRIGHT_YEAR()} {AUTHOR} (-:alumnus Moyhu"
     " Primary School et al.:-)"
 )
 
-SEED = "9d392b49808544f7bc5b93b935b76ced"
 SDELIM = (  # Used to delimit strings - particularly non-translatable sections of strings
     "||"
 )
@@ -80,7 +72,14 @@ TRANSCODE_H264: Final[str] = "H264"
 TRANSCODE_H265: Final[str] = "H265"
 PAL_SPECS = namedtuple(
     "PAL_SPECS",
-    ["width_43", "height_43", "width_169", "height_169", "frame_rate", "field_rate"],
+    [
+        "width_43",
+        "height_43",
+        "width_169",
+        "height_169",
+        "frame_rate",
+        "field_rate",
+    ],
 )(
     width_43=720,
     height_43=576,
@@ -91,7 +90,14 @@ PAL_SPECS = namedtuple(
 )
 NTSC_SPECS = namedtuple(
     "NTSC_SPECS",
-    ["width_43", "height_43", "width_169", "height_169", "frame_rate", "field_rate"],
+    [
+        "width_43",
+        "height_43",
+        "width_169",
+        "height_169",
+        "frame_rate",
+        "field_rate",
+    ],
 )(
     width_43=720,
     height_43=480,
@@ -103,10 +109,10 @@ NTSC_SPECS = namedtuple(
 
 SHELVE_FILE_EXTNS = ("dir", "dat", "bak", "project_files", "dvdmenu")
 # fmt: off
-VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp", 
-                    "3g2", "mj2","mkv","mpg","mpeg","ts", "m2ts", "mts","qt",
-                    "wmv", "asf","flv","f4v","ogg","ogv","rm", "rmvb","divx","mxf",
-                    "dv","mts")
+VIDEO_FILE_EXTNS = ("mp4", "avi", "mkv", "vob",'mod','mov','webm',"m4v","3gp",
+                        "3g2", "mj2","mkv","mpg","mpeg","ts", "m2ts", "mts","qt",
+                        "wmv", "asf","flv","f4v","ogg","ogv","rm", "rmvb","divx","mxf",
+                        "dv","mts")
 # fmt: on
 tool_app_folder: Final[str] = (
     f"{executable_folder}{file_sep}tool_apps{file_sep}usr{file_sep}bin{file_sep}"
@@ -213,14 +219,3 @@ PERCENT_SAFTEY_BUFFER: Final[int] = (
     5  # Used to limit DVD size so that it never exceeds 100%
 )
 DEFAULT_FONT: Final[str] = "IBMPlexMono-SemiBold.ttf"  # Packaged with DVD Archiver
-
-
-class SPECIAL_PATH(utils.strEnum):
-    """Contains enums for strings that represent special paths on the user's computer"""
-
-    DESKTOP: Final[str] = platformdirs.user_desktop_dir()
-    DOCUMENTS: Final[str] = platformdirs.user_documents_dir()
-    DOWNLOADS: Final[str] = platformdirs.user_downloads_dir()
-    MUSIC: Final[str] = platformdirs.user_music_dir()
-    PICTURES: Final[str] = platformdirs.user_pictures_dir()
-    VIDEOS: Final[str] = platformdirs.user_videos_dir()
