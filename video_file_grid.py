@@ -843,7 +843,9 @@ class Video_File_Grid(DVD_Archiver_Base):
                                 == "bff"
                                 else False,
                             )
-                        case "reencode_h264":  # Only one file selected  with this option
+                        case (
+                            "reencode_h264"
+                        ):  # Only one file selected  with this option
                             video_data = video_file_data[0]
                             result, message = dvdarch_utils.Transcode_H26x(
                                 input_file=video_data.video_path,
@@ -861,7 +863,9 @@ class Video_File_Grid(DVD_Archiver_Base):
                                 else False,
                                 h265=False,
                             )
-                        case "reencode_h265":  # Only one file selected  with this option
+                        case (
+                            "reencode_h265"
+                        ):  # Only one file selected  with this option
                             video_data = video_file_data[0]
                             result, message = dvdarch_utils.Transcode_H26x(
                                 input_file=video_data.video_path,
