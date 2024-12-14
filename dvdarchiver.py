@@ -20,8 +20,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 from typing import cast
 
 import platformdirs
@@ -35,15 +33,22 @@ import sys_consts
 from background_task_manager import Task_Manager_Popup
 from dvd import DVD, DVD_Config
 from menu_page_title_popup import Menu_Page_Title_Popup
-from sys_config import (DVD_Archiver_Base, DVD_Menu_Settings,
-                        Get_Video_Editor_Folder, Get_Project_Layout_Names,
-                        Set_Shelved_DVD_Layout, Video_Data, Migrate_Shelves_To_DB, Set_Shelved_Project, Delete_Project,
-                        Delete_DVD_Layout)
+from sys_config import (
+    DVD_Archiver_Base,
+    DVD_Menu_Settings,
+    Get_Video_Editor_Folder,
+    Get_Project_Layout_Names,
+    Set_Shelved_DVD_Layout,
+    Video_Data,
+    Migrate_Shelves_To_DB,
+    Set_Shelved_Project,
+    Delete_Project,
+    Delete_DVD_Layout,
+)
+
 from QTPYGUI.utils import Countries, Text_To_File_Name
 from video_cutter import Video_Editor
 from video_file_grid import Video_File_Grid
-
-# fmt: on
 
 # These global functions and variables are only used by the multi-thread task_manager process and exist by
 # necessity as this seems the only way to communicate the variable values to the rest of the dvdarchiver code
@@ -141,9 +146,9 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         """
         assert isinstance(program_name, str), f"{program_name=}. Must be str"
-        print(f"DBG SS Init {program_name=}")
+
         super().__init__()
-        print(f"DBG S Init {program_name=}")
+
         self._DVD_Arch_App = qtg.QtPyApp(
             display_name=program_name if program_name else sys_consts.PROGRAM_NAME,
             callback=self.event_handler,
@@ -187,8 +192,6 @@ class DVD_Archiver(DVD_Archiver_Base):
         self._video_editor: Video_Editor | None = None
         self._save_existing_project = True
         self._task_stack = {}  # Used to keep track of running tasks
-
-        print(f"DBG E Init {program_name=}")
 
     def db_init(self) -> sqldb.SQLDB:
         """
@@ -453,7 +456,9 @@ class DVD_Archiver(DVD_Archiver_Base):
                             tag="video_editor_tab", enable=True
                         )
 
-            case qtg.Sys_Events.CUSTOM:  # APPPOSTINIT is consumed and CUSTOM is emitted in its place
+            case (
+                qtg.Sys_Events.CUSTOM
+            ):  # APPPOSTINIT is consumed and CUSTOM is emitted in its place
                 match event.tag:
                     case "project_changed":
                         if event.widget_exist(
@@ -688,7 +693,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER_DBK)
 
         if folder is None or folder.strip() == "":
-            folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
 
         folder = popups.PopFolderGet(
             title="Select An Archive Folder....",
@@ -721,7 +726,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         folder = self._db_settings.setting_get(sys_consts.STREAMING_FOLDER_DBK)
 
         if folder is None or folder.strip() == "":
-            folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
 
         folder = popups.PopFolderGet(
             title="Select A Streaming Folder....",
@@ -825,7 +830,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER_DBK)
 
         if folder is None or folder.strip() == "":
-            folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
 
         folder = popups.PopFolderGet(
             title="Select A DVD Build Folder....",
@@ -1352,17 +1357,17 @@ class DVD_Archiver(DVD_Archiver_Base):
         )
 
         if streaming_folder is None or streaming_folder.strip() == "":
-            streaming_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            streaming_folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
             self._db_settings.setting_set(
                 sys_consts.STREAMING_FOLDER_DBK, streaming_folder
             )
 
         if archive_folder is None or archive_folder.strip() == "":
-            archive_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            archive_folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
             self._db_settings.setting_set(sys_consts.ARCHIVE_FOLDER_DBK, archive_folder)
 
         if dvd_build_folder is None or dvd_build_folder.strip() == "":
-            dvd_build_folder = file_utils.Special_Path(sys_consts.SPECIAL_PATH.VIDEOS)
+            dvd_build_folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
             self._db_settings.setting_set(
                 sys_consts.DVD_BUILD_FOLDER_DBK, dvd_build_folder
             )
@@ -1787,10 +1792,8 @@ class DVD_Archiver(DVD_Archiver_Base):
 
     def run(self) -> None:
         """Starts the application and gets the show on the road"""
-        print("DBG Kicking it")
         self._DVD_Arch_App.run(layout=self.layout(), windows_ui=False)
 
 
 if __name__ == "__main__":
-    print("DBG Away we go")
     DVD_Archiver().run()
