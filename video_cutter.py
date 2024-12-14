@@ -17,9 +17,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
-
 import dataclasses
 import functools
 import json
@@ -38,10 +35,12 @@ import QTPYGUI.utils as utils
 from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
 from file_renamer_popup import File_Renamer_Popup
-from sys_config import (DVD_Archiver_Base, Encoding_Details, Video_Data,
-                        Video_File_Settings)
-
-# fmt: on
+from sys_config import (
+    DVD_Archiver_Base,
+    Encoding_Details,
+    Video_Data,
+    Video_File_Settings,
+)
 
 # These global functions and variables are only used by the hy the multi-thread task_manager process and exist by
 # necessity as this seems the only way to communicate the variable values to rest of the dvdarchiver code
