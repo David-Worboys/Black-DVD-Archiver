@@ -17,8 +17,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import dataclasses
 import shelve
 import datetime
@@ -32,8 +30,6 @@ import QTPYGUI.sqldb as sqldb
 import sys_consts
 import QTPYGUI.utils as utils
 from QTPYGUI.qtpygui import Action
-
-# fmt: on
 
 
 def Get_Video_Editor_Folder(suppress_error: bool = False) -> str:
@@ -358,12 +354,12 @@ def Delete_DVD_Layout(project_name: str, layout_name: str) -> tuple[int, str]:
         - arg 2: If the status code is -1, an error occurred, and the message provides details.:
 
     """
-    assert (
-        isinstance(project_name, str) and project_name.strip() != ""
-    ), f"{project_name=}. Must be a non-empty str"
-    assert (
-        isinstance(layout_name, str) and layout_name.strip() != ""
-    ), f"{layout_name=}. Must be a non-empty str"
+    assert isinstance(project_name, str) and project_name.strip() != "", (
+        f"{project_name=}. Must be a non-empty str"
+    )
+    assert isinstance(layout_name, str) and layout_name.strip() != "", (
+        f"{layout_name=}. Must be a non-empty str"
+    )
 
     dvd_menu_key = f"{project_name}.{layout_name}"
 
@@ -417,9 +413,9 @@ def Delete_Project(project_name: str) -> tuple[int, str]:
         - arg 2: If the status code is -1, an error occurred, and the message provides details.:
 
     """
-    assert (
-        isinstance(project_name, str) and project_name.strip() != ""
-    ), f"{project_name=}. Must be a non-empty str"
+    assert isinstance(project_name, str) and project_name.strip() != "", (
+        f"{project_name=}. Must be a non-empty str"
+    )
 
     # Remove Project Folder
     file_handler = file_utils.File()
@@ -513,13 +509,13 @@ def Remove_Project_Files(project_name: str, file_paths: list[str]) -> tuple[int,
         - arg 2: If the status code is -1, an error occurred, and the message provides details.:
 
     """
-    assert (
-        isinstance(project_name, str) and project_name.strip() != ""
-    ), f"{project_name=}. Must be a non-empty str"
+    assert isinstance(project_name, str) and project_name.strip() != "", (
+        f"{project_name=}. Must be a non-empty str"
+    )
     assert isinstance(file_paths, list), f"{file_paths=}. Must be a list"
-    assert all(
-        isinstance(item, str) and item.strip() != "" for item in file_paths
-    ), f"{file_paths=}. Must be a list of non-empty str"
+    assert all(isinstance(item, str) and item.strip() != "" for item in file_paths), (
+        f"{file_paths=}. Must be a list of non-empty str"
+    )
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
     if (
@@ -546,7 +542,8 @@ def Remove_Project_Files(project_name: str, file_paths: list[str]) -> tuple[int,
                     continue
 
                 if video_data["video_data"].video_path == file_path:
-                    video_grid_shelf_dict[project_name].pop(video_data["row_index"])
+                    if video_data["row_index"] in video_grid_shelf_dict[project_name]:
+                        video_grid_shelf_dict[project_name].pop(video_data["row_index"])
 
         if project_name in project_shelf_dict:
             for dvd_layout in project_shelf_dict[project_name]:
@@ -596,9 +593,9 @@ def Get_Project_Files(
 
     """
 
-    assert (
-        isinstance(project_name, str) and project_name.strip() != ""
-    ), f"{project_name=}. Must be a non-empty str"
+    assert isinstance(project_name, str) and project_name.strip() != "", (
+        f"{project_name=}. Must be a non-empty str"
+    )
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
     if sql_shelf.error.code == -1:
@@ -698,9 +695,9 @@ def Get_Project_Layout_Names(project_name: str) -> tuple[list[str], list[str], i
 
 
     """
-    assert (
-        isinstance(project_name, str) and project_name.strip() != ""
-    ), f"{project_name=}. Must be a non-empty str"
+    assert isinstance(project_name, str) and project_name.strip() != "", (
+        f"{project_name=}. Must be a non-empty str"
+    )
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
     if sql_shelf.error.code == -1:
@@ -738,12 +735,12 @@ def Get_Shelved_DVD_Layout(
         list[DVD_Menu_Page]: The DVD menu layout and no error message if no issue. Empty DVD menu layout and
             error message if there is an issue
     """
-    assert (
-        isinstance(project_name, str) and project_name.strip() != ""
-    ), f"{project_name=}. Must be a non-empty str"
-    assert (
-        isinstance(dvd_layout_name, str) and dvd_layout_name.strip() != ""
-    ), f"{dvd_layout_name=}. Must be a non-empty str"
+    assert isinstance(project_name, str) and project_name.strip() != "", (
+        f"{project_name=}. Must be a non-empty str"
+    )
+    assert isinstance(dvd_layout_name, str) and dvd_layout_name.strip() != "", (
+        f"{dvd_layout_name=}. Must be a non-empty str"
+    )
 
     key = f"{project_name}.{dvd_layout_name}"
 
@@ -805,15 +802,15 @@ def Set_Shelved_Project(
             - arg 2: If the status code is -1, an error occurred, and the message provides details.:
 
     """
-    assert (
-        isinstance(project_name, str) and project_name.strip() != ""
-    ), f"{project_name=}. Must be a non-empty str"
-    assert isinstance(
-        dvd_menu_layout_names, list
-    ), f"{dvd_menu_layout_names=}. Must be a list of str"
-    assert all(
-        isinstance(element, str) for element in dvd_menu_layout_names
-    ), f"{dvd_menu_layout_names=}. Must be a list of str"
+    assert isinstance(project_name, str) and project_name.strip() != "", (
+        f"{project_name=}. Must be a non-empty str"
+    )
+    assert isinstance(dvd_menu_layout_names, list), (
+        f"{dvd_menu_layout_names=}. Must be a list of str"
+    )
+    assert all(isinstance(element, str) for element in dvd_menu_layout_names), (
+        f"{dvd_menu_layout_names=}. Must be a list of str"
+    )
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
 
@@ -857,12 +854,12 @@ def Set_Shelved_DVD_Layout(
     Returns:
         str: Empty string if successful, or an error message if there is an issue.
     """
-    assert (
-        isinstance(project_name, str) and project_name.strip() != ""
-    ), f"{project_name=}. Must be non-empty str"
-    assert (
-        isinstance(dvd_layout_name, str) and dvd_layout_name.strip() != ""
-    ), f"{dvd_layout_name=}. Must be a non-empty str"
+    assert isinstance(project_name, str) and project_name.strip() != "", (
+        f"{project_name=}. Must be non-empty str"
+    )
+    assert isinstance(dvd_layout_name, str) and dvd_layout_name.strip() != "", (
+        f"{dvd_layout_name=}. Must be a non-empty str"
+    )
     assert isinstance(dvd_menu_layout, list), f"{dvd_menu_layout=}. Must be a list"
     assert all(
         isinstance(dvd_menu_page, DVD_Menu_Page) for dvd_menu_page in dvd_menu_layout
@@ -954,13 +951,13 @@ class DVD_Menu_Page:
     def add_button_title(
         self, button_index: int, button_title: str, button_video_data: "Video_Data"
     ):
-        assert (
-            isinstance(button_index, int) and button_index >= 0
-        ), f"{button_index=}. Must be int >= 0"
+        assert isinstance(button_index, int) and button_index >= 0, (
+            f"{button_index=}. Must be int >= 0"
+        )
         assert isinstance(button_title, str), f"{button_title=}. Must be str"
-        assert isinstance(
-            button_video_data, Video_Data
-        ), f"{button_video_data=}. Must be Video_Data"
+        assert isinstance(button_video_data, Video_Data), (
+            f"{button_video_data=}. Must be Video_Data"
+        )
         self._button_title[button_index] = (button_title, button_video_data)
 
 
@@ -2593,18 +2590,18 @@ class Video_File_Settings:
     def __post_init__(self) -> None:
         """Post init to check the file settings are valid"""
 
-        assert isinstance(
-            self._deactivate_filters, bool
-        ), f"{self._deactivate_filters=}. Must be a bool"
+        assert isinstance(self._deactivate_filters, bool), (
+            f"{self._deactivate_filters=}. Must be a bool"
+        )
         assert isinstance(self._normalise, bool), f"{self._normalise=}. Must be a bool"
         assert isinstance(self._denoise, bool), f"{self._denoise=}. Must be a bool"
-        assert isinstance(
-            self._white_balance, bool
-        ), f"{self._white_balance=}. Must be a bool"
+        assert isinstance(self._white_balance, bool), (
+            f"{self._white_balance=}. Must be a bool"
+        )
         assert isinstance(self._sharpen, bool), f"{self._sharpen=}. Must be a bool"
-        assert isinstance(
-            self._auto_bright, bool
-        ), f"{self._auto_bright=}. Must be a bool"
+        assert isinstance(self._auto_bright, bool), (
+            f"{self._auto_bright=}. Must be a bool"
+        )
         assert isinstance(self._button_title, str), f"{self._button_title=} must be str"
         assert (
             isinstance(self._menu_button_frame, int)
@@ -2806,9 +2803,9 @@ class Video_File_Settings:
         Returns:
             str : The title of the button
         """
-        assert isinstance(
-            self._button_title, str
-        ), f"{self._button_title=}. Must be a str"
+        assert isinstance(self._button_title, str), (
+            f"{self._button_title=}. Must be a str"
+        )
 
         return self._button_title
 
@@ -2855,9 +2852,9 @@ class Video_File_Settings:
             None
 
         """
-        assert (
-            isinstance(value, int) and value == -1 or value >= 0
-        ), f"{value=}. Must be an int == -1 or >= 0"
+        assert isinstance(value, int) and value == -1 or value >= 0, (
+            f"{value=}. Must be an int == -1 or >= 0"
+        )
         self._menu_button_frame = value
 
     @property
@@ -2888,9 +2885,9 @@ class Video_File_Settings:
             value: (int): Check if the value is an integer and that it's greater than or equal to 0 or equal -1 (not set)
 
         """
-        assert (
-            isinstance(value, int) and value == -1 or value >= 0
-        ), f"{value=}. Must be an int == -1 or >= 0"
+        assert isinstance(value, int) and value == -1 or value >= 0, (
+            f"{value=}. Must be an int == -1 or >= 0"
+        )
         self._menu_group = value
 
 
@@ -2923,29 +2920,29 @@ class Video_Data:
         """
         The __post_init__ method is used to set the video data.
         """
-        assert (
-            isinstance(self.video_folder, str) and self.video_folder.strip() != ""
-        ), f"{self.video_folder=} must be str"
-        assert (
-            isinstance(self.video_file, str) and self.video_file.strip() != ""
-        ), f"{self.video_file=} must be str"
+        assert isinstance(self.video_folder, str) and self.video_folder.strip() != "", (
+            f"{self.video_folder=} must be str"
+        )
+        assert isinstance(self.video_file, str) and self.video_file.strip() != "", (
+            f"{self.video_file=} must be str"
+        )
         assert (
             isinstance(self.video_extension, str) and self.video_extension.strip() != ""
         ), f"{self.video_extension=} must be str"
-        assert isinstance(
-            self.encoding_info, Encoding_Details
-        ), f"{self.encoding_info=}. Must be Encoding_Details"
-        assert isinstance(
-            self.video_file_settings, Video_File_Settings
-        ), f"{self.video_file_settings=}. Must be an instance of Video_Filter_Settings"
+        assert isinstance(self.encoding_info, Encoding_Details), (
+            f"{self.encoding_info=}. Must be Encoding_Details"
+        )
+        assert isinstance(self.video_file_settings, Video_File_Settings), (
+            f"{self.video_file_settings=}. Must be an instance of Video_Filter_Settings"
+        )
 
         assert (
             isinstance(self.dvd_page, int) and self.dvd_page == -1 or self.dvd_page >= 0
         ), f"{self.dvd_page=}. Must be an int == -1 or >= 0"
 
-        assert (
-            isinstance(self.vd_id, int) and self.vd_id == -1 or self.vd_id >= 0
-        ), f"{self.vd_id=}. Must be an int == -1 or >= 0"
+        assert isinstance(self.vd_id, int) and self.vd_id == -1 or self.vd_id >= 0, (
+            f"{self.vd_id=}. Must be an int == -1 or >= 0"
+        )
 
         if self.vd_id == -1:
             self.vd_id = id(self)
@@ -2971,9 +2968,9 @@ class Video_Data:
         Returns:
             str: The menu image file path
         """
-        assert file_utils.File().file_exists(
-            self._menu_image_file_path
-        ), f"{self._menu_image_file_path=}. Path does not exist"
+        assert file_utils.File().file_exists(self._menu_image_file_path), (
+            f"{self._menu_image_file_path=}. Path does not exist"
+        )
 
         return self._menu_image_file_path
 
@@ -2986,9 +2983,9 @@ class Video_Data:
             value: (str): The menu image file path
 
         """
-        assert (
-            isinstance(value, str) and value.strip() != ""
-        ), f"{value=}. Must be a file path"
+        assert isinstance(value, str) and value.strip() != "", (
+            f"{value=}. Must be a file path"
+        )
 
         assert file_utils.File().file_exists(value), f"{value=}. Path does not exist"
 
