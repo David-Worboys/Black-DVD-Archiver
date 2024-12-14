@@ -18,8 +18,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import dataclasses
 from typing import Optional, cast
 
@@ -32,10 +30,13 @@ import QTPYGUI.sqldb as sqldb
 import sys_consts
 from dvdarch_utils import DVD_Percent_Used
 from print_popup import Print_DVD_Label_Popup
-from sys_config import (DVD_Menu_Settings, Get_Shelved_DVD_Layout,
-                        Set_Shelved_DVD_Layout, Video_Data, DVD_Menu_Page)
-
-# fmt: on
+from sys_config import (
+    DVD_Menu_Settings,
+    Get_Shelved_DVD_Layout,
+    Set_Shelved_DVD_Layout,
+    Video_Data,
+    DVD_Menu_Page,
+)
 
 
 @dataclasses.dataclass
