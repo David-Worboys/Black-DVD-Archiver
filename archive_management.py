@@ -17,8 +17,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import dataclasses
 from datetime import datetime
 from typing import Final
@@ -28,8 +26,6 @@ import QTPYGUI.file_utils as file_utils
 import sys_consts
 from sys_config import Video_Data
 from QTPYGUI.utils import Is_Complied, Text_To_File_Name
-
-# fmt: on
 
 # THe Following constants are used in the archive_dvd_build the method below - changes here mean changes there!
 DVD_IMAGE: Final[str] = "dvd_image"
