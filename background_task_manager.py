@@ -17,8 +17,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import dataclasses
 import multiprocessing.dummy as multiprocessing
 import signal
@@ -31,8 +29,6 @@ import QTPYGUI.popups as popups
 import QTPYGUI.qtpygui as qtg
 import QTPYGUI.sqldb as sqldb
 import sys_consts
-
-# fmt: on
 
 
 @dataclasses.dataclass
