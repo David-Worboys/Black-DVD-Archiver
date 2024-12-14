@@ -17,13 +17,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import dataclasses
 from typing import cast
 
 from PySide6.QtGui import QImage, QPainter
-from PySide6.QtPrintSupport import QPrinterInfo, QPrinter, QPrintDialog, QAbstractPrintDialog
+from PySide6.QtPrintSupport import (
+    QPrinterInfo,
+    QPrinter,
+    QPrintDialog,
+    QAbstractPrintDialog,
+)
 
 import dvdarch_utils
 import QTPYGUI.file_utils as file_utils
@@ -33,9 +36,6 @@ import QTPYGUI.sqldb as sqldb
 import sys_consts
 from dvdarch_utils import Create_DVD_Case_Insert, Create_DVD_Label
 from sys_config import DVD_Menu_Page, DVD_Print_Settings
-
-
-# fmt: on
 
 
 @dataclasses.dataclass()
@@ -399,7 +399,7 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
 
-        folder = sys_consts.SPECIAL_PATH.DOCUMENTS
+        folder = qtg.Special_Path.DOCUMENTS
         if self._db_settings.setting_exist(sys_consts.PRINT_FOLDER_DBK):
             folder = self._db_settings.setting_get(sys_consts.PRINT_FOLDER_DBK)
 
@@ -615,7 +615,7 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
 
-        folder = sys_consts.SPECIAL_PATH.DOCUMENTS
+        folder = qtg.Special_Path.DOCUMENTS
         if self._db_settings.setting_exist(sys_consts.PRINT_FOLDER_DBK):
             folder = self._db_settings.setting_get(sys_consts.PRINT_FOLDER_DBK)
         folder = popups.PopFolderGet(
@@ -1082,7 +1082,7 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
                 )
             )
 
-        print_folder = sys_consts.SPECIAL_PATH.DOCUMENTS
+        print_folder = qtg.Special_Path.DOCUMENTS
         if self._db_settings.setting_exist(sys_consts.PRINT_FOLDER_DBK):
             print_folder = self._db_settings.setting_get(sys_consts.PRINT_FOLDER_DBK)
 
