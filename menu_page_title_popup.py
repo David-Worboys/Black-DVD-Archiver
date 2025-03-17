@@ -63,15 +63,15 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         """Sets-up the form"""
         self.container = self.layout()
 
-        assert isinstance(
-            self.video_data_list, list
-        ), f"{self.video_data_list=}. Must be a list of Video_Data instances"
+        assert isinstance(self.video_data_list, list), (
+            f"{self.video_data_list=}. Must be a list of Video_Data instances"
+        )
         assert all(
             isinstance(video_data, Video_Data) for video_data in self.video_data_list
         ), "All elements must be Video_Data instances"
-        assert (
-            isinstance(self.project_name, str) and self.project_name.strip() != ""
-        ), f"{self.project_name=}. Must be non-empty str"
+        assert isinstance(self.project_name, str) and self.project_name.strip() != "", (
+            f"{self.project_name=}. Must be non-empty str"
+        )
 
         assert (
             isinstance(self.dvd_layout_name, str) and self.dvd_layout_name.strip() != ""
@@ -417,9 +417,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             menu_title_grid (qtg.Grid): The main menu grid that holds menu pages
             menu_pages (list[list[Video_Data]]): The menu pages that populate a video title control box
         """
-        assert isinstance(
-            menu_title_grid, qtg.Grid
-        ), f"{menu_title_grid=}. Must be an instance of qtg.Grid"
+        assert isinstance(menu_title_grid, qtg.Grid), (
+            f"{menu_title_grid=}. Must be an instance of qtg.Grid"
+        )
         assert isinstance(menu_pages, list), f"{menu_pages=}. Must be a list"
 
         file_handler = file_utils.File()
@@ -555,9 +555,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             else tuple(reversed(source_grid.checkitems_get))
         )
 
-        assert all(
-            isinstance(item, qtg.Grid_Item) for item in checked_items
-        ), f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
+        assert all(isinstance(item, qtg.Grid_Item) for item in checked_items), (
+            f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
+        )
 
         if not checked_items:
             popups.PopMessage(
@@ -772,9 +772,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         Args:
             event (qtg.Action): The triggering event
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         menu_title_grid: qtg.Grid = cast(
             qtg.Grid,
@@ -815,9 +815,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         Args:
             button_title_grid (qtg.Grid): The button title grid on a given row
         """
-        assert isinstance(
-            button_title_grid, qtg.Grid
-        ), f"{button_title_grid=}. Must be an instance of qtg.Grid"
+        assert isinstance(button_title_grid, qtg.Grid), (
+            f"{button_title_grid=}. Must be an instance of qtg.Grid"
+        )
 
         if not button_title_grid.checkitems_get:
             popups.PopMessage(
