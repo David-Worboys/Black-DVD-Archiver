@@ -181,9 +181,9 @@ class Edit_List:
         # assert (
         #    not project or layout
         # ), f"{layout=}. Must not be empty if {project=} is provided"
-        assert (
-            not layout.strip() or project.strip()
-        ), f"{project=}. Must not be empty if {layout=} is provided"
+        assert not layout.strip() or project.strip(), (
+            f"{project=}. Must not be empty if {layout=} is provided"
+        )
         self._error_message = ""
         self._error_code = 1
 
@@ -246,17 +246,17 @@ class Edit_List:
 
         """
 
-        assert (
-            isinstance(file_path, str) and file_path.strip() != ""
-        ), f"{file_path=}. Must be a str"
+        assert isinstance(file_path, str) and file_path.strip() != "", (
+            f"{file_path=}. Must be a str"
+        )
         assert isinstance(project, str), f"{project=}. Must be a str"
         # Make sure we have a layout with a project and vice versa
         # assert (
         #    not project or layout
         # ), f"{layout=}. Must not be empty if {project=} is provided"
-        assert (
-            not layout.strip() or project.strip()
-        ), f"{project=}. Must not be empty if {layout=} is provided"
+        assert not layout.strip() or project.strip(), (
+            f"{project=}. Must not be empty if {layout=} is provided"
+        )
 
         sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
         self._error_message = sql_shelf.error.message
@@ -305,17 +305,17 @@ class Edit_List:
             - arg 2: If the status code is -1, an error occurred, and the message provides details.
             - arg 3: If the status code is 1 then a tuple of edit cut tuples is returned (mark_in,mark_out,clip_name)
         """
-        assert (
-            isinstance(file_path, str) and file_path.strip() != ""
-        ), f"{file_path=}. Must be a str"
+        assert isinstance(file_path, str) and file_path.strip() != "", (
+            f"{file_path=}. Must be a str"
+        )
         assert isinstance(project, str), f"{project=}. Must be a str"
         # Make sure we have a layout with a project and vice versa
         # assert (
         #    not project or layout
         # ), f"{layout=}. Must not be empty if {project=} is provided"
-        assert (
-            not layout.strip() or project.strip()
-        ), f"{project=}. Must not be empty if {layout=} is provided"
+        assert not layout.strip() or project.strip(), (
+            f"{project=}. Must not be empty if {layout=} is provided"
+        )
         assert isinstance(combine, bool), f"{combine=}. Must be bool"
 
         sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
@@ -387,13 +387,13 @@ class Edit_List:
             - arg 2: If the status code is -1, an error occurred, and the message provides details.:
             - arg 3: If the status code is 1 then a tuple of edit cut tuples is returned (mark_in,mark_out,clip_name)
         """
-        assert (
-            isinstance(file_path, str) and file_path.strip() != ""
-        ), f"{file_path=}. Must be a str"
+        assert isinstance(file_path, str) and file_path.strip() != "", (
+            f"{file_path=}. Must be a str"
+        )
         assert isinstance(project, str), f"{project=}. Must be a str"
-        assert (
-            not layout.strip() or project.strip()
-        ), f"{project=}. Must not be empty if {layout=} is provided"
+        assert not layout.strip() or project.strip(), (
+            f"{project=}. Must not be empty if {layout=} is provided"
+        )
 
         sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
         self._error_message = sql_shelf.error.message
@@ -576,9 +576,9 @@ class Edit_List:
                 - arg 1: If the status code is 1, the operation was successful otherwise it failed.
                 - arg 2: If the status code is -1, an error occurred, and the message provides details.:
         """
-        assert (
-            isinstance(file_path, str) and file_path.strip() != ""
-        ), f"{file_path=}. Must be a str"
+        assert isinstance(file_path, str) and file_path.strip() != "", (
+            f"{file_path=}. Must be a str"
+        )
         assert isinstance(project, str), f"{project=}. Must be a str"
         assert isinstance(layout, str), f"{layout=}. Must be a str"
         assert isinstance(file_cuts, list), f"{file_cuts=}. Must be a list"
@@ -594,9 +594,9 @@ class Edit_List:
         # assert (
         #    not project or layout
         # ), f"{layout=}. Must not be empty if {project=} is provided"
-        assert (
-            not layout.strip() or project.strip()
-        ), f"{project=}. Must not be empty if {layout=} is provided"
+        assert not layout.strip() or project.strip(), (
+            f"{project=}. Must not be empty if {layout=} is provided"
+        )
 
         sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
         self._error_message = sql_shelf.error.message
@@ -701,16 +701,16 @@ class Video_Editor(DVD_Archiver_Base):
 
     def __post_init__(self) -> None:
         """Configures the instance"""
-        assert isinstance(
-            self.processed_files_callback, Callable
-        ), f"{self.processed_files_callback= }. Must be method/function lamda"
+        assert isinstance(self.processed_files_callback, Callable), (
+            f"{self.processed_files_callback= }. Must be method/function lamda"
+        )
 
-        assert (
-            isinstance(self.display_height, int) and self.display_height > 0
-        ), f"{self.display_height=}. Must be int > 0"
-        assert (
-            isinstance(self.display_width, int) and self.display_width > 0
-        ), f"{self.display_width=}. Must be int > 0"
+        assert isinstance(self.display_height, int) and self.display_height > 0, (
+            f"{self.display_height=}. Must be int > 0"
+        )
+        assert isinstance(self.display_width, int) and self.display_width > 0, (
+            f"{self.display_width=}. Must be int > 0"
+        )
 
         self._video_handler = qtg.Video_Player(
             display_width=self.display_width, display_height=self.display_height
@@ -986,9 +986,9 @@ class Video_Editor(DVD_Archiver_Base):
             isinstance(video_file, Video_Data) for video_file in video_file_input
         ), f"{video_file_input=}. Must be list of Video_Data"
 
-        assert (
-            isinstance(output_folder, str) and output_folder.strip() != ""
-        ), f"{output_folder=}. Must be non-empty str"
+        assert isinstance(output_folder, str) and output_folder.strip() != "", (
+            f"{output_folder=}. Must be non-empty str"
+        )
         assert isinstance(project_name, str), f"{project_name=}. Must be str"
 
         self._frame_display.value_set(0)
@@ -1231,36 +1231,20 @@ class Video_Editor(DVD_Archiver_Base):
 
         """
         if self._archive_manager:
-            mark_in = self._edit_list_grid.colindex_get("mark_in")
-            mark_out = self._edit_list_grid.colindex_get("mark_out")
-            clip_name = self._edit_list_grid.colindex_get("clip_name")
-
-            edit_list = [
-                (
-                    int(self._edit_list_grid.value_get(row=row_index, col=mark_in)),
-                    int(
-                        self._edit_list_grid.value_get(row=row_index, col=mark_out)
-                        or self._frame_count
-                    ),
-                    self._edit_list_grid.value_get(row=row_index, col=clip_name),
-                )
-                for row_index in range(self._edit_list_grid.row_count)
-            ]
-
-            if edit_list:
+            if self._get_edit_list():
                 if self._all_projects_rb.value_get():
                     result, message = self._edit_list.write_edit_cuts(
                         file_path=self._video_file_input[0].video_path,
                         project="",
                         layout="",
-                        file_cuts=edit_list,
+                        file_cuts=self._get_edit_list(),
                     )
                 else:
                     result, message = self._edit_list.write_edit_cuts(
                         file_path=self._video_file_input[0].video_path,
                         project=self._project_name,
                         layout="",
-                        file_cuts=edit_list,
+                        file_cuts=self._get_edit_list(),
                     )
             elif self._video_file_input:
                 result, message = self._edit_list.delete_edit_cuts(
@@ -1293,9 +1277,9 @@ class Video_Editor(DVD_Archiver_Base):
             Encoding_Details: arg 2 encoding details if all good otherwise blank encoding details with the error filled
             out
         """
-        assert (
-            isinstance(video_file_path, str) and video_file_path.strip() != ""
-        ), f"{video_file_path=}. Must be a non-empty string"
+        assert isinstance(video_file_path, str) and video_file_path.strip() != "", (
+            f"{video_file_path=}. Must be a non-empty string"
+        )
 
         blank_encoding_info = Encoding_Details()
 
@@ -1351,19 +1335,7 @@ class Video_Editor(DVD_Archiver_Base):
 
         file_handler = file_utils.File()
 
-        mark_in = self._edit_list_grid.colindex_get("mark_in")
-        mark_out = self._edit_list_grid.colindex_get("mark_out")
-        clip_name = self._edit_list_grid.colindex_get("clip_name")
-
-        edit_list: list[tuple[int, int, str]] = [
-            (
-                self._edit_list_grid.value_get(row=row_index, col=mark_in),
-                self._edit_list_grid.value_get(row=row_index, col=mark_out)
-                or self._frame_count,
-                self._edit_list_grid.value_get(row=row_index, col=clip_name),
-            )
-            for row_index in range(self._edit_list_grid.row_count)
-        ]
+        edit_list = self._get_edit_list()
 
         if edit_list:
             result = popups.PopOptions(
@@ -1391,7 +1363,6 @@ class Video_Editor(DVD_Archiver_Base):
                         result, video_files_string = self._cut_video_with_editlist(
                             input_file=self._video_file_input[0].video_path,
                             output_file=assembled_file,
-                            edit_list=edit_list,
                             cut_out=False,
                         )
 
@@ -1500,7 +1471,6 @@ class Video_Editor(DVD_Archiver_Base):
                         result, video_files_string = self._cut_video_with_editlist(
                             input_file=self._video_file_input[0].video_path,
                             output_file=assembled_file,
-                            edit_list=edit_list,
                             cut_out=False,
                         )
 
@@ -1512,7 +1482,7 @@ class Video_Editor(DVD_Archiver_Base):
                                 message=f"<{video_files_string}>",
                             ).show()
                         else:
-                            result, message = dvdarch_utils.Concatenate_Videos(
+                            result, message, _ = dvdarch_utils.Concatenate_Videos(
                                 temp_files=video_files_string.split(","),
                                 output_file=assembled_file,
                                 delete_temp_files=True,
@@ -1562,11 +1532,46 @@ class Video_Editor(DVD_Archiver_Base):
                 message="Please Mark Edit List Entries With The [ and ] Button!",
             ).show()
 
+    def _get_edit_list(self) -> list[tuple[int, int, str]]:
+        """Returns the edit list from the edit list grid.
+
+        Returns:
+            list[tuple[int, int, str]]: A list of tuples containing the following elements -mark_in, mark_out, clip_name.
+        """
+
+        mark_in = self._edit_list_grid.colindex_get("mark_in")
+        mark_out = self._edit_list_grid.colindex_get("mark_out")
+        clip_name = self._edit_list_grid.colindex_get("clip_name")
+
+        edit_list: list[tuple[int, int, str]] = [
+            (
+                self._edit_list_grid.value_get(row=row_index, col=mark_in),
+                self._edit_list_grid.value_get(row=row_index, col=mark_out) + 1
+                or self._frame_count,
+                str(
+                    self._edit_list_grid.value_get(row=row_index, col=clip_name)
+                ).replace(
+                    "'", ""
+                ),  # str because numbers are auto translated to ints, replace because SQL does not like '!
+            )
+            for row_index in range(self._edit_list_grid.row_count)
+        ]
+        # Dev check only, should always pass
+        assert all(
+            isinstance(item, tuple)
+            and len(item) == 3
+            and isinstance(item[0], int)
+            and isinstance(item[1], int)
+            and isinstance(item[2], str)
+            for item in edit_list
+        ), f"{edit_list=} is invalid"
+
+        return edit_list
+
     def _cut_video_with_editlist(
         self,
         input_file: str,
         output_file: str,
-        edit_list: list[tuple[int, int, str]],
         cut_out: bool = True,
     ) -> tuple[int, str]:
         """
@@ -1575,7 +1580,6 @@ class Video_Editor(DVD_Archiver_Base):
         Args:
             input_file (str): Path of the input video file.
             output_file (str): Path of the output video file.
-            edit_list (list[tuple[int, int, str]]): List of tuples containing start, end frames and clip name of each segment to cut.
             cut_out (bool, optional): Whether to cut out the edit points of the video. Defaults to True.
 
         Returns:
@@ -1618,17 +1622,17 @@ class Video_Editor(DVD_Archiver_Base):
                 list[tuple[int, int]]: A list of tuples representing the cut in/out points and cut name of the video.
 
             """
-            assert isinstance(
-                edit_list, list
-            ), f"{edit_list=}. Must be a list of tuples"
+            assert isinstance(edit_list, list), (
+                f"{edit_list=}. Must be a list of tuples"
+            )
             assert edit_list, f"{edit_list=}. Must not be empty"
             assert all(isinstance(x, tuple) and len(x) == 3 for x in edit_list), (
                 f"{edit_list=}. Must contain tuples of size 3"
                 " [start_frame, end_frame, cut name]"
             )
-            assert (
-                isinstance(frame_count, int) and frame_count >= 0
-            ), f"{frame_count=}. Must be an int >= 0"
+            assert isinstance(frame_count, int) and frame_count >= 0, (
+                f"{frame_count=}. Must be an int >= 0"
+            )
 
             assert all(
                 start_frame < end_frame for start_frame, end_frame, _ in edit_list
@@ -1667,23 +1671,10 @@ class Video_Editor(DVD_Archiver_Base):
         # ===== Main
         assert isinstance(input_file, str), f"{input_file=}. Must be str"
         assert isinstance(output_file, str), f"{output_file=} must be str"
-        assert isinstance(edit_list, list), f"{edit_list=}. Must be a list"
-        assert all(
-            isinstance(edit, tuple) for edit in edit_list
-        ), "Each edit in edit_list must be a tuple"
-        assert all(len(edit) == 3 for edit in edit_list), (
-            "Each edit tuple in edit_list must have exactly three elements (start"
-            " frame, end frame, cut name)"
-        )
-        assert all(
-            isinstance(edit[0], int) for edit in edit_list
-        ), "The start frame in each edit tuple must be an integer"
-        assert all(
-            isinstance(edit[1], int) for edit in edit_list
-        ), "The end frame in each edit tuple must be an integer"
         assert isinstance(cut_out, bool), f"{cut_out=}. Must be a bool"
 
         file_handler = file_utils.File()
+        edit_list = self._get_edit_list()
 
         for edit_tuple in edit_list:
             if edit_tuple[2] != "" and not file_handler.filename_validate(
@@ -1692,8 +1683,8 @@ class Video_Editor(DVD_Archiver_Base):
                 return (
                     -1,
                     (
-                        "Invalid Clip"
-                        f" Name:{sys_consts.SDELIM}{edit_tuple[2]}{sys_consts.SDELIM}!"
+                        "Invalid Clip Name"
+                        f" {sys_consts.SDELIM}{edit_tuple[2]}{sys_consts.SDELIM}!"
                     ),
                 )
 
@@ -1708,9 +1699,10 @@ class Video_Editor(DVD_Archiver_Base):
 
         self._progress_bar.range_set(0, len(edit_list))
         self._progress_bar.value_set(len(edit_list))
-
+        print(f"DBG  {edit_list=}")
         task_list = []
         for cut_index, (start_frame, end_frame, clip_name) in enumerate(edit_list):
+            print(f"DBG {cut_index} {start_frame=}, {end_frame=}, {clip_name=}")
             if end_frame - start_frame <= 0:  # Probably should not happen
                 continue
 
@@ -1798,10 +1790,15 @@ class Video_Editor(DVD_Archiver_Base):
                 self._progress_bar.value_set(task_index)
                 task_index -= 1
 
+                if (
+                    task_tuple is None or task_tuple[1] is None
+                ):  # This should never happen
+                    continue
+
                 task_error_code, task_error_message = dvdarch_utils.Cut_Video(
                     cut_video_def=task_tuple[1]
                 )
-
+                print(f"DBG {task_tuple} {task_error_code=} {task_error_message=}")
                 if task_error_code == -1:
                     self._progress_bar.reset()
                     return -1, task_error_message
@@ -1809,13 +1806,13 @@ class Video_Editor(DVD_Archiver_Base):
         self._progress_bar.reset()
 
         if cut_out:  # Concat temp file for final file and remove the temp files
-            result, message = dvdarch_utils.Concatenate_Videos(
+            result, message, _ = dvdarch_utils.Concatenate_Videos(
                 temp_files=temp_files,
                 output_file=output_file,
                 delete_temp_files=True,
-                debug=False,
+                debug=True,
             )
-
+            print(f"DBG {result=} {message=}")
             if result == -1:
                 return -1, message
 
@@ -1839,19 +1836,7 @@ class Video_Editor(DVD_Archiver_Base):
         dvd_menu_title = self._menu_title.value_get()
         file_handler = file_utils.File()
 
-        mark_in = self._edit_list_grid.colindex_get("mark_in")
-        mark_out = self._edit_list_grid.colindex_get("mark_out")
-        clip_name = self._edit_list_grid.colindex_get("clip_name")
-
-        edit_list = [
-            (
-                self._edit_list_grid.value_get(row=row_index, col=mark_in),
-                self._edit_list_grid.value_get(row=row_index, col=mark_out)
-                or self._frame_count,
-                self._edit_list_grid.value_get(row=row_index, col=clip_name),
-            )
-            for row_index in range(self._edit_list_grid.row_count)
-        ]
+        edit_list = self._get_edit_list()
 
         if edit_list:
             if (
@@ -1868,14 +1853,13 @@ class Video_Editor(DVD_Archiver_Base):
                     dvd_menu_title = filename
 
                 output_file = file_handler.file_join(
-                    self._edit_folder, f"{dvd_menu_title}_cut", extension
+                    self._edit_folder, f"{filename}_cut", extension
                 )
 
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
                     result, trimmed_file = self._cut_video_with_editlist(
                         input_file=self._video_file_input[0].video_path,
                         output_file=output_file,
-                        edit_list=edit_list,
                     )
 
                     if (
@@ -1921,9 +1905,9 @@ class Video_Editor(DVD_Archiver_Base):
         """
         grid_col_value: qtg.Grid_Col_Value = event.value
 
-        assert isinstance(
-            grid_col_value, qtg.Grid_Col_Value
-        ), f"{grid_col_value=} must be a qtg.Grid_Col_Value"
+        assert isinstance(grid_col_value, qtg.Grid_Col_Value), (
+            f"{grid_col_value=} must be a qtg.Grid_Col_Value"
+        )
 
         if grid_col_value.value is None or not isinstance(grid_col_value.value, int):
             return None
@@ -1950,9 +1934,9 @@ class Video_Editor(DVD_Archiver_Base):
 
         """
 
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be of type qtg.Action but got {type(event)}"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be of type qtg.Action but got {type(event)}"
+        )
 
         if (
             self._edit_list_grid.row_count > 0
@@ -2000,9 +1984,9 @@ class Video_Editor(DVD_Archiver_Base):
             else tuple(reversed(self._edit_list_grid.checkitems_get))
         )
 
-        assert all(
-            isinstance(item, qtg.Grid_Item) for item in checked_items
-        ), f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
+        assert all(isinstance(item, qtg.Grid_Item) for item in checked_items), (
+            f"{checked_items=}. Must be a list of'qtg.Grid_Item_Tuple'"
+        )
 
         if not checked_items:
             popups.PopMessage(
@@ -2065,9 +2049,9 @@ class Video_Editor(DVD_Archiver_Base):
         self,
         edit_cuts: tuple[tuple[int, int, str], ...] | list[tuple[int, int, str]],
     ):
-        assert isinstance(
-            edit_cuts, (list, tuple)
-        ), f"{edit_cuts=}. Must be a list or tuple"
+        assert isinstance(edit_cuts, (list, tuple)), (
+            f"{edit_cuts=}. Must be a list or tuple"
+        )
         for edit_cut in edit_cuts:
             assert len(edit_cut) == 3, f"{edit_cut=}. Must be (int,int,str)"
             assert isinstance(edit_cut[0], int), f"{edit_cut[0]=}. Must be int"
@@ -2135,9 +2119,9 @@ class Video_Editor(DVD_Archiver_Base):
             event (qtg.Action): The triggering event
 
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be of type qtg.Action but got {type(event)} instead"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be of type qtg.Action but got {type(event)} instead"
+        )
         assert hasattr(self, "_video_handler"), "Media source not set"
 
         frame = self._video_handler.current_frame()
@@ -2168,9 +2152,9 @@ class Video_Editor(DVD_Archiver_Base):
             event (qtg.Action): The triggering event
 
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be of type qtg.Action but got {type(event)} instead"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be of type qtg.Action but got {type(event)} instead"
+        )
         assert hasattr(self, "_video_handler"), "Media source not set"
 
         frame = self._video_handler.current_frame()
@@ -2192,9 +2176,9 @@ class Video_Editor(DVD_Archiver_Base):
             init (bool): True if initialising the button state fo first use, otherwise false
 
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be of type qtg.Action but got {type(event)} instead"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be of type qtg.Action but got {type(event)} instead"
+        )
         select_start: qtg.Button = cast(
             qtg.Button,
             event.widget_get(container_tag="video_buttons", tag="selection_start"),
@@ -2267,9 +2251,9 @@ class Video_Editor(DVD_Archiver_Base):
         Returns:
             None.
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be of type qtg.Action but got {type(event)} instead"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be of type qtg.Action but got {type(event)} instead"
+        )
 
         if event.widget_exist(container_tag=event.container_tag, tag=event.tag):
             value: qtg.Combo_Data = event.value_get(
