@@ -149,6 +149,8 @@ BUTTON_FONT_POINT_SIZE_DBK: Final[str] = "button_font_point_size"
 BUTTONS_ACROSS_DBK: Final[str] = "buttons_across"
 BUTTONS_PER_PAGE_DBK: Final[str] = "buttons_per_page"
 
+DISPLAY_FILE_NAMES_DBK: Final[str] = "display_file_names"
+
 DEFAULT_PROJECT_NAME_DBK: Final[str] = "Default"
 DEFAULT_DVD_LAYOUT_NAME_DBK: Final[str] = "DVD 1"
 DVD_BUILD_FOLDER_DBK: Final[str] = "dvd_build_folder"
