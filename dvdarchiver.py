@@ -312,7 +312,10 @@ class DVD_Archiver(DVD_Archiver_Base):
                         ).show()
                         == "yes"
                     ):
-                        if self._video_editor.shutdown() == 1:
+                        if (
+                            self._video_editor.shutdown() == 1
+                            # and self._file_control.shutdown() == 1
+                        ):
                             # Remove the temporary DVD Build Folder subdirectories
                             with qtg.sys_cursor(qtg.Cursor.hourglass):
                                 if self._db_settings.setting_exist(
@@ -420,21 +423,34 @@ class DVD_Archiver(DVD_Archiver_Base):
                         video_edit_folder = Get_Video_Editor_Folder()
                         video_data: list[Video_Data] = event.value
 
-                        if (
-                            video_data[0].encoding_info.video_duration
-                            < 5  # ~ ! seconds
-                            or video_data[0].encoding_info.error.strip() != ""
-                        ):
+                        if video_data[0].encoding_info.error.strip():
                             popups.PopError(
-                                title="Video File Is Invalid...",
+                                title="Video File Is Not Supported Or Corrupt...",
                                 message=(
-                                    "Selected Video File Is Not  Supported, Corrupt Or"
-                                    " Too Short < 5 seconds"
-                                    f" ({video_data[0].encoding_info.video_duration} seconds)"
-                                    f" : {video_data[0].video_path} "
+                                    "Selected Video File Is Not  Supported Or Corrupt"
+                                    f" ({sys_consts.SDELIM}{video_data[0].encoding_info.error}{sys_consts.SDELIM})"
+                                    f" : {sys_consts.SDELIM}{video_data[0].video_path}{sys_consts.SDELIM} "
                                 ),
                             ).show()
+
                             return None
+
+                        if (
+                            video_data[0].encoding_info.video_duration
+                            < 5  # 5 seconds seems a reasonable minimum
+                        ):
+                            if (
+                                popups.PopYesNo(
+                                    title="Video File Is Too Short...",
+                                    message=(
+                                        "Open Selected Short Video File ?"
+                                        f" ({sys_consts.SDELIM}{video_data[0].encoding_info.video_duration}{sys_consts.SDELIM} seconds)"
+                                        f" : {sys_consts.SDELIM}{video_data[0].video_path}{sys_consts.SDELIM} "
+                                    ),
+                                ).show()
+                                == "no"
+                            ):
+                                return None
 
                         if video_edit_folder.strip() == "":
                             popups.PopError(
@@ -861,9 +877,9 @@ class DVD_Archiver(DVD_Archiver_Base):
         Returns:
             str: A string containing the generated DVD serial number.
         """
-        assert (
-            isinstance(product_code, str) and product_code.strip() != ""
-        ), f"{product_code=}. Must be a non-empty string"
+        assert isinstance(product_code, str) and product_code.strip() != "", (
+            f"{product_code=}. Must be a non-empty string"
+        )
         assert (
             isinstance(product_description, str) and product_description.strip() != ""
         ), f"{product_description=}. Must be a non-empty string"
@@ -910,9 +926,9 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         """
 
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event} is not an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event} is not an instance of qtg.Action"
+        )
 
         project_combo: qtg.ComboBox = cast(
             qtg.ComboBox,
