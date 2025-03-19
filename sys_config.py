@@ -2082,6 +2082,13 @@ class Encoding_Details:
     _video_tracks: int = 0
     _audio_format: str = ""
     _audio_channels: int = 0
+    _audio_bitrate: int = 0
+    _audio_codec: str = ""
+    _audio_sample_rate: int = 0
+    _video_codec: str = ""
+    _video_pix_fmt: str = ""
+    _video_profile: str = ""
+    _video_level: str = ""
     _video_format: str = ""
     _video_width: int = 0
     _video_height: int = 0
@@ -2148,6 +2155,30 @@ class Encoding_Details:
         self._audio_tracks = value
 
     @property
+    def audio_codec(self) -> str:
+        """
+        The audio_codec method returns the audio codec of a video.
+
+        Returns:
+            str: The audio codec of the video
+
+        """
+        return self._audio_codec
+
+    @audio_codec.setter
+    def audio_codec(self, value: str) -> None:
+        """
+        The audio_codec method sets the audio codec of a video.
+
+        Args:
+            value (str): Set the audio codec of the video
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._audio_codec = value
+
+    @property
     def audio_format(self) -> str:
         """
         The audio_format method returns the audio format of a video.
@@ -2196,6 +2227,54 @@ class Encoding_Details:
         self._audio_channels = value
 
     @property
+    def audio_bitrate(self) -> int:
+        """
+        The audio_bitrate method returns the audio bitrate of a video.
+
+        Returns:
+            int: The audio bitrate of the video
+
+        """
+        return self._audio_bitrate
+
+    @audio_bitrate.setter
+    def audio_bitrate(self, value: int) -> None:
+        """
+        The audio_bitrate method sets the audio bitrate of a video.
+
+        Args:
+            value (int): Set the audio bitrate of the video
+
+        """
+        assert isinstance(value, int), f"{value=}. Must be int"
+
+        self._audio_bitrate = value
+
+    @property
+    def audio_sample_rate(self) -> int:
+        """
+        The audio_sample_rate method returns the audio sample rate of a video.
+
+        Returns:
+            int: The audio sample rate of the video
+
+        """
+        return self._audio_sample_rate
+
+    @audio_sample_rate.setter
+    def audio_sample_rate(self, value: int) -> None:
+        """
+        The audio_sample_rate method sets the audio sample rate of a video.
+
+        Args:
+            value (int): Set the audio sample rate of the video
+
+        """
+        assert isinstance(value, int), f"{value=}. Must be int"
+
+        self._audio_sample_rate = value
+
+    @property
     def video_tracks(self) -> int:
         """
         The video_tracks method returns the number of video tracks in a video.
@@ -2218,6 +2297,102 @@ class Encoding_Details:
         assert isinstance(value, int), f"{value=}. Must be int"
 
         self._video_tracks = value
+
+    @property
+    def video_codec(self) -> str:
+        """
+        The video_codec method returns the video codec of a video.
+
+        Returns:
+            str: The video codec of the video
+
+        """
+        return self._video_codec
+
+    @video_codec.setter
+    def video_codec(self, value: str) -> None:
+        """
+        The video_codec method sets the video codec of a video.
+
+        Args:
+            value (str): Set the video codec of the video
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._video_codec = value
+
+    @property
+    def video_pix_fmt(self) -> str:
+        """
+        The video_pix_fmt method returns the pixel format of a video.
+
+        Returns:
+            str: The pixel format of the video
+
+        """
+        return self._video_pix_fmt
+
+    @video_pix_fmt.setter
+    def video_pix_fmt(self, value: str) -> None:
+        """
+        The video_pix_fmt method sets the pixel format of a video.
+
+        Args:
+            value (str): Set the pixel format of the video
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._video_pix_fmt = value
+
+    @property
+    def video_profile(self) -> str:
+        """
+        The video_profile method returns the profile of a video.
+
+        Returns:
+            str: The profile of the video
+
+        """
+        return self._video_profile
+
+    @video_profile.setter
+    def video_profile(self, value: str) -> None:
+        """
+        The video_profile method sets the profile of a video.
+
+        Args:
+            value (str): Set the profile of the video
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._video_profile = value
+
+    @property
+    def video_level(self) -> str:
+        """
+        The video_level method returns the level of a video.
+
+        Returns:
+            str: The level of the video
+
+        """
+        return self._video_level
+
+    @video_level.setter
+    def video_level(self, value: str) -> None:
+        """
+        The video_level method sets the level of a video.
+
+        Args:
+            value (str): Set the level of the video
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._video_level = value
 
     @property
     def video_format(self) -> str:
