@@ -109,9 +109,9 @@ class File_Renamer_Popup(qtg.PopContainer):
         Returns:
             bool: True if any file names have been changed, False otherwise.
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         file_handler = file_utils.File()
 
@@ -169,9 +169,9 @@ class File_Renamer_Popup(qtg.PopContainer):
         Args:
             event (qtg.Action): The event that triggered this method.
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=} must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=} must be an instance of qtg.Action"
+        )
 
         file_handler = file_utils.File()
 
