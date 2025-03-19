@@ -41,9 +41,9 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
     def __post_init__(self) -> None:
         """Sets-up the form"""
 
-        assert (
-            isinstance(self.title, str) and self.title.strip() != ""
-        ), f"{self.title=}. Must be a non-empty str"
+        assert isinstance(self.title, str) and self.title.strip() != "", (
+            f"{self.title=}. Must be a non-empty str"
+        )
 
         self.container = self.layout()
 
