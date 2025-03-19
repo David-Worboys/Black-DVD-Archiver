@@ -56,9 +56,9 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
     def __post_init__(self) -> None:
         """Sets-up the form"""
         assert isinstance(self.disk_title, str), f"{self.disk_title=}. Must be str"
-        assert isinstance(
-            self.dvd_menu_pages, list
-        ), f"{self.dvd_menu_pages=}. Must be A list Of DVD_Menu_Page instances"
+        assert isinstance(self.dvd_menu_pages, list), (
+            f"{self.dvd_menu_pages=}. Must be A list Of DVD_Menu_Page instances"
+        )
         assert all(
             isinstance(dvd_menu_page, DVD_Menu_Page)
             for dvd_menu_page in self.dvd_menu_pages
@@ -809,12 +809,12 @@ class Print_DVD_Label_Popup(qtg.PopContainer):
             event (qtg.Action): The triggering event
             selected_printer (str): The selected printer
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
-        assert (
-            isinstance(selected_printer, str) and selected_printer.strip() != ""
-        ), f"{selected_printer=}. Must be a non-empty string"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
+        assert isinstance(selected_printer, str) and selected_printer.strip() != "", (
+            f"{selected_printer=}. Must be a non-empty string"
+        )
 
         printer_info = self._printer_info.printerInfo(selected_printer)
 
