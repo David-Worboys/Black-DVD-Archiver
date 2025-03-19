@@ -53,9 +53,9 @@ class _Task:
     def __post_init__(self):
         assert isinstance(self.name, str), f"{self.name=}. Must be a string"
         assert isinstance(self.method, Callable), f"{self.method=}. Must be a callable"
-        assert isinstance(
-            self.callback, Callable
-        ), f"{self.callback=}. Must be a callable"
+        assert isinstance(self.callback, Callable), (
+            f"{self.callback=}. Must be a callable"
+        )
 
 
 class Task_Manager:
@@ -249,9 +249,9 @@ class Task_Manager:
             message (str): Message to write to the shared memory.
         """
 
-        assert (
-            isinstance(shared_mem_name, str) and shared_mem_name.strip() != ""
-        ), f"{shared_mem_name=}. Must be non-empty str"
+        assert isinstance(shared_mem_name, str) and shared_mem_name.strip() != "", (
+            f"{shared_mem_name=}. Must be non-empty str"
+        )
         assert isinstance(message, str), f"{message=}. Must be str"
 
         try:
@@ -292,9 +292,9 @@ class Task_Manager:
 
         """
 
-        assert (
-            isinstance(name, str) and name.strip() != ""
-        ), f"{name=}. Must be a non-empty str"
+        assert isinstance(name, str) and name.strip() != "", (
+            f"{name=}. Must be a non-empty str"
+        )
         assert isinstance(method, Callable), f"{method=}. Must be a callable"
         assert isinstance(callback, Callable), f"{callback=}. Must be a callable"
 
@@ -369,9 +369,9 @@ class Task_Manager_Popup(qtg.PopContainer):
 
     def __post_init__(self) -> None:
         """Sets-up the form"""
-        assert isinstance(
-            self.task_manager, Task_Manager
-        ), f"{self.task_manager=}. Must be an instance of Task_Manager"
+        assert isinstance(self.task_manager, Task_Manager), (
+            f"{self.task_manager=}. Must be an instance of Task_Manager"
+        )
 
         self.container = self.layout()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
