@@ -44,9 +44,9 @@ class Video_File_Picker_Popup(qtg.PopContainer):
     def __post_init__(self):
         """Sets-up the form"""
 
-        assert (
-            isinstance(self.title, str) and self.title.strip() != ""
-        ), f"{self.title=}. Must be a non-empty str"
+        assert isinstance(self.title, str) and self.title.strip() != "", (
+            f"{self.title=}. Must be a non-empty str"
+        )
 
         self.container = self.layout()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
@@ -134,9 +134,9 @@ class Video_File_Picker_Popup(qtg.PopContainer):
             video_folder (str): The video folder where the video files hang-out
             event (qtg.Action): The calling event
         """
-        assert (
-            isinstance(video_folder, str) and video_folder.strip() != ""
-        ), f"{video_folder=}. Must be a non-empty str"
+        assert isinstance(video_folder, str) and video_folder.strip() != "", (
+            f"{video_folder=}. Must be a non-empty str"
+        )
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
 
         file_handler = file_utils.File()
