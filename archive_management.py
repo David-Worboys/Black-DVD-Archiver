@@ -54,9 +54,9 @@ class Archive_Manager:
         assert (
             isinstance(self.archive_folder, str) and self.archive_folder.strip() != ""
         ), f"{self.archive_folder=}. Must Be non-empty str"
-        assert isinstance(
-            self.streaming_folder, str
-        ), f"{self.streaming_folder=}. Must be str"
+        assert isinstance(self.streaming_folder, str), (
+            f"{self.streaming_folder=}. Must be str"
+        )
         assert isinstance(self.archive_size, str) and self.archive_size in (
             sys_consts.BLUERAY_ARCHIVE_SIZE,
             sys_consts.DVD_ARCHIVE_SIZE,
@@ -196,12 +196,12 @@ class Archive_Manager:
                     ]
                 ]
             """
-            assert isinstance(
-                preservation_master_folder, str
-            ), f"{preservation_master_folder=}. Must be a str"
-            assert isinstance(
-                streaming_folder, str
-            ), f"{streaming_folder=}. Must be a str"
+            assert isinstance(preservation_master_folder, str), (
+                f"{preservation_master_folder=}. Must be a str"
+            )
+            assert isinstance(streaming_folder, str), (
+                f"{streaming_folder=}. Must be a str"
+            )
             video_folders = []
 
             for menu_index, menu in enumerate(menu_layout):
@@ -289,27 +289,25 @@ class Archive_Manager:
                    arg 2: Empty string if ok, error message if failed`
 
             """
-            assert isinstance(
-                video_data, Video_Data
-            ), f"{video_data=}. Must be instance of Video_Data"
-            assert isinstance(
-                preservation_master_path, str
-            ), f"{preservation_master_path=}. Must be str"
+            assert isinstance(video_data, Video_Data), (
+                f"{video_data=}. Must be instance of Video_Data"
+            )
+            assert isinstance(preservation_master_path, str), (
+                f"{preservation_master_path=}. Must be str"
+            )
             assert isinstance(streaming_path, str), f"{streaming_path=}. Must be str"
-            assert isinstance(
-                button_file_name, str
-            ), f"{button_file_name=}. Must be str"
+            assert isinstance(button_file_name, str), (
+                f"{button_file_name=}. Must be str"
+            )
             assert isinstance(button_index, int), f"{button_index=}. Must be int"
-            assert (
-                isinstance(transcode_type, str)
-                and transcode_type
-                in (
-                    sys_consts.TRANSCODE_NONE,
-                    sys_consts.TRANSCODE_FFV1ARCHIVAL,
-                    sys_consts.TRANSCODE_H264,
-                    sys_consts.TRANSCODE_H265,
-                )
-            ), f"{transcode_type=}. Must be TRANSCODE_NONE,TRANSCODE_FFV1ARCHIVAL,TRANSCODE_H264, TRANSCODE_H265"
+            assert isinstance(transcode_type, str) and transcode_type in (
+                sys_consts.TRANSCODE_NONE,
+                sys_consts.TRANSCODE_FFV1ARCHIVAL,
+                sys_consts.TRANSCODE_H264,
+                sys_consts.TRANSCODE_H265,
+            ), (
+                f"{transcode_type=}. Must be TRANSCODE_NONE,TRANSCODE_FFV1ARCHIVAL,TRANSCODE_H264, TRANSCODE_H265"
+            )
 
             (
                 _,
@@ -569,18 +567,18 @@ class Archive_Manager:
 
         ##### Main
 
-        assert (
-            isinstance(dvd_name, str) and dvd_name.strip() != ""
-        ), f"{dvd_name=}. Must be a non-empty str"
-        assert (
-            isinstance(dvd_folder, str) and dvd_folder.strip() != ""
-        ), f"{dvd_folder=}. Must be a non-empty str"
-        assert (
-            isinstance(iso_folder, str) and iso_folder.strip() != ""
-        ), f"{iso_folder=}. Must be a non-empty str"
-        assert isinstance(
-            menu_layout, list
-        ), f"{menu_layout=} must be a list of tuples of str,Video_Data"
+        assert isinstance(dvd_name, str) and dvd_name.strip() != "", (
+            f"{dvd_name=}. Must be a non-empty str"
+        )
+        assert isinstance(dvd_folder, str) and dvd_folder.strip() != "", (
+            f"{dvd_folder=}. Must be a non-empty str"
+        )
+        assert isinstance(iso_folder, str) and iso_folder.strip() != "", (
+            f"{iso_folder=}. Must be a non-empty str"
+        )
+        assert isinstance(menu_layout, list), (
+            f"{menu_layout=} must be a list of tuples of str,Video_Data"
+        )
 
         self._error_code = 1
         self._error_message = ""
