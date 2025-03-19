@@ -1699,10 +1699,10 @@ class Video_Editor(DVD_Archiver_Base):
 
         self._progress_bar.range_set(0, len(edit_list))
         self._progress_bar.value_set(len(edit_list))
-        print(f"DBG  {edit_list=}")
+
         task_list = []
         for cut_index, (start_frame, end_frame, clip_name) in enumerate(edit_list):
-            print(f"DBG {cut_index} {start_frame=}, {end_frame=}, {clip_name=}")
+
             if end_frame - start_frame <= 0:  # Probably should not happen
                 continue
 
@@ -1798,7 +1798,7 @@ class Video_Editor(DVD_Archiver_Base):
                 task_error_code, task_error_message = dvdarch_utils.Cut_Video(
                     cut_video_def=task_tuple[1]
                 )
-                print(f"DBG {task_tuple} {task_error_code=} {task_error_message=}")
+
                 if task_error_code == -1:
                     self._progress_bar.reset()
                     return -1, task_error_message
@@ -1812,7 +1812,7 @@ class Video_Editor(DVD_Archiver_Base):
                 delete_temp_files=True,
                 debug=True,
             )
-            print(f"DBG {result=} {message=}")
+
             if result == -1:
                 return -1, message
 
