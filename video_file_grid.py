@@ -17,8 +17,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import dataclasses
 import datetime
 from typing import cast, Final
@@ -32,12 +30,322 @@ import QTPYGUI.qtpygui as qtg
 import QTPYGUI.sqldb as sqldb
 import sys_consts
 import QTPYGUI.utils as utils
+
+from background_task_manager import Task_Manager
 from dvd_menu_configuration import DVD_Menu_Config_Popup
-from sys_config import (DVD_Archiver_Base, Get_Video_Editor_Folder, Video_Data, Get_Project_Files, 
-                        Get_Project_Layout_Names, Remove_Project_Files)
+from sys_config import (
+    DVD_Archiver_Base,
+    Get_Video_Editor_Folder,
+    Video_Data,
+    Get_Project_Files,
+    Get_Project_Layout_Names,
+    Remove_Project_Files,
+)
 from video_file_picker import Video_File_Picker_Popup
 
-# fmt: on
+# These global functions and variables are only used by the hy the multi-thread task_manager process and exist by
+# necessity as this seems the only way to communicate the variable values to rest of the dvdarchiver code
+gi_task_error_code = -1
+gi_thread_status = -1
+gs_thread_error_message = ""
+gs_task_error_message = ""
+gs_thread_status = ""
+gs_thread_message = ""
+gs_thread_output = ""
+gs_thread_task_name = ""
+
+gb_task_errored = False
+gi_tasks_completed = -1
+
+
+def Run_Video_Trancode(arguments: tuple) -> tuple[int, str]:
+    """This is a wrapper function used hy the multi-thread task_manager to run the Execute_Check_Output process
+
+    Args:
+        cut_video_def (dvdarch_utils.Cut_Video_Def): Defines video cut parameters
+
+    Returns:
+        tuple[int, str]:
+        - arg1 1: ok, -1: fail
+        - arg2: error message or "" if ok
+    """
+    global gi_task_error_code
+    global gs_task_error_message
+
+    if not utils.Is_Complied():
+        print(f"DBG {arguments=}")
+
+    transcode_container = arguments[0]
+    video_data: Video_Data = arguments[1]
+    operation_action: str = arguments[2]
+    transcode_folder: str = arguments[3]
+
+    gi_task_error_code, gs_task_error_message = dvdarch_utils.Transcode_DV(
+        input_file=video_data.video_path,
+        frame_rate=video_data.encoding_info.video_frame_rate,
+        output_folder=transcode_folder,
+        width=video_data.encoding_info.video_width,
+        height=video_data.encoding_info.video_height,
+    )
+
+    if not utils.Is_Complied():
+        print(f"DBG Run_Video Transcode {gi_task_error_code=} {gs_task_error_message=}")
+
+    return gi_task_error_code, gs_task_error_message
+
+
+@dataclasses.dataclass
+class Reencode_Options(qtg.PopContainer):
+    """Pop-up Options dialogue that displays a list of options in a radio button format and returns the
+    selected option.
+
+    If the option needs a tooltip, then separate the option from the tooltip with a :: i.e., Test Option :: Test Tooltip
+    """
+
+    message: str = ""
+    transcode_options: dict[str, str] = dataclasses.field(default_factory=dict)
+    join_options: dict[str, str] = dataclasses.field(default_factory=dict)
+    translate: bool = True
+
+    _transcode_option: str = ""
+    _join_option: str = ""
+
+    def __post_init__(self):
+        """Constructor for the Reencode Options class that checks the arguments and sets instance variables.
+
+        The function creates a radio button for each item in the list of options, and then adds a button container with
+        an OK and Cancel button
+        """
+        super().__post_init__()
+        assert isinstance(self.transcode_options, (dict)), (
+            f"{self.transcode_options=}. Must be a dict dict[text:tag]"
+        )
+        assert isinstance(self.join_options, (dict)), (
+            f"{self.join_options=}. Must be a dict dict[text:tag]"
+        )
+        assert self.transcode_options or self.join_options, (
+            f"{self.transcode_options=} or {self.join_options=}. Must have at least one transcode or join option"
+        )
+        assert isinstance(self.message, str), f"{self.message=}. Mut be str"
+
+        def _Populate_Options(
+            options: dict, container: qtg.VBoxContainer
+        ) -> [str, int]:
+            """
+            Populate the given container with radio buttons based on the given options.
+
+            The function also keeps track of the maximum option width and the original option selected.
+
+            Args:
+                options (dict): dict of options where the key is the text to display and the value is the tag.
+                container (qtg.VBoxContainer): container to add the options to.
+
+            Returns:
+                tuple[str, int]: tuple where the first item is the original option selected and the second item is the maximum width of the options.
+            """
+            max_width = 0
+            original_option = ""
+
+            for index, (option, tag) in enumerate(options.items()):
+                tooltip = ""
+
+                if "::" in option:
+                    (
+                        option,
+                        tooltip,
+                    ) = option.split("::")
+
+                if index == 0:
+                    original_option = option
+
+                tag = f"{tag}|{index}".strip().replace(" ", "")
+
+                max_width = max(max_width, len(option) + 8)
+
+                container.add_row(
+                    qtg.RadioButton(
+                        text=f"{self.sdelim}{option}{self.sdelim}",
+                        callback=self.event_handler,
+                        tag=tag,
+                        checked=True if index == 0 else False,
+                        translate=self.translate,
+                        tooltip=tooltip,
+                    )
+                )
+
+            return original_option, max_width
+
+        transcode_option_container = qtg.VBoxContainer(
+            tag="transcode_container", text=self.message
+        )
+        join_option_container = qtg.VBoxContainer(
+            tag="join_container", text=self.message
+        )
+
+        self._transcode_option, transcode_width = _Populate_Options(
+            self.transcode_options, transcode_option_container
+        )
+        self._join_option, join_width = _Populate_Options(
+            self.join_options, join_option_container
+        )
+
+        assert transcode_width > 0 or join_width > 0, (
+            f"Error: {transcode_width=}, {join_width=}"
+        )
+
+        control_container = qtg.VBoxContainer(
+            tag="option_controls", align=qtg.Align.TOPLEFT
+        )
+
+        self.container.add_row(control_container)
+
+        # Creates a GUI for the dialog box with a list of options.
+        tab = qtg.Tab(
+            tag="option_tab",
+            callback=self.event_handler,
+            width=max(transcode_width, join_width),
+            height=9,
+        )
+
+        if self.transcode_options:
+            transcode_option_container.width = transcode_width
+            tab.page_add(
+                tag="transcode_page",
+                title="Transcode",
+                control=transcode_option_container,
+            )
+
+        if self.join_options:
+            control_container.add_row(
+                qtg.Switch(
+                    tag="transcode_join",
+                    label="Transcode",
+                    text="Join",
+                    callback=self.event_handler,
+                )
+            )
+
+            join_option_container.width = join_width
+            tab.page_add(
+                tag="join_page",
+                title="Join",
+                control=join_option_container,
+                enabled=False,
+            )
+
+        control_container.add_row(tab)
+        self.container.add_row(qtg.Spacer())
+        self.container.add_row(
+            qtg.Command_Button_Container(
+                ok_callback=self.event_handler, cancel_callback=self.event_handler
+            )
+        )
+
+    def event_handler(self, event: qtg.Action):
+        """Control event handler for the PopOptions dialogue.
+
+        If the user clicks the "ok" button, then the value of the selected option is saved to the _result variable and
+        the dialogue is closed. If the user clicks the "cancel" button, then the dialogue is closed and the _result
+        variable is set to an empty string
+
+        Args:
+            event (Action): Calling event
+        """
+        print(f"DBG {event.container_tag=} {event.tag=} {event.event=} {event.value=}")
+
+        match event.event:
+            case qtg.Sys_Events.WINDOWPOSTOPEN:
+                if event.widget_exist(
+                    container_tag="option_controls", tag="transcode_join"
+                ) and event.widget_exist(container_tag="option_tab", tag="join_page"):
+                    tab: qtg.Tab = cast(
+                        qtg.Tab,
+                        event.widget_get(
+                            container_tag="option_controls", tag="option_tab"
+                        ),
+                    )
+                    tab.enable_set(tag="join_page", enable=False)
+
+            case qtg.Sys_Events.CLICKED:
+                match event.tag:
+                    case "ok":
+                        selected_option = self._get_selection_option(event)
+
+                        self._result = selected_option
+
+                        self.close()
+                    case "cancel":
+                        if (
+                            popups.PopYesNo(
+                                container_tag="discard_selection",
+                                title="Stop Transcode/Join..",
+                                message="Stop Transcode/Join?",
+                            ).show()
+                            == "yes"
+                        ):
+                            self._result = ""
+                            self.close()
+                    case "transcode_join":
+                        if event.widget_exist(
+                            container_tag="option_controls", tag="transcode_join"
+                        ) and event.widget_exist(
+                            container_tag="option_tab", tag="join_page"
+                        ):
+                            tab: qtg.Tab = cast(
+                                qtg.Tab,
+                                event.widget_get(
+                                    container_tag="option_controls", tag="option_tab"
+                                ),
+                            )
+
+                            if event.value:  # True is join!
+                                tab.enable_set(tag="join_page", enable=True)
+                                tab.enable_set(tag="transcode_page", enable=False)
+                                tab.select_tab(tag_name="join_page")
+                            else:
+                                tab.enable_set(tag="join_page", enable=False)
+                                tab.enable_set(tag="transcode_page", enable=True)
+                                tab.select_tab(tag_name="transcode_page")
+
+    def _get_selection_option(self, event: qtg.Action) -> str:
+        """
+            Returns the selected selection option
+
+        Args:
+            event (qtg.Action):
+
+        Returns:
+            str: "" if no slected option, otherwiaw "tnascode|option" or "join|option"
+
+        """
+        assert isinstance(event, qtg.Action), f"{event=}. Must be a qtg.Action"
+
+        # Default ti transcode
+        container_tag = "transcode_container"
+        options = self.transcode_options
+        option_type = "transcode"
+        selected_option = ""
+
+        if event.widget_exist(
+            container_tag="option_controls", tag="transcode_join"
+        ) and event.widget_exist(
+            container_tag="option_tab", tag="join_page"
+        ):  # We have a join option
+            if event.value_get(
+                container_tag="option_controls", tag="transcode_join"
+            ):  # Join
+                container_tag = "join_container"
+                option_type = "join"
+                options = self.join_options
+
+        for index, (option, tag) in enumerate(options.items()):
+            tag = f"{tag}|{index}".strip().replace(" ", "")
+
+            if event.value_get(container_tag=container_tag, tag=tag):
+                selected_option = f"{option_type}|{tag.split('|')[0]}"
+                break
+
+        return selected_option
 
 
 @dataclasses.dataclass(slots=True)
@@ -56,6 +364,7 @@ class Video_File_Grid(DVD_Archiver_Base):
     _project_name: str = ""
     _project_video_standard: str = ""  # PAL or NTSC
     _shutdown: bool = False
+    _task_dict: dict = dataclasses.field(default_factory=dict)
 
     @property
     def dvd_percent_used(self) -> int:
@@ -81,6 +390,72 @@ class Video_File_Grid(DVD_Archiver_Base):
         assert isinstance(value, int) and 0 >= 0, f"{value=}. Must be int >=0"
 
         self._dvd_percent_used = value
+
+    def notification_call_back(self, status: int, message: str, output: str, name):
+        """
+        The notification_call_back function is called by the multi-thread task_manager when a task completes
+
+
+        Args:
+            status: int: Determine if the task was successful or not
+            message: str: Pass a message to the user
+            output: str: Return the output of the task
+            name: Identify the task that has completed
+
+        """
+        global gs_thread_status
+        global gs_thread_message
+        global gs_thread_output
+        global gs_thread_task_name
+
+        global gi_tasks_completed
+        global gb_task_errored
+
+        gs_thread_status = status
+        gs_thread_message = "" if message is None else message
+        gs_thread_output = "" if gs_thread_output is None else gs_thread_output
+        gs_thread_task_name = name
+
+        operation = gs_thread_task_name.split("_")[0]
+        vd_id = int(gs_thread_task_name.split("_")[-1])
+        print(f"DBG notification_call_back {vd_id=} {operation=}")
+        print(f"DBG {self._task_dict[vd_id]=}")
+        if status == -1:
+            gb_task_errored = True
+        else:
+            gi_tasks_completed += 1
+
+            if operation == "transcode":
+                video_data: Video_Data = self._task_dict[vd_id][0]
+                transcode_folder: str = self._task_dict[vd_id][1]
+
+                for row in range(self._file_grid.row_count):
+                    user_data: Video_Data = self._file_grid.userdata_get(
+                        row=row, col=self._file_grid.colindex_get("video_file")
+                    )
+
+                    print(f"DBG {user_data=} {transcode_folder=}")
+
+                    if user_data and user_data.vd_id == vd_id:
+                        print("DBG BINGO")
+                        result, message = self._processed_trimmed(
+                            self._file_grid,
+                            vd_id,
+                            transcode_folder,
+                            video_data.video_file_settings.button_title,
+                        )
+                        print(f"DBG {result=} {message=}")
+                        if result == -1:
+                            gi_thread_status = -1
+                            gs_task_error_message = message
+                            gb_task_errored = True
+
+        self._task_dict.pop(vd_id)
+        if not utils.Is_Complied():
+            print(
+                "DBG notification_call_back"
+                f" {gs_thread_status=} {gs_thread_message=} {gs_thread_output=} {gs_thread_task_name=}"
+            )
 
     @property
     def project_duration(self) -> str:
@@ -146,9 +521,12 @@ class Video_File_Grid(DVD_Archiver_Base):
 
     def __post_init__(self) -> None:
         """Initializes the instance for use"""
-        assert isinstance(
-            self.parent, DVD_Archiver_Base
-        ), f"{self.parent=}. Must be an instance of DVD_Archiver_Base"
+        assert isinstance(self.parent, DVD_Archiver_Base), (
+            f"{self.parent=}. Must be an instance of DVD_Archiver_Base"
+        )
+
+        self._background_task_manager: Task_Manager = Task_Manager()
+        self._background_task_manager.start()
 
         if self._db_settings.setting_exist(sys_consts.LATEST_PROJECT_DBK):
             self.project_name = self._db_settings.setting_get(
@@ -165,9 +543,9 @@ class Video_File_Grid(DVD_Archiver_Base):
         Args:
             event (Action): Action
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         if event.event == qtg.Sys_Events.CLICKED:
             if event.tag.startswith("grid_button"):
@@ -208,9 +586,15 @@ class Video_File_Grid(DVD_Archiver_Base):
             self._delete_file_from_grid(self._file_grid, video_file_input[0].vd_id)
 
             # Insert Assembled Children Files
-            self._insert_files_into_grid(
-                [video_file_data for video_file_data in video_file_input[1:]],
+            rejected = self._insert_files_into_grid(
+                selected_files=[
+                    video_file_data for video_file_data in video_file_input[1:]
+                ],
+                debug=False,
             )
+
+            if rejected:
+                popups.PopError(title="Video File Error...", message=rejected).show()
 
     def _edit_video(self, event: qtg.Action) -> None:
         """
@@ -219,9 +603,9 @@ class Video_File_Grid(DVD_Archiver_Base):
             event (qtg.Action): The event that triggered the video edit.
         """
 
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         video_editor_folder = Get_Video_Editor_Folder()
 
@@ -309,19 +693,29 @@ class Video_File_Grid(DVD_Archiver_Base):
         self,
         file_grid: qtg.Grid,
         vd_id: int,
-        trimmed_file: str,
+        updated_file: str,
         button_title: str = "",
-    ) -> None:
+    ) -> [int, str]:
         """
         Updates the file_grid with the trimmed_file detail, after finding the corresponding grid entry.
         Args:
             file_grid (qtg.Grid): The grid to update.
             vd_id (int): The Video_Data ID of the source file.
-            trimmed_file (str): The trimmed file to update the grid details with.
+            updated_file (str): The trimmed file to update the grid details with.
             button_title (str): The button title to update the grid details with.
+
+        Returns:
+            int: 1 if successful, -1 if failed
+            str: error message or "" if ok
         """
         assert isinstance(file_grid, qtg.Grid), f"{file_grid=}. Must be qtg.Grid,"
         assert isinstance(vd_id, int) and vd_id >= 0, f"{vd_id=}. Must be an int >= 0"
+        assert isinstance(updated_file, str) and updated_file.strip() != "", (
+            f"{updated_file=}. Must be non-empty str"
+        )
+        assert isinstance(button_title, str) and button_title.strip() != "", (
+            f"{button_title=}. Must be non-empty str"
+        )
 
         file_handler = file_utils.File()
 
@@ -329,22 +723,18 @@ class Video_File_Grid(DVD_Archiver_Base):
             trimmed_folder,
             trimmed_file_name,
             trimmed_extension,
-        ) = file_handler.split_file_path(trimmed_file)
+        ) = file_handler.split_file_path(updated_file)
 
-        # Scan looking for source of trimmed file
+        # Scan looking for a source of trimmed file
         for row in range(file_grid.row_count):
             user_data: Video_Data = file_grid.userdata_get(
                 row=row, col=file_grid.colindex_get("video_file")
             )
 
             if user_data and vd_id == user_data.vd_id:
-                encoding_info = dvdarch_utils.Get_File_Encoding_Info(trimmed_file)
+                encoding_info = dvdarch_utils.Get_File_Encoding_Info(updated_file)
                 if encoding_info.error:  # Error Occurred
-                    popups.PopError(
-                        title="Encoding Read Error...",
-                        message=encoding_info.error,
-                    ).show()
-                    return None
+                    return -1, encoding_info.error
 
                 if (
                     button_title
@@ -379,15 +769,18 @@ class Video_File_Grid(DVD_Archiver_Base):
                     )
 
                 break  # Only one trimmed file
+        else:
+            return -1, f"Failed To Find {vd_id} In Grid. {updated_file=}"
+        return 1, ""
 
     def event_handler(self, event: qtg.Action) -> None:
         """Handles  application events
         Args:
             event (Action): The triggering event
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         match event.event:
             case qtg.Sys_Events.APPINIT:
@@ -485,10 +878,15 @@ class Video_File_Grid(DVD_Archiver_Base):
                         self._remove_files(event)
 
                     case "toggle_file_button_names":
+                        self._db_settings.setting_set(
+                            sys_consts.DISPLAY_FILE_NAMES_DBK, self._display_filename
+                        )
+
                         if self._display_filename:
                             self._display_filename = False
                         else:
                             self._display_filename = True
+
                         self._toggle_file_button_names(event)
                     case "ungroup_files":
                         self._ungroup_files(event)
@@ -503,13 +901,13 @@ class Video_File_Grid(DVD_Archiver_Base):
             project_name (str): The name of the project
             save_existing (bool): If True saves the existing project, else does not
         """
-        assert (
-            isinstance(project_name, str) and project_name.strip() != ""
-        ), f"{project_name=}. Must be non-empty str"
+        assert isinstance(project_name, str) and project_name.strip() != "", (
+            f"{project_name=}. Must be non-empty str"
+        )
 
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         file_grid: qtg.Grid = cast(
             qtg.Grid,
@@ -632,7 +1030,13 @@ class Video_File_Grid(DVD_Archiver_Base):
                 value=False,
             )
 
-        # Hot wire to show title names instead of file names #TODO:  make this user settable
+        self._display_filename = True
+        if self._db_settings.setting_exist(sys_consts.DISPLAY_FILE_NAMES_DBK):
+            self._display_filename = cast(
+                bool, self._db_settings.setting_get(sys_consts.DISPLAY_FILE_NAMES_DBK)
+            )
+
+        # Hot wire to display title names or file names as required
         event.event = qtg.Sys_Events.CLICKED
         event.tag = "toggle_file_button_names"
         self.event_handler(event)
@@ -647,9 +1051,15 @@ class Video_File_Grid(DVD_Archiver_Base):
         Returns:
             None
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        # HD Camcorder MTS files gave me no end of trouble, so have to reencode to mezzanine
+        # The same applies to the mod/tod files which are proprietary mpg formats
+        proprietary_extensions = ("mod", "tod")  # , "mts")
+
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
+
+        message = ""
 
         file_grid: qtg.Grid = cast(
             qtg.Grid,
@@ -717,253 +1127,295 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         if not checked_items:
             popups.PopError(
-                title="No Files Selected", message="Please Select Files To Join"
+                title="No Files Selected",
+                message="Please Select Files To Join/Transcode",
             ).show()
             return None
 
         copy_method = ""
+        dv_option = False
+        stream_copy = False
+        join_options = {}
+        file_extension = checked_items[0].user_data.video_extension.lower().strip(".")
 
-        if len(checked_items) == 1:  # Only one file selected, so transcode only
-            copy_title = "Re-Encode File..."
-            copy_message = "Re-Encode Selected File"
-            copy_option = {
-                "Make Edit File - Slow   :: Transcode File Into An Intermediate Edit File Format Suitable For Editing": "reencode_edit",
-                "Re-Encode H264 - Slower :: Transcode File Into The Common H264 Format": "reencode_h264",
-                "Re-Encode H265 - Slowest ::Transcode File Into The Common H264 Format": "reencode_h265",
-            }
-        else:  # Join files
-            copy_title = "Join Files..."
-            copy_message = "Join Selected Files"
+        if all(
+            item.user_data.encoding_info.video_height
+            in (sys_consts.PAL_SPECS.height_43, sys_consts.NTSC_SPECS.height_43)
+            and item.user_data.encoding_info.video_width
+            in (sys_consts.PAL_SPECS.width_43, sys_consts.NTSC_SPECS.width_43)
+            for item in checked_items
+        ):
+            dv_option = True
 
-            file_extension = checked_items[0].user_data.video_extension.lower()
+        if file_extension not in proprietary_extensions and all(
+            item.user_data.video_path.lower().endswith(file_extension)
+            for item in checked_items
+        ):  # All files of the same type can stream copy
+            stream_copy = True
 
-            # HD Camcorder MTS files gave me no end of trouble, so have to reencode to mezzanine
-            if all(
-                item.user_data.video_path.lower().endswith("mts")
-                for item in checked_items
-            ):
-                copy_option = {}
-                copy_method = ""
+        reencode_options = {
+            "Make Edit File - Slow   :: Transcode File Into An Intermediate Edit File Format Suitable For Editing": "reencode_edit"
+        }
+        if dv_option:
+            reencode_options.update({
+                "Re-Encode DV   - Slow  :: Transcode File Into The Common DV Format. Files Are Large": "reencode_dv"
+            })
 
-                if (
-                    popups.PopYesNo(
-                        title="MTS Files Selected...",
-                        message="MTS Joins Are Re-encoded As A High Quality Edit File - This Takes Some Time! Continue?",
-                    ).show()
-                    == "yes"
-                ):
-                    copy_method = "transjoin_edit"  # Makes a mezzanine edit master
-            elif all(
-                item.user_data.video_path.lower().endswith("mod")
-                for item in checked_items
-            ):
-                copy_option = {}
-                copy_method = "stream_copy"  # At least until tested
-            elif all(
-                item.user_data.video_path.lower().endswith(file_extension)
-                for item in checked_items
-            ):  # All files of the same type can stream copy
-                copy_option = {
-                    "Stream Copy - Fast       :: Use Where There Is No Problem Joining Files ": (
-                        "stream_copy"
+        reencode_options.update({
+            "Re-Encode H264 - Slower :: Transcode File Into The Common H264 Format": "reencode_h264",
+            "Re-Encode H265 - Slowest ::Transcode File Into The Common H264 Format": "reencode_h265",
+        })
+
+        if len(checked_items) > 1:  # More than one file, so can transcode or join
+            if stream_copy:
+                join_options.update({
+                    "Stream Copy            - Fast :: Use Where There Is No Problem Joining Files ": "stream_copy"
+                })
+
+            if dv_option:
+                join_options.update({
+                    "Re-Encode As DV File   - Very Large :: Use Where There Is A Problem Joining Files & The Joined "
+                    "Files Needs To Be Edited   ": "transjoin_dv"
+                })
+
+            join_options.update({
+                "Reencode As Edit File  - Slow       :: Use Where There Is A Problem Joining Files & The Joined File Needs "
+                "To Be Edited": "transjoin_edit",
+                "Re-Encode As H264 File - Slower     ::  Use To Join Files Into The Common H264 Format": "transjoin_h264",
+                "Re-Encode As H265 File - Slowest    ::  Use To Join Files Into The Newer H265 Format": "transjoin_h265",
+            })
+
+        result = Reencode_Options(
+            transcode_options=reencode_options,
+            join_options=join_options,
+        ).show()
+
+        if result.strip() == "":
+            return None
+
+        operation_option = result.split("|")[0]
+        operation_action = result.split("|")[1]
+
+        concatenating_files = []
+        video_file_data = []
+        removed_files = []
+        output_file = ""
+        vd_id = -1
+        button_title = ""
+        transcode_format = "mp4"  # TODO Make user selectable - mpg, mp4
+
+        for item in checked_items:
+            item: qtg.Grid_Item
+            video_data: Video_Data = item.user_data
+
+            if not output_file:  # Happens on first iteration
+                vd_id = video_data.vd_id
+                button_title = video_data.video_file_settings.button_title
+                output_file = file_handler.file_join(
+                    dir_path=transcode_folder,
+                    file_name=f"{video_data.video_file}_joined",
+                    ext=(
+                        transcode_format
+                        if copy_method == "transcode_copy"
+                        else video_data.video_extension
                     ),
-                    "Make Edit File - Slow    :: Use Where There Is A Problem Joining Files & The Joined File Needs "
-                    "To Be Edited": "transjoin_edit",
-                    "Re-Encode H264 - Slower  ::  Use To Join Files Into The Common H264 Format": "transjoin_h264",
-                    "Re-Encode H265 - Slowest ::  Use To Join Files Into The Newer H265 Format": "transjoin_h265",
-                }
-            else:  # Different file extensions, need a transcode copy
-                copy_option = {
-                    "Make Edit File - Slow   :: Use Where The Joined Files Needs To Be Edited   ": "transjoin_edit",
-                    "Re-Encode H264 - Slower :: Use To Join Files Into The Common H264 Format ": "transjoin_h264",
-                    "Re-Encode H265 - Slowest:: Use To Join Files Into The Newer H265 Format": "transjoin_h265",
-                }
+                )
+            else:
+                removed_files.append(video_data)
 
-        if copy_option:
-            copy_method = popups.PopOptions(
-                title=copy_title,
-                message=copy_message,
-                options=copy_option,
+            concatenating_files.append(video_data.video_path)
+            video_file_data.append(video_data)
+
+        transcoded_files = []
+
+        if concatenating_files and output_file:
+            with qtg.sys_cursor(qtg.Cursor.hourglass):
+                match operation_option:
+                    case "transcode":
+                        for video_data in video_file_data:
+                            match operation_action:
+                                case "reencode_edit":
+                                    transcode_format = "avi"
+                                    result, message = dvdarch_utils.Transcode_Mezzanine(
+                                        input_file=video_data.video_path,
+                                        frame_rate=video_data.encoding_info.video_frame_rate,
+                                        output_folder=transcode_folder,
+                                        width=video_data.encoding_info.video_width,
+                                        height=video_data.encoding_info.video_height,
+                                        interlaced=True
+                                        if video_data.encoding_info.video_scan_type.lower()
+                                        == "interlaced"
+                                        else False,
+                                        bottom_field_first=True
+                                        if video_data.encoding_info.video_scan_order.lower()
+                                        == "bff"
+                                        else False,
+                                    )
+
+                                    if result == -1:
+                                        return None
+                                case "reencode_dv":
+                                    # Example on how to transcode in background TODO Implement this
+                                    # transcode_format = "avi"
+                                    # task_tuple = (
+                                    #     video_data.vd_id,
+                                    #     (
+                                    #         "avi",
+                                    #         video_data,
+                                    #         operation_action,
+                                    #         transcode_folder,
+                                    #     ),
+                                    # )
+                                    #
+                                    # self._background_task_manager.add_task(
+                                    #     name=f"transcode_video_{task_tuple[0]}",
+                                    #     method=Run_Video_Trancode,
+                                    #     arguments=(task_tuple[1],),
+                                    #     callback=self.notification_call_back,
+                                    # )
+                                    # self._task_dict[video_data.vd_id] = (
+                                    #     video_data,
+                                    #     transcode_file,
+                                    # )
+                                    transcode_format = "avi"
+
+                                    result, message = dvdarch_utils.Transcode_DV(
+                                        input_file=video_data.video_path,
+                                        frame_rate=video_data.encoding_info.video_frame_rate,
+                                        output_folder=transcode_folder,
+                                        width=video_data.encoding_info.video_width,
+                                        height=video_data.encoding_info.video_height,
+                                    )
+                                case "reencode_h264":
+                                    transcode_format = "mp4"
+                                    result, message = dvdarch_utils.Transcode_H26x(
+                                        input_file=video_data.video_path,
+                                        frame_rate=video_data.encoding_info.video_frame_rate,
+                                        output_folder=transcode_folder,
+                                        width=video_data.encoding_info.video_width,
+                                        height=video_data.encoding_info.video_height,
+                                        interlaced=True
+                                        if video_data.encoding_info.video_scan_type.lower()
+                                        == "interlaced"
+                                        else False,
+                                        bottom_field_first=True
+                                        if video_data.encoding_info.video_scan_order.lower()
+                                        == "bff"
+                                        else False,
+                                        h265=False,
+                                    )
+                                case "reencode_h265":
+                                    transcode_format = "mp4"
+                                    result, message = dvdarch_utils.Transcode_H26x(
+                                        input_file=video_data.video_path,
+                                        frame_rate=video_data.encoding_info.video_frame_rate,
+                                        output_folder=transcode_folder,
+                                        width=video_data.encoding_info.video_width,
+                                        height=video_data.encoding_info.video_height,
+                                        interlaced=True
+                                        if video_data.encoding_info.video_scan_type.lower()
+                                        == "interlaced"
+                                        else False,
+                                        bottom_field_first=True
+                                        if video_data.encoding_info.video_scan_order.lower()
+                                        == "bff"
+                                        else False,
+                                        h265=True,
+                                    )
+
+                            if result == -1:
+                                break
+
+                            transcoded_files.append((
+                                video_data.vd_id,
+                                video_data.video_file_settings.button_title,
+                                file_handler.file_join(
+                                    dir_path=transcode_folder,
+                                    file_name=video_data.video_file,
+                                    ext=transcode_format,
+                                ),
+                            ))
+
+                        if transcoded_files:
+                            for (
+                                vd_id,
+                                button_title,
+                                transcoded_file,
+                            ) in transcoded_files:
+                                result, message = self._processed_trimmed(
+                                    vd_id=vd_id,
+                                    file_grid=file_grid,
+                                    updated_file=transcoded_file,
+                                    button_title=button_title,
+                                )
+
+                    case "join":
+                        video_data = checked_items[0].user_data
+
+                        match operation_action:
+                            case "stream_copy":  # No transcoding
+                                transcode_format = ""
+                            case "transjoin_dv":
+                                transcode_format = "dv"  # lives in an avi file
+                            case "transjoin_edit":
+                                transcode_format = "mjpeg"
+                            case "transjoin_h264":
+                                transcode_format = "h264"
+                            case "transjoin_h265":
+                                transcode_format = "h265"
+
+                        if (
+                            video_data.video_extension.strip(".").lower()
+                            in proprietary_extensions
+                        ):
+                            file_extension = "avi"
+                        elif video_data.video_extension.strip(".").lower() in "mts":
+                            file_extension = "mkv"
+
+                        output_file = file_handler.file_join(
+                            dir_path=transcode_folder,
+                            file_name=f"{video_data.video_file}_joined",
+                            ext=file_extension,
+                        )
+
+                        print(concatenating_files)
+                        result, message, _ = dvdarch_utils.Concatenate_Videos(
+                            temp_files=concatenating_files,
+                            output_file=output_file,
+                            transcode_format=transcode_format,
+                            debug=True,
+                        )
+
+                        if result == 1:
+                            video_data = checked_items[0].user_data
+                            vd_id = video_data.vd_id
+                            button_title = video_data.video_file_settings.button_title
+
+                            result, message = self._processed_trimmed(
+                                file_grid=file_grid,
+                                vd_id=vd_id,
+                                updated_file=output_file,
+                                button_title=button_title,
+                            )
+
+                            for item in reversed(checked_items):
+                                if item.user_data and vd_id != item.user_data.vd_id:
+                                    file_grid.row_delete(item.row_index)
+
+        if result == -1:
+            popups.PopError(
+                title="Error Joining Files..."
+                if operation_option == "join"
+                else "Error Transcoding Files...",
+                message=f" Failed!\n{sys_consts.SDELIM}{message}{sys_consts.SDELIM}",
             ).show()
 
-        if copy_method.strip() == "" or copy_method == "cancel":
             return None
         else:
-            concatenating_files = []
-            video_file_data = []
-            removed_files = []
-            output_file = ""
-            vd_id = -1
-            button_title = ""
-            container_format = "mp4"  # TODO Make user selectable - mpg, mp4
-
-            for item in checked_items:
-                item: qtg.Grid_Item
-                video_data: Video_Data = item.user_data
-
-                if not output_file:  # Happens on first iteration
-                    vd_id = video_data.vd_id
-                    button_title = video_data.video_file_settings.button_title
-                    output_file = file_handler.file_join(
-                        dir_path=transcode_folder,
-                        file_name=f"{video_data.video_file}_joined",
-                        ext=(
-                            container_format
-                            if copy_method == "transcode_copy"
-                            else video_data.video_extension
-                        ),
-                    )
-                else:
-                    removed_files.append(video_data)
-
-                concatenating_files.append(video_data.video_path)
-                video_file_data.append(video_data)
-
-            if concatenating_files and output_file:
-                result = -1
-                message = ""
-
-                with qtg.sys_cursor(qtg.Cursor.hourglass):
-                    match copy_method:
-                        case "reencode_edit":  # Only one file selected with this option
-                            video_data = video_file_data[0]
-
-                            result, message = dvdarch_utils.Transcode_Mezzanine(
-                                input_file=video_data.video_path,
-                                frame_rate=video_data.encoding_info.video_frame_rate,
-                                output_folder=transcode_folder,
-                                width=video_data.encoding_info.video_width,
-                                height=video_data.encoding_info.video_height,
-                                interlaced=True
-                                if video_data.encoding_info.video_scan_type.lower()
-                                == "interlaced"
-                                else False,
-                                bottom_field_first=True
-                                if video_data.encoding_info.video_scan_order.lower()
-                                == "bff"
-                                else False,
-                            )
-                        case (
-                            "reencode_h264"
-                        ):  # Only one file selected  with this option
-                            video_data = video_file_data[0]
-                            result, message = dvdarch_utils.Transcode_H26x(
-                                input_file=video_data.video_path,
-                                frame_rate=video_data.encoding_info.video_frame_rate,
-                                output_folder=transcode_folder,
-                                width=video_data.encoding_info.video_width,
-                                height=video_data.encoding_info.video_height,
-                                interlaced=True
-                                if video_data.encoding_info.video_scan_type.lower()
-                                == "interlaced"
-                                else False,
-                                bottom_field_first=True
-                                if video_data.encoding_info.video_scan_order.lower()
-                                == "bff"
-                                else False,
-                                h265=False,
-                            )
-                        case (
-                            "reencode_h265"
-                        ):  # Only one file selected  with this option
-                            video_data = video_file_data[0]
-                            result, message = dvdarch_utils.Transcode_H26x(
-                                input_file=video_data.video_path,
-                                frame_rate=video_data.encoding_info.video_frame_rate,
-                                output_folder=transcode_folder,
-                                width=video_data.encoding_info.video_width,
-                                height=video_data.encoding_info.video_height,
-                                interlaced=True
-                                if video_data.encoding_info.video_scan_type.lower()
-                                == "interlaced"
-                                else False,
-                                bottom_field_first=True
-                                if video_data.encoding_info.video_scan_order.lower()
-                                == "bff"
-                                else False,
-                                h265=True,
-                            )
-                        case "stream_copy":  # Multiple files selected from here on
-                            result, message = dvdarch_utils.Concatenate_Videos(
-                                temp_files=concatenating_files, output_file=output_file
-                            )
-                        case "transjoin_edit":
-                            result, message = dvdarch_utils.Concatenate_Videos(
-                                temp_files=concatenating_files,
-                                output_file=output_file,
-                                transcode_format="mjpeg",
-                            )
-                        case "transjoin_h264":
-                            result, message = dvdarch_utils.Concatenate_Videos(
-                                temp_files=concatenating_files,
-                                output_file=output_file,
-                                transcode_format="h264",
-                            )
-                        case "transjoin_h265":
-                            result, message = dvdarch_utils.Concatenate_Videos(
-                                temp_files=concatenating_files,
-                                output_file=output_file,
-                                transcode_format="h265",
-                            )
-
-                if result == -1:
-                    popups.PopError(
-                        title="Error Joining Files",
-                        message=(
-                            "File Join"
-                            f" Failed!\n{sys_consts.SDELIM}{message}{sys_consts.SDELIM}"
-                        ),
-                    ).show()
-
-                    return None
-                else:
-                    # If all good message has the output file name. A reencode concat will have a different extension. A
-                    # stream concat will have the same extension as the inpt file. This will be the only delta
-                    output_file = message
-
-                self._processed_trimmed(
-                    file_grid,
-                    vd_id,
-                    output_file,
-                    button_title,
-                )
-
-                removed_file_txt = "\n".join(
-                    video_data.video_path for video_data in removed_files
-                )
-
-                delete_source = False
-                if (
-                    popups.PopYesNo(
-                        width=80,
-                        title="Remove Source Video Files?",
-                        message=(
-                            "Delete Source Video Files?"
-                            f" {sys_consts.SDELIM}\n{removed_file_txt}{sys_consts.SDELIM}"
-                        ),
-                    ).show()
-                    == "yes"
-                ):
-                    delete_source = True
-
-                failed = []
-                with qtg.sys_cursor(qtg.Cursor.hourglass):
-                    for video_data in removed_files:
-                        self._delete_file_from_grid(file_grid, video_data.vd_id)
-                        if delete_source:
-                            if file_handler.remove_file(video_data.video_path) == -1:
-                                failed.append(video_data.video_path)
-
-                if failed:
-                    failed_txt = "\n".join(failed)
-                    popups.PopError(
-                        width=80,
-                        title="Error Removing Video Files...",
-                        message=(
-                            "Failed To Remove Source Video Files:"
-                            f" {sys_consts.SDELIM}{failed_txt}{sys_consts.SDELIM}"
-                        ),
-                    ).show()
+            # If all good message has the output file name. A reencode concat will have a different extension. A
+            # stream concat will have the same extension as the inpt file. This will be the only delta
+            output_file = message
+        return None
 
     def _remove_files(self, event: qtg.Action) -> None:
         """Removes the selected files
@@ -971,9 +1423,9 @@ class Video_File_Grid(DVD_Archiver_Base):
         Args:
             event (qtg.Action) : Calling event
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         file_grid: qtg.Grid = cast(
             qtg.Grid,
@@ -1029,9 +1481,9 @@ class Video_File_Grid(DVD_Archiver_Base):
             else tuple(reversed(file_grid.checkitems_get))
         )
 
-        assert all(
-            isinstance(item, qtg.Grid_Item) for item in checked_items
-        ), f"{checked_items=}. Must be a list of 'qtg.Grid_Item_Tuple'"
+        assert all(isinstance(item, qtg.Grid_Item) for item in checked_items), (
+            f"{checked_items=}. Must be a list of 'qtg.Grid_Item_Tuple'"
+        )
 
         if not checked_items:
             popups.PopMessage(
@@ -1169,9 +1621,9 @@ class Video_File_Grid(DVD_Archiver_Base):
         Args:
             event (qtg.Action): Calling event
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         file_handler = file_utils.File()
 
@@ -1197,7 +1649,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             grid_row = 0
             for shelf_item in shelf_list:
                 if (
-                    shelf_item["video_data"] is None
+                    shelf_item["video_data"] is None or shelf_item["duration"] is None
                 ):  # This is an error and should not happen
                     continue
 
@@ -1206,12 +1658,16 @@ class Video_File_Grid(DVD_Archiver_Base):
                     continue
 
                 video_data: Video_Data = shelf_item["video_data"]
+                duration: str = shelf_item["duration"]
+
+                if video_data is None or duration is None:
+                    continue
 
                 self._populate_grid_row(
                     file_grid=file_grid,
                     row_index=grid_row,
-                    video_data=shelf_item["video_data"],
-                    duration=shelf_item["duration"],
+                    video_data=video_data,
+                    duration=duration,
                     italic=True
                     if "dvdmenu" in shelf_item
                     else False,  # Item comes from a dvd layout button
@@ -1293,9 +1749,9 @@ class Video_File_Grid(DVD_Archiver_Base):
         Args:
             event (qtg.Action) : Calling event
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         error_title: Final[str] = "File Grid Save Error..."
 
@@ -1328,6 +1784,12 @@ class Video_File_Grid(DVD_Archiver_Base):
 
             row_data = []
             for row in range(file_grid.row_count):
+                if (
+                    file_grid.userdata_get(row=row, col=0) is None
+                    or file_grid.colindex_get("duration") is None
+                ):
+                    continue  # This is an error and should not happen
+
                 row_data.append({
                     "row_index": row,
                     "video_data": file_grid.userdata_get(row=row, col=0),
@@ -1406,9 +1868,9 @@ class Video_File_Grid(DVD_Archiver_Base):
         Returns:
             int: The maximum menu_group number.
         """
-        assert isinstance(
-            file_grid, qtg.Grid
-        ), f"{file_grid=}. Must be an instance of qtg.Grid"
+        assert isinstance(file_grid, qtg.Grid), (
+            f"{file_grid=}. Must be an instance of qtg.Grid"
+        )
 
         max_group_num = 0
 
@@ -1520,9 +1982,9 @@ class Video_File_Grid(DVD_Archiver_Base):
             None
         """
 
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         file_grid: qtg.Grid = cast(
             qtg.Grid,
@@ -1561,9 +2023,9 @@ class Video_File_Grid(DVD_Archiver_Base):
         Args:
             event (qtg.Acton) : Calling event
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         video_file_list: list[Video_Data] = []
 
@@ -1616,28 +2078,31 @@ class Video_File_Grid(DVD_Archiver_Base):
     def _insert_files_into_grid(
         self,
         selected_files: list[Video_Data],
+        debug: bool = False,
     ) -> str:
         """
         Inserts files into the file grid widget.
 
         Args:
             selected_files (list[Video_Data]): list of video file data
+            debug (bool): Whether to print debug information
 
         Returns:
             str: A string containing information about any rejected files.
         """
-        assert isinstance(
-            selected_files, list
-        ), f"{selected_files=}.  Must be a list of Video_Data objects"
-        assert all(
-            isinstance(item, Video_Data) for item in selected_files
-        ), f"{selected_files=}.  Must be a list of Video_Data objects"
+        assert isinstance(selected_files, list), (
+            f"{selected_files=}.  Must be a list of Video_Data objects"
+        )
+        assert all(isinstance(item, Video_Data) for item in selected_files), (
+            f"{selected_files=}.  Must be a list of Video_Data objects"
+        )
 
         rejected = ""
         rows_loaded = self._file_grid.row_count
         row_index = 0
         video_standard = ""
 
+        # Get video_standard - PAL/NTSC
         while self._file_grid.row_count > 0:
             grid_video_data = self._file_grid.userdata_get(
                 row=0, col=self._file_grid.colindex_get("video_file")
@@ -1657,12 +2122,15 @@ class Video_File_Grid(DVD_Archiver_Base):
                 )
 
                 if grid_video_data is None:  # Invalid row so remove it
-                    self._file_grid.row_delete(int(row_index))
+                    self._file_grid.row_delete(row=int(check_row_index))
                     continue
 
                 if grid_video_data.video_path == file_video_data.video_path:
                     break
             else:  # File not in the grid
+                if debug and not utils.Is_Complied():
+                    print(f"DBG FNIG {file_video_data}")
+
                 if (
                     file_video_data.encoding_info.video_tracks <= 0
                     or file_video_data.encoding_info.video_standard
@@ -1681,6 +2149,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                         f" {sys_consts.SDELIM}{file_video_data.video_path} :"
                         f"  {file_video_data.encoding_info.error}{sys_consts.SDELIM} \n"
                     )
+                    if debug and not utils.Is_Complied():
+                        print(f"DBG FE {file_video_data}")
                     continue
 
                 if video_standard == "":  # Only happens if no rows in grid
@@ -1694,6 +2164,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                         f"{sys_consts.SDELIM}{file_video_data.video_path} :"
                         f" {sys_consts.SDELIM} Is Not PAL, NTSC \n"
                     )
+                    if debug and not utils.Is_Complied():
+                        print(f"DBG VSB {file_video_data}")
                     continue
 
                 if file_video_data.encoding_info.video_standard != video_standard:
@@ -1701,6 +2173,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                         f"{sys_consts.SDELIM}{file_video_data.video_path} ({file_video_data.encoding_info.video_standard}) :"
                         f" {sys_consts.SDELIM} Is Not {video_standard} The Project Video Standard  \n"
                     )
+                    if debug and not utils.Is_Complied():
+                        print(f"DBG VSM {file_video_data}")
                     continue
 
                 if file_video_data.encoding_info.video_tracks == 0:
@@ -1708,6 +2182,23 @@ class Video_File_Grid(DVD_Archiver_Base):
                         f"{sys_consts.SDELIM}{file_video_data.video_path} :"
                         f" {sys_consts.SDELIM}No Video Track \n"
                     )
+                    if debug and not utils.Is_Complied():
+                        print(f"DBG NVT {file_video_data}")
+                    continue
+
+                if file_video_data.encoding_info.video_frame_rate not in (
+                    sys_consts.PAL_FRAME_RATE,
+                    sys_consts.PAL_FIELD_RATE,
+                    sys_consts.NTSC_FRAME_RATE,
+                    sys_consts.NTSC_FIELD_RATE,
+                    30,
+                ):
+                    rejected += (
+                        f"{sys_consts.SDELIM}{file_video_data.video_path} :"
+                        f" {sys_consts.SDELIM}Frame Rate Not Pal Or NTSC \n"
+                    )
+                    if debug and not utils.Is_Complied():
+                        print(f"DBG FRE {file_video_data}")
                     continue
 
                 # Set default filter settings from database
@@ -1764,6 +2255,9 @@ class Video_File_Grid(DVD_Archiver_Base):
                     )
                 ).split(".")[0]
 
+                if debug and not utils.Is_Complied():
+                    print(f"DBG PGR {file_video_data}")
+
                 self._populate_grid_row(
                     file_grid=self._file_grid,
                     row_index=rows_loaded + row_index,
@@ -1788,9 +2282,9 @@ class Video_File_Grid(DVD_Archiver_Base):
         Returns:
             qtg.HBoxContainer: The toolbox.
         """
-        assert isinstance(
-            video_user_data, Video_Data
-        ), f"{video_user_data=}. Must be an instance of Video_Data"
+        assert isinstance(video_user_data, Video_Data), (
+            f"{video_user_data=}. Must be an instance of Video_Data"
+        )
 
         toolbox = qtg.HBoxContainer(
             height=1, width=3, align=qtg.Align.CENTER, margin_left=0, margin_right=0
@@ -1826,12 +2320,12 @@ class Video_File_Grid(DVD_Archiver_Base):
             italic (bool): Whether the text should be italic. Defaults to False.
             tooltip (str): The tooltip text. Defaults to "".
         """
-        assert isinstance(
-            file_grid, qtg.Grid
-        ), f"{file_grid=}. Must be an instance of qtg.Grid"
-        assert isinstance(
-            video_data, Video_Data
-        ), f"{video_data=}. Must be an instance of File_Control.Video_Data"
+        assert isinstance(file_grid, qtg.Grid), (
+            f"{file_grid=}. Must be an instance of qtg.Grid"
+        )
+        assert isinstance(video_data, Video_Data), (
+            f"{video_data=}. Must be an instance of File_Control.Video_Data"
+        )
         assert isinstance(duration, str), f"{duration=}. Must be str."
         assert isinstance(italic, bool), f"{italic=}. Must be bool."
         assert isinstance(tooltip, str), f"{tooltip=}. Must be str."
@@ -1880,6 +2374,9 @@ class Video_File_Grid(DVD_Archiver_Base):
             )
         )
 
+        cur_value = file_grid.trans_get
+        file_grid.trans_set(False)
+
         file_grid.value_set(
             value=encoder_str,
             tooltip=encoder_str,
@@ -1887,6 +2384,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             col=file_grid.colindex_get("encoder"),
             user_data=video_data,
         )
+        file_grid.trans_set(cur_value)
 
         file_grid.value_set(
             value=duration,
@@ -1927,9 +2425,9 @@ class Video_File_Grid(DVD_Archiver_Base):
         Args:
             event (qtg.Action): The calling event.
         """
-        assert isinstance(
-            event, qtg.Action
-        ), f"{event=}. Must be an instance of qtg.Action"
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
 
         file_grid: qtg.Grid = cast(
             qtg.Grid,
@@ -2000,6 +2498,29 @@ class Video_File_Grid(DVD_Archiver_Base):
             tag="percent_of_dvd",
             value=f"{sys_consts.SDELIM}{self.dvd_percent_used}{sys_consts.SDELIM}",
         )
+
+    def shutdown(self) -> int:
+        """
+        Shuts down the instance
+
+        Returns:
+            int: 1:Ok, -1 Shutdown terminated
+        """
+        self._background_task_manager.throw_errors = False
+
+        if self._background_task_manager.list_running_tasks():
+            if (
+                popups.PopYesNo(
+                    title="Background Tasks Running...",
+                    message="Kill Background Tasks And Exit?",
+                ).show()
+                == "no"
+            ):
+                return -1
+
+            self._background_task_manager.stop()
+
+        return 1
 
     def layout(self) -> qtg.VBoxContainer:
         """Generates the file handler ui
