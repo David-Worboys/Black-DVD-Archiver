@@ -351,10 +351,10 @@ class DVD_Archiver(DVD_Archiver_Base):
                             self._video_editor.video_pause()
                             self._video_editor.archive_edit_list_write()
 
-                            if self._video_editor.video_file_input:
-                                self._file_control.process_edited_video_files(
-                                    video_file_input=self._video_editor.video_file_input
-                                )
+                        if self._video_editor.video_file_input:
+                            self._file_control.process_edited_video_files(
+                                video_file_input=self._video_editor.video_file_input
+                            )
 
                             self._tab_enable_handler(event=event, enable=True)
                     case "video_editor_tab":
