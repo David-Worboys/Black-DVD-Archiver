@@ -34,10 +34,10 @@ import sys_consts
 import QTPYGUI.utils as utils
 from archive_management import Archive_Manager
 from background_task_manager import Task_Manager
+from dvdarch_utils import Get_File_Encoding_Info
 from file_renamer_popup import File_Renamer_Popup
 from sys_config import (
     DVD_Archiver_Base,
-    Encoding_Details,
     Video_Data,
     Video_File_Settings,
 )
@@ -1263,66 +1263,6 @@ class Video_Editor(DVD_Archiver_Base):
                     title="Archive Edit List", message=f"Write Failed : {message}"
                 ).show()
 
-    def _get_encoding_info(self, video_file_path: str) -> tuple[int, Encoding_Details]:
-        """Gets the encoding info for a video file
-
-        Belts and braces because should never need this loopiness unless something goes off the rails in thread handling.
-        This meothpd is only useful where thread handling is used to assemble or cut files in threads
-
-        Args:
-            video_file_path: This file path to the video file
-
-        Returns:
-            int : arg 1 if ok, 0 otherwise
-            Encoding_Details: arg 2 encoding details if all good otherwise blank encoding details with the error filled
-            out
-        """
-        assert isinstance(video_file_path, str) and video_file_path.strip() != "", (
-            f"{video_file_path=}. Must be a non-empty string"
-        )
-
-        blank_encoding_info = Encoding_Details()
-
-        file_handler = file_utils.File()
-        file_path, file_name, file_extn = file_handler.split_file_path(video_file_path)
-
-        if not file_handler.file_exists(
-            directory_path=file_path, file_name=file_name, file_extension=file_extn
-        ):
-            blank_encoding_info.error = f"File does not exist : {video_file_path=}"
-            blank_encoding_info.video_duration = 0
-            popups.PopError(
-                title="Failed to Get Encoding Info...",
-                message=(
-                    "Failed To Get Encoding Info Or Duration Is 0"
-                    f" Secs : {video_file_path=} :"
-                    f" {blank_encoding_info.error} :"
-                    f" {blank_encoding_info.video_duration}"
-                ),
-            ).show()
-
-        for i in range(20):  # Loop 20 times with a 3 second sleep = 1 Minute
-            encoding_info = dvdarch_utils.Get_File_Encoding_Info(video_file_path)
-
-            if (
-                encoding_info.error.strip() == "" and encoding_info.video_duration > 0
-            ):  # Should break first time if thread handling did its job!
-                return 1, encoding_info
-
-        else:
-            blank_encoding_info.error = encoding_info.error
-            popups.PopError(
-                title="Failed to Get Encoding Info...",
-                message=(
-                    "Failed To Get Encoding Info Or Duration Is 0"
-                    f" Secs : {video_file_path=} :"
-                    f" {encoding_info.error} :"
-                    f" {encoding_info.video_duration}"
-                ),
-            ).show()
-
-            return -1, blank_encoding_info
-
     def _assemble_segments(self, event: qtg.Action) -> None:
         """
         Takes the specified segments from the input file and makes new video files from them.
@@ -1360,21 +1300,21 @@ class Video_Editor(DVD_Archiver_Base):
                     video_data = []
 
                     with qtg.sys_cursor(qtg.Cursor.hourglass):
-                        result, video_files_string = self._cut_video_with_editlist(
-                            input_file=self._video_file_input[0].video_path,
-                            output_file=assembled_file,
-                            cut_out=False,
+                        result, video_files_string, video_files = (
+                            self._cut_video_with_editlist(
+                                input_file=self._video_file_input[0].video_path,
+                                output_file=assembled_file,
+                                cut_out=False,
+                            )
                         )
 
-                        if (
-                            result == -1
-                        ):  # video_files_string is the error message and not the ',' delimitered file list
+                        if result == -1:
                             popups.PopError(
                                 title="Error Cutting File...",
                                 message=f"<{video_files_string}>",
                             ).show()
                         else:
-                            for video_file_path in video_files_string.split(","):
+                            for video_file_path in video_files:
                                 (
                                     video_path,
                                     video_file,
@@ -1382,12 +1322,13 @@ class Video_Editor(DVD_Archiver_Base):
                                 ) = file_handler.split_file_path(video_file_path)
 
                                 video_file_settings = Video_File_Settings()
+                                encoding_info = Get_File_Encoding_Info(video_file_path)
 
-                                result, encoding_info = self._get_encoding_info(
-                                    video_file_path
-                                )
-
-                                if result == -1:
+                                if encoding_info.error:
+                                    popups.PopError(
+                                        title="Error Getting Encoder Info...",
+                                        message=f"{sys_consts.SDELIM}{video_file_path}{sys_consts.SDELIM}\n<{encoding_info.error}>",
+                                    ).show()
                                     return None
 
                                 if self._db_settings.setting_exist(
@@ -1468,22 +1409,20 @@ class Video_Editor(DVD_Archiver_Base):
                     )
 
                     with qtg.sys_cursor(qtg.Cursor.hourglass):
-                        result, video_files_string = self._cut_video_with_editlist(
+                        result, message, video_files = self._cut_video_with_editlist(
                             input_file=self._video_file_input[0].video_path,
                             output_file=assembled_file,
                             cut_out=False,
                         )
 
-                        if (
-                            result == -1
-                        ):  # video_files_string is the error message and not the ',' delimitered file list
+                        if result == -1:  #
                             popups.PopError(
                                 title="Error Cutting File...",
-                                message=f"<{video_files_string}>",
+                                message=f"<{message}>",
                             ).show()
                         else:
                             result, message, _ = dvdarch_utils.Concatenate_Videos(
-                                temp_files=video_files_string.split(","),
+                                temp_files=video_files,
                                 output_file=assembled_file,
                                 delete_temp_files=True,
                             )
@@ -1502,11 +1441,13 @@ class Video_Editor(DVD_Archiver_Base):
                                 assembled_extension,
                             ) = file_handler.split_file_path(assembled_file)
 
-                            result, encoding_info = self._get_encoding_info(
-                                assembled_file
-                            )
+                            encoding_info = Get_File_Encoding_Info(assembled_file)
 
-                            if result == -1:
+                            if encoding_info.error:
+                                popups.PopError(
+                                    title="Error Getting Encoder Info...",
+                                    message=f"{sys_consts.SDELIM}{assembled_file}{sys_consts.SDELIM}\n<{encoding_info.error}>",
+                                ).show()
                                 return None
 
                             self._video_file_input.append(
@@ -1543,19 +1484,36 @@ class Video_Editor(DVD_Archiver_Base):
         mark_out = self._edit_list_grid.colindex_get("mark_out")
         clip_name = self._edit_list_grid.colindex_get("clip_name")
 
-        edit_list: list[tuple[int, int, str]] = [
-            (
-                self._edit_list_grid.value_get(row=row_index, col=mark_in),
-                self._edit_list_grid.value_get(row=row_index, col=mark_out) + 1
-                or self._frame_count,
-                str(
-                    self._edit_list_grid.value_get(row=row_index, col=clip_name)
-                ).replace(
-                    "'", ""
-                ),  # str because numbers are auto translated to ints, replace because SQL does not like '!
+        edit_list = []
+
+        for row_index in range(self._edit_list_grid.row_count):
+            mark_in_frame = (
+                int(self._edit_list_grid.value_get(row=row_index, col=mark_in))
+                if self._edit_list_grid.value_get(row=row_index, col=mark_in)
+                else 0
             )
-            for row_index in range(self._edit_list_grid.row_count)
-        ]
+
+            mark_out_frame = (
+                int(self._edit_list_grid.value_get(row=row_index, col=mark_out))
+                if self._edit_list_grid.value_get(row=row_index, col=mark_out)
+                else 0
+            )
+
+            if mark_in_frame < 0:
+                mark_in_frame = 0
+            # else:
+            #    mark_in_frame += 1
+
+            if mark_out_frame == 0:
+                mark_out_frame = self._frame_count
+
+            # str because numbers are auto translated to ints, replace because SQL does not like '!
+            clip_title = str(
+                self._edit_list_grid.value_get(row=row_index, col=clip_name)
+            ).replace("'", "")
+
+            edit_list.append((mark_in_frame, mark_out_frame, clip_title))
+
         # Dev check only, should always pass
         assert all(
             isinstance(item, tuple)
@@ -1573,7 +1531,7 @@ class Video_Editor(DVD_Archiver_Base):
         input_file: str,
         output_file: str,
         cut_out: bool = True,
-    ) -> tuple[int, str]:
+    ) -> tuple[int, str, list[str]]:
         """
         Cuts a video file based on a given edit list of start and end frames.
 
@@ -1591,6 +1549,7 @@ class Video_Editor(DVD_Archiver_Base):
             - If the operation failed:
                 - arg 1 (int): -1
                 - arg 2 (str): An error message.
+                - arg 3 (list[str]): List of video files
         """
         # Used for background task information
         global gi_task_error_code
@@ -1686,6 +1645,7 @@ class Video_Editor(DVD_Archiver_Base):
                         "Invalid Clip Name"
                         f" {sys_consts.SDELIM}{edit_tuple[2]}{sys_consts.SDELIM}!"
                     ),
+                    [],
                 )
 
         out_path, out_file, out_extn = file_handler.split_file_path(output_file)
@@ -1702,7 +1662,6 @@ class Video_Editor(DVD_Archiver_Base):
 
         task_list = []
         for cut_index, (start_frame, end_frame, clip_name) in enumerate(edit_list):
-
             if end_frame - start_frame <= 0:  # Probably should not happen
                 continue
 
@@ -1736,6 +1695,7 @@ class Video_Editor(DVD_Archiver_Base):
                             "Failed To Remove"
                             f" {sys_consts.SDELIM}{temp_file}{sys_consts.SDELIM}"
                         ),
+                        [],
                     )
 
             cut_def = dvdarch_utils.Cut_Video_Def(
@@ -1776,7 +1736,7 @@ class Video_Editor(DVD_Archiver_Base):
                         f" {gs_thread_task_name=}"
                     )
 
-                    return -1, str(f"Cut Video Failed: {error_str}")
+                    return -1, str(f"Cut Video Failed: {error_str}"), []
 
                 if current_task != gi_tasks_completed:
                     current_task = gi_tasks_completed
@@ -1801,11 +1761,11 @@ class Video_Editor(DVD_Archiver_Base):
 
                 if task_error_code == -1:
                     self._progress_bar.reset()
-                    return -1, task_error_message
+                    return -1, task_error_message, []
 
         self._progress_bar.reset()
 
-        if cut_out:  # Concat temp file for final file and remove the temp files
+        if cut_out:  # Concat temp file for the final file and remove the temp files
             result, message, _ = dvdarch_utils.Concatenate_Videos(
                 temp_files=temp_files,
                 output_file=output_file,
@@ -1814,14 +1774,14 @@ class Video_Editor(DVD_Archiver_Base):
             )
 
             if result == -1:
-                return -1, message
+                return -1, message, []
+            return 1, "", [output_file]
 
         else:
-            # We keep the temp files, as they are the new videos, and build an output file str where each video is
-            # delimitered by a ','
-            output_file = ",".join(temp_files)
+            # We keep the temp files, as they are the new videos
+            output_file = temp_files
 
-        return 1, output_file
+        return 1, "", output_file
 
     def _delete_segments(self, event: qtg.Action) -> None:
         """
@@ -1857,19 +1817,28 @@ class Video_Editor(DVD_Archiver_Base):
                 )
 
                 with qtg.sys_cursor(qtg.Cursor.hourglass):
-                    result, trimmed_file = self._cut_video_with_editlist(
+                    result, message, video_files = self._cut_video_with_editlist(
                         input_file=self._video_file_input[0].video_path,
                         output_file=output_file,
                     )
 
-                    if (
-                        result == -1
-                    ):  # trimmed file is the error message and not the file name
+                    if not video_files:  # Should never happen
                         popups.PopError(
                             title="Error Cutting File...",
-                            message=f"<{trimmed_file}>",
+                            message=f"<Cuttiing Failed! {sys_consts.SDELIM} {self._video_file_input[0].video_path} {sys_consts.SDELIM}>",
+                        ).show()
+                        return None
+
+                    if result == -1:
+                        popups.PopError(
+                            title="Error Cutting File...",
+                            message=f"<{message}>",
                         ).show()
                     else:
+                        trimmed_file = video_files[
+                            0
+                        ]  # Can only be one file at this point
+
                         (
                             trimmed_path,
                             trimmed_filename,
