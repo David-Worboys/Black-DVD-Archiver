@@ -17,8 +17,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import dataclasses
 import glob
 import hashlib
@@ -32,103 +30,102 @@ import shlex
 import shutil
 import subprocess
 import textwrap
-from typing import Final
+from enum import Enum
+from typing import Final, Union
 
 import psutil
 
 import QTPYGUI.file_utils as file_utils
 import QTPYGUI.popups as popups
+
 import sys_consts
 import QTPYGUI.utils as utils
 from sys_config import Encoding_Details, DVD_Menu_Page
 
-# fmt: on
 
-colors = {
-    "white": "#ffffff",
-    "black": "#000000",
-    "gray": "#808080",
-    "red": "#ff0000",
-    "green": "#00ff00",
-    "blue": "#0000ff",
-    "yellow": "#ffff00",
-    "purple": "#800080",
-    "orange": "#ffa500",
-    "pink": "#ffc0cb",
-    "brown": "#a52a2a",
-    "cyan": "#00FFFF",
-    "lightblue": "#add8e6",
-    "lightgreen": "#90ee90",
-    "lightgray": "#d3d3d3",
-    "darkgray": "#696969",
-    "darkred": "#8b0000",
-    "darkblue": "#00008b",
-    "darkgreen": "#006400",
-    "beige": "#f5f5dc",
-    "maroon": "#800000",
-    "turquoise": "#40e0d0",
-    "lightyellow": "#ffffe0",
-    "lavender": "#e6e6fa",
-    "navy": "#000080",
-    "olive": "#808000",
-    "teal": "#008080",
-    "silver": "#c0c0c0",
-    "transparent": "#00000000",
-    "gainsboro": "#DCDCDC",
-    "floralwhite": "#FFFAF0",
-    "oldlace": "#FDF5E6",
-    "linen": "#FAF0E6",
-    "antiquewhite": "#FAEBD7",
-    "papayawhip": "#FFEFD5",
-    "blanchedalmond": "#FFEBCD",
-    "bisque": "#FFE4C4",
-    "peachpuff": "#FFDAB9",
-    "navajowhite": "#FFDEAD",
-    "moccasin": "#FFE4B5",
-    "cornsilk": "#FFF8DC",
-    "ivory": "#FFFFF0",
-    "lemonchiffon": "#FFFACD",
-    "seashell": "#FFF5EE",
-    "honeydew": "#F0FFF0",
-    "mintcream": "#F5FFFA",
-    "azure": "#F0FFFF",
-    "aliceblue": "#F0F8FF",
-    "lavenderblush": "#FFF0F5",
-    "mistyrose": "#FFE4E1",
-    "rosybrown": "#bc8f8f",
-    "saddlebrown": "#8b4513",
-    "sandybrown": "#f4a460",
-    "seagreen": "#2e8b57",
-    "sienna": "#a0522d",
-    "skyblue": "#87ceeb",
-    "slateblue": "#6a5acd",
-    "slategray": "#708090",
-    "slategrey": "#708090",
-    "snow": "#fffafa",
-    "springgreen": "#00ff7f",
-    "steelblue": "#4682b4",
-    "tan": "#d2b48c",
-    "thistle": "#d8bfd8",
-    "tomato": "#ff6347",
-    "violet": "#ee82ee",
-    "wheat": "#f5deb3",
-    "whitesmoke": "#f5f5f5",
-    "yellowgreen": "#9acd32",
-}
+class Color(Enum):
+    WHITE = "#ffffff"
+    BLACK = "#000000"
+    GRAY = "#808080"
+    RED = "#ff0000"
+    GREEN = "#00ff00"
+    BLUE = "#0000ff"
+    YELLOW = "#ffff00"
+    PURPLE = "#800080"
+    ORANGE = "#ffa500"
+    PINK = "#ffc0cb"
+    BROWN = "#a52a2a"
+    CYAN = "#00FFFF"
+    LIGHTBLUE = "#add8e6"
+    LIGHTGREEN = "#90ee90"
+    LIGHTGRAY = "#d3d3d3"
+    DARKGRAY = "#696969"
+    DARKRED = "#8b0000"
+    DARKBLUE = "#00008b"
+    DARKGREEN = "#006400"
+    BEIGE = "#f5f5dc"
+    MAROON = "#800000"
+    TURQUOISE = "#40e0d0"
+    LIGHTYELLOW = "#ffffe0"
+    LAVENDER = "#e6e6fa"
+    NAVY = "#000080"
+    OLIVE = "#808000"
+    TEAL = "#008080"
+    SILVER = "#c0c0c0"
+    TRANSPARENT = "#00000000"
+    GAINSBORO = "#DCDCDC"
+    FLORALWHITE = "#FFFAF0"
+    OLDLACE = "#FDF5E6"
+    LINEN = "#FAF0E6"
+    ANTIQUEWHITE = "#FAEBD7"
+    PAPAYAWHIP = "#FFEFD5"
+    BLANCHEDALMOND = "#FFEBCD"
+    BISQUE = "#FFE4C4"
+    PEACHPUFF = "#FFDAB9"
+    NAVAJOWHITE = "#FFDEAD"
+    MOCCASIN = "#FFE4B5"
+    CORNSILK = "#FFF8DC"
+    IVORY = "#FFFFF0"
+    LEMONCHIFFON = "#FFFACD"
+    SEASHELL = "#FFF5EE"
+    HONEYDEW = "#F0FFF0"
+    MINTCREAM = "#F5FFFA"
+    AZURE = "#F0FFFF"
+    ALICEBLUE = "#F0F8FF"
+    LAVENDERBLUSH = "#FFF0F5"
+    MISTYROSE = "#FFE4E1"
+    ROSYBROWN = "#bc8f8f"
+    SADDLEBROWN = "#8b4513"
+    SANDYBROWN = "#f4a460"
+    SEAGREEN = "#2e8b57"
+    SIENNA = "#a0522d"
+    SKYBLUE = "#87ceeb"
+    SLATEBLUE = "#6a5acd"
+    SLATEGRAY = "#708090"
+    SNOW = "#fffafa"
+    SPRINGGREEN = "#00ff7f"
+    STEELBLUE = "#4682b4"
+    TAN = "#d2b48c"
+    THISTLE = "#d8bfd8"
+    TOMATO = "#ff6347"
+    VIOLET = "#ee82ee"
+    WHEAT = "#f5deb3"
+    WHITESMOKE = "#f5f5f5"
+    YELLOWGREEN = "#9acd32"
 
-valid_gravities = [
-    "center",
-    "north",
-    "northeast",
-    "east",
-    "southeast",
-    "south",
-    "southwest",
-    "west",
-    "northwest",
-    "static",
-    "forget",
-]
+
+class Gravity(Enum):
+    CENTER = "center"
+    NORTH = "north"
+    NORTHEAST = "northeast"
+    EAST = "east"
+    SOUTHEAST = "southeast"
+    SOUTH = "south"
+    SOUTHWEST = "southwest"
+    WEST = "west"
+    NORTHWEST = "northwest"
+    STATIC = "static"
+    FORGET = "forget"
 
 
 @dataclasses.dataclass(slots=True)
@@ -149,26 +146,26 @@ class Cut_Video_Def:
     tag: str = ""
 
     def __post_init__(self) -> None:
-        assert (
-            isinstance(self.input_file, str) and self.input_file.strip() != ""
-        ), f"{self.input_file=}. Must be a non-empty str"
-        assert (
-            isinstance(self.output_file, str) and self.output_file.strip() != ""
-        ), f"{self.output_file=}. Must be a non-empty str"
-        assert (
-            isinstance(self.start_cut, int) and self.start_cut >= 0
-        ), f"{self.start_cut=}. Must be a int >= 0"
-        assert (
-            isinstance(self.end_cut, int) and self.end_cut >= 0
-        ), f"{self.end_cut=}. Must be a int >= 0"
+        assert isinstance(self.input_file, str) and self.input_file.strip() != "", (
+            f"{self.input_file=}. Must be a non-empty str"
+        )
+        assert isinstance(self.output_file, str) and self.output_file.strip() != "", (
+            f"{self.output_file=}. Must be a non-empty str"
+        )
+        assert isinstance(self.start_cut, int) and self.start_cut >= 0, (
+            f"{self.start_cut=}. Must be a int >= 0"
+        )
+        assert isinstance(self.end_cut, int) and self.end_cut >= 0, (
+            f"{self.end_cut=}. Must be a int >= 0"
+        )
 
-        assert (
-            isinstance(self.frame_rate, float) and self.frame_rate >= 24
-        ), f"{self.end_cut_secs=}. Must be a float >= 24"
+        assert isinstance(self.frame_rate, float) and self.frame_rate >= 24, (
+            f"{self.end_cut_secs=}. Must be a float >= 24"
+        )
 
-        assert (
-            self.end_cut > self.start_cut
-        ), f"{self.end_cut=} must be > {self.start_cut} "
+        assert self.end_cut > self.start_cut, (
+            f"{self.end_cut=} must be > {self.start_cut} "
+        )
 
         assert isinstance(self.tag, str), f"{self.tag=}. Must be str"
 
@@ -193,9 +190,9 @@ def DVD_Percent_Used(total_duration: float, pop_error_message: bool = True):
         int: percentage of DVD used
 
     """
-    assert (
-        isinstance(total_duration, float) and total_duration >= 0.0
-    ), f"{total_duration=}. Must be >= 0.0"
+    assert isinstance(total_duration, float) and total_duration >= 0.0, (
+        f"{total_duration=}. Must be >= 0.0"
+    )
     assert isinstance(pop_error_message, bool), f"{pop_error_message=}. Must be bool"
 
     dvd_percent_used = (
@@ -220,7 +217,7 @@ def DVD_Percent_Used(total_duration: float, pop_error_message: bool = True):
 def Get_Thread_Count() -> str:
     """
     Returns the number of threads we can use for processing video. This is a bit of a performance killer because I
-    have been getting thermal related crashes
+    have been getting thermal-related crashes
 
     Returns:
         str : Number of threads we can use for processing video
@@ -398,7 +395,7 @@ def Concatenate_Videos(
     delete_temp_files: bool = False,
     transcode_format: str = "",
     debug: bool = False,
-) -> tuple[int, str]:
+) -> tuple[int, str, str]:
     """
     Concatenates video files using ffmpeg.
 
@@ -409,52 +406,337 @@ def Concatenate_Videos(
         audio_codec (str): The audio codec to checked against (aac is special)
         delete_temp_files (bool): Whether to delete the temp files, defaults to False
         transcode_format (str): Transcode files as per the transcode_format and then joins (concatenates) the files.
-            Note: Transcodes are slow, defaults to "". legal values are h264 | h265 | mpg | mjpeg
+            Note: Transcodes are slow, defaults to "". legal values are dv | h264 | h265 | mpg | mjpeg
         debug (bool): True, print debug info, otherwise do not
 
     Returns:
-        tuple[int, str]:
+        tuple[int, str, str]:
             - arg 1: 1 if success, -1 if error
             - arg 2: "" if success otherwise and error message
+            - arg 3: container_format  if success otherwise ""
     """
-    assert isinstance(
-        temp_files, list
-    ), f"{temp_files} Must be a list of input video files"
-    assert all(
-        isinstance(file, str) for file in temp_files
-    ), "all elements in temp_files must str"
+
+    # Helper functions
+    def _transcode_video(
+        input_file: str,
+        transcode_path: str,
+        encoding_info: Encoding_Details,
+        transcode_format: str,
+    ) -> tuple[int, str]:
+        """
+        Transcodes a single video file to a specified format.
+
+        Args:
+            input_file (str): The path to the input video file.
+            transcode_path (str): The path to the directory where the transcoded file will be stored.
+            encoding_info (Encoding_Details): An object containing the encoding information of the input video.
+            transcode_format (str): The desired output format for transcoding. Valid values are:
+                                    "dv", "ffv1", "h264", "h265", "mpg", "mjpeg", or "" for stream copy.
+
+        Returns:
+            tuple[int, str]:
+                - int: 1 if transcoding was successful, -1 if an error occurred.
+                - str: The path to the transcoded file if successful, or an error message if an error occurred.
+        """
+        assert isinstance(input_file, str) and input_file.strip(), (
+            "input_file must be a non-empty string."
+        )
+        assert isinstance(transcode_path, str) and transcode_path.strip(), (
+            "transcode_path must be a non-empty string."
+        )
+        assert isinstance(encoding_info, Encoding_Details), (
+            "encoding_info must be an Encoding_Details object."
+        )
+        assert isinstance(transcode_format, str) and transcode_format in (
+            "dv",
+            "ffv1",
+            "h264",
+            "h265",
+            "mpg",
+            "mjpeg",
+            "",
+        ), "transcode_format must be a valid format string."
+
+        file_handler = file_utils.File()
+        _, file_name, _ = file_handler.split_file_path(input_file)
+
+        match transcode_format:
+            case "dv":
+                transcode_file = file_handler.file_join(
+                    transcode_path, file_name, "avi"
+                )
+
+                result, message = Transcode_DV(
+                    input_file=input_file,
+                    output_folder=transcode_path,
+                    frame_rate=encoding_info.video_frame_rate,
+                    width=encoding_info.video_width,
+                    height=encoding_info.video_height,
+                )
+
+                if result == -1:
+                    return -1, message
+
+            case "ffv1":
+                transcode_file = file_handler.file_join(
+                    transcode_path, file_name, "mkv"
+                )
+
+                result, message = Transcode_ffv1_archival(
+                    input_file=input_file,
+                    output_folder=transcode_path,
+                    frame_rate=encoding_info.video_frame_rate,
+                    width=encoding_info.video_width,
+                    height=encoding_info.video_height,
+                )
+
+                if result == -1:
+                    return -1, message
+
+            case "h264":
+                transcode_file = file_handler.file_join(
+                    transcode_path, file_name, "mp4"
+                )
+
+                result, message = Transcode_H26x(
+                    input_file=input_file,
+                    output_folder=transcode_path,
+                    frame_rate=encoding_info.video_frame_rate,
+                    width=encoding_info.video_width,
+                    height=encoding_info.video_height,
+                    interlaced=(
+                        True
+                        if encoding_info.video_scan_type.lower() == "interlaced"
+                        else False
+                    ),
+                    bottom_field_first=(
+                        True
+                        if encoding_info.video_scan_order.lower() == "bff"
+                        else False
+                    ),
+                    h265=False,
+                    high_quality=True,
+                )
+
+                if result == -1:
+                    return -1, message
+            case "h265":
+                transcode_file = file_handler.file_join(
+                    transcode_path, file_name, "mp4"
+                )
+
+                result, message = Transcode_H26x(
+                    input_file=input_file,
+                    output_folder=transcode_path,
+                    frame_rate=encoding_info.video_frame_rate,
+                    width=encoding_info.video_width,
+                    height=encoding_info.video_height,
+                    interlaced=(
+                        True
+                        if encoding_info.video_scan_type.lower() == "interlaced"
+                        else False
+                    ),
+                    bottom_field_first=(
+                        True
+                        if encoding_info.video_scan_order.lower() == "bff"
+                        else False
+                    ),
+                    h265=True,
+                    high_quality=True,
+                )
+
+                if result == -1:
+                    return -1, message
+            case "mpg":
+                transcode_file = file_handler.file_join(
+                    transcode_path, file_name, "mpg"
+                )
+
+                result, message = Transcode_MPEG2_High_Bitrate(
+                    input_file=input_file,
+                    output_folder=transcode_path,
+                    frame_rate=encoding_info.video_frame_rate,
+                    width=encoding_info.video_width,
+                    height=encoding_info.video_height,
+                    interlaced=(
+                        True
+                        if encoding_info.video_scan_type.lower() == "interlaced"
+                        else False
+                    ),
+                    bottom_field_first=(
+                        True
+                        if encoding_info.video_scan_order.lower() == "bff"
+                        else False
+                    ),
+                )
+
+                if result == -1:
+                    return -1, message
+
+            case "mjpeg":
+                transcode_file = file_handler.file_join(
+                    transcode_path,
+                    file_name,
+                    "mkv",  # avi if use MJPEG
+                )
+                # Set mjpeg argument to true and make the mkv/avi changes above to switch to MJPEG
+
+                result, message = Transcode_Mezzanine(
+                    input_file=input_file,
+                    output_folder=transcode_path,
+                    frame_rate=encoding_info.video_frame_rate,
+                    width=encoding_info.video_width,
+                    height=encoding_info.video_height,
+                    interlaced=(
+                        True
+                        if encoding_info.video_scan_type.lower() == "interlaced"
+                        else False
+                    ),
+                    bottom_field_first=(
+                        True
+                        if encoding_info.video_scan_order.lower() == "bff"
+                        else False
+                    ),
+                )
+
+                if result == -1:
+                    return -1, message
+
+            case _:  # Stream Copy
+                transcode_file = file_handler.file_join(
+                    transcode_path, file_name, container_format
+                )
+
+                commands = [
+                    sys_consts.FFMPG,
+                    "-fflags",
+                    "+genpts",  # generate presentation timestamps
+                    "-threads",
+                    Get_Thread_Count(),
+                    "-i",
+                    input_file,
+                    "-map",
+                    "0",
+                    "-c",
+                    "copy",
+                    "-sn",  # Remove titles
+                    "-movflags",
+                    "+faststart",
+                    "-threads",
+                    Get_Thread_Count(),
+                    transcode_file,
+                ]
+
+                result, message = Execute_Check_Output(
+                    commands=commands, stderr_to_stdout=True, debug=debug
+                )
+
+                if result == -1:
+                    return -1, message
+
+        return 1, transcode_file
+
+    def _transcoder(
+        transcode_format: str, video_files: list[str], transcode_path: str
+    ) -> tuple[int, str, list[str]]:
+        """
+        Transcodes a list of video files to a specified format.
+
+        Args:
+            transcode_format (str): The desired output format for transcoding. Valid values are:
+                                    "dv", "ffv1", "h264", "h265", "mpg", "mjpeg", or "" for stream copy.
+            video_files (list[str]): A list of paths to the input video files to be transcoded.
+            transcode_path (str): The path to the directory where transcoded files will be stored.
+
+        Returns:
+            tuple[int, str, list[str]]:
+                - int: 1 if transcoding was successful, -1 if an error occurred.
+                - str: An error message if an error occurred (return code -1), or an empty string if successful.
+                - list[str]: A list of paths to the transcoded files if successful, or an empty list if an error occurred.
+        """
+        assert isinstance(video_files, list), (
+            f"{video_files} Must be a list of input video files"
+        )
+        assert all(isinstance(file, str) for file in video_files), (
+            "all elements in video_files must be strings"
+        )
+        assert isinstance(transcode_path, str), f"{transcode_path} Must be a string"
+
+        transcode_file_list = []
+
+        for video_file in video_files:
+            encoding_info: Encoding_Details = Get_File_Encoding_Info(video_file)
+
+            if encoding_info.error.strip():
+                return (
+                    -1,
+                    (
+                        "Failed To Get Encoding Details :"
+                        f" {sys_consts.SDELIM}{video_file}{sys_consts.SDELIM}"
+                    ),
+                    [],
+                )
+            else:
+                result, transcode_file = _transcode_video(
+                    input_file=video_file,
+                    transcode_path=transcode_path,
+                    encoding_info=encoding_info,
+                    transcode_format=transcode_format,
+                )
+
+                if result == -1:  # transcode file contains an error message
+                    return -1, transcode_file, []
+
+                transcode_file_list.append(transcode_file)
+
+        return 1, "", transcode_file_list
+
+    # Main
+    assert isinstance(temp_files, list), (
+        f"{temp_files} Must be a list of input video files"
+    )
+    assert all(isinstance(file, str) for file in temp_files), (
+        "all elements in temp_files must str"
+    )
     assert isinstance(output_file, str), f"{output_file=}. Must be str"
     assert isinstance(audio_codec, str), f"{audio_codec=}. Must be a str"
     assert isinstance(delete_temp_files, bool), f"{delete_temp_files=}. Must be a bool"
     assert isinstance(transcode_format, str) and transcode_format in (
         "",
+        "dv",
         "h264",
         "h265",
         "mpg",
         "mjpeg",
         "ffv1",
-    ), f"{transcode_format=}. Must be str - h264 | h265 | mpg | mjpeg | ffv1"
+    ), f"{transcode_format=}. Must be str - dv | h264 | h265 | mpg | mjpeg | ffv1"
 
     if debug and not utils.Is_Complied():
         print(f"DBG CV {temp_files=} {output_file=} {audio_codec=} {delete_temp_files}")
 
     file_handler = file_utils.File()
-    out_path, _, _ = file_handler.split_file_path(output_file)
+
+    out_path, _, conainer_format = file_handler.split_file_path(output_file)
+    transcode_path = file_handler.file_join(out_path, "transcode_temp_files")
+
+    container_format = conainer_format.replace(".", "")
     file_list_txt = file_handler.file_join(
         out_path, f"video_data_list_{utils.Get_Unique_Id()}", "txt"
     )
 
     if not file_handler.path_writeable(out_path):
-        return -1, f"Can Not Be Write To {out_path}!"
+        return -1, f"Can Not Be Write To {out_path}!", ""
 
     for video_file in temp_files:
         if not file_handler.file_exists(video_file):
-            return -1, f"File {video_file} Does Not Exist!"
+            return -1, f"File {video_file} Does Not Exist!", ""
 
     transcode_file_list = []
 
-    if transcode_format:  # Very slow on a AMD2400G with 1GB of RAM :-)
-        if transcode_format in ("h264", "h265"):
+    if transcode_format:  # Very slow on a AMD2400G with 16GB of RAM :-)
+        if transcode_format == "dv":
+            container_format = "avi"
+        elif transcode_format in ("h264", "h265"):
             container_format = "mp4"
         elif transcode_format == "mpg":
             container_format = "mpg"
@@ -467,220 +749,54 @@ def Concatenate_Videos(
         else:
             raise RuntimeError(f"Unknown transcode_concat {transcode_format=}")
 
-        out_path, out_name, _ = file_handler.split_file_path(output_file)
-        output_file = file_handler.file_join(out_path, out_name, container_format)
-        # audio_codec = "aac"  # H26x Transcode uses aac
-
-        temp_path, temp_name, _ = file_handler.split_file_path(
-            temp_files[0]
-        )  # Must exist
-        transcode_path = file_handler.file_join(temp_path, "transcode_temp_files")
-
         if file_handler.path_exists(transcode_path):
             result, message = file_handler.remove_dir_contents(
                 file_path=transcode_path, keep_parent=False
             )
 
             if result == -1:
-                return -1, message
+                return -1, message, ""
 
         if file_handler.make_dir(transcode_path) == -1:
-            return -1, f"Failed To Create {transcode_path}"
+            return -1, f"Failed To Create {transcode_path}", ""
 
-        for video_file in temp_files:
-            temp_path, temp_name, _ = file_handler.split_file_path(video_file)
-            transcode_path = file_handler.file_join(temp_path, "transcode_temp_files")
-            encoding_info: Encoding_Details = Get_File_Encoding_Info(video_file)
+        result, message, temp_files = _transcoder(
+            transcode_format=transcode_format,
+            video_files=temp_files,
+            transcode_path=transcode_path,
+        )
 
-            if encoding_info.error.strip():
-                return (
-                    -1,
-                    (
-                        "Failed To Get Encoding Details :"
-                        f" {sys_consts.SDELIM}{video_file}{sys_consts.SDELIM}"
-                    ),
-                )
-            else:
-                match transcode_format:
-                    case "ffv1":
-                        transcode_file = file_handler.file_join(
-                            transcode_path, temp_name, "mkv"
-                        )
-                        result, message = Transcode_ffv1_archival(
-                            input_file=video_file,
-                            output_folder=transcode_path,
-                            frame_rate=encoding_info.video_frame_rate,
-                            width=encoding_info.video_width,
-                            height=encoding_info.video_height,
-                        )
+        if result == -1:
+            return -1, message, ""
 
-                        if result == -1:
-                            return -1, message
+    temp_file_list = []
 
-                    case "h264":
-                        transcode_file = file_handler.file_join(
-                            transcode_path, temp_name, "mp4"
-                        )
-
-                        result, message = Transcode_H26x(
-                            input_file=video_file,
-                            output_folder=transcode_path,
-                            frame_rate=encoding_info.video_frame_rate,
-                            width=encoding_info.video_width,
-                            height=encoding_info.video_height,
-                            interlaced=(
-                                True
-                                if encoding_info.video_scan_type.lower() == "interlaced"
-                                else False
-                            ),
-                            bottom_field_first=(
-                                True
-                                if encoding_info.video_scan_order.lower() == "bff"
-                                else False
-                            ),
-                            h265=False,
-                            high_quality=True,
-                        )
-
-                        if result == -1:
-                            return -1, message
-                    case "h265":
-                        transcode_file = file_handler.file_join(
-                            transcode_path, temp_name, "mp4"
-                        )
-
-                        result, message = Transcode_H26x(
-                            input_file=video_file,
-                            output_folder=transcode_path,
-                            frame_rate=encoding_info.video_frame_rate,
-                            width=encoding_info.video_width,
-                            height=encoding_info.video_height,
-                            interlaced=(
-                                True
-                                if encoding_info.video_scan_type.lower() == "interlaced"
-                                else False
-                            ),
-                            bottom_field_first=(
-                                True
-                                if encoding_info.video_scan_order.lower() == "bff"
-                                else False
-                            ),
-                            h265=True,
-                            high_quality=True,
-                        )
-
-                        if result == -1:
-                            return -1, message
-                    case "mpg":
-                        transcode_file = file_handler.file_join(
-                            transcode_path, temp_name, "mpg"
-                        )
-
-                        result, message = Transcode_MPEG2_High_Bitrate(
-                            input_file=video_file,
-                            output_folder=transcode_path,
-                            frame_rate=encoding_info.video_frame_rate,
-                            width=encoding_info.video_width,
-                            height=encoding_info.video_height,
-                            interlaced=(
-                                True
-                                if encoding_info.video_scan_type.lower() == "interlaced"
-                                else False
-                            ),
-                            bottom_field_first=(
-                                True
-                                if encoding_info.video_scan_order.lower() == "bff"
-                                else False
-                            ),
-                        )
-
-                        if result == -1:
-                            return -1, message
-
-                    case "mjpeg":
-                        transcode_file = file_handler.file_join(
-                            transcode_path,
-                            temp_name,
-                            "mkv",  # avi if use MJPEG
-                        )
-                        # Set mjpeg argument to true and make the mkv/avi changes above to switch to MJPEG
-                        result, message = Transcode_Mezzanine(
-                            input_file=video_file,
-                            output_folder=transcode_path,
-                            frame_rate=encoding_info.video_frame_rate,
-                            width=encoding_info.video_width,
-                            height=encoding_info.video_height,
-                            interlaced=(
-                                True
-                                if encoding_info.video_scan_type.lower() == "interlaced"
-                                else False
-                            ),
-                            bottom_field_first=(
-                                True
-                                if encoding_info.video_scan_order.lower() == "bff"
-                                else False
-                            ),
-                        )
-
-                        if result == -1:
-                            return -1, message
-
-                    case _:  # Stream Copy
-                        transcode_file = file_handler.file_join(
-                            transcode_path, temp_name, container_format
-                        )
-
-                        commands = [
-                            sys_consts.FFMPG,
-                            "-fflags",
-                            "+genpts",  # generate presentation timestamps
-                            "-threads",
-                            Get_Thread_Count(),
-                            "-i",
-                            video_file,
-                            "-map",
-                            "0",
-                            "-c",
-                            "copy",
-                            "-sn",  # Remove titles
-                            "-movflags",
-                            "+faststart",
-                            "-threads",
-                            Get_Thread_Count(),
-                            transcode_file,
-                        ]
-
-                        result, message = Execute_Check_Output(
-                            commands=commands, stderr_to_stdout=True
-                        )
-
-                        if result == -1:
-                            return -1, message
-
-                transcode_file_list.append(transcode_file)
-
-        temp_files = transcode_file_list
+    for file in temp_files:
+        temp_file_list.append(f"file '{file}'")
 
     # Generate a file list for ffmpeg
     result, message = file_handler.write_list_to_txt_file(
-        str_list=[f"file '{file}'" for file in temp_files], text_file=file_list_txt
+        str_list=temp_file_list, text_file=file_list_txt
     )
 
     if result == -1:
-        return -1, message
+        return -1, message, ""
+
+    temp_folder, temp_file, temp_ext = file_handler.split_file_path(output_file)
+
+    if temp_ext.strip(".").lower() in ("mod", "tod"):  # MPG2 Proprietry formats
+        output_file = file_handler.file_join(temp_folder, temp_file, "mpg")
 
     if file_handler.file_exists(output_file):
         result = file_handler.remove_file(output_file)
 
         if result == -1:
-            return -1, f"Failed To Remove File {output_file}"
+            return -1, f"Failed To Remove File {output_file}", ""
 
     aac_audio = []
+
     if audio_codec == "aac":
-        aac_audio = [
-            "-bsf:a",
-            "aac_adtstoasc",
-        ]
+        aac_audio = ["-bsf:a", "aac_adtstoasc"]
 
     # Concatenate the video files using ffmpeg
     result, message = Execute_Check_Output(
@@ -713,7 +829,6 @@ def Concatenate_Videos(
             Get_Thread_Count(),
             "-y",
         ],
-        debug=debug,
     )
 
     if debug and not utils.Is_Complied():
@@ -722,23 +837,19 @@ def Concatenate_Videos(
     if result == -1:
         if not debug:
             file_handler.remove_file(file_list_txt)
-        return -1, message
+        return -1, message, ""
 
     # Remove the file list and temp files
     if not debug and file_handler.remove_file(file_list_txt) == -1:
-        return -1, f"Failed to delete text file: {file_list_txt}"
+        return -1, f"Failed to delete text file: {file_list_txt}", ""
 
     if not debug and delete_temp_files:
         for file in temp_files:
             if file_handler.file_exists(file):
                 if file_handler.remove_file(file) == -1:
-                    return -1, f"Failed to delete temp file: {file}"
+                    return -1, f"Failed to delete temp file: {file}", ""
 
     if transcode_file_list:  # always delete these
-        transcode_path, _, _ = file_handler.split_file_path(
-            transcode_file_list[0]
-        )  # Must have at least 1
-
         result, message = file_handler.remove_dir_contents(
             file_path=transcode_path, keep_parent=False
         )
@@ -750,9 +861,10 @@ def Concatenate_Videos(
                     "Failed To Delete Transcode Temp Files And/Or Folder :"
                     f" {sys_consts.SDELIM}{transcode_path}{sys_consts.SDELIM}"
                 ),
+                "",
             )
 
-    return 1, output_file
+    return 1, output_file, container_format
 
 
 def Create_DVD_Iso(input_dir: str, output_file: str) -> tuple[int, str]:
@@ -768,13 +880,13 @@ def Create_DVD_Iso(input_dir: str, output_file: str) -> tuple[int, str]:
         - arg 1: Status code. Returns 1 if the iso image was created, -1 otherwise.
         - arg 2: "" if ok, otherwise an error message
     """
-    assert (
-        isinstance(input_dir, str) and input_dir.strip() != ""
-    ), f"{input_dir}. Must be a non-empty str"
-    assert (
-        isinstance(output_file, str) and output_file.strip() != ""
-    ), f"{output_file}. Must be a non-empty str"
-    # ffmpeg -i VIDEO_TS -i AUDIO_TS -c copy -map 0:0 -map 1:0 "-dvd-video",
+    assert isinstance(input_dir, str) and input_dir.strip() != "", (
+        f"{input_dir}. Must be a non-empty str"
+    )
+    assert isinstance(output_file, str) and output_file.strip() != "", (
+        f"{output_file}. Must be a non-empty str"
+    )
+
     command = [
         sys_consts.GENISOIMAGE,
         # "-dvd-video",
@@ -810,6 +922,7 @@ def Create_DVD_Case_Insert(
     menu_font_path="",
     menu_font_colour="black",
     opacity: float = 1.0,
+    debug: bool = False,
 ) -> tuple[int, bytes]:
     """
     Creates a DVD case insert image with DVD title, menu titles, and using ImageMagick.
@@ -829,147 +942,241 @@ def Create_DVD_Case_Insert(
         menu_font_colour (str): Color of the text.
         opacity (float): The opacity level to be set for the color,
                         where 0.0 is fully transparent and 1.0 is fully opaque.
+        debug (bool): Whether to print debug messages.
 
     Returns:
         - arg 1 : Status code. Returns 1 if the iso image was created, -1 otherwise.
         - arg 2 : bytes: The generated DVD case insert image data.
     """
-    assert (
-        isinstance(title, str) and title.strip() != ""
-    ), f"{title=}. Must be a non-empty str"
-    assert (
-        isinstance(menu_pages, list) and len(menu_pages) > 0
-    ), f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
-    assert all(
-        isinstance(page, DVD_Menu_Page) for page in menu_pages
-    ), f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
-    assert (
-        isinstance(insert_width, int) and insert_width > 0
-    ), f"{insert_width=}. Must be an int >"
-    assert (
-        isinstance(insert_height, int) and insert_height > 0
-    ), f"{insert_height=}. Must be an int > 0"
-    assert (
-        isinstance(resolution, int) and resolution > 0
-    ), f"{resolution=}. Must be an int > 0"
-    assert (
-        isinstance(menu_font_size, int) and menu_font_size > 0
-    ), f"{menu_font_size=}. Must be an int > 0"
-    assert (
-        isinstance(menu_font_path, str) and menu_font_path.strip() != ""
-    ), f"{menu_font_path=}. Must be a non-empty str"
-    assert (
-        isinstance(insert_colour, str) and insert_colour.strip() != ""
-    ), f"{insert_colour=}. Must be a non-empty str"
-    assert (
-        isinstance(menu_font_colour, str) and menu_font_colour.strip() != ""
-    ), f"{menu_font_colour=}. Must be a non-empty str"
+    assert isinstance(title, str) and title.strip() != "", (
+        f"{title=}. Must be a non-empty str"
+    )
+    assert isinstance(menu_pages, list) and len(menu_pages) > 0, (
+        f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
+    )
+    assert all(isinstance(page, DVD_Menu_Page) for page in menu_pages), (
+        f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
+    )
+    assert isinstance(insert_width, int) and insert_width > 0, (
+        f"{insert_width=}. Must be an int >"
+    )
+    assert isinstance(insert_height, int) and insert_height > 0, (
+        f"{insert_height=}. Must be an int > 0"
+    )
+    assert isinstance(resolution, int) and resolution > 0, (
+        f"{resolution=}. Must be an int > 0"
+    )
+    assert isinstance(menu_font_size, int) and menu_font_size > 0, (
+        f"{menu_font_size=}. Must be an int > 0"
+    )
+    assert isinstance(menu_font_path, str) and menu_font_path.strip() != "", (
+        f"{menu_font_path=}. Must be a non-empty str"
+    )
+    assert isinstance(insert_colour, str) and insert_colour.strip() != "", (
+        f"{insert_colour=}. Must be a non-empty str"
+    )
+    assert isinstance(menu_font_colour, str) and menu_font_colour.strip() != "", (
+        f"{menu_font_colour=}. Must be a non-empty str"
+    )
 
-    assert (
-        isinstance(opacity, float) and 0 <= int(opacity) <= 1
-    ), f"{opacity=}. Must be a float between 0.0 and 1.0"
+    assert isinstance(opacity, float) and 0 <= int(opacity) <= 1, (
+        f"{opacity=}. Must be a float between 0.0 and 1.0"
+    )
+    assert isinstance(debug, bool), f"{debug=}. Must be a bool"
 
-    MAX_TITLE_LINES: Final[int] = 4
+    #### Helper
+    def _get_label_text(
+        background_canvas_width: int,
+        menu_font_path: str,
+        menu_font_size: int,
+        menu_pages: list[DVD_Menu_Page],
+    ) -> tuple[list[str], int]:
+        """
+        Generates the text content for the DVD label, including menu titles and button titles, with wrapping.
 
-    if menu_font_path.strip() == "":
-        fonts = Get_Fonts()
-        for font in fonts:
-            if font[0].lower().startswith("ubuntu"):
-                menu_font_path = font[1]
-                break
-        else:
-            return -1, b"A Default Menu Font Could Not Be Found "
+        This function prepares the text content to be written on the DVD label image, handling text wrapping
+        to ensure it fits within the specified label area. It processes menu titles and button titles from
+        the provided menu pages, formatting them appropriately for display.
 
-    # Check if font file exists
-    if not os.path.exists(menu_font_path):
-        return -1, b""
+        Args:
+            background_canvas_width (float): The width of the background  where the text will be placed, in pixels.
+            menu_font_path (str): The path to the font file used for rendering the menu and button text.
+            menu_font_size (int): The font size, in points, used for rendering the menu and button text.
+            menu_pages (list[DVD_Menu_Page]): A list of DVD_Menu_Page objects, each representing a menu page.
+                Each DVD_Menu_Page object should contain a 'menu_title' attribute (str) and a
+                'get_button_titles' attribute (which returns a dictionary of button titles).
 
-    debug = True
-    dpm = resolution / 25.4  # Convert DPI to DPMM
+        Returns:
+            tuple[List[str], int]: A tuple containing:
+                - A list of strings, where each string represents a line of text to be written on the label.
+                - The maximum width of the text column, in pixels.
+        """
 
-    background_canvas_width = insert_width * dpm
-    background_canvas_height = insert_height * dpm
+        assert (
+            isinstance(background_canvas_width, int) and background_canvas_width > 0
+        ), f"{background_canvas_width=} must > 0"
+        assert isinstance(menu_font_path, str), f"{menu_font_path=} must be a string."
+        assert isinstance(menu_font_size, int) and menu_font_size > 0, (
+            f"{menu_font_size=} must be > 0."
+        )
+        assert isinstance(menu_pages, list) and all(
+            isinstance(page, DVD_Menu_Page) for page in menu_pages
+        ), "menu_pages must be a list of DVD_Menu_Page objects "
 
-    title_char_width, title_char_height = Get_Text_Dims(
-        text="W", font=title_font_path, pointsize=title_font_size
-    )  # In English at least and in most fonts W is the widest
+        dvd_text = []
+        max_text_column_width = (background_canvas_width // 2) - 20  # Padding
+        max_char_width = int(max_text_column_width // menu_char_width)
 
-    menu_char_width, menu_char_height = Get_Text_Dims(
-        text="W", font=menu_font_path, pointsize=menu_font_size
-    )  # In English at least and in most fonts W is the widest
+        for menu_index, menu_title in enumerate(menu_pages):
+            if menu_title.menu_title.strip():
+                menu_title_text = f"* {menu_title.menu_title}"
+            else:
+                menu_title_text = f"* Menu {menu_index + 1}"
 
-    dvd_text = []
-
-    max_text_column_width = (background_canvas_width // 2) - 20  # Padding
-    max_char_width = int(max_text_column_width // menu_char_width)
-
-    for menu_index, menu_title in enumerate(menu_pages):
-        if menu_title.menu_title.strip():
-            dvd_text.append(f"* {menu_title.menu_title}")
-        else:
-            dvd_text.append(f"* Menu {menu_index + 1}")
-
-        for button_item in menu_title.get_button_titles.values():
-            button_title = f"\  - {button_item[0]}"  # Button titles are indented 4 spaces (\ required!)
-
-            width, _ = Get_Text_Dims(
-                text=f"{button_title}", font=menu_font_path, pointsize=menu_font_size
+            wrapped_text = textwrap.wrap(
+                menu_title_text,
+                width=max_char_width,
+                subsequent_indent="    ",
             )
 
-            if width > max_text_column_width:
-                wrapped_text = textwrap.wrap(
-                    button_title,
-                    width=max_char_width,
-                    subsequent_indent="    ",
+            for line_index, menu_line in enumerate(wrapped_text):
+                dvd_text.append(f"{menu_line}" if line_index == 0 else f"\ {menu_line}")
+
+            for button_item in menu_title.get_button_titles.values():
+                button_title = f"\  - {button_item[0]}"  # Button titles are indented 4 spaces (\ required!)
+
+                width, _ = Get_Text_Dims(
+                    text=f"{button_title}",
+                    font=menu_font_path,
+                    pointsize=menu_font_size,
                 )
 
-                for line_index, button_line in enumerate(wrapped_text):
-                    dvd_text.append(
-                        f"{button_line}" if line_index == 0 else f"\ {button_line}"
+                if width > max_text_column_width:
+                    wrapped_text = textwrap.wrap(
+                        button_title,
+                        width=max_char_width,
+                        subsequent_indent="    ",
                     )
 
-            else:
-                dvd_text.append(f"{button_title}")
+                    for line_index, button_line in enumerate(wrapped_text):
+                        dvd_text.append(
+                            f"{button_line}" if line_index == 0 else f"\ {button_line}"
+                        )
 
-        dvd_text.append(" ")
+                else:
+                    dvd_text.append(f"{button_title}")
 
-    dvd_text.pop(len(dvd_text) - 1)  # Remove the last blank line
+            dvd_text.append(" ")
+        dvd_text.pop(len(dvd_text) - 1)  # Remove the last blank line
 
-    # Get the length of the longest line in the menu/button text
-    max_menu_length = 0
-    for line in dvd_text:
-        if len(line) > max_menu_length:
-            max_menu_length = len(line)
+        return dvd_text, max_text_column_width
 
-    result, insert_hex = Make_Opaque(color=insert_colour, opacity=opacity)
+    def _get_background_insert_image(
+        background_canvas_width: int,
+        background_canvas_height: int,
+        insert_colour: str,
+        opacity: float,
+    ) -> tuple[int, bytes]:
+        """
+        Generates a PNG image with a solid color background, intended for use as a DVD insert.
 
-    if result == -1:
-        return -1, f"Invalid System Color {insert_colour}".encode("utf-8")
+        Args:
+            background_canvas_width (int): The width of the image canvas in pixels.
+            background_canvas_height (int): The height of the image canvas in pixels.
+            insert_colour (str): The color of the background.  Must be a valid ImageMagick color string.
+            opacity (float): The opacity level of the color, where 0.0 is fully transparent and 1.0 is fully opaque.
 
-    command = [
-        sys_consts.CONVERT,
-        "-size",
-        f"{background_canvas_width}x{background_canvas_height}",
-        "xc:none",
-        "-fill",
-        insert_hex,
-        "-draw",
-        f"'rectangle' 0,0 {background_canvas_width},{background_canvas_height}'",
-        "PNG:-",  # Output to standard output (pipe)
-    ]
+        Returns:
+            Tuple[int, bytes]: A tuple containing the status code and the image data.
+                - int: 1 if the image was generated successfully, -1 otherwise.
+                - bytes: The generated PNG image data as a byte string, or an error message as a byte encoded string if an error occurred.
+        """
+        assert (
+            isinstance(background_canvas_width, int) and background_canvas_width > 0
+        ), "background_canvas_width must be a positive integer."
+        assert (
+            isinstance(background_canvas_height, int) and background_canvas_height > 0
+        ), "background_canvas_height must be a positive integer."
+        assert isinstance(insert_colour, str), "insert_colour must be a string."
+        assert isinstance(opacity, float) and 0 <= opacity <= 1, (
+            "opacity must be a float between 0.0 and 1.0"
+        )
 
-    try:
-        image_data = subprocess.check_output(command, stderr=subprocess.DEVNULL)
+        result, insert_hex = Make_Opaque(color=insert_colour, opacity=opacity)
 
-        left_y1 = 50  # Padding
-        left_y2 = background_canvas_height - 20  # Padding
+        if result == -1:
+            return -1, f"Invalid System Color {insert_colour}".encode("utf-8")
 
-        left_y2 = left_y1 + left_y2
-        left_x1 = 50  # Padding
+        command = [
+            sys_consts.CONVERT,
+            "-size",
+            f"{background_canvas_width}x{background_canvas_height}",
+            "xc:none",
+            "-fill",
+            insert_hex,
+            "-draw",
+            f"'rectangle' 0,0 {background_canvas_width},{background_canvas_height}'",
+            "PNG:-",  # Output to standard output (pipe)
+        ]
 
-        # left_x2 = max_text_column_width - 20 # Padding
-        right_x1 = max_text_column_width + 20  # Padding
-        right_x1 = right_x1 + max_text_column_width - 20  # Padding
+        try:
+            image_data = subprocess.check_output(command, stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError as e:
+            return -1, f"Error Generating DVD Insert Image - {e}".encode("utf-8")
+
+        return 1, image_data
+
+    def _write_title_on_background(
+        image_data: bytes,
+        background_canvas_width: int,
+        title: str,
+        title_char_width: int,
+        title_font_path: str,
+        title_font_size: int,
+        title_font_colour: str,
+        left_y1: int,
+        MAX_TITLE_LINES: int,
+    ) -> tuple[int, bytes, int]:
+        """
+        Writes a title onto a given image background, handling text wrapping and manual spacing.
+
+        This function takes image data, title information, and font settings to write a title onto the image.
+        It supports both automatic and manual title wrapping using '|' as a manual line break delimiter.
+
+        Args:
+            image_data (bytes): The image data in bytes format.
+            background_canvas_width (int): The width of the image canvas in pixels.
+            title (str): The title text to write onto the image.
+            title_char_width (int): The width of a single character in the title font.
+            title_font_path (str): The path to the font file used for the title.
+            title_font_size (int): The font size for the title in points.
+            title_font_colour (str): The color of the title text.
+            left_y1 (int): The starting y-coordinate for the title text.
+            MAX_TITLE_LINES (int): The maximum number of title lines allowed.
+
+        Returns:
+            tuple[int, bytes]: A tuple containing the status code and the modified image data.
+                - int: 1 if the title was written successfully, -1 otherwise.
+                - bytes: The modified image data in bytes, or an error message as a byte encoded string if an error occurred.
+                - int: The title height
+        """
+        assert isinstance(image_data, bytes), "image_data must be bytes."
+        assert (
+            isinstance(background_canvas_width, int) and background_canvas_width > 0
+        ), "background_canvas_width must be a positive integer."
+        assert isinstance(title, str), "title must be a string."
+        assert isinstance(title_char_width, int) and title_char_width > 0, (
+            "title_char_width must be a positive integer."
+        )
+        assert isinstance(title_font_path, str), "title_font_path must be a string."
+        assert isinstance(title_font_size, int) and title_font_size > 0, (
+            "title_font_size must be a positive integer."
+        )
+        assert isinstance(title_font_colour, str), "title_font_colour must be a string."
+        assert isinstance(left_y1, int), "left_y1 must be an integer."
+        assert isinstance(MAX_TITLE_LINES, int) and MAX_TITLE_LINES > 0, (
+            "MAX_TITLE_LINES must be a positive integer."
+        )
 
         # Write title
         if "|" in title:  # Manual spacing of title text
@@ -1010,6 +1217,7 @@ def Create_DVD_Case_Insert(
                 -1,
                 f"Menu Title Is {len(title_wrapped_text)} Lines Long And Only {MAX_TITLE_LINES} Are Allowed! Reduce "
                 f"Title Font Size Or Change Title Font".encode("utf-8"),
+                -1,
             )
 
         for line_num, title_line in enumerate(title_wrapped_text):
@@ -1025,9 +1233,71 @@ def Create_DVD_Case_Insert(
             )
 
             if result == -1:  # Image data will contain the error message in this case
-                return -1, image_data.decode("utf-8")
+                return -1, image_data.encode("utf-8"), -1
 
-        # Write menu titles
+        return 1, image_data, title_height
+
+    def _write_menu_titles(
+        image_data: bytes,
+        dvd_text: list[str],
+        left_x1: int,
+        left_y1: int,
+        left_y2: int,
+        right_x1: int,
+        menu_char_height: int,
+        menu_font_colour: str,
+        menu_font_path: str,
+        menu_font_size: int,
+        MAX_TITLE_LINES: int,
+        title_height: int,
+    ) -> tuple[int, bytes]:
+        """
+        Writes menu titles onto a given image, handling line wrapping and side switching.
+
+        This function iterates through the provided DVD text lines, writing them onto the image at specified
+        positions. It handles switching between left and right sides of the image if the text exceeds
+        the left side's boundary.
+
+        Args:
+            image_data (bytes): The image data in bytes format.
+            dvd_text (List[str]): A list of strings, each representing a line of text to write.
+            left_x1 (int): The starting x-coordinate for the left side text.
+            left_y1 (int): The starting y-coordinate for the text.
+            left_y2 (int): The maximum y-coordinate for the left side text.
+            right_x1 (int): The starting x-coordinate for the right side text.
+            menu_char_height (int): The height of a single character in the menu font.
+            menu_font_colour (str): The color of the menu text.
+            menu_font_path (str): The path to the font file used for the menu text.
+            menu_font_size (int): The font size for the menu text in points.
+            MAX_TITLE_LINES (int): The maximum number of title lines allowed per side.
+            title_height (int): The height of the title text.
+
+        Returns:
+            tuple[int, bytes]: A tuple containing the status code and the modified image data.
+                - int: 1 if the titles were written successfully, -1 otherwise.
+                - bytes: The modified image data in bytes, or an error message as a byte encoded string if an error occurred.
+        """
+        assert isinstance(image_data, bytes), f"{image_data=} must be bytes."
+        assert isinstance(dvd_text, list) and all(
+            isinstance(line, str) for line in dvd_text
+        ), "dvd_text must be a list of strings."
+        assert isinstance(left_x1, int), f"{left_x1=} must be an integer."
+        assert isinstance(left_y1, int), f"{left_y1=} must be an integer."
+        assert isinstance(left_y2, int), f"{left_y2=} must be an integer."
+        assert isinstance(right_x1, int), f"{right_x1=} must be an integer."
+        assert isinstance(menu_char_height, int), (
+            f"{menu_char_height=} must be an integer."
+        )
+        assert isinstance(menu_font_colour, str), (
+            f"{menu_font_colour=} must be a string."
+        )
+        assert isinstance(menu_font_path, str), f"{menu_font_path=} must be a string."
+        assert isinstance(menu_font_size, int), f"{menu_font_size=} must be an integer."
+        assert isinstance(MAX_TITLE_LINES, int), (
+            f"{MAX_TITLE_LINES=} must be an integer."
+        )
+        assert isinstance(title_height, int), f"{title_height=} must be an integer."
+
         line_num = 0
         side = 0
         x_offset = left_x1
@@ -1064,17 +1334,103 @@ def Create_DVD_Case_Insert(
             )
 
             if result == -1:  # Image data will contain the error message in this case
-                return -1, image_data.decode("utf-8")
+                return -1, image_data.encode("utf-8")
 
             line_num += 1
 
-        if debug and not utils.Is_Complied():
-            with open("cddvd_insert.png", "wb") as png_file:
-                png_file.write(image_data)
-
         return 1, image_data
-    except subprocess.CalledProcessError as e:
-        return -1, f"Error Generating DVD Insert Image - {e}".encode("utf-8")
+
+    #### Main
+    MAX_TITLE_LINES: Final[int] = 4
+
+    if menu_font_path.strip() == "":
+        fonts = Get_Fonts()
+        for font in fonts:
+            if font[0].lower().startswith("ubuntu"):
+                menu_font_path = font[1]
+                break
+        else:
+            return -1, b"A Default Menu Font Could Not Be Found "
+
+    # Check if font file exists
+    if not os.path.exists(menu_font_path):
+        return -1, b""
+
+    dpmm = resolution / 25.4  # Convert DPI to DPMM
+
+    background_canvas_width = round(insert_width * dpmm)
+    background_canvas_height = round(insert_height * dpmm)
+
+    left_y1 = 50  # Padding
+    left_y2 = background_canvas_height - 20  # Padding
+
+    left_y2 = left_y1 + left_y2
+    left_x1 = 50  # Padding
+
+    title_char_width, title_char_height = Get_Text_Dims(
+        text="W", font=title_font_path, pointsize=title_font_size
+    )  # In English at least and in most fonts W is the widest
+
+    menu_char_width, menu_char_height = Get_Text_Dims(
+        text="W", font=menu_font_path, pointsize=menu_font_size
+    )  # In English at least and in most fonts W is the widest
+
+    dvd_text, max_text_column_width = _get_label_text(
+        background_canvas_width,
+        menu_font_path,
+        menu_font_size,
+        menu_pages,
+    )
+
+    # left_x2 = max_text_column_width - 20 # Padding
+    right_x1 = max_text_column_width + 20  # Padding
+    right_x1 = right_x1 + max_text_column_width - 20  # Padding
+
+    result, image_data = _get_background_insert_image(
+        background_canvas_height, background_canvas_width, insert_colour, opacity
+    )
+
+    if result == -1:
+        return -1, image_data
+
+    result, image_data, title_height = _write_title_on_background(
+        image_data,
+        background_canvas_width,
+        title,
+        title_char_width,
+        title_font_path,
+        title_font_size,
+        title_font_colour,
+        left_y1,
+        MAX_TITLE_LINES,
+    )
+
+    if result == -1:  # Image data will contain the error message in this case
+        return -1, image_data
+
+    result, image_data = _write_menu_titles(
+        image_data,
+        dvd_text,
+        left_x1,
+        left_y1,
+        left_y2,
+        right_x1,
+        menu_char_height,
+        menu_font_colour,
+        menu_font_path,
+        menu_font_size,
+        MAX_TITLE_LINES,
+        title_height,
+    )
+
+    if result == -1:  # Image data will contain the error message in this case
+        return -1, image_data
+
+    if debug and not utils.Is_Complied():
+        with open("cddvd_insert.png", "wb") as png_file:
+            png_file.write(image_data)
+
+    return 1, image_data
 
 
 def Create_DVD_Label(
@@ -1091,6 +1447,7 @@ def Create_DVD_Label(
     menu_font_size: int = 24,
     spindle_diameter: float = 36,  # 15mm standard make a little larger (Verbatim guide 36)
     opacity: float = 1.0,
+    debug: bool = True,
 ) -> tuple[int, bytes]:
     """
     Creates a DVD label image with menu titles and a central hole.
@@ -1115,6 +1472,7 @@ def Create_DVD_Label(
         spindle_diameter (float): diameter of the central hole.
         opacity (float): The opacity level to be set for the color,
                         where 0.0 is fully transparent and 1.0 is fully opaque.
+        debug (bool): If True, debug information will be printed.
 
     Returns:
         tuple[int, bytes]
@@ -1123,191 +1481,261 @@ def Create_DVD_Label(
     """
 
     assert isinstance(title, str), f"{title=}. Must be a str"
-    assert (
-        isinstance(menu_pages, list) and len(menu_pages) > 0
-    ), f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
-    assert all(
-        isinstance(page, DVD_Menu_Page) for page in menu_pages
-    ), f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
-    assert (
-        isinstance(disk_diameter, (int, float)) and disk_diameter > 0
-    ), f"{disk_diameter=}. Must be a float > 0"
-    assert (
-        isinstance(resolution, int) and resolution > 0
-    ), f"{resolution=}. Must be an int > 0"
-    assert (
-        isinstance(title_font_colour, str) and title_font_colour.strip() != ""
-    ), f"{title_font_colour=}. Must be a non-empty str"
-    assert (
-        isinstance(title_font_size, int) and title_font_size > 0
-    ), f"{title_font_size=}. Must be an int > 0"
-    assert (
-        isinstance(menu_font_colour, str) and menu_font_colour.strip() != ""
-    ), f"{menu_font_colour=}. Must be a non-empty str"
-    assert (
-        isinstance(menu_font_size, int) and menu_font_size > 0
-    ), f"{menu_font_size=}. Must be an int > 0"
+    assert isinstance(menu_pages, list) and len(menu_pages) > 0, (
+        f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
+    )
+    assert all(isinstance(page, DVD_Menu_Page) for page in menu_pages), (
+        f"{menu_pages=}. Must be a non-empty list of DVD_Menu_Page"
+    )
+    assert isinstance(disk_diameter, (int, float)) and disk_diameter > 0, (
+        f"{disk_diameter=}. Must be a float > 0"
+    )
+    assert isinstance(resolution, int) and resolution > 0, (
+        f"{resolution=}. Must be an int > 0"
+    )
+    assert isinstance(title_font_colour, str) and title_font_colour.strip() != "", (
+        f"{title_font_colour=}. Must be a non-empty str"
+    )
+    assert isinstance(title_font_size, int) and title_font_size > 0, (
+        f"{title_font_size=}. Must be an int > 0"
+    )
+    assert isinstance(menu_font_colour, str) and menu_font_colour.strip() != "", (
+        f"{menu_font_colour=}. Must be a non-empty str"
+    )
+    assert isinstance(menu_font_size, int) and menu_font_size > 0, (
+        f"{menu_font_size=}. Must be an int > 0"
+    )
     assert isinstance(title_font_path, str), f"{title_font_path=}. Must be a str"
     assert isinstance(menu_font_path, str), f"{menu_font_path=}. Must be a str"
     assert (
-        isinstance(spindle_diameter, (int, float)) and 21 <= spindle_diameter <= 36
-    ), f"{spindle_diameter=}. Must be a float >= 21 and <= 36"
+        isinstance(spindle_diameter, (int, float)) and 21 <= spindle_diameter <= 45
+    ), f"{spindle_diameter=}. Must be a float >= 21 and <= 45"
+    assert isinstance(opacity, float) and 0 <= int(opacity) <= 1, (
+        f"{opacity=}. Must be a float between 0.0 and 1.0"
+    )
+
+    assert isinstance(disk_colour, str) and disk_colour.upper() in Color.__members__, (
+        f"{disk_colour=}. Must be one of {[member.name for member in Color]}"
+    )
+
     assert (
-        isinstance(opacity, float) and 0 <= int(opacity) <= 1
-    ), f"{opacity=}. Must be a float between 0.0 and 1.0"
+        isinstance(title_font_colour, str)
+        and title_font_colour.upper() in Color.__members__
+    ), f"{title_font_colour=}. Must be one of {[member.name for member in Color]}"
 
-    assert disk_colour in [
-        colour for colour in colors.keys()
-    ], f"{disk_colour=}. Must be one of {colors}"
-    assert title_font_colour in [
-        colour for colour in colors.keys()
-    ], f"{title_font_colour=}. Must be one of {colors}"
-    assert menu_font_colour in [
-        colour for colour in colors.keys()
-    ], f"{menu_font_colour=}. Must be one of {colors}"
+    assert (
+        isinstance(menu_font_colour, str)
+        and menu_font_colour.upper() in Color.__members__
+    ), f"{menu_font_colour=}. Must be one of {[member.name for member in Color]}"
 
-    debug = True
-    MAX_TITLE_LINES: Final[int] = 4
-    result, disk_hex = Make_Opaque(color=disk_colour, opacity=opacity)
+    assert isinstance(debug, bool), f"{debug=}. Must be a bool"
 
-    if result == -1:
-        return -1, f"Invalid System Color {disk_colour}".encode("utf-8")
+    #### Helper functions
+    def _get_default_font() -> tuple[int, str]:
+        """Gets a default font file path
 
-    if title_font_path.strip() == "":
+        Returns:
+            tuple[int, str]
+            - arg 1 : Status code. Returns 1 if the font was found, -1 otherwise.
+            - arg 2 : str: The font path or an error message if not found
+
+        """
         fonts = Get_Fonts()
+
         for font in fonts:
             if font[0].lower().startswith("ubuntu") or "arial" in font[0].lower():
-                title_font_path = font[1]
-                break
+                return 1, font[1]
         else:
-            return -1, b"A Default Title Font Could Not Be Found "
+            return -1, "A Default Font Could Not Be Found "
 
-    if menu_font_path.strip() == "":
-        fonts = Get_Fonts()
-        for font in fonts:
-            if font[0].lower().startswith("ubuntu"):
-                menu_font_path = font[1]
-                break
-        else:
-            return -1, b"A Default Menu Font Could Not Be Found "
+    def _get_label_image(
+        background_canvas_width: int,
+        background_canvas_height: int,
+        label_x: float,
+        label_y: float,
+        disk_radius: float,
+        spindle_radius: float,
+    ) -> tuple[int, bytes]:
+        """Generates the DVD label image
 
-    if not os.path.exists(title_font_path):
-        return -1, f"Title Font file not found: {menu_font_path}".encode("utf-8")
+        Args:
+            background_canvas_width (int): width of the background canvas
+            background_canvas_height (int): height of the background canvas
+            label_x (float): x position of the label
+            label_y (float): y position of the label
+            disk_radius (float): radius of the disk
+            spindle_radius (float): radius of the spindle
 
-    if not os.path.exists(menu_font_path):
-        return -1, f"Menu Font file not found: {menu_font_path}".encode("utf-8")
+        Returns:
+            tuple[int, bytes]
+            - arg 1 : Status code. Returns 1 if the png image was created, -1 otherwise.
+            - arg 2 : bytes: The generated DVD label image data as a PNG byte  string or the error message if not created.
+        """
+        result, disk_hex = Make_Opaque(color=disk_colour, opacity=opacity)
 
-    dpm = resolution / 25.4  # Convert DPI to DPMM
+        if result == -1:
+            return -1, f"Invalid System Color {disk_colour}".encode("utf-8")
 
-    disk_diameter = round(disk_diameter * dpm)
-    spindle_diameter = round(spindle_diameter * dpm)
+        # Generate the background CD/DVD label image
+        command = [
+            sys_consts.CONVERT,
+            "-size",
+            f"{background_canvas_width}x{background_canvas_height}",
+            "xc:none",
+            "-fill",
+            disk_hex,
+            "-draw",
+            f"'circle' {label_x - 0.5},{label_y - 0.5} {disk_radius - 0.5},{0}'",
+            "(",
+            "-size",
+            f"{background_canvas_width}x{background_canvas_height}",
+            "xc:none",
+            "-fill",
+            "black",
+            "-draw",
+            f"'circle' {label_x},{label_y} {label_x + spindle_radius},{label_y + spindle_radius}'",
+            ")",
+            "-alpha",
+            "Set",
+            "-compose",
+            "Dst_Out",
+            "-composite",
+            "PNG:-",  # Output to standard output (pipe)
+        ]
+        try:
+            image_data = subprocess.check_output(command, stderr=subprocess.DEVNULL)
 
-    disk_radius = disk_diameter // 2
-    spindle_radius = spindle_diameter // 2
-    background_canvas_width = disk_diameter
-    background_canvas_height = disk_diameter
-    label_x = background_canvas_width // 2
-    label_y = background_canvas_height // 2
+        except subprocess.CalledProcessError:
+            return -1, "Error Generating DVD Label Image".encode("utf-8")
 
-    # Get the largest square that fits in the circle
-    disk_square_size = round(disk_radius * math.sqrt(2))
-    spindle_square_size = round(spindle_radius * math.sqrt(2))
-    label_square_width = (
-        disk_square_size // 2 - spindle_square_size // 2 - 20  # Padding
-    )  # Take into account spindle hole
+        return 1, image_data
 
-    # Generate the background CD/DVD label image
-    command = [
-        sys_consts.CONVERT,
-        "-size",
-        f"{background_canvas_width}x{background_canvas_height}",
-        "xc:none",
-        "-fill",
-        disk_hex,
-        "-draw",
-        f"'circle' {label_x - 0.5},{label_y - 0.5} {disk_radius - 0.5},{0}'",
-        "(",
-        "-size",
-        f"{background_canvas_width}x{background_canvas_height}",
-        "xc:none",
-        "-fill",
-        "black",
-        "-draw",
-        f"'circle' {label_x},{label_y} {label_x + spindle_radius},{label_y + spindle_radius}'",
-        ")",
-        "-alpha",
-        "Set",
-        "-compose",
-        "Dst_Out",
-        "-composite",
-        "PNG:-",  # Output to standard output (pipe)
-    ]
-    try:
-        image_data = subprocess.check_output(command, stderr=subprocess.DEVNULL)
+    def _get_label_text(
+        label_square_width: int,
+        menu_font_path: str,
+        menu_font_size: int,
+        menu_pages: list[DVD_Menu_Page],
+    ) -> tuple[list[str], int]:
+        """Generates the DVD label text
 
-    except subprocess.CalledProcessError:
-        return -1, "Error Generating DVD Label Image".encode("utf-8")
+        Args:
+            label_square_width (int): width of the label square
+            menu_font_path (str): path to the font file
+            menu_font_size (int): font size
+            menu_pages (list[DVD_Menu_Page]): list of menu pages
 
-    # Extract text to place on the DVD image
-    dvd_text = []
+        Returns:
+            tuple[list[str],int]
+            - arg 1 : list of text lines
+            - arg 2 : int: The number of lines
+        """
+        assert isinstance(label_square_width, int) and label_square_width > 0, (
+            f"{label_square_width=}. Must > 0"
+        )
+        assert isinstance(menu_font_path, str) and menu_font_path.strip() != "", (
+            f"{menu_font_path=}. Must be a non-empty str"
+        )
+        assert isinstance(menu_font_size, int) and menu_font_size > 0, (
+            f"{menu_font_size=}. Must be > 0"
+        )
+        assert isinstance(menu_pages, list), f"{menu_pages=}. Must be a list"
 
-    menu_char_width, menu_char_height = Get_Text_Dims(
-        text="W", font=menu_font_path, pointsize=menu_font_size
-    )  # In English at least and in most fonts W is the widest
-
-    for menu_index, menu_title in enumerate(menu_pages):
-        if menu_title.menu_title.strip():
-            dvd_text.append(f"* {menu_title.menu_title}")
-        else:
-            dvd_text.append(f"* Menu {menu_index + 1}")
-
-        for button_item in menu_title.get_button_titles.values():
-            button_title = f"\  - {button_item[0]}"  # Button titles are indented 4 spaces (\ required!)
-
-            width, _ = Get_Text_Dims(
-                text=f"{button_title}", font=menu_font_path, pointsize=menu_font_size
+        for menu_page in menu_pages:
+            assert isinstance(menu_page, DVD_Menu_Page), (
+                f"{menu_page=}. Must be a DVD_Menu_Page"
             )
 
-            if width > label_square_width:
+        # Extract text to place on the DVD image
+        dvd_text = []
+
+        menu_char_width, menu_char_height = Get_Text_Dims(
+            text="W", font=menu_font_path, pointsize=menu_font_size
+        )  # In English at least and in most fonts W is the widest
+
+        for menu_index, menu_title in enumerate(menu_pages):
+            if menu_title.menu_title.strip():
+                menu_text = f"* {menu_title.menu_title}"
+            else:
+                menu_text = f"* Menu {menu_index + 1}"
+
+            wrapped_text = textwrap.wrap(
+                menu_text,
+                width=label_square_width // menu_char_width,
+                subsequent_indent="    ",
+            )
+
+            # leading \ is required for menu line!
+            for line_index, menu_line in enumerate(wrapped_text):
+                dvd_text.append(menu_line if line_index == 0 else f"\ {menu_line}")
+
+            # menu button title text is indented 4 spaces and leading \ is required!
+            for button_item in menu_title.get_button_titles.values():
+                button_title = f"\  - {button_item[0]}"
+
                 wrapped_text = textwrap.wrap(
                     button_title,
                     width=label_square_width // menu_char_width,
                     subsequent_indent="    ",
                 )
 
+                # leading \ is required for button line!
                 for line_index, button_line in enumerate(wrapped_text):
                     dvd_text.append(
                         f"{button_line}" if line_index == 0 else f"\ {button_line}"
                     )
 
-            else:
-                dvd_text.append(f"{button_title}")
+            dvd_text.append(" ")
 
-        dvd_text.append(" ")
+        dvd_text.pop(len(dvd_text) - 1)  # Remove the last blank line
 
-    dvd_text.pop(len(dvd_text) - 1)  # Remove the last blank line
+        return dvd_text, menu_char_height
 
-    # Get the length of the longest line in the menu/button text
-    max_menu_length = 0
-    for line in dvd_text:
-        if len(line) > max_menu_length:
-            max_menu_length = len(line)
+    def _write_label_title(
+        image_data: bytes,
+        title: str,
+        title_font_path: str,
+        title_font_size: int,
+        label_x: int,
+        left_sq_y1: int,
+        disk_square_size: int,
+        left_sq_x1: int,
+        title_font_colour: str,
+    ) -> tuple[int, bytes]:
+        """
+        Writes the DVD label title onto the provided image data.
 
-    # Calculate co-ordinates for 2 rectangles on the left and right side of the spindle hole
-    left_sq_x1 = 80  # Fixed
+        Args:
+            image_data (bytes): The image data to write the title onto.
+            title (str): The title text.
+            title_font_path (str): The path to the title font file.
+            title_font_size (int): The font size of the title.
+            label_x (int): The x-coordinate of the label's center.
+            left_sq_y1 (int): The y-coordinate of the top edge of the left square.
+            disk_square_size (int): The size of the square that fits within the DVD label circle.
+            left_sq_x1 (int): The x-coordinate of the left side of the left square.
+            title_font_colour (str): The colour of the title text.
 
-    right_sq_x1 = (
-        label_x + spindle_square_size + 20  # Padding
-    )
+        Returns:
+            tuple[int, bytes]: A tuple containing the status code and the modified image data.
+                - int: 1 if successful, -1 if an error occurred.
+                - bytes: The modified image data with the title written on it, or an error message as byte encoded string
+                if an error occurred.
+        """
 
-    left_sq_y1 = background_canvas_height - disk_square_size
-    # right_sq_y1 = background_canvas_height - disk_square_size
-    left_sq_y2 = disk_square_size
+        assert isinstance(image_data, bytes), "image_data must be bytes."
+        assert isinstance(title, str), "title must be a string."
+        assert isinstance(title_font_path, str), "title_font_path must be a string."
+        assert isinstance(title_font_size, int) and title_font_size > 0, (
+            "title_font_size must be a positive integer."
+        )
+        assert isinstance(label_x, int), "label_x must be an integer."
+        assert isinstance(left_sq_y1, int), "left_sq_y1 must be an integer."
+        assert isinstance(disk_square_size, int), "disk_square_size must be an integer."
+        assert isinstance(left_sq_x1, int), "left_sq_x1 must be an integer."
+        assert isinstance(title_font_colour, str), "title_font_colour must be a string."
 
-    x_offset = left_sq_x1
+        MAX_TITLE_LINES: Final[int] = 4
 
-    # Now write the text on the DVD image
-    if title:  # First up deal with the title - Max 4 lines allowed
         title_char_width, title_char_height = Get_Text_Dims(
             text="W", font=title_font_path, pointsize=title_font_size
         )
@@ -1374,44 +1802,197 @@ def Create_DVD_Label(
             if result == -1:  # Image data will contain the error message in this case
                 return -1, image_data.decode("utf-8")
 
-    # Now write the menu and button text on the DVD image
-    line_num = 0
-    side = 1
+        return 1, image_data
 
-    for line in dvd_text:
-        y_position = left_sq_y1 + (line_num * menu_char_height)
+    def _write_label_text(
+        image_data: bytes,
+        dvd_text: list[str],
+        menu_font_path: str,
+        menu_font_size: int,
+        menu_font_colour: str,
+        x_offset: int,
+        left_sq_y1: int,
+        left_sq_y2: int,
+        left_sq_x1: int,
+        right_sq_x1: int,
+        menu_char_height: int,
+    ) -> tuple[int, bytes]:
+        """
+        Writes the menu and button text onto the DVD label image.
 
-        if y_position > left_sq_y2:  # Switch to right side
-            side += 1
-            if side > 2:
-                return (
-                    -1,
-                    "Too Many Menu Titles To Print! Reduce Menu Font Size Or Change Font".encode(
-                        "utf-8"
-                    ),
-                )
+        Args:
+            image_data (bytes): The image data to write the text onto.
+            dvd_text (list[str]): A list of strings containing the menu and button text.
+            menu_font_path (str): The path to the menu font file.
+            menu_font_size (int): The font size of the menu text.
+            menu_font_colour (str): The colour of the menu text.
+            x_offset (int): The x-coordinate offset for the menu text.
+            left_sq_y1 (int): The y-coordinate of the top edge of the left square.
+            left_sq_y2 (int): The y-coordinate of the bottom edge of the left square.
+            left_sq_x1 (int): The x-coordinate of the left side of the left square.
+            right_sq_x1 (int): The x-coordinate of the left side of the right square.
+            menu_char_height (int): The height of a single character in the menu font.
 
-            line_num = 0
-            x_offset = right_sq_x1
-            if line.strip() == "":
-                continue
+        Returns:
+            tuple[int, bytes]: A tuple containing the status code and the modified image data.
+                - int: 1 if successful, -1 if an error occurred.
+                - bytes: The modified image data with the menu text written on it, or an error message as byte encoded string if an error occurred.
+        """
 
+        assert isinstance(image_data, bytes), "image_data must be bytes."
+        assert isinstance(dvd_text, list) and all(
+            isinstance(line, str) for line in dvd_text
+        ), "dvd_text must be a list of strings."
+        assert isinstance(menu_font_path, str), "menu_font_path must be a string."
+        assert isinstance(menu_font_size, int) and menu_font_size > 0, (
+            "menu_font_size must be a positive integer."
+        )
+        assert isinstance(menu_font_colour, str), "menu_font_colour must be a string."
+        assert isinstance(left_sq_y1, int), "left_sq_y1 must be an integer."
+        assert isinstance(left_sq_y2, int), "left_sq_y2 must be an integer."
+        assert isinstance(left_sq_x1, int), "left_sq_x1 must be an integer."
+        assert isinstance(right_sq_x1, int), "right_sq_x1 must be an integer."
+        assert isinstance(menu_char_height, int), "menu_char_height must be an integer."
+
+        # Now write the menu and button text on the DVD image
+        line_num = 0
+        side = 1
+
+        for line in dvd_text:
             y_position = left_sq_y1 + (line_num * menu_char_height)
 
-        result, image_data = Write_Text_On_Image(
-            image_data=image_data,
-            text=line,
-            x=x_offset,
-            y=y_position,
-            color=menu_font_colour,
-            font=menu_font_path,
-            pointsize=menu_font_size,
+            if y_position > left_sq_y2:  # Switch to right side
+                side += 1
+                if side > 2:
+                    return (
+                        -1,
+                        "Too Many Menu Titles To Print! Reduce Menu Font Size Or Change Font".encode(
+                            "utf-8"
+                        ),
+                    )
+
+                line_num = 0
+                x_offset = right_sq_x1
+
+                if line.strip() == "":
+                    continue
+
+                y_position = left_sq_y1 + (line_num * menu_char_height)
+
+            result, image_data = Write_Text_On_Image(
+                image_data=image_data,
+                text=line,
+                x=x_offset,
+                y=y_position,
+                color=menu_font_colour,
+                font=menu_font_path,
+                pointsize=menu_font_size,
+            )
+
+            if result == -1:  # Image data will contain the error message in this case
+                return -1, image_data.decode("utf-8")
+
+            line_num += 1
+
+        return 1, image_data
+
+    #### Main
+    LABEL_HORIZONTAL_PADDING: Final[int] = 25
+    LEFT_SQUARE_X_OFFSET: Final[int] = 80
+    SQUARE_ROOT_OF_2: Final[float] = math.sqrt(2)
+
+    if title_font_path.strip() == "":
+        result, title_font_path = _get_default_font()
+        if result == -1:
+            return -1, title_font_path.encode("utf-8")
+
+    if menu_font_path.strip() == "":
+        result, menu_font_path = _get_default_font()
+        if result == -1:
+            return -1, menu_font_path.encode("utf-8")
+
+    if not os.path.exists(title_font_path):
+        return -1, f"Title Font file not found: {menu_font_path}".encode("utf-8")
+
+    if not os.path.exists(menu_font_path):
+        return -1, f"Menu Font file not found: {menu_font_path}".encode("utf-8")
+
+    # Calculate the required variables
+    dpmm = resolution / 25.4
+
+    disk_diameter = round(disk_diameter * dpmm)
+    spindle_diameter = round(spindle_diameter * dpmm)
+
+    disk_radius = disk_diameter // 2
+    spindle_radius = spindle_diameter // 2
+    background_canvas_width = disk_diameter
+    background_canvas_height = disk_diameter
+    label_x = background_canvas_width // 2
+    label_y = background_canvas_height // 2
+
+    disk_square_size = round(disk_radius * SQUARE_ROOT_OF_2)
+    spindle_square_size = round(spindle_radius * SQUARE_ROOT_OF_2)
+    label_square_width = (
+        disk_square_size // 2 - spindle_square_size // 2 - LABEL_HORIZONTAL_PADDING
+    )
+
+    left_sq_x1 = LEFT_SQUARE_X_OFFSET
+    right_sq_x1 = label_x + spindle_square_size + LABEL_HORIZONTAL_PADDING
+    left_sq_y1 = background_canvas_height - disk_square_size
+    left_sq_y2 = disk_square_size
+
+    x_offset = left_sq_x1
+
+    # Get the label image for the DVD
+    result, image_data = _get_label_image(
+        background_canvas_width,
+        background_canvas_height,
+        label_x,
+        label_y,
+        disk_radius,
+        spindle_radius,
+    )
+    if result == -1:
+        return -1, image_data
+
+    # Get the text for the DVD label
+    dvd_text, menu_char_height = _get_label_text(
+        label_square_width, menu_font_path, menu_font_size, menu_pages
+    )
+
+    if title:  # Write the label title text on the DVD label
+        result, image_data = _write_label_title(
+            image_data,
+            title,
+            title_font_path,
+            title_font_size,
+            label_x,
+            left_sq_y1,
+            disk_square_size,
+            left_sq_x1,
+            title_font_colour,
         )
 
-        if result == -1:  # Image data will contain the error message in this case
-            return -1, image_data.decode("utf-8")
+        if result == -1:
+            return -1, image_data
 
-        line_num += 1
+    # Write the menu text on the DVD label
+    result, image_data = _write_label_text(
+        image_data,
+        dvd_text,
+        menu_font_path,
+        menu_font_size,
+        menu_font_colour,
+        x_offset,
+        left_sq_y1,
+        left_sq_y2,
+        left_sq_x1,
+        right_sq_x1,
+        menu_char_height,
+    )
+
+    if result == -1:
+        return -1, image_data
 
     if debug and not utils.Is_Complied():
         with open("cddvd_label.png", "wb") as png_file:
@@ -1444,13 +2025,13 @@ def Get_Space_Available(path: str) -> tuple[int, str]:
         )
 
 
-def Get_Color_Names() -> list:
-    """Return a list of color names in the colors dictionary.
+def Get_Color_Names() -> list[str]:
+    """Return a sorted list of color names from the Color Enum.
 
     Returns:
-        list[str]: A list of color names as strings.
+        list[str]: A sorted list of color names as strings.
     """
-    return sorted(list(colors.keys()), key=lambda x: x[0].upper())
+    return sorted([member.name.lower() for member in Color])
 
 
 def Get_Hex_Color(color: str) -> str:
@@ -1467,14 +2048,17 @@ def Get_Hex_Color(color: str) -> str:
         isinstance(color, str) and color.strip() != "" and color in Get_Color_Names()
     ), f"{color=}. Must be string  in {', '.join(Get_Color_Names())} "
 
+    assert isinstance(color, str) and color.upper() in Color.__members__, (
+        f"{color=}. Must be one of {[member.name for member in Color]}"
+    )
+
     color = color.lower()
 
-    if color in colors:
-        hex_value = colors[color]
+    for member in Color:
+        if member.name.lower() == color:
+            return member.value
     else:
-        hex_value = ""
-
-    return hex_value
+        return ""
 
 
 def Get_Colored_Rectangle_Example(width: int, height: int, color: str) -> bytes:
@@ -1491,12 +2075,12 @@ def Get_Colored_Rectangle_Example(width: int, height: int, color: str) -> bytes:
     """
     # Check input arguments
     assert isinstance(width, int) and width > 0, f"{width}. Must be a positive integer."
-    assert (
-        isinstance(height, int) and height > 0
-    ), f"{height}. Must be a positive integer."
-    assert (
-        isinstance(color, str) and color in colors
-    ), f"{color=} must be a string in {', '.join(Get_Color_Names())}"
+    assert isinstance(height, int) and height > 0, (
+        f"{height}. Must be a positive integer."
+    )
+    assert isinstance(color, str) and color.upper() in Color.__members__, (
+        f"{color=}. Must be one of {[member.name for member in Color]}"
+    )
 
     size = f"{width}x{height}"
     command = ["convert", "-size", size, f"xc:{color}", "png:-"]
@@ -1536,24 +2120,28 @@ def Get_Font_Example(
         - arg 2: A png byte string or an empty byte sttring if an error occurs
     """
     assert isinstance(font_file, str), f"{font_file=}. Must be str"
-    assert (
-        isinstance(pointsize, int) and pointsize == -1 or pointsize > 0
-    ), f"{pointsize=}. Must be -1 to autocalc or int > 0"
+    assert isinstance(pointsize, int) and pointsize == -1 or pointsize > 0, (
+        f"{pointsize=}. Must be -1 to autocalc or int > 0"
+    )
     assert isinstance(text, str), (
         f"{text=}. Must be non-empty str" and text.strip() != ""
     )
+
+    assert isinstance(text_color, str) and text_color.upper() in Color.__members__, (
+        f"{text_color=}. Must be one of {[member.name for member in Color]}"
+    )
+
     assert (
-        isinstance(text_color, str) and text_color in colors
-    ), f"{text_color=} must be a string in {', '.join(Get_Color_Names())}"
-    assert (
-        isinstance(background_color, str) and background_color in colors
-    ), f"{background_color=} must be a string in {', '.join(Get_Color_Names())}"
-    assert (
-        isinstance(width, int) and width == -1 or width > 0
-    ), f"{width=}. Must be int > 0 or -1 to autocalc"
-    assert (
-        isinstance(height, int) and height == -1 or height > 0
-    ), f"{height=}. Must be int > 0 or -1 to autocalc"
+        isinstance(background_color, str)
+        and background_color.upper() in Color.__members__
+    ), f"{background_color=}. Must be one of {[member.name for member in Color]}"
+
+    assert isinstance(width, int) and width == -1 or width > 0, (
+        f"{width=}. Must be int > 0 or -1 to autocalc"
+    )
+    assert isinstance(height, int) and height == -1 or height > 0, (
+        f"{height=}. Must be int > 0 or -1 to autocalc"
+    )
     assert 0.0 <= opacity <= 1.0, "Opacity must be between 0.0 and 1.0"
 
     if not os.path.exists(font_file):
@@ -1678,9 +2266,10 @@ def Make_Opaque(color: str, opacity: float) -> tuple[int, str]:
         - arg2: Error message or hex color value with the specified opacity level. if ok
 
     """
-    assert (
-        isinstance(color, str) and color in colors
-    ), f"{color=} must be a string in {', '.join(Get_Color_Names())}"
+    assert isinstance(color, str) and color.upper() in Color.__members__, (
+        f"{color=}. Must be one of {[member.name for member in Color]}"
+    )
+
     assert 0.0 <= opacity <= 1.0, "Opacity must be between 0.0 and 1.0"
 
     hex_color = Get_Hex_Color(color)
@@ -1812,13 +2401,13 @@ def Overlay_Text(
     """
     assert isinstance(in_file, str), f"{in_file=} must be a string"
     assert isinstance(text, str), f"{text=} must be a string"
-    assert (
-        isinstance(text_font, str) and text_font.strip() != ""
-    ), f"{text_font=} must be a non-empty str {type(text_font)=}"
+    assert isinstance(text_font, str) and text_font.strip() != "", (
+        f"{text_font=} must be a non-empty str {type(text_font)=}"
+    )
     assert isinstance(text_pointsize, int), f"{text_pointsize=} must be an integer"
-    assert (
-        isinstance(text_color, str) and text_color in colors
-    ), f"{text_color=} must be a string"
+    assert isinstance(text_color, str) and text_color.upper() in Color.__members__, (
+        f"{text_color=}. Must be one of {[member.name for member in Color]}"
+    )
     assert position.lower() in [
         "top",
         "bottom",
@@ -1907,6 +2496,102 @@ def Overlay_Text(
     return Execute_Check_Output(commands=command)
 
 
+def Transcode_DV(
+    input_file: str,
+    output_folder: str,
+    frame_rate: float,
+    width: int,
+    height: int,
+) -> tuple[int, str]:
+    """
+    Converts an input vile file into an DV avi file.
+
+    Args:
+        input_file (str): The path to the input video file.
+        output_folder (str): The path to the output folder.
+        frame_rate (float): The frame rate to use for the output video.
+        width (int): The width of the video
+        height (int): The height of the video
+
+    Returns:
+        tuple[int, str]:
+            - arg 1: 1 if ok, -1 if error
+            - arg 2: error message if error (-1) else output file path (1)
+
+    """
+
+    assert isinstance(input_file, str) and input_file.strip() != "", (
+        f"{input_file=}. Must be a non-empty str"
+    )
+    assert isinstance(output_folder, str) and output_folder.strip() != "", (
+        f"{output_folder=}. Must be a non-empty str"
+    )
+    assert isinstance(frame_rate, float) and frame_rate > 0, (
+        f"{frame_rate=}. Must be float > 0"
+    )
+    assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
+    assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
+
+    file_handler = file_utils.File()
+
+    if not file_handler.path_exists(output_folder):
+        return -1, f"{output_folder} Does not exist"
+
+    if not file_handler.path_writeable(output_folder):
+        return -1, f"{output_folder} Cannot Be Written To"
+
+    if not file_handler.file_exists(input_file):
+        return -1, f"File Does Not Exist {input_file}"
+
+    _, input_file_name, _ = file_handler.split_file_path(input_file)
+
+    output_file = file_handler.file_join(output_folder, f"{input_file_name}.avi")
+
+    if (
+        width == sys_consts.PAL_SPECS.width_43
+        or width == sys_consts.PAL_SPECS.width_169
+        and height == sys_consts.PAL_SPECS.height_43
+        or height == sys_consts.PAL_SPECS.height_169
+    ):
+        frame_rate = 25
+    elif (
+        width == sys_consts.NTSC_SPECS.width_43
+        or width == sys_consts.NTSC_SPECS.width_169
+        and height == sys_consts.NTSC_SPECS.height_43
+        or height == sys_consts.NTSC_SPECS.height_169
+    ):
+        frame_rate = 30000 / 1001
+    else:
+        return -1, f"{width=} X {height=} Does Not Meet Pal or NTSC specs"
+
+    command = [
+        sys_consts.FFMPG,
+        "-threads",
+        str(Get_Thread_Count()),
+        "-i",
+        input_file,
+        "-vsync",
+        "1",
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        str(frame_rate),
+        "-c:v",
+        "dvvideo",
+        "-c:a",
+        "pcm_s16le",  # Encode audio to PCM (common for AVI)
+        output_file,
+        "-y",
+    ]
+
+    result, message = Execute_Check_Output(commands=command, debug=False)
+
+    if result == -1:
+        return -1, message
+
+    return 1, ""
+
+
 def Transcode_ffv1_archival(
     input_file: str,
     output_folder: str,
@@ -1932,15 +2617,15 @@ def Transcode_ffv1_archival(
             - arg 2: error message if error (-1) else output file path (1)
 
     """
-    assert (
-        isinstance(input_file, str) and input_file.strip() != ""
-    ), f"{input_file=}. Must be a non-empty str"
-    assert (
-        isinstance(output_folder, str) and output_folder.strip() != ""
-    ), f"{output_folder=}. Must be a non-empty str"
-    assert (
-        isinstance(frame_rate, float) and frame_rate > 0
-    ), f"{frame_rate=}. Must be float > 0"
+    assert isinstance(input_file, str) and input_file.strip() != "", (
+        f"{input_file=}. Must be a non-empty str"
+    )
+    assert isinstance(output_folder, str) and output_folder.strip() != "", (
+        f"{output_folder=}. Must be a non-empty str"
+    )
+    assert isinstance(frame_rate, float) and frame_rate > 0, (
+        f"{frame_rate=}. Must be float > 0"
+    )
     assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
     assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
 
@@ -2069,13 +2754,13 @@ def Create_SD_Intermediate_Copy(input_file: str, output_folder: str) -> tuple[in
             - arg 1: 1 if successful, -1 if an error occurred
             - arg 2: error message if error (-1) else output file path (1)
     """
-    assert (
-        isinstance(input_file, str) and input_file.strip() != ""
-    ), f"{input_file=}. Must be a non-empty str"
+    assert isinstance(input_file, str) and input_file.strip() != "", (
+        f"{input_file=}. Must be a non-empty str"
+    )
 
-    assert (
-        isinstance(output_folder, str) and output_folder.strip() != ""
-    ), f"{output_folder=}. Must be a non-empty str"
+    assert isinstance(output_folder, str) and output_folder.strip() != "", (
+        f"{output_folder=}. Must be a non-empty str"
+    )
 
     file_handler = file_utils.File()
 
@@ -2171,16 +2856,16 @@ def Transcode_Mezzanine(
                - arg 1: 1 if ok, -1 if error
                - arg 2: error message if error (-1) else output file path (1)
     """
-    assert (
-        isinstance(input_file, str) and input_file.strip() != ""
-    ), f"{input_file=}. Must be a non-empty str"
+    assert isinstance(input_file, str) and input_file.strip() != "", (
+        f"{input_file=}. Must be a non-empty str"
+    )
 
-    assert (
-        isinstance(output_folder, str) and output_folder.strip() != ""
-    ), f"{output_folder=}. Must be a non-empty str"
-    assert (
-        isinstance(frame_rate, float) and frame_rate > 0
-    ), f"{frame_rate=}. Must be float > 0"
+    assert isinstance(output_folder, str) and output_folder.strip() != "", (
+        f"{output_folder=}. Must be a non-empty str"
+    )
+    assert isinstance(frame_rate, float) and frame_rate > 0, (
+        f"{frame_rate=}. Must be float > 0"
+    )
     assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
     assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
     assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
@@ -2358,16 +3043,16 @@ def Transcode_MPEG2_High_Bitrate(
                 - arg 1: 1 if ok, -1 if error
                 - arg 2: error message if error (-1) else output file path (1)
     """
-    assert (
-        isinstance(input_file, str) and input_file.strip() != ""
-    ), f"{input_file=}. Must be a non-empty str"
+    assert isinstance(input_file, str) and input_file.strip() != "", (
+        f"{input_file=}. Must be a non-empty str"
+    )
 
-    assert (
-        isinstance(output_folder, str) and output_folder.strip() != ""
-    ), f"{output_folder=}. Must be a non-empty str"
-    assert (
-        isinstance(frame_rate, float) and frame_rate > 0
-    ), f"{frame_rate=}. Must be float > 0"
+    assert isinstance(output_folder, str) and output_folder.strip() != "", (
+        f"{output_folder=}. Must be a non-empty str"
+    )
+    assert isinstance(frame_rate, float) and frame_rate > 0, (
+        f"{frame_rate=}. Must be float > 0"
+    )
     assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
     assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
     assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
@@ -2506,16 +3191,16 @@ def Transcode_H26x(
             - arg 1: 1 if ok, -1 if error
             - arg 2: error message if error (-1) else output file path (1)
     """
-    assert (
-        isinstance(input_file, str) and input_file.strip() != ""
-    ), f"{input_file=}. Must be a non-empty str"
+    assert isinstance(input_file, str) and input_file.strip() != "", (
+        f"{input_file=}. Must be a non-empty str"
+    )
 
-    assert (
-        isinstance(output_folder, str) and output_folder.strip() != ""
-    ), f"{output_folder=}. Must be a non-empty str"
-    assert (
-        isinstance(frame_rate, float) and frame_rate > 0
-    ), f"{frame_rate=}. Must be float > 0"
+    assert isinstance(output_folder, str) and output_folder.strip() != "", (
+        f"{output_folder=}. Must be a non-empty str"
+    )
+    assert isinstance(frame_rate, float) and frame_rate > 0, (
+        f"{frame_rate=}. Must be float > 0"
+    )
     assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
     assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
     assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
@@ -2604,17 +3289,13 @@ def Transcode_H26x(
         "-pix_fmt",
         "yuv420p",  # Ensure the pixel format is compatible with Blu-ray
         "-crf",
-        "17" if not h265 else "23",
+        "19" if not h265 else "25",
         "-preset",
         quality_preset,
         "-c:a",
         "aac",
         "-b:a",
         "128k",
-        "-b:v",
-        (
-            "5M" if height <= 576 else "25M"
-        ),  # SD Get low-bit rate everything else gets Blu-ray rate. Black Choice for now
         "-muxrate",
         "25M",  # Maximum Blu-ray mux rate in bits per second
         "-bufsize",
@@ -2631,11 +3312,10 @@ def Transcode_H26x(
         "-y",
     ]
 
-    if not file_handler.file_exists(output_file):
-        result, message = Execute_Check_Output(commands=command, debug=False)
+    result, message = Execute_Check_Output(commands=command, debug=False)
 
-        if result == -1:
-            return -1, message
+    if result == -1:
+        return -1, message
 
     return 1, output_file
 
@@ -2644,7 +3324,7 @@ def Convert_To_PNG_Stream(
     image_filename: str, width: int, height: int, keep_aspect_ratio: bool = True
 ) -> (int, bytes):
     """
-    Converts an image file to PNG format,  resizing it, and returns the PNG data as bytes.
+    Converts an image file to PNG format, resizing it, and returns the PNG data as bytes.
 
     Args:
         image_filename (str): The filename of the input image.
@@ -2657,9 +3337,9 @@ def Convert_To_PNG_Stream(
             - arg1: 1 (ok) or -1 (error)
             - arg2: The image data as a byte string (PNG format) on success, empty bytes on error
     """
-    assert (
-        isinstance(image_filename, str) and image_filename.strip() != ""
-    ), f"{image_filename=}. Must be a non-empty str"
+    assert isinstance(image_filename, str) and image_filename.strip() != "", (
+        f"{image_filename=}. Must be a non-empty str"
+    )
     assert isinstance(width, int) and width > 0, f"{width=} . Must be an int > 0"
     assert isinstance(height, int) and height > 0, f"{height=} . Must be an int > 0"
     assert isinstance(keep_aspect_ratio, bool), f"{keep_aspect_ratio=}. Must be a bool"
@@ -2676,7 +3356,7 @@ def Convert_To_PNG_Stream(
         f"{width}x{height} {'>' if keep_aspect_ratio else ''}>",
         "png:-",
     ]
-    print(f"DBG {' '.join(command)} ")
+
     try:
         with subprocess.Popen(
             command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -2697,7 +3377,7 @@ def Write_Image_On_Image(
     overlay_image_data: bytes,
     x: int,
     y: int,
-    gravity: str = "northwest",
+    gravity: str = Gravity.NORTHWEST.value,
 ) -> (int, bytes):
     """
     Overlays an image (provided as bytes) onto another base image (provided as bytes)
@@ -2715,17 +3395,19 @@ def Write_Image_On_Image(
             - arg1: 1 (ok) or -1 (error)
             - arg2: The modified image data as a byte string (PNG format) on success, empty bytes on error
     """
-    assert (
-        isinstance(base_image_data, bytes) and base_image_data.strip() != ""
-    ), f"{base_image_data=}. Must be a non-empty bytes"
-    assert (
-        isinstance(overlay_image_data, bytes) and base_image_data.strip() != ""
-    ), f"{base_image_data=}. Must be a non-empty bytes"
+    assert isinstance(base_image_data, bytes) and base_image_data.strip() != "", (
+        f"{base_image_data=}. Must be a non-empty bytes"
+    )
+    assert isinstance(overlay_image_data, bytes) and base_image_data.strip() != "", (
+        f"{base_image_data=}. Must be a non-empty bytes"
+    )
     assert isinstance(x, int) and x >= 0, f"{x=}. Must be a non-negative int"
     assert isinstance(y, int) and y >= 0, f"{y=}. Must be a non-negative int"
-    assert (
-        isinstance(gravity.lower(), str) and gravity.lower() in valid_gravities
-    ), f"{gravity=} must be a gravity str"
+    assert isinstance(gravity, str) and gravity.strip().lower() in [
+        member.value for member in Gravity
+    ], (
+        f"{gravity=} must be a valid gravity string from {[member.value for member in Gravity]}"
+    )
 
     try:
         SEPARATOR: Final[bytes] = b"##ImageSeparator##"
@@ -2769,7 +3451,7 @@ def Write_Text_On_Image(
     font: str,
     pointsize: int,
     color: str,
-    gravity: str = "northwest",
+    gravity: str = Gravity.NORTHWEST.value,
 ) -> (int, bytes):
     """Writes text on an image (provided as bytes) and returns the modified image as a byte string (PNG format).
 
@@ -2789,24 +3471,28 @@ def Write_Text_On_Image(
             - arg2: The modified image data as a byte string (PNG format) on success empty bytes on error.
     """
 
-    assert (
-        isinstance(gravity.lower(), str) and gravity.lower() in valid_gravities
-    ), f"{gravity=} must be a gravity str"
+    assert isinstance(gravity, str) and gravity.strip().lower() in [
+        member.value for member in Gravity
+    ], (
+        f"{gravity=} must be a valid gravity string from {[member.value for member in Gravity]}"
+    )
 
-    assert (
-        isinstance(image_data, bytes) and image_data != b""
-    ), f"{image_data=}. Must be non-empty bytes"
+    assert isinstance(image_data, bytes) and image_data != b"", (
+        f"{image_data=}. Must be non-empty bytes"
+    )
     assert isinstance(text, str), f"{text=}. Must be str"
-    assert (
-        isinstance(font, str) and font.strip() != ""
-    ), f"{font=}. Must be non-empty str"
+    assert isinstance(font, str) and font.strip() != "", (
+        f"{font=}. Must be non-empty str"
+    )
     assert isinstance(x, int) and x > 0, f"{x=}. Must be int > 0"
-    assert (
-        isinstance(pointsize, int) and pointsize > 0
-    ), f"{pointsize=}. Must be int > 0"
+    assert isinstance(pointsize, int) and pointsize > 0, (
+        f"{pointsize=}. Must be int > 0"
+    )
     assert isinstance(y, int) and y > 0, f"{y=}. Must be int > 0"
 
-    assert isinstance(color, str) and color in colors, f"{color=} must be a string"
+    assert isinstance(color, str) and color.upper() in Color.__members__, (
+        f"{color=}. Must be one of {[member.name for member in Color]}"
+    )
 
     try:
         # Construct ImageMagick command (pipe image data as input)
@@ -2867,20 +3553,22 @@ def Write_Text_On_File(
         - arg1: 1 OK, -1 Error,
         - arg2: Error message or "" if ok
     """
-    assert (
-        isinstance(input_file, str) and input_file.strip() != ""
-    ), f"{input_file=}. Must be non-empty str"
+    assert isinstance(input_file, str) and input_file.strip() != "", (
+        f"{input_file=}. Must be non-empty str"
+    )
     assert isinstance(text, str), f"{text=}. Must be str"
-    assert (
-        isinstance(font, str) and font.strip() != ""
-    ), f"{font=}. Must be non-empty str"
+    assert isinstance(font, str) and font.strip() != "", (
+        f"{font=}. Must be non-empty str"
+    )
     assert isinstance(x, int) and x > 0, f"{x=}. Must be int > 0"
-    assert (
-        isinstance(pointsize, int) and pointsize > 0
-    ), f"{pointsize=}. Must be int > 0"
+    assert isinstance(pointsize, int) and pointsize > 0, (
+        f"{pointsize=}. Must be int > 0"
+    )
     assert isinstance(y, int) and y > 0, f"{y=}. Must be int > 0"
 
-    assert isinstance(color, str) and color in colors, f"{color=} must be a string"
+    assert isinstance(color, str) and color.upper() in Color.__members__, (
+        f"{color=}. Must be one of {[member.name for member in Color]}"
+    )
 
     if not os.path.exists(input_file):
         return -1, f"{input_file} Does Not Exist!"
@@ -2917,12 +3605,12 @@ def Get_Text_Dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
         tuple[int,int]: The width and height of the text. Both are -1 if there is an error
     """
     assert isinstance(text, str), f"{text=}. Must be str"
-    assert (
-        isinstance(font, str) and font.strip() != ""
-    ), f"{font=}. Must be noon-empty str"
-    assert (
-        isinstance(pointsize, int) and pointsize > 0
-    ), f"{pointsize=}. Must be int > 0"
+    assert isinstance(font, str) and font.strip() != "", (
+        f"{font=}. Must be noon-empty str"
+    )
+    assert isinstance(pointsize, int) and pointsize > 0, (
+        f"{pointsize=}. Must be int > 0"
+    )
 
     # Run the ImageMagick command to measure the text
     result, message = Execute_Check_Output(
@@ -2977,9 +3665,9 @@ def Get_Codec(input_file: str) -> tuple[int, str]:
         - arg 2: Codec name if obtained successfully, otherwise error message
 
     """
-    assert (
-        isinstance(input_file, str) and input_file.strip() != ""
-    ), "Input file must be a string."
+    assert isinstance(input_file, str) and input_file.strip() != "", (
+        "Input file must be a string."
+    )
 
     commands = [
         sys_consts.FFPROBE,
@@ -3004,10 +3692,10 @@ def Get_Codec(input_file: str) -> tuple[int, str]:
 
 def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
     """
-    Cut and join a video based on start and end cut frames.
+    Attempts a frame accurate cut and join of a video based on start and end cut frames.
 
     Args:
-        cut_video_def(Cut_Video_Def): Cut video definition file
+        cut_video_def(Cut_Video_Def): Cut video definition
 
 
     Returns:
@@ -3017,202 +3705,242 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
     """
 
     ##### Helper
-    def get_frame_dict(
-        input_file: str, start_frame: int, frame_rate: float, time_window: int = 60
-    ) -> tuple[int, dict]:
-        """
-        Uses FFProbe to get a GOP (Group Of Pictures) frame dictionary centered on the start time.
+    def _get_GOP_info(
+        input_file: str,
+        start_time: float,
+    ) -> tuple[int, str, float, float]:
+        """Get the GOP Block I frame start and end times around the start time video file
 
         Args:
-            input_file (str): Path to input video file.
-            start_frame (int): The frame we want the GOP dict for
-            frame_rate (float): The frame rate of the video
-            time_window (int): The time window in seconds centred around the start_frame in which we do a GOP search
+            input_file (str): The input file
+            start_time (float): The start time
 
         Returns:
-            tuple[int, Optional[float]]: tuple containing result code and
-            - arg 1: Result code 1 indicates success and -1 indicates failure.
-            - arg 2: GOP Dict centered on the start time (has error entry when error occurs)
-
+            tuple[int, str, float, float]: The result (1 if ok, -1 if not),
+                                            the message ("" or "stream" if all iframes, if ok, error message if not )
+                                            the start time of the GOP
+                                            the end time of the GOP
         """
-        assert (
-            isinstance(input_file, str) and input_file.strip() != ""
-        ), "Input file path must be a string."
-        assert (
-            isinstance(start_frame, int) and start_frame >= 0
-        ), f"{start_frame=} must be an int > 0"
-        assert (
-            isinstance(frame_rate, float) and frame_rate > 0
-        ), f"{frame_rate=}. Must be a float"
-        assert (
-            isinstance(time_window, int) and time_window > 0
-        ), f"{time_window=}. Must be int"
 
-        start_time = 0 if start_frame == 0 else start_frame / frame_rate
+        assert isinstance(input_file, str) and input_file.strip() != "", (
+            f"{input_file=}. Must be non-empty str"
+        )
+        assert isinstance(start_time, float) and start_time >= 0.0, (
+            f"{start_time=}. Must be int >= 0"
+        )
 
-        # Centre start time in the time window (start a bit before in case we are in the middle of a GO0!P)
-        if start_time > time_window // 2:
-            start_time -= time_window // 2
+        search_window = 5  # Initial search window (seconds)
+        current_search_start = max(0.0, start_time - search_window)
+        found_iframe = False
+        start_i_time = -1.0
+        end_i_time = -1.0
+        stream_copy = False
+        max_searches = (
+            10  # Works out at 50 seconds if no I-frames found not likely to find any
+        )
+        search_count = 0
 
+        # Find the nearest I-frame before start_time
+        while (
+            not found_iframe
+            and current_search_start >= 0.0
+            and search_count < max_searches
+        ):
+            commands = [
+                sys_consts.FFPROBE,
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_frames",
+                "-of",
+                "json",
+                "-read_intervals",
+                f"{current_search_start}%+{search_window}",
+                input_file,
+            ]
+
+            result, message = Execute_Check_Output(
+                commands, debug=False, stderr_to_stdout=True
+            )
+
+            if result == -1:
+                return -1, message, -1.0, -1.0
+
+            try:
+                iframe_data = json.loads(message)
+            except json.JSONDecodeError:
+                return -1, "JSON Decode Error!", -1.0, -1.0
+
+            try:
+                i_frames = [
+                    frame
+                    for frame in iframe_data["frames"]
+                    if frame["pict_type"] == "I" and frame["key_frame"] == 1
+                ]
+
+                if not i_frames:
+                    break
+
+                i_frame = i_frames[0]
+                I_Pos = float(i_frame["pkt_pos"])
+                I_Pts = float(i_frame["pts"])
+
+                for frame in reversed(iframe_data["frames"]):  # Search backwards
+                    if (
+                        frame["pict_type"] == "I"
+                        and frame["key_frame"] == 1
+                        and float(frame["pts_time"]) <= start_time
+                    ):
+                        start_i_time = float(frame["pts_time"])
+                        found_iframe = True
+
+                        stream_copy = all(
+                            frame["pict_type"] == "I" and frame["key_frame"] == 1
+                            for frame in iframe_data["frames"]
+                        )
+
+                        break
+                    elif frame["pict_type"] == "B":
+                        B_pos = float(frame["pkt_pos"])
+                        B_pts = float(frame["pts"])
+
+                        if B_pos > I_Pos and B_pts < I_Pts:
+                            return (
+                                -1,
+                                "Open GOP detected!",
+                                -1.0,
+                                -1.0,
+                            )  # Open GOP detected
+
+                    current_search_start = max(
+                        0.0, current_search_start - search_window
+                    )
+            except (KeyError, KeyError):
+                return -1, "Failed to get head I-frame!", -1.0, -1.0
+
+            search_count += 1
+
+        # Get video duration
         commands = [
             sys_consts.FFPROBE,
             "-v",
             "error",
-            "-select_streams",
-            "v:0",
             "-show_entries",
-            "frame=pkt_pts_time,pkt_duration_time,coded_picture_number,pict_type,best_effort_timestamp_time",
+            "format=duration",
             "-of",
-            "csv=print_section=0",
-            "-read_intervals",
-            f"{start_time}%+{time_window}",
+            "json",
             input_file,
         ]
 
-        result, output = Execute_Check_Output(
-            commands, debug=True, stderr_to_stdout=True
+        result, message = Execute_Check_Output(
+            commands, debug=False, stderr_to_stdout=True
         )
 
         if result == -1:
-            return -1, {"error": output}
+            return -1, message, -1.0, -1.0
 
-        lines = output.strip().split("\n")
-        frame_dict = {}
-        start_frame_offset = int(start_time * frame_rate)
-        absolute_frame_number = -1
+        try:
+            video_duration = float(json.loads(message)["format"]["duration"])
+        except json.JSONDecodeError:
+            return -1, "JSON Decode Error!", -1.0, -1.0
+        except (ValueError, KeyError):
+            return -1, "Failed to get video duration!", -1.0, -1.0
 
-        # Parse lines to get the frame info needed loaded into the frame_dict
-        for line in lines:
-            if line.strip() == "":
-                continue
+        found_iframe = False
+        current_search_start = start_i_time
 
-            line_items = line.split(",")
+        # # Find the nearest I-frame after the start_time
+        while not found_iframe and current_search_start < video_duration:
+            commands = [
+                sys_consts.FFPROBE,
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_frames",
+                "-of",
+                "json",
+                "-read_intervals",
+                f"{current_search_start}%+{search_window}",
+                input_file,
+            ]
 
-            if len(line_items) < 3:
-                continue
-
-            if absolute_frame_number == -1:
-                absolute_frame_number = int(float(line_items[0]) * frame_rate) + 1
-
-            computed_frame = float(line_items[0]) * frame_rate
-            pts_time = line_items[1]
-            pict_type = line_items[2]
-            coded_picture_number = line_items[3]
-
-            duration = float(pts_time) / frame_rate
-            offset_frame = int(coded_picture_number) + start_frame_offset
-
-            frame_dict[absolute_frame_number] = (
-                pict_type,
-                pts_time,
-                duration,
-                computed_frame,
-                offset_frame,
-                coded_picture_number,
-                absolute_frame_number,
-                float(line_items[0]),
+            result, message = Execute_Check_Output(
+                commands, debug=False, stderr_to_stdout=True
             )
 
-            absolute_frame_number += 1
+            if result == -1:
+                return -1, message, -1.0, -1.0
 
-        frame_list = sorted(frame_dict.items(), key=lambda x: x[0])
+            try:
+                iframe_data = json.loads(message)
+            except json.JSONDecodeError:
+                return -1, "JSON Decode Error!", -1.0, -1.0
 
-        for index in range(0, len(frame_list)):
-            (
-                frame_no,
-                (
-                    pict_type,
-                    pts_time,
-                    duration,
-                    computed_frame,
-                    offset_frame,
-                    coded_picture_number,
-                    frame_offset,
-                    time_offset,
-                ),
-            ) = frame_list[index]
+            try:
+                i_frames = [
+                    frame
+                    for frame in iframe_data["frames"]
+                    if frame["pict_type"] == "I" and frame["key_frame"] == 1
+                ]
 
-            if start_frame == frame_no or frame_no > start_frame:
-                # Initialize frame_dict
-                frame_dict = {}
-                start_index = index
-                if (
-                    index > 0 and pict_type == "I" and frame_no > start_frame
-                ):  # Have to use previous GOP, possible dropped frame issue
-                    start_index = index - 1
+                if not i_frames:
+                    break
 
-                # Iterate backward to find the previous I-frame
-                for backward_index in range(start_index, -1, -1):
-                    (
-                        backward_frame_no,
-                        (
-                            backward_pict_type,
-                            backward_pts_time,
-                            backward_duration,
-                            backward_computed_frame,
-                            backward_offset_frame,
-                            backward_coded_picture_number,
-                            backward_frame_offset,
-                            backward_time_offset,
-                        ),
-                    ) = frame_list[backward_index]
+                i_frame = i_frames[0]
+                I_Pos = float(i_frame["pkt_pos"])
+                I_Pts = float(i_frame["pts"])
 
-                    frame_dict[backward_frame_no] = (
-                        backward_pict_type,
-                        backward_pts_time,
-                        backward_duration,
-                        backward_computed_frame,
-                        backward_offset_frame,
-                        backward_coded_picture_number,
-                        backward_frame_offset,
-                        backward_time_offset,
-                    )
+                for frame in iframe_data["frames"]:  # Search forwards
+                    if (
+                        frame["pict_type"] == "I"
+                        and frame["key_frame"] == 1
+                        and float(frame["pts_time"]) > start_time
+                    ):
+                        end_i_time = float(frame["pts_time"])
+                        found_iframe = True
+                        stream_copy = all(
+                            frame["pict_type"] == "I" and frame["key_frame"] == 1
+                            for frame in iframe_data["frames"]
+                        )
 
-                    # Break if an I-frame is found
-                    if backward_pict_type == "I":
                         break
 
-                # Iterate forward to find frames until the next I-frame
-                for forward_index in range(start_index + 1, len(frame_list)):
-                    (
-                        forward_frame_no,
-                        (
-                            forward_pict_type,
-                            forward_pts_time,
-                            forward_duration,
-                            forward_computed_frame,
-                            forward_offset_frame,
-                            forward_coded_picture_number,
-                            forward_frame_offset,
-                            forward_time_offset,
-                        ),
-                    ) = frame_list[forward_index]
+                    elif frame["pict_type"] == "B":
+                        B_pos = float(frame["pkt_pos"])
+                        B_pts = float(frame["pts"])
 
-                    frame_dict[forward_frame_no] = (
-                        forward_pict_type,
-                        forward_pts_time,
-                        forward_duration,
-                        forward_computed_frame,
-                        forward_offset_frame,
-                        forward_coded_picture_number,
-                        forward_frame_offset,
-                        forward_time_offset,
-                    )
+                        if B_pos > I_Pos and B_pts < I_Pts:
+                            return (
+                                -1,
+                                "Open GOP detected!",
+                                -1.0,
+                                -1.0,
+                            )  # Open GOP detected
 
-                    # Break if an I-frame is found
-                    if forward_pict_type == "I":
-                        break
+                if found_iframe:
+                    break
+            except (KeyError, ValueError):
+                return -1, "Failed to get tail I-frame!", -1.0, -1.0
 
-                return 1, frame_dict
+            current_search_start += search_window
 
-        return -1, {"error ": "GOP Not Found"}
+        if end_i_time > 0 and start_i_time < 0:
+            start_i_time = 0.0
+
+        return (
+            1,
+            "stream" if stream_copy else "",
+            start_i_time,
+            end_i_time,
+        )
 
     def stream_copy_segment(
         input_file: str,
         output_file: str,
-        start_frame: int,
-        duration: float,
-        frame_rate: float,
+        start_time: float,
+        end_time: float,
     ) -> tuple[int, str]:
         """
         Extracts a segment from an input video file using stream copy.
@@ -3220,9 +3948,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         Args:
             input_file (str): The input video file to extract the segment from.
             output_file (str): The output file where the segment will be saved.
-            start_frame (inr): The start frame of the segment.
-            duration (float): The duration of the segment (in seconds).
-            frame_rate (float): The frame rate of the video.
+            start_time (float): The start time of the segment.
 
         Returns:
             tuple[int, Optional[float]]: tuple containing result code and
@@ -3232,36 +3958,27 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
 
         """
 
+        assert isinstance(input_file, str) and input_file.strip() != "", (
+            f"{input_file=}. Must be a non-empty str"
+        )
+        assert isinstance(output_file, str) and output_file.strip() != "", (
+            f"{output_file=}. Must be a non-empty str"
+        )
+        assert isinstance(start_time, float) and start_time >= 0, (
+            f"{start_time=}. Must be float >= 0"
+        )
         assert (
-            isinstance(input_file, str) and input_file.strip() != ""
-        ), f"{input_file=}. Must be a non-empty str"
-        assert (
-            isinstance(output_file, str) and output_file.strip() != ""
-        ), f"{output_file=}. Must be a non-empty str"
-        assert (
-            isinstance(start_frame, int) and start_frame >= 0
-        ), f"{start_frame=}. Must be int >= 0"
-        assert (
-            isinstance(duration, float) and duration > 0
-        ), f"{duration=}. Must be float > 0"
-        assert (
-            isinstance(frame_rate, float) and frame_rate > 0
-        ), f"{frame_rate=}. Must be float > 0"
+            isinstance(end_time, float) and end_time >= 0.0 and end_time > start_time
+        ), f"{end_time=}. Must be float >= 0.0 and > {start_time=}"
 
         command = [
             sys_consts.FFMPG,
-            "-fflags",
-            "+genpts",  # generate presentation timestamps
             "-i",
             input_file,
-            "-max_muxing_queue_size",  # Attempt to stop buffer issues on playback
-            "9999",
             "-ss",
-            Frame_Num_To_FFMPEG_Time(frame_num=start_frame, frame_rate=frame_rate),
+            f"{start_time}",
             "-t",
-            str(duration),
-            "-avoid_negative_ts",
-            "make_zero",
+            f"{end_time - start_time}",
             "-c",
             "copy",
             output_file,
@@ -3271,19 +3988,17 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         result, output = Execute_Check_Output(commands=command, debug=False)
 
         if result == -1:
-            return -1, output  # Output has error message
+            return -1, output  # Output has an error message
 
         return 1, ""
 
     def reencode_segment(
         input_file: str,
         output_file: str,
-        start_frame: int,
-        duration: float,
-        frame_rate: float,
+        encoder_settings: Encoding_Details,
+        start_time: float,
+        end_time: float,
         gop_size: int,
-        codec: str,
-        encoding_details: Encoding_Details,
     ) -> tuple[int, str]:
         """
         Reencodes a segment from an input video file with specific settings.
@@ -3291,12 +4006,10 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         Args:
             input_file (str): The input video file to extract the segment from.
             output_file (str): The output file where the segment will be saved.
-            start_frame (int): The start frame of the segment.
-            duration (float): The duration of the segment (in seconds).
-            frame_rate (float): The frame rate of the video.
+            encoder_settings (Encoding_Details): The encoding settings used in the segment.
+            start_time (float): The start time of the segment.
+            end_time (float): The end time of the segment.
             gop_size (int): The desired GOP (Group of Pictures) size.
-            codec (str): The codec to use for reencoding.
-            encoding_details (Encoding_Details): An instance containing encoding details.
 
         Returns:
             Tuple[int, str]: A tuple containing the status code and a message.
@@ -3305,37 +4018,45 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             - If the status code is -1, an error occurred, and the message provides details.
         """
 
+        assert isinstance(input_file, str) and input_file.strip() != "", (
+            f"{input_file=}. Must be a non-empty  str"
+        )
+        assert isinstance(output_file, str) and output_file.strip() != "", (
+            f"{output_file=}. Must be a non-empty str"
+        )
+        assert isinstance(encoder_settings, Encoding_Details), (
+            f"{encoder_settings=}. Must be Encoding_Details"
+        )
+        assert isinstance(start_time, float) and start_time >= 0.0, (
+            f"{start_time=}. Must be float >= 0.0"
+        )
         assert (
-            isinstance(input_file, str) and input_file.strip() != ""
-        ), f"{input_file=}. Must be a non-empty  str"
-        assert (
-            isinstance(output_file, str) and output_file.strip() != ""
-        ), f"{output_file=}. Must be a non-empty str"
-        assert (
-            isinstance(start_frame, int) and start_frame >= 0
-        ), f"{start_frame=}. Must be int > 0"
-        assert (
-            isinstance(duration, float) and duration > 0
-        ), f"{duration=}. Must be float > 0"
-        assert (
-            isinstance(frame_rate, float) and frame_rate > 0
-        ), f"{frame_rate=}. Must be float > 0"
-        assert (
-            isinstance(gop_size, int) and gop_size > 0
-        ), f"{gop_size=}. Must be int > 0"
-        assert (
-            isinstance(codec, str) and codec.strip() != ""
-        ), f"{codec=}. Must be a non-empty str"
-        assert isinstance(
-            encoding_details, Encoding_Details
-        ), f"{encoding_details=}. Must Encoding_Details instance"
+            isinstance(end_time, float) and end_time > 0.0 and end_time > start_time
+        ), f"{end_time=}. Must be float > 0.0 and > {start_time=}"
+        assert isinstance(gop_size, int) and gop_size > 0, (
+            f"{gop_size=}. Must be int > 0"
+        )
 
-        video_filter = []  # Might be needed later
+        if encoder_settings.video_scan_type == "interlaced":
+            field_order = f"fieldorder={encoder_settings.video_scan_order}"
+
+            video_filter = [
+                "-vf",
+                f"{field_order}",
+                "-flags:v:0",  # video flags for the first video stream
+                "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
+                "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
+                "1",  # alternate scan value is 1,
+            ]
+        else:
+            video_filter = []
+
         command = [
             sys_consts.FFMPG,
+            "-ss",
+            f"{start_time}",
             "-fflags",
-            "+genpts",  # generate presentation timestamps
-            # "+igndts",
+            "+genpts",
             "-threads",
             Get_Thread_Count(),
             "-i",
@@ -3345,30 +4066,28 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             *video_filter,
             "-tune",
             "fastdecode",
-            "-ss",
-            Frame_Num_To_FFMPEG_Time(frame_num=start_frame, frame_rate=frame_rate),
             "-t",
-            str(duration),
-            "-avoid_negative_ts",
-            "make_zero",
+            f"{end_time - start_time}",
             "-r",
-            str(frame_rate),  # Set the output frame rate
+            str(encoder_settings.video_frame_rate),
             "-g",
-            str(gop_size),  # Set the GOP size to match the input file
+            str(gop_size),
             "-keyint_min",
-            str(gop_size),  # Set the minimum key frame interval to match input file
+            str(gop_size),
             "-sc_threshold",
-            "0",  # Set the scene change threshold to 0 for frequent key frames
+            "0",
             "-c:v",
-            codec,
+            encoder_settings.video_codec,
             "-crf",
             "18",
             "-preset",
             "slow",
             "-b:v",
-            str(encoding_details.video_bitrate),
+            str(encoder_settings.video_bitrate),
+            "-pix_fmt",
+            encoder_settings.video_pix_fmt,
             "-s",
-            f"{encoding_details.video_width}x{encoding_details.video_height}",
+            f"{encoder_settings.video_width}x{encoder_settings.video_height}",
             "-c:a",
             "copy",
             "-threads",
@@ -3387,133 +4106,79 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         return 1, ""
 
     ##### Main
-    assert isinstance(
-        cut_video_def, Cut_Video_Def
-    ), f"{cut_video_def=}. Must be an instance of Cut_Video_Def"
+    assert isinstance(cut_video_def, Cut_Video_Def), (
+        f"{cut_video_def=}. Must be an instance of Cut_Video_Def"
+    )
 
     file_handler = file_utils.File()
+    encoder_settings = Get_File_Encoding_Info(cut_video_def.input_file)
+    if encoder_settings.error:
+        return -1, f"Failed to get encoder settings: {encoder_settings.error}"
 
-    encoding_info: Encoding_Details = Get_File_Encoding_Info(cut_video_def.input_file)
+    if encoder_settings.video_frame_rate not in (
+        sys_consts.PAL_SPECS.frame_rate,
+        sys_consts.NTSC_SPECS.frame_rate,
+        sys_consts.PAL_SPECS.field_rate,
+        sys_consts.NTSC_SPECS.field_rate,
+        30,
+    ):
+        return -1, f"Frame Rate Error: {encoder_settings.video_frame_rate}"
 
-    if encoding_info.error:
-        return -1, encoding_info.error
+    start_time = cut_video_def.start_cut / cut_video_def.frame_rate
+    end_time = cut_video_def.end_cut / cut_video_def.frame_rate
+    frame_time = 1 / cut_video_def.frame_rate
+    cut_duration = end_time - start_time
 
-    result, codec = Get_Codec(cut_video_def.input_file)
-
-    if result == -1:  # codec carries error message
-        return -1, codec
-
-    _, _, input_extension = file_handler.split_file_path(cut_video_def.input_file)
-    output_dir, _, _ = file_handler.split_file_path(cut_video_def.output_file)
-
-    for time_window in range(
-        10, 91, 10
-    ):  # Iterate with time_window values from 10 to 90 in steps of 10 to try and get a gop dict - long gops might
-        # need this
-        result, start_frame_dict = get_frame_dict(
-            input_file=cut_video_def.input_file,
-            start_frame=cut_video_def.start_cut,
-            frame_rate=cut_video_def.frame_rate,
-            time_window=time_window,
-        )
-
-        if result == 1:
-            break
-    else:
-        start_frame_dict = {}
-
-    if result == -1:  # Going to Force a stream copy
-        pass
-        # return -1, "Failed To Get Start GOP"
-
-    for time_window in range(
-        10, 91, 10
-    ):  # Iterate with time_window values from 10 to 90 in steps of 10 to try and get a gop dict - long gops might
-        # need this
-        result, end_frame_dict = get_frame_dict(
-            input_file=cut_video_def.input_file,
-            start_frame=cut_video_def.end_cut,
-            frame_rate=cut_video_def.frame_rate,
-            time_window=time_window,
-        )
-
-        if result == 1:
-            break
-    else:
-        end_frame_dict = {}
-
-    if result == -1:  # Going to Force a stream copy
-        pass
-        # return -1, "Failed To Get End GOP"
-
-    # All iframes (e.g.: DV) means we can stream copy the video which is far more likely to process without issues
-    # and has no reencoded start/end GOP so no quality hit (mind you who is going to notice a gop size encode!)
-    stream_copy = False
-    i_frame_count = sum(
-        1
-        for value in {**start_frame_dict, **end_frame_dict}.values()
-        if value[0] == "I"
+    result, message, start_start_rencode_time, start_end_rencode_time = _get_GOP_info(
+        input_file=cut_video_def.input_file,
+        start_time=start_time,
     )
-    if i_frame_count == len({**start_frame_dict, **end_frame_dict}):
-        stream_copy = True
 
-    if (
-        not stream_copy and start_frame_dict and end_frame_dict
-    ):  # Got to have GOP blocks for frame accurate video cuts of compressed video
-        # Note: sorting is required because sometimes the dicts unpacked unsorted!
-        start_gop_block = []
-        for key, item in start_frame_dict.items():
-            if key >= cut_video_def.start_cut:
-                # break
-                start_gop_block.append((key, item))
+    if result == -1:
+        return result, message
 
-        start_gop_block = sorted(start_gop_block, key=lambda x: x[0])
+    result, message, end_start_rencode_time, end_end_rencode_time = _get_GOP_info(
+        input_file=cut_video_def.input_file,
+        start_time=end_time,
+    )
 
-        end_gop_block = []
+    # Need to snap to the nearest I frames around the rencode start and end times - hence 2 frame offset
+    # Note: 2 frames may not always be enough, and this may need revisiting.
+    stream_start = (
+        0.0
+        if start_end_rencode_time - (2 * frame_time) < 0
+        else start_end_rencode_time - (2 * frame_time)
+    )
 
-        for key, item in end_frame_dict.items():
-            if key > cut_video_def.end_cut:
-                break
+    stream_end = end_start_rencode_time - (2 * frame_time)
 
-            end_gop_block.append((key, item))
+    if result == -1:
+        return result, message
 
-        end_gop_block = sorted(end_gop_block, key=lambda x: x[0])
+    if message == "stream":  # All i frames like DV video make for a stream copy cut
+        result, message = stream_copy_segment(
+            input_file=cut_video_def.input_file,
+            output_file=cut_video_def.output_file,
+            start_time=start_time,
+            end_time=end_time,
+        )
 
-        start_gop_block_start_frame = 0
-        # start_gop_block_end_frame = 0
-        start_gop_block_duration = 0.0
-
-        stream_start_frame = 0
-        stream_end_frame = 0
-
-        end_gop_block_start_frame = 0
-        # end_gop_block_end_frame = 0
-        end_gop_block_duration = 0.0
-
-        if start_gop_block:
-            start_gop_block_start_frame = start_gop_block[0][0] + 1
-            start_gop_block_end_frame = start_gop_block[-1][0]
-            start_gop_block_duration = (
-                start_gop_block_end_frame / cut_video_def.frame_rate
-            ) - (start_gop_block_start_frame / cut_video_def.frame_rate)
-
-            stream_start_frame = start_gop_block_end_frame - 3
-
-        if end_gop_block:
-            end_gop_block_start_frame = end_gop_block[0][0]
-            end_gop_block_end_frame = end_gop_block[-1][0]
-            end_gop_block_duration = (
-                end_gop_block_end_frame / cut_video_def.frame_rate
-            ) - (end_gop_block_start_frame / cut_video_def.frame_rate)
-            stream_end_frame = end_gop_block_start_frame - 3
-
-        stream_duration = (
-            stream_end_frame - stream_start_frame
-        ) / cut_video_def.frame_rate
-
+        if result == -1:
+            return -1, message
+    else:  # We have GOPS with I,P,B frames and need to reencode start and end GOP blocks to cut accurately
         concat_files = []
+        _, _, input_extension = file_handler.split_file_path(cut_video_def.input_file)
+        output_dir, output_file_name, _ = file_handler.split_file_path(
+            cut_video_def.output_file
+        )
 
-        if start_gop_block_duration > 0:
+        start_offset = (start_time - start_start_rencode_time) + frame_time
+
+        if start_offset < 0:
+            return -1, f"Did not find start I frame  {start_offset} "
+
+        ##### Reencode Start GOP Block
+        if start_end_rencode_time - start_start_rencode_time > 0:
             reencode_start_seg_file = file_handler.file_join(
                 dir_path=output_dir,
                 file_name=f"reencode_start_segment_{cut_video_def.tag}",
@@ -3523,20 +4188,21 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             result, message = reencode_segment(
                 input_file=cut_video_def.input_file,
                 output_file=reencode_start_seg_file,
-                start_frame=start_gop_block_start_frame,
-                duration=start_gop_block_duration,
-                frame_rate=cut_video_def.frame_rate,
+                encoder_settings=encoder_settings,
+                start_time=start_start_rencode_time,
+                end_time=start_end_rencode_time,
                 gop_size=1,  # Force all frames to I frame in the GOP block, so we can cut in and out where we want,
-                codec=codec,
-                encoding_details=encoding_info,
             )
 
             if result == -1:
                 return -1, message
 
             concat_files.append(reencode_start_seg_file)
+        else:
+            print("Warning: Skipping zero-duration re-encode start segment.")
 
-        if stream_duration > 0:
+        ##### Make a stream copy of the untouched oart of the file
+        if end_start_rencode_time - start_end_rencode_time > 0:
             streamcopy_seg_file = file_handler.file_join(
                 dir_path=output_dir,
                 file_name=f"stream_copy_segment_{cut_video_def.tag}",
@@ -3546,17 +4212,19 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             result, message = stream_copy_segment(
                 input_file=cut_video_def.input_file,
                 output_file=streamcopy_seg_file,
-                start_frame=stream_start_frame,
-                duration=stream_duration,
-                frame_rate=cut_video_def.frame_rate,
+                start_time=stream_start,
+                end_time=stream_end,
             )
 
             if result == -1:
                 return -1, message
 
             concat_files.append(streamcopy_seg_file)
+        else:
+            print("Warning: Skipping zero-duration stream copy segment.")
 
-        if end_gop_block_duration > 0:
+        ##### Reencode End GOP Block
+        if end_end_rencode_time - end_start_rencode_time > 0:
             reencode_end_seg_file = file_handler.file_join(
                 dir_path=output_dir,
                 file_name=f"reencode_end_segment_{cut_video_def.tag}",
@@ -3566,51 +4234,50 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             result, message = reencode_segment(
                 input_file=cut_video_def.input_file,
                 output_file=reencode_end_seg_file,
-                start_frame=end_gop_block_start_frame,
-                duration=end_gop_block_duration,
-                frame_rate=cut_video_def.frame_rate,
+                encoder_settings=encoder_settings,
+                start_time=end_start_rencode_time,
+                end_time=end_end_rencode_time,
                 gop_size=1,  # Force all frames to I frame in the GOP block, so we can cut in and out where we want,
-                codec=codec,
-                encoding_details=encoding_info,
             )
 
             if result == -1:
                 return -1, message
+
             concat_files.append(reencode_end_seg_file)
+        else:
+            print("Warning: Skipping zero-duration re-encode end segment.")
 
         if concat_files:
+            temp_output_file = file_handler.file_join(
+                dir_path=output_dir,
+                file_name=f"{output_file_name}_temp",
+                ext=input_extension,
+            )
+
             # Join re-encoded_start segment, stream_copy segment and re-encoded end segment to make the final frame
             # accurate cut file with nearly no loss
-            result, message = Concatenate_Videos(
+            result, message, _ = Concatenate_Videos(
                 temp_files=concat_files,
-                output_file=cut_video_def.output_file,
-                delete_temp_files=False,
+                output_file=temp_output_file,
+                delete_temp_files=True,
                 debug=False,
             )
 
             if result == -1:
                 return -1, message
 
-    else:
-        # If video comprised of all I frames it will cut accurately, but compressed video with no key frames is not
-        # going to cut accurately
-        stream_duration = (
-            cut_video_def.end_cut - cut_video_def.start_cut  # -1
-        ) / cut_video_def.frame_rate
-
-        try:
             result, message = stream_copy_segment(
-                input_file=cut_video_def.input_file,
+                input_file=temp_output_file,
                 output_file=cut_video_def.output_file,
-                start_frame=cut_video_def.start_cut + 1,
-                duration=stream_duration,
-                frame_rate=cut_video_def.frame_rate,
+                start_time=start_offset,
+                end_time=start_offset + cut_duration + frame_time,
             )
 
             if result == -1:
                 return -1, message
-        except Exception as e:
-            return -1, f"Cut Video Failed - {sys_consts.SDELIM}{e}{sys_consts.SDELIM}"
+
+            if file_handler.remove_file(temp_output_file) == -1:
+                return -1, f"Failed to remove {temp_output_file}"
 
     return 1, ""
 
@@ -3621,24 +4288,52 @@ def Frame_Num_To_FFMPEG_Time(frame_num: int, frame_rate: float) -> str:
 
     Args:
         frame_num: An integer representing the frame number to convert.
-        frame_rate: The video frame rate t
+        frame_rate: The video frame rate.
+
+    Returns:
+        A string representing the FFmpeg offset time in the format "hh:mm:ss.mmm".
+    """
+
+    assert isinstance(frame_num, int) and frame_num >= 0, (
+        f"{frame_num=}. Must be int >= 0"
+    )
+    assert isinstance(frame_rate, float) and frame_rate > 0, (
+        f"{frame_rate=}. Must be float > 0"
+    )
+
+    seconds = frame_num / frame_rate
+    milliseconds = int(seconds * 1000)
+
+    hours = milliseconds // 3600000
+    milliseconds %= 3600000
+    minutes = milliseconds // 60000
+    milliseconds %= 60000
+    seconds = milliseconds // 1000
+    milliseconds %= 1000
+
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
+
+def Seconds_To_FFMPEG_Time(seconds: float) -> str:
+    """Converts seconds to the FFMPEG offset format HH:MM:SS.mmm
+
+    Args:
+        seconds (float): The number of seconds to convert
 
     Returns:
         A string representing the FFmpeg offset time in the format "hh:mm:ss.mmm".
 
     """
-    assert (
-        isinstance(frame_num, int) and frame_num >= 0
-    ), f"{frame_num=}. Must be int > 0"
-    assert (
-        isinstance(frame_rate, float) and frame_rate > 0
-    ), f"{frame_rate=}. Must be float > 0"
+    assert isinstance(seconds, float) and seconds >= 0.0, (
+        f"{seconds=}. Must be float >= 0.0"
+    )
 
-    offset_time = frame_num / frame_rate
-    hours = int(offset_time / 3600)
-    minutes = int((offset_time % 3600) / 60)
-    seconds = int(offset_time % 60)
-    milliseconds = int((offset_time % 1) * 1000)
+    milliseconds = int(seconds * 1000)
+    seconds = milliseconds // 1000
+    minutes = seconds // 60
+    seconds %= 60
+    hours = minutes // 60
+    minutes %= 60
 
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
@@ -3659,15 +4354,15 @@ def Split_Large_Video(
             - arg1: 1 for success, -1 for failure.
             - arg2: An error message, or a list of chunk files delimitered by | if arg 1 is 1.
     """
-    assert (
-        isinstance(source, str) and source.strip()
-    ), f"Invalid source video path: {source}"
-    assert (
-        isinstance(output_folder, str) and output_folder.strip()
-    ), f"Invalid output folder: {output_folder}"
-    assert (
-        isinstance(desired_chunk_size_gb, int) and desired_chunk_size_gb > 0
-    ), "Invalid max_size_gb"
+    assert isinstance(source, str) and source.strip(), (
+        f"Invalid source video path: {source}"
+    )
+    assert isinstance(output_folder, str) and output_folder.strip(), (
+        f"Invalid output folder: {output_folder}"
+    )
+    assert isinstance(desired_chunk_size_gb, int) and desired_chunk_size_gb > 0, (
+        "Invalid max_size_gb"
+    )
 
     if not os.path.exists(source):
         return -1, f"Video file not found: {source}"
@@ -3763,9 +4458,9 @@ def Stream_Optimise(output_file: str) -> tuple[int, str]:
         - arg 1:  1 if the optimization was successful, and -1 otherwise
         - arg 2: If the optimization fails, the message will contain an error otherwise "".
     """
-    assert (
-        isinstance(output_file, str) and output_file.strip() != ""
-    ), f"{output_file=}. Must be a non-empty string."
+    assert isinstance(output_file, str) and output_file.strip() != "", (
+        f"{output_file=}. Must be a non-empty string."
+    )
 
     command = [
         sys_consts.FFMPG,
@@ -3818,20 +4513,20 @@ def Execute_Check_Output(
     if env is None:
         env = dict()
 
-    assert (
-        isinstance(commands, list) and len(commands) > 0
-    ), f"{commands=} must be a non-empty list of commands and options"
+    assert isinstance(commands, list) and len(commands) > 0, (
+        f"{commands=} must be a non-empty list of commands and options"
+    )
     assert isinstance(execute_as_string, bool), f"{execute_as_string=} must be bool"
     assert isinstance(debug, bool), f"{debug=} must be bool"
     assert isinstance(env, dict), f"{env=} must be dict"
     assert isinstance(shell, bool), f"{shell=} must be bool"
     assert isinstance(stderr_to_stdout, bool), f"{stderr_to_stdout=}. Must be bool"
-    assert (
-        isinstance(buffer_size, int) and buffer_size > 0
-    ), f"{buffer_size=}. Must be int > 0"
+    assert isinstance(buffer_size, int) and buffer_size > 0, (
+        f"{buffer_size=}. Must be int > 0"
+    )
 
     if debug and not utils.Is_Complied():
-        print(f'DBG Call command ***   {" ".join(commands)}')
+        print(f"DBG Call command ***   {' '.join(commands)}")
         print(f"DBG Call commands command list ***   {commands}")
         print(f"DBG Call commands shlex split  ***   {shlex.split(' '.join(commands))}")
         print("DBG Lets Do It!")
@@ -3845,13 +4540,12 @@ def Execute_Check_Output(
         "bufsize": buffer_size,
     }
 
-    if stderr_to_stdout:  # A ffmpeg special - stderr output is sometimes good stuff
-        subprocess_args["stderr"] = subprocess.STDOUT
-    else:
-        # Redirect stderr to /dev/null (Unix-like) or nul (Windows)
-        subprocess_args["stderr"] = (
-            open("/dev/null", "w") if "posix" in os.name else open("nul", "w")
-        )
+    # A ffmpeg special - stderr output is sometimes good stuff
+    subprocess_args["stderr"] = (
+        subprocess.STDOUT
+        if stderr_to_stdout
+        else (open(os.devnull, "w") if "posix" in os.name else open("nul", "w"))
+    )
 
     try:
         output = subprocess.check_output(**subprocess_args)
@@ -3955,9 +4649,9 @@ def Get_Image_Width(image_file: str) -> tuple[int, str]:
         - arg2: Error message ot "" if ok
 
     """
-    assert (
-        isinstance(image_file, str) and image_file.strip() != ""
-    ), f"{image_file=}. Must be a path to a file"
+    assert isinstance(image_file, str) and image_file.strip() != "", (
+        f"{image_file=}. Must be a path to a file"
+    )
     assert os.path.exists(image_file), f"{image_file=}. Does not exist"
 
     commands = [sys_consts.IDENTIFY, "-format", "%w", image_file]
@@ -3982,9 +4676,9 @@ def Get_Image_Height(image_file: str) -> tuple[int, str]:
         - arg2: Error message ot "" if ok
 
     """
-    assert (
-        isinstance(image_file, str) and image_file.strip() != ""
-    ), f"{image_file=}. Must be a path to a file"
+    assert isinstance(image_file, str) and image_file.strip() != "", (
+        f"{image_file=}. Must be a path to a file"
+    )
     assert os.path.exists(image_file), f"{image_file=}. Does not exits"
 
     commands = [sys_consts.IDENTIFY, "-format", "%h", image_file]
@@ -4010,9 +4704,9 @@ def Get_Image_Size(image_file: str) -> tuple[int, int, str]:
         - arg3: Error message ot "" if ok
 
     """
-    assert (
-        isinstance(image_file, str) and image_file.strip() != ""
-    ), f"{image_file=}. Must be a path to a file"
+    assert isinstance(image_file, str) and image_file.strip() != "", (
+        f"{image_file=}. Must be a path to a file"
+    )
     assert os.path.exists(image_file), f"{image_file=}. Does not exits"
 
     commands = [sys_consts.IDENTIFY, "-format", "%w %h", image_file]
@@ -4043,15 +4737,15 @@ def Generate_Menu_Image_From_File(
             - arg1: > 0 OK, -1 Error,
             - arg2: Error message ot "" if ok
     """
-    assert (
-        isinstance(video_file, str) and video_file.strip() != ""
-    ), f"{video_file=}. Must be non-empty str"
-    assert (
-        isinstance(frame_number, int) and frame_number >= 0
-    ), f"{frame_number=}. Must be int >= 0"
-    assert (
-        isinstance(out_folder, str) and out_folder.strip() != ""
-    ), f"{out_folder=}. Must be non-empty str"
+    assert isinstance(video_file, str) and video_file.strip() != "", (
+        f"{video_file=}. Must be non-empty str"
+    )
+    assert isinstance(frame_number, int) and frame_number >= 0, (
+        f"{frame_number=}. Must be int >= 0"
+    )
+    assert isinstance(out_folder, str) and out_folder.strip() != "", (
+        f"{out_folder=}. Must be non-empty str"
+    )
     assert isinstance(button_height, int), f"{button_height=}. Must be int > 0"
 
     file_handler = file_utils.File()
@@ -4102,11 +4796,93 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         Video_Details: Check video_details.error if it is not an empty string an error occurred
 
     """
-    debug = False
+
+    # Helper function
+    def _calculate_frame_rate(stream: dict) -> float:
+        """Calculates frame rate, prioritizing avg_frame_rate.
+
+        Args:
+            stream (dict): The video stream dictionary
+
+        Returns:
+            float: The calculated frame rate
+        """
+
+        #### Helper functions
+        def _extract_frame_rate(key: str) -> float:
+            """Extracts and rounds frame rate from a stream key."""
+            if isinstance(stream.get(key), str) and "/" in stream[key]:
+                try:
+                    num, den = map(int, stream[key].split("/"))
+                    return round(num / den, 3)
+                except (ValueError, ZeroDivisionError):
+                    return 0.0
+            return 0.0
+
+        def _get_frame_rate(frame_rate: float) -> float:
+            """Returns standard or adjusted near-standard frame rate.
+            Args:
+                frame_rate (float): The frame rate to check
+
+            Returns:
+                float: The adjusted frame rate
+            """
+            if frame_rate > 0.0:
+                if 24 < frame_rate < 25:
+                    return float(sys_consts.PAL_FRAME_RATE)
+                elif 49 < frame_rate < 50:
+                    return float(sys_consts.PAL_FIELD_RATE)
+                elif 29 < frame_rate < 30:
+                    return float(sys_consts.NTSC_FRAME_RATE)
+                elif 59 < frame_rate < 60:
+                    return float(sys_consts.NTSC_FIELD_RATE)
+                elif frame_rate in (
+                    sys_consts.NTSC_FRAME_RATE,
+                    sys_consts.NTSC_FIELD_RATE,
+                    sys_consts.PAL_FRAME_RATE,
+                    sys_consts.PAL_FIELD_RATE,
+                    30,
+                ):
+                    return float(frame_rate)
+            return 0.0
+
+        #### Main
+        average_frame_rate = _get_frame_rate(_extract_frame_rate("avg_frame_rate"))
+        frame_rate = _get_frame_rate(_extract_frame_rate("r_frame_rate"))
+
+        return average_frame_rate if average_frame_rate > 0.0 else frame_rate
+
+    def _calculate_aspect_ratio(aspect_ratio_str: str) -> float:
+        """Calculates aspect ratio from string.
+
+        Args:
+            aspect_ratio_str (str): The aspect ratio string
+
+        Returns:
+            float: The calculated aspect ratio
+        """
+        if aspect_ratio_str and ":" in aspect_ratio_str:
+            try:
+                num, den = map(int, aspect_ratio_str.split(":"))
+                float_ar = num / den
+                return round(float_ar, 3)
+            except (ValueError, ZeroDivisionError):
+                return 0.0
+        return 0.0
+
+    # Main
+    debug = True
     video_file_details = Encoding_Details()
 
-    if utils.Is_Complied():
+    if debug and utils.Is_Complied():
         debug = False
+
+    assert isinstance(video_file, str) and video_file.strip() != "", (
+        f"{video_file=}. Must be a path to a file"
+    )
+    if not os.path.exists(video_file):
+        video_file_details.error = f"{video_file=}. Does not exist"
+        return video_file_details
 
     commands = [
         sys_consts.FFPROBE,
@@ -4132,114 +4908,129 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
 
     json_string = message
     json_data = {}
+    video_frames = []
 
     try:
         json_data = json.loads(json_string)
 
         audio_track_count = 0
         video_track_count = 0
-        video_scan_type = ""
 
         video_file_details.video_duration = float(json_data["format"]["duration"])
+        video_frames = [
+            frame
+            for frame in json_data.get("frames")
+            if frame.get("media_type") == "video"
+            and frame.get("pict_type") == "I"
+            and frame.get("key_frame") == 1
+        ]
 
-        for frame in json_data["frames"]:
-            if (
-                "media_type" in frame
-                and frame["media_type"] == "video"
-                and video_scan_type == ""
-            ):
-                if video_scan_type == "" and "interlaced_frame" in frame:
-                    video_scan_type = (
-                        "interlaced"
-                        if frame["interlaced_frame"] == 1
-                        else "progressive"
-                    )
+        video_file_details.video_scan_type = (
+            "progressive"
+            if any(frame.get("interlaced_frame") == 0 for frame in video_frames)
+            else "interlaced"
+        )
 
-                if video_scan_type == "interlaced" and "top_field_first" in frame:
-                    if (
-                        frame["top_field_first"] == "1"
-                        and video_file_details.video_scan_order == ""
-                    ):
-                        video_file_details.video_scan_order = "tff"
-                    else:
-                        video_file_details.video_scan_order = "bff"
-                break
+        if video_file_details.video_scan_type == "interlaced":
+            video_file_details.video_scan_order = (
+                "tff"
+                if any(
+                    frame.get("top_field_first") == "1"
+                    for frame in video_frames
+                    if frame.get("interlaced_frame") == 1
+                )
+                else "bff"
+            )
 
-        for stream in json_data["streams"]:
-            if "codec_type" in stream and stream["codec_type"] == "video":
-                video_track_count += 1
+        video_streams = [
+            stream
+            for stream in json_data.get("streams")
+            if stream.get("codec_type") == "video"
+        ]
 
-                if "codec_name" in stream:
-                    video_file_details.video_format = stream["codec_name"]
+        audio_streams = [
+            stream
+            for stream in json_data.get("streams")
+            if stream.get("codec_type") == "audio"
+        ]
 
-                if "width" in stream:
-                    video_file_details.video_width = int(stream["width"])
+        if not video_frames:
+            video_file_details.error = "No Video Frames found"
 
-                if "height" in stream:
-                    video_file_details.video_height = int(stream["height"])
+            if debug:
+                print(f"==== File Encoding Details {video_file=} ")
+                print("==== JSON DATA")
+                pprint.pprint(json_data)
 
-                if "r_frame_rate" in stream and "/" in stream["r_frame_rate"]:
-                    float_fr = int(stream["r_frame_rate"].split("/")[0]) / int(
-                        stream["r_frame_rate"].split("/")[1]
-                    )
-                    video_file_details.video_frame_rate = [
-                        math.floor(float_fr * 10**i) / 10**i for i in range(3)
-                    ][-1]
+            return video_file_details
 
-                if (
-                    "display_aspect_ratio" in stream
-                    and ":" in stream["display_aspect_ratio"]
-                ):
-                    float_dar = int(stream["display_aspect_ratio"].split(":")[0]) / int(
-                        stream["display_aspect_ratio"].split(":")[1]
-                    )
-                    video_file_details.video_dar = [
-                        math.floor(float_dar * 10**i) / 10**i for i in range(3)
-                    ][-1]
+        for stream in video_streams:
+            video_track_count += 1
+            video_file_details.video_codec = stream.get("codec_name", "")
+            video_file_details.video_format = stream.get("codec_name", "")
+            video_file_details.video_width = int(stream.get("width", 0))
+            video_file_details.video_height = int(stream.get("height", 0))
+            video_file_details.video_frame_rate = _calculate_frame_rate(stream)
+            video_file_details.video_dar = _calculate_aspect_ratio(
+                stream.get("display_aspect_ratio", "")
+            )
+            video_file_details.video_par = _calculate_aspect_ratio(
+                stream.get("sample_aspect_ratio", "")
+            )
+            video_file_details.video_ar = stream.get("display_aspect_ratio", "")
 
-                if (
-                    "sample_aspect_ratio" in stream
-                    and ":" in stream["sample_aspect_ratio"]
-                ):
-                    float_par = int(stream["sample_aspect_ratio"].split(":")[0]) / int(
-                        stream["sample_aspect_ratio"].split(":")[1]
-                    )
-                    video_file_details.video_par = [
-                        math.floor(float_par * 10**i) / 10**i for i in range(3)
-                    ][-1]
+            video_file_details.video_frame_count = int(stream.get("nb_frames", 0))
+            video_file_details.video_bitrate = int(stream.get("bit_rate", 0))
+            video_file_details.video_profile = stream.get("profile", "")
+            video_file_details.video_pix_fmt = stream.get("pix_fmt", "yuv420p")
+            video_file_details.video_level = str(stream.get("level", ""))
 
-                if "display_aspect_ratio" in stream:
-                    video_file_details.video_ar = stream["display_aspect_ratio"]
-
-                if "field_order" in stream:
-                    if stream["field_order"] in ("interlaced", "progressive"):
-                        video_file_details.video_scan_type = stream["field_order"]
-
-                if "nb_frames" in stream:
-                    video_file_details.video_frame_count = int(stream["nb_frames"])
-
-                if "bit_rate" in stream:
-                    video_file_details.video_bitrate = int(stream["bit_rate"])
-
-            elif "codec_type" in stream and stream["codec_type"] == "audio":
-                audio_track_count += 1
-                if "codec_name" in stream:
-                    video_file_details.audio_format = stream["codec_name"]
-
-                if "channels" in stream:
-                    video_file_details.audio_channels = int(stream["channels"])
+        for stream in audio_streams:
+            audio_track_count += 1
+            video_file_details.audio_codec = stream.get("codec_name", "")
+            video_file_details.audio_format = stream.get(
+                "codec_name", ""
+            )  # Sunset this and use audio_codec
+            video_file_details.audio_sample_rate = int(stream.get("sample_rate", 0))
+            video_file_details.audio_channels = int(stream.get("channels", 0))
+            video_file_details.audio_bitrate = int(stream.get("bit_rate", 0))
 
         video_file_details.audio_tracks = audio_track_count
         video_file_details.video_tracks = video_track_count
 
         # Attempted fix-ups
-        if video_file_details.video_frame_count == 0:
+        if (
+            video_file_details.video_frame_count == 0
+            and video_file_details.video_frame_rate > 0
+        ):
             video_file_details.video_frame_count = math.floor(
                 video_file_details.video_duration * video_file_details.video_frame_rate
             )
 
-        if video_file_details.video_scan_type == "" and video_scan_type != "":
-            video_file_details.video_scan_type = video_scan_type
+        if (
+            video_file_details.video_frame_rate == 0
+            and video_file_details.video_frame_count > 0
+            and video_file_details.video_duration > 0
+        ):
+            video_file_details.video_frame_rate = math.floor(
+                video_file_details.video_duration / video_file_details.video_frame_count
+            )
+
+        if (
+            video_file_details.video_frame_count == 0
+            and video_file_details.video_frame_rate > 0
+        ):
+            video_file_details.video_frame_count = math.floor(
+                video_file_details.video_duration * video_file_details.video_frame_rate
+            )
+
+        if (
+            video_file_details.video_frame_rate == 0
+            and video_file_details.video_frame_count > 0
+        ):
+            video_file_details.video_frame_rate = math.floor(
+                video_file_details.video_duration / video_file_details.video_frame_count
+            )
 
         if video_file_details.video_scan_type == "" and (
             video_file_details.video_scan_order == "tff"
@@ -4271,7 +5062,13 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
             video_file_details.error = "Failed To Determine Pixel Aspect Ratio"
         elif video_file_details.video_ar == "":
             video_file_details.error = "Failed To Determine Aspect Ratio"
-        elif video_file_details.video_frame_rate == 0:
+        elif video_file_details.video_frame_rate not in (
+            sys_consts.PAL_FRAME_RATE,
+            sys_consts.NTSC_FRAME_RATE,
+            sys_consts.PAL_FIELD_RATE,
+            sys_consts.NTSC_FIELD_RATE,
+            30,
+        ):
             video_file_details.error = "Failed To Determine Frame Rate"
         elif video_file_details.video_bitrate == 0:
             video_file_details.error = "Failed To Determine Video Bit Rate"
@@ -4285,11 +5082,17 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
             video_file_details.error = "Failed To Determine The Video Width"
         elif video_file_details.video_standard == 0:
             video_file_details.error = "Failed To Determine The Video Standard"
-        elif video_file_details.audio_tracks == 0:
-            video_file_details.error = "Failed To Determine The Number Of Audio Tracks"
-        elif video_file_details.audio_format == "":
+        # elif video_file_details.audio_tracks == 0:
+        #    video_file_details.error = "Failed To Determine The Number Of Audio Tracks"
+        elif (
+            video_file_details.audio_tracks > 0
+            and video_file_details.audio_format == ""
+        ):
             video_file_details.error = "Failed To Determine The Audio Format"
-        elif video_file_details.audio_channels == 0:
+        elif (
+            video_file_details.audio_tracks > 0
+            and video_file_details.audio_channels == 0
+        ):
             video_file_details.error = (
                 "Failed To Determine The Number Of Audio Channels"
             )
@@ -4304,6 +5107,8 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         pprint.pprint(json_data)
         print("==== Vide File details ")
         pprint.pprint(video_file_details)
+        print("==== Vide File Frames ")
+        pprint.pprint(video_frames)
         print("==== File Encoding Details End ")
 
     return video_file_details
@@ -4341,12 +5146,12 @@ def Resize_Image(
     """
     assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
     assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
-    assert (
-        isinstance(input_file, str) and input_file.strip() != ""
-    ), f"{input_file=}. Must be a path to a file"
-    assert (
-        isinstance(out_file, str) and out_file.strip() != ""
-    ), f"{out_file=}. Must be a path to a file"
+    assert isinstance(input_file, str) and input_file.strip() != "", (
+        f"{input_file=}. Must be a path to a file"
+    )
+    assert isinstance(out_file, str) and out_file.strip() != "", (
+        f"{out_file=}. Must be a path to a file"
+    )
     assert isinstance(ignore_aspect, bool), f"{ignore_aspect=}. Must be bool"
     assert isinstance(no_antialias, bool), f"{no_antialias=}. Must be bool"
     assert isinstance(no_dither, bool), f"{no_dither=}. Must be bool"
@@ -4417,6 +5222,15 @@ class Video_File_Copier:
         Returns:
             bool: True if all files' checksums match the stored checksums, False otherwise.
         """
+        assert isinstance(folder_path, str) and folder_path.strip() != "", (
+            f"{folder_path=}. Must be a non-empty str"
+        )
+
+        assert isinstance(hash_algorithm, str) and hash_algorithm.strip().lower() in (
+            "md5",
+            "sha256",
+        ), f"{hash_algorithm=}. Must be a non-empty str md5 or sha256"
+
         if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
             return False
 
@@ -4454,6 +5268,15 @@ class Video_File_Copier:
         Returns:
             str: The checksum value.
         """
+        assert isinstance(file_path, str) and file_path.strip() != "", (
+            f"{file_path=}. Must be a non-empty str"
+        )
+
+        assert isinstance(hash_algorithm, str) and hash_algorithm.strip().lower() in (
+            "md5",
+            "sha256",
+        ), f"{hash_algorithm=}. Must be a non-empty str md5 or sha256"
+
         if not os.path.exists(file_path):
             return ""
 
@@ -4481,6 +5304,13 @@ class Video_File_Copier:
                 - arg1: 1 for success, -1 for failure.
                 - arg2: An error message, or an empty string if successful.
         """
+        assert isinstance(file_path, str) and file_path.strip() != "", (
+            f"{file_path=}. Must be a non-empty str"
+        )
+        assert isinstance(checksum, str) and checksum.strip() != "", (
+            f"{checksum=}. Must be a non-empty str"
+        )
+
         try:
             with open(file_path, "w") as f:
                 f.write(checksum)
@@ -4493,7 +5323,7 @@ class Video_File_Copier:
         source_folder: str,
         destination_root_folder: str,
         menu_title: str,
-        folder_size_gb: int,
+        folder_size_gb: Union[int, float],
         hash_algorithm="sha256",
     ) -> tuple[int, str]:
         """
@@ -4504,7 +5334,7 @@ class Video_File_Copier:
             source_folder (str): The source folder whose contents will be copied.
             destination_root_folder (str): The root folder where subfolders will be created to store the copied contents.
             menu_title (str): The menu title is used in archive folder naming
-            folder_size_gb (int): The maximum size (in GB) of each subfolder.
+            folder_size_gb (Union[int, float]): The maximum size (in GB) of each subfolder.
             hash_algorithm (str): The hash algorithm to use for checksum calculation (e.g., "md5", "sha256").
 
         Returns:
@@ -4512,18 +5342,18 @@ class Video_File_Copier:
                 - arg1: 1 for success, -1 for failure.
                 - arg2: An error message, or an empty string if successful.
         """
-        assert (
-            isinstance(source_folder, str) and source_folder.strip()
-        ), f"Invalid source folder path: {source_folder}"
+        assert isinstance(source_folder, str) and source_folder.strip(), (
+            f"Invalid source folder path: {source_folder}"
+        )
         assert (
             isinstance(destination_root_folder, str) and destination_root_folder.strip()
         ), f"Invalid destination root folder: {destination_root_folder}"
-        assert (
-            isinstance(menu_title, str) and menu_title.strip() != ""
-        ), f"{menu_title=}. Must be non-empty str"
-        assert (
-            isinstance(folder_size_gb, int) and folder_size_gb > 0.5
-        ), f"{folder_size_gb=}. Must be > 0.5"
+        assert isinstance(menu_title, str) and menu_title.strip() != "", (
+            f"{menu_title=}. Must be non-empty str"
+        )
+        assert isinstance(folder_size_gb, (int, float)) and folder_size_gb > 0.5, (
+            f"{folder_size_gb=}. Must be > 0.5"
+        )
 
         file_handler = file_utils.File()
 
@@ -4647,9 +5477,3 @@ class Video_File_Copier:
 
         except Exception as e:
             return -1, f"Error copying folder into sub-folders: {e}"
-
-    def write_checksum_file(self, checksum_file_path, checksum):
-        checksum_file = open(checksum_file_path, "w")
-        checksum_file.write(checksum)
-        checksum_file.close()
-        return 1, ""
