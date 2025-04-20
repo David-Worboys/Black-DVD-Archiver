@@ -48,7 +48,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
     video_data_list: list[Video_Data] = dataclasses.field(
         default_factory=list
     )  # Pass by reference
-    menu_layout: list[tuple[str, list[Video_Data]], dict[str:str]] = dataclasses.field(
+    menu_layout: list[tuple[str, list[Video_Data], any]] = dataclasses.field(
         default_factory=list
     )  # Pass by reference
     project_name: str = ""
@@ -606,6 +606,8 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 source_grid.checkitemrow_set(True, checked_item.row_index, 0)
                 source_grid.select_col(checked_item.row_index, 0)
 
+        return None
+
     def _process_cancel(self, event: qtg.Action) -> int:
         """
         Handles processing the cancel button.
@@ -876,6 +878,8 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             menu_list: list[
                 tuple[str, tuple[tuple[str, Video_Data], ...], dict[str, str]]
             ] = []
+            menu_title = ""
+            menu_title_user_data = {}
 
             for col in range(menu_title_grid.col_count):
                 # grid_user_data = menu_title_grid.userdata_get(row=row, col=col)

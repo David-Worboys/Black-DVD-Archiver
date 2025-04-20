@@ -971,7 +971,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         checked_items: tuple[qtg.Grid_Item] = file_grid.checkitems_get
 
         menu_video_data: list[Video_Data] = [file.user_data for file in checked_items]
-        menu_layout: list[tuple[str, list[Video_Data]]] = []
+        menu_layout: list[tuple[str, list[Video_Data], any]] = []
         if (
             Menu_Page_Title_Popup(
                 title=(
@@ -1125,6 +1125,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     arguments=(dvd_creator,),
                     callback=Notification_Call_Back,
                 )
+        return None
 
     def _new_dvd_layout(self, event: qtg.Action) -> None:
         """
