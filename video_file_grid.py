@@ -33,6 +33,7 @@ import QTPYGUI.utils as utils
 
 from background_task_manager import Task_Manager
 from dvd_menu_configuration import DVD_Menu_Config_Popup
+from reencode_options_popup import Reencode_Options
 from sys_config import (
     DVD_Archiver_Base,
     Get_Video_Editor_Folder,
@@ -94,260 +95,6 @@ def Run_Video_Trancode(arguments: tuple) -> tuple[int, str]:
     return gi_task_error_code, gs_task_error_message
 
 
-@dataclasses.dataclass
-class Reencode_Options(qtg.PopContainer):
-    """Pop-up Options dialogue that displays a list of options in a radio button format and returns the
-    selected option.
-
-    If the option needs a tooltip, then separate the option from the tooltip with a :: i.e., Test Option :: Test Tooltip
-    """
-
-    message: str = ""
-    transcode_options: dict[str, str] = dataclasses.field(default_factory=dict)
-    join_options: dict[str, str] = dataclasses.field(default_factory=dict)
-    translate: bool = True
-
-    _transcode_option: str = ""
-    _join_option: str = ""
-
-    def __post_init__(self):
-        """Constructor for the Reencode Options class that checks the arguments and sets instance variables.
-
-        The function creates a radio button for each item in the list of options, and then adds a button container with
-        an OK and Cancel button
-        """
-        super().__post_init__()
-        assert isinstance(self.transcode_options, (dict)), (
-            f"{self.transcode_options=}. Must be a dict dict[text:tag]"
-        )
-        assert isinstance(self.join_options, (dict)), (
-            f"{self.join_options=}. Must be a dict dict[text:tag]"
-        )
-        assert self.transcode_options or self.join_options, (
-            f"{self.transcode_options=} or {self.join_options=}. Must have at least one transcode or join option"
-        )
-        assert isinstance(self.message, str), f"{self.message=}. Mut be str"
-
-        def _Populate_Options(
-            options: dict, container: qtg.VBoxContainer
-        ) -> [str, int]:
-            """
-            Populate the given container with radio buttons based on the given options.
-
-            The function also keeps track of the maximum option width and the original option selected.
-
-            Args:
-                options (dict): dict of options where the key is the text to display and the value is the tag.
-                container (qtg.VBoxContainer): container to add the options to.
-
-            Returns:
-                tuple[str, int]: tuple where the first item is the original option selected and the second item is the maximum width of the options.
-            """
-            max_width = 0
-            original_option = ""
-
-            for index, (option, tag) in enumerate(options.items()):
-                tooltip = ""
-
-                if "::" in option:
-                    (
-                        option,
-                        tooltip,
-                    ) = option.split("::")
-
-                if index == 0:
-                    original_option = option
-
-                tag = f"{tag}|{index}".strip().replace(" ", "")
-
-                max_width = max(max_width, len(option) + 8)
-
-                container.add_row(
-                    qtg.RadioButton(
-                        text=f"{self.sdelim}{option}{self.sdelim}",
-                        callback=self.event_handler,
-                        tag=tag,
-                        checked=True if index == 0 else False,
-                        translate=self.translate,
-                        tooltip=tooltip,
-                    )
-                )
-
-            return original_option, max_width
-
-        transcode_option_container = qtg.VBoxContainer(
-            tag="transcode_container", text=self.message
-        )
-        join_option_container = qtg.VBoxContainer(
-            tag="join_container", text=self.message
-        )
-
-        self._transcode_option, transcode_width = _Populate_Options(
-            self.transcode_options, transcode_option_container
-        )
-        self._join_option, join_width = _Populate_Options(
-            self.join_options, join_option_container
-        )
-
-        assert transcode_width > 0 or join_width > 0, (
-            f"Error: {transcode_width=}, {join_width=}"
-        )
-
-        control_container = qtg.VBoxContainer(
-            tag="option_controls", align=qtg.Align.TOPLEFT
-        )
-
-        self.container.add_row(control_container)
-
-        # Creates a GUI for the dialog box with a list of options.
-        tab = qtg.Tab(
-            tag="option_tab",
-            callback=self.event_handler,
-            width=max(transcode_width, join_width),
-            height=9,
-        )
-
-        if self.transcode_options:
-            transcode_option_container.width = transcode_width
-            tab.page_add(
-                tag="transcode_page",
-                title="Transcode",
-                control=transcode_option_container,
-            )
-
-        if self.join_options:
-            control_container.add_row(
-                qtg.Switch(
-                    tag="transcode_join",
-                    label="Transcode",
-                    text="Join",
-                    callback=self.event_handler,
-                )
-            )
-
-            join_option_container.width = join_width
-            tab.page_add(
-                tag="join_page",
-                title="Join",
-                control=join_option_container,
-                enabled=False,
-            )
-
-        control_container.add_row(tab)
-        self.container.add_row(qtg.Spacer())
-        self.container.add_row(
-            qtg.Command_Button_Container(
-                ok_callback=self.event_handler, cancel_callback=self.event_handler
-            )
-        )
-
-    def event_handler(self, event: qtg.Action):
-        """Control event handler for the PopOptions dialogue.
-
-        If the user clicks the "ok" button, then the value of the selected option is saved to the _result variable and
-        the dialogue is closed. If the user clicks the "cancel" button, then the dialogue is closed and the _result
-        variable is set to an empty string
-
-        Args:
-            event (Action): Calling event
-        """
-        print(f"DBG {event.container_tag=} {event.tag=} {event.event=} {event.value=}")
-
-        match event.event:
-            case qtg.Sys_Events.WINDOWPOSTOPEN:
-                if event.widget_exist(
-                    container_tag="option_controls", tag="transcode_join"
-                ) and event.widget_exist(container_tag="option_tab", tag="join_page"):
-                    tab: qtg.Tab = cast(
-                        qtg.Tab,
-                        event.widget_get(
-                            container_tag="option_controls", tag="option_tab"
-                        ),
-                    )
-                    tab.enable_set(tag="join_page", enable=False)
-
-            case qtg.Sys_Events.CLICKED:
-                match event.tag:
-                    case "ok":
-                        selected_option = self._get_selection_option(event)
-
-                        self._result = selected_option
-
-                        self.close()
-                    case "cancel":
-                        if (
-                            popups.PopYesNo(
-                                container_tag="discard_selection",
-                                title="Stop Transcode/Join..",
-                                message="Stop Transcode/Join?",
-                            ).show()
-                            == "yes"
-                        ):
-                            self._result = ""
-                            self.close()
-                    case "transcode_join":
-                        if event.widget_exist(
-                            container_tag="option_controls", tag="transcode_join"
-                        ) and event.widget_exist(
-                            container_tag="option_tab", tag="join_page"
-                        ):
-                            tab: qtg.Tab = cast(
-                                qtg.Tab,
-                                event.widget_get(
-                                    container_tag="option_controls", tag="option_tab"
-                                ),
-                            )
-
-                            if event.value:  # True is join!
-                                tab.enable_set(tag="join_page", enable=True)
-                                tab.enable_set(tag="transcode_page", enable=False)
-                                tab.select_tab(tag_name="join_page")
-                            else:
-                                tab.enable_set(tag="join_page", enable=False)
-                                tab.enable_set(tag="transcode_page", enable=True)
-                                tab.select_tab(tag_name="transcode_page")
-
-    def _get_selection_option(self, event: qtg.Action) -> str:
-        """
-            Returns the selected selection option
-
-        Args:
-            event (qtg.Action):
-
-        Returns:
-            str: "" if no slected option, otherwiaw "tnascode|option" or "join|option"
-
-        """
-        assert isinstance(event, qtg.Action), f"{event=}. Must be a qtg.Action"
-
-        # Default ti transcode
-        container_tag = "transcode_container"
-        options = self.transcode_options
-        option_type = "transcode"
-        selected_option = ""
-
-        if event.widget_exist(
-            container_tag="option_controls", tag="transcode_join"
-        ) and event.widget_exist(
-            container_tag="option_tab", tag="join_page"
-        ):  # We have a join option
-            if event.value_get(
-                container_tag="option_controls", tag="transcode_join"
-            ):  # Join
-                container_tag = "join_container"
-                option_type = "join"
-                options = self.join_options
-
-        for index, (option, tag) in enumerate(options.items()):
-            tag = f"{tag}|{index}".strip().replace(" ", "")
-
-            if event.value_get(container_tag=container_tag, tag=tag):
-                selected_option = f"{option_type}|{tag.split('|')[0]}"
-                break
-
-        return selected_option
-
-
 @dataclasses.dataclass(slots=True)
 class Video_File_Grid(DVD_Archiver_Base):
     """This class implements the file handling of the Black DVD Archiver ui"""
@@ -391,7 +138,9 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         self._dvd_percent_used = value
 
-    def notification_call_back(self, status: int, message: str, output: str, name):
+    def notification_call_back(
+        self, status: int, message: str, output: str, name
+    ) -> None:
         """
         The notification_call_back function is called by the multi-thread task_manager when a task completes
 
@@ -434,10 +183,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                         row=row, col=self._file_grid.colindex_get("video_file")
                     )
 
-                    print(f"DBG {user_data=} {transcode_folder=}")
-
                     if user_data and user_data.vd_id == vd_id:
-                        print("DBG BINGO")
                         result, message = self._processed_trimmed(
                             self._file_grid,
                             vd_id,
@@ -457,6 +203,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                 f" {gs_thread_status=} {gs_thread_message=} {gs_thread_output=} {gs_thread_task_name=}"
             )
 
+        return None
+
     @property
     def project_duration(self) -> str:
         """Returns the project duration as a string
@@ -474,6 +222,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             value (str): The project duration
         """
         assert isinstance(value, str), f"{value=}. Must be str"
+
         self._project_duration = value
 
     @property
@@ -517,6 +266,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             sys_consts.PAL,
             sys_consts.NTSC,
         ), f"{value=}. Must be str PAL Or NTSC"
+
         self._project_video_standard = value
 
     def __post_init__(self) -> None:
@@ -538,6 +288,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                 sys_consts.LATEST_PROJECT_DBK, self.project_name
             )
 
+        return None
+
     def grid_events(self, event: qtg.Action) -> None:
         """Process Grid Events
         Args:
@@ -552,6 +304,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                 self._edit_video(event)
             elif event.value.row >= 0 and event.value.col >= 0:
                 self.set_project_standard_duration(event)
+
+        return None
 
     def process_edited_video_files(self, video_file_input: list[Video_Data]) -> None:
         """
@@ -595,6 +349,8 @@ class Video_File_Grid(DVD_Archiver_Base):
 
             if rejected:
                 popups.PopError(title="Video File Error...", message=rejected).show()
+
+        return None
 
     def _edit_video(self, event: qtg.Action) -> None:
         """
@@ -669,6 +425,8 @@ class Video_File_Grid(DVD_Archiver_Base):
             if user_data and user_data.vd_id == vd_id:
                 file_grid.checkitemrow_set(row=row, col=col_index, checked=checked)
 
+        return None
+
     def _delete_file_from_grid(
         self,
         file_grid: qtg.Grid,
@@ -689,13 +447,15 @@ class Video_File_Grid(DVD_Archiver_Base):
             if user_data and user_data.vd_id == vd_id:
                 file_grid.row_delete(row)
 
+        return None
+
     def _processed_trimmed(
         self,
         file_grid: qtg.Grid,
         vd_id: int,
         updated_file: str,
         button_title: str = "",
-    ) -> [int, str]:
+    ) -> tuple[int, str]:
         """
         Updates the file_grid with the trimmed_file detail, after finding the corresponding grid entry.
         Args:
@@ -891,9 +651,11 @@ class Video_File_Grid(DVD_Archiver_Base):
                     case "ungroup_files":
                         self._ungroup_files(event)
 
+        return None
+
     def project_changed(
         self, event: qtg.Action, project_name: str, save_existing: bool
-    ):
+    ) -> None:
         """Handles the change of a project
 
         Args:
@@ -950,7 +712,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         return None
 
-    def postinit_handler(self, event: qtg.Action):
+    def postinit_handler(self, event: qtg.Action) -> None:
         """
         The postinit_handler method is called after the GUI has been created.
         It is used to set default values for widgets
@@ -1040,6 +802,8 @@ class Video_File_Grid(DVD_Archiver_Base):
         event.event = qtg.Sys_Events.CLICKED
         event.tag = "toggle_file_button_names"
         self.event_handler(event)
+
+        return None
 
     def _join_files(self, event: qtg.Action) -> None:
         """
@@ -1235,7 +999,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                         for video_data in video_file_data:
                             match operation_action:
                                 case "reencode_edit":
-                                    transcode_format = "avi"
+                                    transcode_format = "mkv"  # "avi" if mjpeg arg is true for Transcode_Mezzanine
+
                                     result, message = dvdarch_utils.Transcode_Mezzanine(
                                         input_file=video_data.video_path,
                                         frame_rate=video_data.encoding_info.video_frame_rate,
@@ -1415,6 +1180,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             # If all good message has the output file name. A reencode concat will have a different extension. A
             # stream concat will have the same extension as the inpt file. This will be the only delta
             output_file = message
+
         return None
 
     def _remove_files(self, event: qtg.Action) -> None:
@@ -1455,6 +1221,8 @@ class Video_File_Grid(DVD_Archiver_Base):
             event.value_set(
                 container_tag="video_file_controls", tag="bulk_select", value=False
             )
+
+        return None
 
     def _move_video_file(self, event: qtg.Action, up: bool) -> None:
         """
@@ -1614,6 +1382,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                 file_grid.select_col(
                     checked_items[0].row_index, file_grid.colindex_get("video_file")
                 )
+
+        return None
 
     def _load_grid(self, event: qtg.Action) -> None:
         """Loads the grid from the database
@@ -1858,6 +1628,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                     row=row_index, col=col, user_data=grid_video_data
                 )
 
+        return None
+
     def _get_max_group_num(self, file_grid: qtg.Grid) -> int:
         """
         Scan all items in the file_grid and return the maximum menu_group number.
@@ -1971,6 +1743,8 @@ class Video_File_Grid(DVD_Archiver_Base):
             )
         file_grid.checkitems_all(checked=False)
 
+        return None
+
     def _ungroup_files(self, event: qtg.Action) -> None:
         """
         Ungroups selected files by setting their menu_group to -1.
@@ -2017,6 +1791,8 @@ class Video_File_Grid(DVD_Archiver_Base):
                     value="",
                     user_data=video_item,
                 )
+
+        return None
 
     def load_video_input_files(self, event: qtg.Action) -> None:
         """Loads video files into the video input grid
@@ -2073,6 +1849,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                     message=f"The Files Below Failed Acceptability Checks:\n{rejected}",
                     width=80,
                 ).show()
+
         return None
 
     def _insert_files_into_grid(
@@ -2417,6 +2194,8 @@ class Video_File_Grid(DVD_Archiver_Base):
             user_data=video_data,
         )
 
+        return None
+
     def set_project_standard_duration(self, event: qtg.Action) -> None:
         """
         Sets the duration and video standard for the current project based on the selected
@@ -2498,6 +2277,8 @@ class Video_File_Grid(DVD_Archiver_Base):
             tag="percent_of_dvd",
             value=f"{sys_consts.SDELIM}{self.dvd_percent_used}{sys_consts.SDELIM}",
         )
+
+        return None
 
     def shutdown(self) -> int:
         """
