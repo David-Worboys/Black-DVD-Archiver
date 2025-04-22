@@ -120,6 +120,8 @@ def Notification_Call_Back(status: int, message: str, output: str, name):
             f" {gs_thread_status=} {gs_thread_message=} {gs_thread_output=} {gs_thread_task_name=}"
         )
 
+    return None
+
 
 # self._tasks_submitted -= 1
 def Error_Callback(error_message: str):
@@ -134,6 +136,8 @@ def Error_Callback(error_message: str):
 
     if not utils.Is_Complied():
         print(f"DBG Error_Callback {gs_thread_error_message=}")
+
+    return None
 
 
 ################################
@@ -156,6 +160,8 @@ class Edit_List:
             self._archive_folder = self._db_settings.setting_get(
                 sys_consts.ARCHIVE_FOLDER_DBK
             )
+
+        return None
 
     def delete_edit_cuts(
         self,
@@ -560,7 +566,7 @@ class Edit_List:
         file_path: str,
         project: str,
         layout: str,
-        file_cuts: list[(int, int, str)],
+        file_cuts: list[tuple[int, int, str]],
     ) -> tuple[int, str]:
         """Store files and cuts in the archive json_file.
 
@@ -743,6 +749,8 @@ class Video_Editor(DVD_Archiver_Base):
 
         if archive_folder:
             self._archive_manager = Archive_Manager(archive_folder=archive_folder)
+
+        return None
 
     def shutdown(self) -> int:
         """
@@ -954,6 +962,8 @@ class Video_Editor(DVD_Archiver_Base):
                     case "video_slider":
                         self._seek(event.value)
 
+        return None
+
     @property
     def get_task_manager(self) -> Task_Manager:
         """Returns the task manager instance
@@ -1068,6 +1078,8 @@ class Video_Editor(DVD_Archiver_Base):
             f"{sys_consts.SDELIM}{self._video_file_input[0].video_path}{sys_consts.SDELIM}"
         )
 
+        return None
+
     @property
     def video_file_input(self) -> list[Video_Data]:
         """The input video information
@@ -1128,9 +1140,13 @@ class Video_Editor(DVD_Archiver_Base):
                 tag="sharpen",
             ).value_get()
 
+        return None
+
     def video_pause(self):
         """Pause video playback"""
         self._video_handler.pause()
+
+        return None
 
     def _set_dvd_settings(self):
         """Writes DVD settings into the appropriate values of self.video_file_input"""
@@ -1179,6 +1195,8 @@ class Video_Editor(DVD_Archiver_Base):
             tag="sharpen",
         ).value_set(self._video_file_input[0].video_file_settings.sharpen)
 
+        return None
+
     def _archive_edit_list_read(self) -> None:
         """Reads edit cuts from the archive manager and populates the edit list grid with the data. If both the
         archive manager and the edit list grid exist, reads edit cuts for the input file from the archive manager
@@ -1218,6 +1236,7 @@ class Video_Editor(DVD_Archiver_Base):
                     row=row, col=clip_name, value=cut_tuple[2], user_data=cut_tuple
                 )
             self._edit_list_grid.select_row(0, clip_name)
+        return None
 
     def archive_edit_list_write(self) -> None:
         """Writes the edit list from the GUI grid to the archive manager for the current video file.
@@ -1262,6 +1281,7 @@ class Video_Editor(DVD_Archiver_Base):
                 popups.PopError(
                     title="Archive Edit List", message=f"Write Failed : {message}"
                 ).show()
+        return None
 
     def _assemble_segments(self, event: qtg.Action) -> None:
         """
@@ -1472,6 +1492,8 @@ class Video_Editor(DVD_Archiver_Base):
                 title="No Entries In The Edit List...",
                 message="Please Mark Edit List Entries With The [ and ] Button!",
             ).show()
+
+        return None
 
     def _get_edit_list(self) -> list[tuple[int, int, str]]:
         """Returns the edit list from the edit list grid.
@@ -1864,6 +1886,8 @@ class Video_Editor(DVD_Archiver_Base):
                 message="Please Mark Some Edit List Entries With The [ and ] Button!",
             ).show()
 
+        return None
+
     def _edit_list_seek(self, event: qtg.Action) -> None:
         """
         Seeks on a frame number from the edit list when mark_in or mark_out is clicked
@@ -1889,6 +1913,8 @@ class Video_Editor(DVD_Archiver_Base):
             self._video_handler.seek(self._frame_count - 1)  # frame count is zero based
         else:
             self._video_handler.seek(clicked_frame)
+
+        return None
 
     def _remove_edit_points(self, event: qtg.Action) -> None:
         """
@@ -1936,6 +1962,8 @@ class Video_Editor(DVD_Archiver_Base):
                     message="Can Not Play/Edit Files Of This Type!",
                 ).show()
                 # TODO Offer to transcode
+
+        return None
 
     def _move_edit_point(self, up: bool) -> None:
         """
@@ -2002,6 +2030,7 @@ class Video_Editor(DVD_Archiver_Base):
             else:
                 self._edit_list_grid.checkitemrow_set(True, checked_item.row_index, 0)
                 self._edit_list_grid.select_col(checked_item.row_index, 0)
+        return None
 
     def _frame_handler(self, frame: qtG.QPixmap) -> None:
         """Handles displaying the video frame
@@ -2013,6 +2042,8 @@ class Video_Editor(DVD_Archiver_Base):
                 self.display_width, self.display_height, qtC.Qt.KeepAspectRatio
             )
         )
+
+        return None
 
     def _populate_edit_cuts(
         self,
@@ -2065,6 +2096,8 @@ class Video_Editor(DVD_Archiver_Base):
 
         self._frame_display.value_set(frame)
 
+        return None
+
     def _seek(self, frame: int) -> None:
         """
         The _seek function seeks to that frame in the video handler.
@@ -2080,6 +2113,8 @@ class Video_Editor(DVD_Archiver_Base):
         """
         self._current_frame = frame
         self._video_handler.seek(frame)
+
+        return None
 
     def _selection_end(self, event: qtg.Action) -> None:
         """Handler method for selecting the end of a media clip.
@@ -2114,6 +2149,8 @@ class Video_Editor(DVD_Archiver_Base):
             )
             self._selection_button_toggle(event=event)
 
+        return None
+
     def _selection_start(self, event: qtg.Action) -> None:
         """Handler method for selecting the start of a media clip.
 
@@ -2136,6 +2173,8 @@ class Video_Editor(DVD_Archiver_Base):
             row=new_row, col=0, value=frame, user_data=start_time
         )
         self._selection_button_toggle(event=event)
+
+        return None
 
     def _selection_button_toggle(self, event: qtg.Action, init=False) -> None:
         """Toggles the state of the selection buttons for selecting the start and end of a media clip.
@@ -2171,6 +2210,8 @@ class Video_Editor(DVD_Archiver_Base):
                 select_start.enable_set(True)
                 select_end.enable_set(False)
 
+        return None
+
     def _step_backward(self) -> None:
         """
         Seeks the media source backwards by `_step_value` frames.
@@ -2190,6 +2231,8 @@ class Video_Editor(DVD_Archiver_Base):
             if 0 <= seek_frame < self._frame_count:
                 self._video_handler.pause()
                 self._video_handler.seek(seek_frame)
+
+        return None
 
     def _step_forward(self) -> None:
         """
@@ -2212,6 +2255,8 @@ class Video_Editor(DVD_Archiver_Base):
                 self._video_handler.pause()
                 self._video_handler.seek(seek_frame)
 
+        return None
+
     def _step_unit(self, event: qtg.Action) -> None:
         """
         Sets the value of `self._step_value` based on the value of the `event` argument.
@@ -2229,16 +2274,23 @@ class Video_Editor(DVD_Archiver_Base):
                 container_tag=event.container_tag, tag=event.tag
             )
 
-            step_values = {
-                "frame": 1,
-                "0.5s": self._frame_rate // 2,
-                "1s": int(self._frame_rate),
-                "15s": int(self._frame_rate * 15),
-                "30s": int(self._frame_rate * 30),
-                "60s": int(self._frame_rate * 60),
-                "300s": int(self._frame_rate * 300),
-            }
-            self._step_value = step_values[value.data]
+            step_str = value.data.lower()
+
+            if step_str == "frame":
+                self._step_value = 1
+            elif step_str.endswith("s"):
+                try:
+                    seconds = float(step_str[:-1])
+                    self._step_value = int(self._frame_rate * seconds)
+                except ValueError:
+                    # Handle potential error if the format is unexpected
+                    print(f"Warning: Unexpected step format '{step_str}'")
+                    self._step_value = 1
+            else:
+                print(f"Warning: Unknown step unit '{step_str}'")
+                self._step_value = 1
+
+        return None
 
     def _video_file_system_maker(self) -> int:
         """
@@ -2351,26 +2403,20 @@ class Video_Editor(DVD_Archiver_Base):
                 qtg.VBoxContainer: A vboxcontainer housing the video cutter
 
             """
+            step_definitions = [
+                ("Frame", "frame"),
+                ("0.5 Sec", "0.5s"),
+                ("1   Sec", "1s"),
+                ("5   Sec", "5s"),
+                ("10  Sec", "10s"),
+                ("20  Sec", "20s"),
+                ("1   Min", "60s"),
+                ("5   Min", "300s"),
+            ]
+
             step_unit_list = [
-                qtg.Combo_Item(
-                    display="Frame", data="frame", icon=None, user_data=None
-                ),
-                qtg.Combo_Item(
-                    display="0.5 Sec", data="0.5s", icon=None, user_data=None
-                ),
-                qtg.Combo_Item(display="1   Sec", data="1s", icon=None, user_data=None),
-                qtg.Combo_Item(
-                    display="15  Sec", data="15s", icon=None, user_data=None
-                ),
-                qtg.Combo_Item(
-                    display="30  Sec", data="30s", icon=None, user_data=None
-                ),
-                qtg.Combo_Item(
-                    display="1   Min", data="60s", icon=None, user_data=None
-                ),
-                qtg.Combo_Item(
-                    display="5   Min", data="300s", icon=None, user_data=None
-                ),
+                qtg.Combo_Item(display=display, data=data, icon=None, user_data=None)
+                for display, data in step_definitions
             ]
 
             self._video_display = qtg.Label(
