@@ -2,7 +2,7 @@
 Implements a popup dialog that displays a list of video re-encoding/transcoding
 and joining options to the user.
 
-Copyright (C) 2025  David Worboys (alumnus of Moyhu Primary School and other institutions)
+Copyright (C) 2025  David Worboys (-:alumnus Moyhu Primary School et al.:-)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -53,6 +53,7 @@ class Reencode_Options(qtg.PopContainer):
         _transcode_option (str): Stores the tag of the initially selected
             transcode option.
         _join_option (str): Stores the tag of the initially selected join option.
+        _control_width (int): The width of the control.
     """
 
     message: str = ""
@@ -62,6 +63,7 @@ class Reencode_Options(qtg.PopContainer):
 
     _transcode_option: str = ""
     _join_option: str = ""
+    _control_width: int = 0
 
     def __post_init__(self) -> None:
         """
@@ -119,7 +121,9 @@ class Reencode_Options(qtg.PopContainer):
                     original_option_tag = tag
 
                 item_tag = f"{tag}|{index}".strip().replace(" ", "")
-                max_width = max(max_width, len(option_text) + 8)
+                max_width = max(
+                    max_width, len(option_text) + 8
+                )  # Padding to fill out Tab
 
                 container.add_row(
                     qtg.RadioButton(
@@ -149,8 +153,10 @@ class Reencode_Options(qtg.PopContainer):
         )
 
         assert transcode_width > 0 or join_width > 0, (
-            f"Error: {transcode_width=}, {join_width=}"
+            f"Dev Error: {transcode_width=}, {join_width=}"
         )
+
+        self._control_width = max(40, max(transcode_width, join_width))
 
         control_container = qtg.VBoxContainer(
             tag="option_controls", align=qtg.Align.TOPLEFT
@@ -162,12 +168,11 @@ class Reencode_Options(qtg.PopContainer):
         tab = qtg.Tab(
             tag="option_tab",
             callback=self.event_handler,
-            width=max(transcode_width, join_width),
+            width=self._control_width,
             height=9,
         )
 
         if self.transcode_options:
-            transcode_option_container.width = transcode_width
             tab.page_add(
                 tag="transcode_page",
                 title="Transcode",
@@ -196,7 +201,9 @@ class Reencode_Options(qtg.PopContainer):
         self.container.add_row(qtg.Spacer())
         self.container.add_row(
             qtg.Command_Button_Container(
-                ok_callback=self.event_handler, cancel_callback=self.event_handler
+                ok_callback=self.event_handler,
+                cancel_callback=self.event_handler,
+                margin_right=10,
             )
         )
 
@@ -233,6 +240,11 @@ class Reencode_Options(qtg.PopContainer):
                         ),
                     )
                     tab.enable_set(tag="join_page", enable=False)
+
+                pixel_size = self.container.pixel_char_size(1, 1)
+                pixel_width = pixel_size.width * (self._control_width + 2)
+
+                self.container.guiwidget_get.parent().setFixedWidth(pixel_width)
 
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
