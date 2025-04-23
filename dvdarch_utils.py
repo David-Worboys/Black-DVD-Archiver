@@ -2549,20 +2549,22 @@ def Transcode_DV(
 
     if (
         width == sys_consts.PAL_SPECS.width_43
-        or width == sys_consts.PAL_SPECS.width_169
         and height == sys_consts.PAL_SPECS.height_43
-        or height == sys_consts.PAL_SPECS.height_169
-    ):
+    ) or (
+        width == sys_consts.PAL_SPECS.width_169
+        and height == sys_consts.PAL_SPECS.height_43
+    ):  # Anamorphic PAL
         frame_rate = 25
     elif (
         width == sys_consts.NTSC_SPECS.width_43
-        or width == sys_consts.NTSC_SPECS.width_169
         and height == sys_consts.NTSC_SPECS.height_43
-        or height == sys_consts.NTSC_SPECS.height_169
-    ):
+    ) or (
+        width == sys_consts.NTSC_SPECS.width_169
+        and height == sys_consts.NTSC_SPECS.height_43
+    ):  # Anamorphic NTSC
         frame_rate = 30000 / 1001
     else:
-        return -1, f"{width=} X {height=} Does Not Meet Pal or NTSC specs"
+        return -1, f"{width=} X {height=} Does Not Meet Standard PAL/NTSC DV specs"
 
     command = [
         sys_consts.FFMPG,
@@ -2903,11 +2905,14 @@ def Transcode_Mezzanine(
         ]
         black_box_filter = ",".join(filter_commands)
 
-        field_order = ["-top"]
-        field_order.extend(f"{'0' if bottom_field_first else '1'}")
+        field_order = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
         video_filter = [
             "-vf",
-            f"{black_box_filter},scale={width}x{height}",
+            f"{black_box_filter},scale={width}x{height},{field_order}",
+            "-flags:v:0",  # video flags for the first video stream
+            "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
+            "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
+            "1",  # alternate scan value is 1,
         ]
     else:
         video_filter = []
@@ -2934,7 +2939,6 @@ def Transcode_Mezzanine(
             *video_filter,
             "-c:v",
             "mjpeg",
-            *field_order,
             "-q:v",
             "3",  # Adjust quality (lower is higher quality)
             "-b:v",
@@ -2981,9 +2985,9 @@ def Transcode_Mezzanine(
             "-crf",
             "17",  # Visually Lossless
             "-preset",
-            "ultrafast",
-            "-qp",
-            "0",
+            "superfast",
+            # "-qp", # Lossless Not needed
+            # "0",
             "-b:v",
             f"{bit_rate}M",
             "-maxrate",
@@ -4396,23 +4400,24 @@ def Split_Large_Video(
     chunk_frames = chunk_duration * encoding_info.video_frame_rate // 1
 
     chunk_adjust = True
+    max_possible_chunks = (
+        encoding_info.video_frame_count
+        // (encoding_info.video_frame_rate * min_chunk_duration_s)
+        + 2
+    )  # Add a small buffer
 
-    while chunk_adjust:  # Need to make sure our last chunk is a good size
-        for chunk_index in range(num_chunks):
-            if chunk_index == num_chunks - 1:  # Last chunk
-                start_frame = int(chunk_index * chunk_frames)
-                end_frame = int(
-                    (chunk_index + 1) * chunk_frames
-                    if chunk_index < num_chunks - 1
-                    else encoding_info.video_frame_count
-                )
+    while chunk_adjust and num_chunks <= max_possible_chunks:
+        chunk_frames = encoding_info.video_frame_count / num_chunks
+        last_chunk_start_frame = int((num_chunks - 1) * chunk_frames)
+        last_chunk_end_frame = encoding_info.video_frame_count
+        last_chunk_num_frames = last_chunk_end_frame - last_chunk_start_frame
+        last_chunk_duration = last_chunk_num_frames / encoding_info.video_frame_rate
 
-                num_frames = end_frame - start_frame
-                duration = num_frames * encoding_info.video_frame_rate
-
-                if duration < min_chunk_duration_s:
-                    num_chunks += 1
-                    break
+        if (
+            last_chunk_duration < min_chunk_duration_s
+            and num_chunks < max_possible_chunks
+        ):
+            num_chunks += 1
         else:
             chunk_adjust = False
 
@@ -5238,21 +5243,22 @@ class Video_File_Copier:
             for file in files:
                 file_path = os.path.join(root, file)
 
-                # Check if the file has a corresponding checksum file
-                checksum_file_path = f"{file_path}.{hash_algorithm}"
-                if not os.path.exists(checksum_file_path):
-                    return False
+                if os.path.isfile(file_path):
+                    # Check if the file has a corresponding checksum file
+                    checksum_file_path = f"{file_path}.{hash_algorithm}"
+                    if not os.path.exists(checksum_file_path):
+                        return False
 
-                # Read the stored checksum from the checksum file
-                with open(checksum_file_path, "r") as checksum_file:
-                    expected_checksum = checksum_file.read()
+                    # Read the stored checksum from the checksum file
+                    with open(checksum_file_path, "r") as checksum_file:
+                        expected_checksum = checksum_file.read()
 
-                # Calculate the checksum of the file
-                actual_checksum = self.calculate_checksum(file_path, hash_algorithm)
+                    # Calculate the checksum of the file
+                    actual_checksum = self.calculate_checksum(file_path, hash_algorithm)
 
-                # Compare the expected and actual checksums
-                if actual_checksum != expected_checksum:
-                    return False
+                    # Compare the expected and actual checksums
+                    if actual_checksum != expected_checksum:
+                        return False
 
         # All files have matching checksums
         return True
@@ -5354,6 +5360,10 @@ class Video_File_Copier:
         assert isinstance(folder_size_gb, (int, float)) and folder_size_gb > 0.5, (
             f"{folder_size_gb=}. Must be > 0.5"
         )
+        assert isinstance(hash_algorithm, str) and hash_algorithm.strip().lower() in (
+            "md5",
+            "sha256",
+        ), f"{hash_algorithm=}. Must be a non-empty str md5 or sha256"
 
         file_handler = file_utils.File()
 
@@ -5440,7 +5450,8 @@ class Video_File_Copier:
                                 "Failed to create directory: {destination_folder}",
                             )
 
-                    # Copy the file to the current subfolder
+                    # Copy the file to the current subfolder.
+                    # Note: The destination_folder is always set on the first iteration of the loop
                     destination_file_path = file_handler.file_join(
                         destination_folder, os.path.basename(chunked_file)
                     )
