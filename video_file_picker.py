@@ -16,8 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import dataclasses
 from typing import cast
 
@@ -29,8 +27,6 @@ import sys_consts
 from sys_config import Encoding_Details, Video_Data, Video_File_Settings
 from QTPYGUI.utils import Get_Unique_Int
 
-# fmt: on
-
 
 @dataclasses.dataclass
 class Video_File_Picker_Popup(qtg.PopContainer):
@@ -40,6 +36,8 @@ class Video_File_Picker_Popup(qtg.PopContainer):
     video_file_list: list[Video_Data] = dataclasses.field(
         default_factory=list
     )  # Pass by ref
+
+    _row_checked: dict[int, bool] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self):
         """Sets-up the form"""
@@ -96,6 +94,9 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                         file_grid.checkitems_all(
                             checked=event.value, col_tag="video_file"
                         )
+
+                        for row_index in range(file_grid.row_count):
+                            self._row_checked[row_index] = event.value
 
                     case "video_import_folder":
                         video_folder = self._db_settings.setting_get(
@@ -314,9 +315,15 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                     ),
                 )
 
-                if file_grid.checkitemrow_get(event.value.row, col=0):
+                row_checked = self._row_checked.get(event.value.row, False)
+
+                if row_checked:
                     file_grid.checkitemrow_set(
                         row=event.value.row, col=0, checked=False
                     )
+                    self._row_checked[event.value.row] = False
+                    file_grid.select_col(event.value.row, 0)
                 else:
+                    self._row_checked[event.value.row] = True
+                    file_grid.select_col(event.value.row, 0)
                     file_grid.checkitemrow_set(row=event.value.row, col=0, checked=True)
