@@ -63,7 +63,7 @@ def Run_Video_Trancode(arguments: tuple) -> tuple[int, str]:
     """This is a wrapper function used hy the multi-thread task_manager to run the Execute_Check_Output process
 
     Args:
-        cut_video_def (dvdarch_utils.Cut_Video_Def): Defines video cut parameters
+        arguments (tuple): Defines video cut parameters
 
     Returns:
         tuple[int, str]:
@@ -102,6 +102,7 @@ class Video_File_Grid(DVD_Archiver_Base):
     parent: DVD_Archiver_Base
 
     # Private instance variables
+    _common_words: list[str] = dataclasses.field(default_factory=list)
     _display_filename: bool = True
     _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
     _db_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
@@ -110,8 +111,19 @@ class Video_File_Grid(DVD_Archiver_Base):
     _project_duration: str = ""
     _project_name: str = ""
     _project_video_standard: str = ""  # PAL or NTSC
+    _row_checked: dict[int, bool] = dataclasses.field(default_factory=dict)
     _shutdown: bool = False
     _task_dict: dict = dataclasses.field(default_factory=dict)
+
+    # Constants
+    VIDEO_FILE_COL: Final[str] = "video_file"
+    WIDTH_COL: Final[str] = "width"
+    HEIGHT_COL: Final[str] = "height"
+    ENCODER_COL: Final[str] = "encoder"
+    DURATION_COL: Final[str] = "duration"
+    STANDARD_COL: Final[str] = "standard"
+    GROUP_COL: Final[str] = "group"
+    SETTINGS_COL: Final[str] = "settings"
 
     @property
     def dvd_percent_used(self) -> int:
@@ -180,12 +192,11 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 for row in range(self._file_grid.row_count):
                     user_data: Video_Data = self._file_grid.userdata_get(
-                        row=row, col=self._file_grid.colindex_get("video_file")
+                        row=row, col=self._file_grid.colindex_get(self.VIDEO_FILE_COL)
                     )
 
                     if user_data and user_data.vd_id == vd_id:
                         result, message = self._processed_trimmed(
-                            self._file_grid,
                             vd_id,
                             transcode_folder,
                             video_data.video_file_settings.button_title,
@@ -300,10 +311,31 @@ class Video_File_Grid(DVD_Archiver_Base):
         )
 
         if event.event == qtg.Sys_Events.CLICKED:
+            col_index = self._file_grid.colindex_get(self.VIDEO_FILE_COL)
+
             if event.tag.startswith("grid_button"):
+                row_unique_id = int(
+                    event.container_tag.split("|")[0]
+                )  # Grid button container tag has the row_id embedded as the 1st element and delimitered by |
+                row = self._file_grid.row_from_item_id(row_unique_id)
                 self._edit_video(event)
+                self._file_grid.select_col(row, col_index)
             elif event.value.row >= 0 and event.value.col >= 0:
                 self.set_project_standard_duration(event)
+                row_checked = self._row_checked.get(event.value.row, False)
+
+                if row_checked:
+                    self._file_grid.checkitemrow_set(
+                        row=event.value.row, col=col_index, checked=False
+                    )
+                    self._row_checked[event.value.row] = False
+                    self._file_grid.select_col(event.value.row, col_index)
+                else:
+                    self._row_checked[event.value.row] = True
+                    self._file_grid.select_col(event.value.row, col_index)
+                    self._file_grid.checkitemrow_set(
+                        row=event.value.row, col=col_index, checked=True
+                    )
 
         return None
 
@@ -314,6 +346,36 @@ class Video_File_Grid(DVD_Archiver_Base):
         Args:
             video_file_input (list[Video_Data]): THhe edited video file list
         """
+
+        #### Helper Functions
+        def _select_row(desired_file_path: str) -> None:
+            """
+            Selects the row and column in the file grid for the given video file path.
+
+            Args:
+                desired_file_path (str): The video file name to find in the grid and select.
+
+            Returns:
+                None
+
+            """
+            assert (
+                isinstance(desired_file_path, str) and desired_file_path.strip() != ""
+            ), f"{desired_file_path=}. Must be str"
+
+            col_index = self._file_grid.colindex_get(self.VIDEO_FILE_COL)
+
+            for row in range(self._file_grid.row_count):
+                user_data: Video_Data = self._file_grid.userdata_get(row=row, col=0)
+
+                if user_data and desired_file_path == user_data.video_path:
+                    self._file_grid.select_col(row, col_index)
+                    self._file_grid.guiwidget_get.setFocus()
+
+                    break
+            return None
+
+        #### Main
         assert isinstance(video_file_input, list), f"{video_file_input=}. Must be list"
         assert all(
             isinstance(video_file, Video_Data) for video_file in video_file_input
@@ -323,21 +385,27 @@ class Video_File_Grid(DVD_Archiver_Base):
             len(video_file_input) == 1
         ):  # Original, only user entered file title text might have changed
             self._processed_trimmed(
-                self._file_grid,
                 video_file_input[0].vd_id,
                 video_file_input[0].video_path,
                 video_file_input[0].video_file_settings.button_title,
             )
-        elif len(video_file_input) == 2:  # Original & one edited file (cut/assemble)
+
+            _select_row(video_file_input[0].video_path)
+        elif (
+            len(video_file_input) == 2
+        ):  # Original & one edited file (cut/assemble). The edited file replaces the orginal
             self._processed_trimmed(
-                self._file_grid,
                 video_file_input[0].vd_id,
                 video_file_input[1].video_path,
                 video_file_input[0].video_file_settings.button_title,
             )
-        elif len(video_file_input) > 2:  # Original and multiple edited files
+
+            _select_row(video_file_input[1].video_path)
+        elif (
+            len(video_file_input) > 2
+        ):  # Original and multiple edited files that replace the original
             # TODO Make user configurable perhaps
-            self._delete_file_from_grid(self._file_grid, video_file_input[0].vd_id)
+            self._delete_file_from_grid(video_file_input[0].vd_id)
 
             # Insert Assembled Children Files
             rejected = self._insert_files_into_grid(
@@ -368,17 +436,11 @@ class Video_File_Grid(DVD_Archiver_Base):
         if not video_editor_folder:
             return None
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls", tag="video_input_files"
-            ),
-        )
-
+        col_index = self._file_grid.colindex_get(self.VIDEO_FILE_COL)
         row_unique_id = int(
             event.container_tag.split("|")[0]
         )  # Grid button container tag has the row_id embedded as the 1st element and delimitered by |
-        row = file_grid.row_from_item_id(row_unique_id)
+        row = self._file_grid.row_from_item_id(row_unique_id)
 
         if row == -1:
             popups.PopError(
@@ -388,9 +450,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
             return None
 
-        user_data: Video_Data = file_grid.userdata_get(
-            row=row, col=file_grid.colindex_get("video_file")
-        )
+        user_data: Video_Data = self._file_grid.userdata_get(row=row, col=col_index)
         video_file_input: list[Video_Data] = [user_data]
 
         self._aspect_ratio = video_file_input[0].encoding_info.video_ar
@@ -402,56 +462,58 @@ class Video_File_Grid(DVD_Archiver_Base):
         event.tag = "video_editor"
         event.value = video_file_input
         self.parent.event_handler(event)  # Processed in DVD Archiver!
+        self._file_grid.select_col(row, col_index)
 
         return None
 
-    def check_file(self, file_grid: qtg.Grid, vd_id: int, checked: bool) -> None:
+    def check_file(self, vd_id: int, checked: bool) -> None:
         """Checks the file (identified by vd_id) in the file grid.
 
         Args:
-            file_grid (qtg.Grid): An instance of the `Grid` class.
             vd_id (int): The Video_Data ID of the source file that is to be checked.
             checked (bool): True Checked, False Unchecked
         """
-        assert isinstance(file_grid, qtg.Grid), f"{file_grid}. Must be a Grid instance"
         assert isinstance(vd_id, int), f"{vd_id=}. Must be an int"
         assert isinstance(checked, bool), f"{checked=}. Must be a bool"
 
-        col_index = file_grid.colindex_get("video_file")
+        col_index = self._file_grid.colindex_get(self.VIDEO_FILE_COL)
 
-        for row in range(file_grid.row_count):
-            user_data: Video_Data = file_grid.userdata_get(row=row, col=col_index)
+        for row in range(self._file_grid.row_count):
+            user_data: Video_Data = self._file_grid.userdata_get(row=row, col=col_index)
 
             if user_data and user_data.vd_id == vd_id:
-                file_grid.checkitemrow_set(row=row, col=col_index, checked=checked)
+                self._file_grid.checkitemrow_set(
+                    row=row, col=col_index, checked=checked
+                )
+            self._row_checked[row] = checked
+            self._file_grid.select_col(row, col_index)
 
         return None
 
     def _delete_file_from_grid(
         self,
-        file_grid: qtg.Grid,
         vd_id: int,
     ) -> None:
-        """Delete the source file from the file grid.
+        """Deletes the source file from the file grid.
         Args:
-            file_grid (qtg.Grid): An instance of the `Grid` class.
             vd_id (int): The Video_Data ID of the source file that is to be deleted.
         """
-        assert isinstance(file_grid, qtg.Grid), f"{file_grid}. Must be a Grid instance"
+        assert isinstance(self._file_grid, qtg.Grid), (
+            f"{self._file_grid}. Must be a Grid instance"
+        )
 
-        for row in range(file_grid.row_count):
-            user_data: Video_Data = file_grid.userdata_get(
-                row=row, col=file_grid.colindex_get("video_file")
+        for row in range(self._file_grid.row_count):
+            user_data: Video_Data = self._file_grid.userdata_get(
+                row=row, col=self._file_grid.colindex_get(self.VIDEO_FILE_COL)
             )
 
             if user_data and user_data.vd_id == vd_id:
-                file_grid.row_delete(row)
+                self._file_grid.row_delete(row)
 
         return None
 
     def _processed_trimmed(
         self,
-        file_grid: qtg.Grid,
         vd_id: int,
         updated_file: str,
         button_title: str = "",
@@ -459,7 +521,6 @@ class Video_File_Grid(DVD_Archiver_Base):
         """
         Updates the file_grid with the trimmed_file detail, after finding the corresponding grid entry.
         Args:
-            file_grid (qtg.Grid): The grid to update.
             vd_id (int): The Video_Data ID of the source file.
             updated_file (str): The trimmed file to update the grid details with.
             button_title (str): The button title to update the grid details with.
@@ -468,7 +529,6 @@ class Video_File_Grid(DVD_Archiver_Base):
             int: 1 if successful, -1 if failed
             str: error message or "" if ok
         """
-        assert isinstance(file_grid, qtg.Grid), f"{file_grid=}. Must be qtg.Grid,"
         assert isinstance(vd_id, int) and vd_id >= 0, f"{vd_id=}. Must be an int >= 0"
         assert isinstance(updated_file, str) and updated_file.strip() != "", (
             f"{updated_file=}. Must be non-empty str"
@@ -485,11 +545,11 @@ class Video_File_Grid(DVD_Archiver_Base):
             trimmed_extension,
         ) = file_handler.split_file_path(updated_file)
 
+        col_index = self._file_grid.colindex_get(self.VIDEO_FILE_COL)
+
         # Scan looking for a source of trimmed file
-        for row in range(file_grid.row_count):
-            user_data: Video_Data = file_grid.userdata_get(
-                row=row, col=file_grid.colindex_get("video_file")
-            )
+        for row in range(self._file_grid.row_count):
+            user_data: Video_Data = self._file_grid.userdata_get(row=row, col=col_index)
 
             if user_data and vd_id == user_data.vd_id:
                 encoding_info = dvdarch_utils.Get_File_Encoding_Info(updated_file)
@@ -508,6 +568,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                     video_extension=trimmed_extension,
                     encoding_info=encoding_info,
                     video_file_settings=user_data.video_file_settings,
+                    vd_id=user_data.vd_id,
                 )
 
                 duration = str(
@@ -517,14 +578,13 @@ class Video_File_Grid(DVD_Archiver_Base):
                 ).split(".")[0]
 
                 self._populate_grid_row(
-                    file_grid=file_grid,
                     row_index=row,
                     video_data=updated_user_data,
                     duration=duration,
                 )
 
-                for col in range(0, file_grid.col_count):
-                    file_grid.userdata_set(
+                for col in range(0, self._file_grid.col_count):
+                    self._file_grid.userdata_set(
                         row=row, col=col, user_data=updated_user_data
                     )
 
@@ -583,17 +643,12 @@ class Video_File_Grid(DVD_Archiver_Base):
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "bulk_select":
-                        file_grid: qtg.Grid = cast(
-                            qtg.Grid,
-                            event.widget_get(
-                                container_tag="video_file_controls",
-                                tag="video_input_files",
-                            ),
+                        self._file_grid.checkitems_all(
+                            checked=event.value, col_tag=self.VIDEO_FILE_COL
                         )
 
-                        file_grid.checkitems_all(
-                            checked=event.value, col_tag="video_file"
-                        )
+                        for row_index in range(self._file_grid.row_count):
+                            self._row_checked[row_index] = event.value
 
                         self.set_project_standard_duration(event)
                     case "normalise":
@@ -671,15 +726,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             f"{event=}. Must be an instance of qtg.Action"
         )
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
-
-        if save_existing and file_grid.changed:
+        if save_existing and self._file_grid.changed:
             self._save_grid(event)
 
         self.project_name = project_name
@@ -697,10 +744,10 @@ class Video_File_Grid(DVD_Archiver_Base):
         self._db_settings.setting_set(sys_consts.LATEST_PROJECT_DBK, self.project_name)
 
         if self.project_name in project_names:  # Existing Project
-            file_grid.clear()
+            self._file_grid.clear()
             self._load_grid(event)
         else:
-            file_grid.clear()
+            self._file_grid.clear()
 
         self._save_grid(event)
 
@@ -825,14 +872,6 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         message = ""
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
-
         # Get the required file paths
         file_handler = file_utils.File()
         video_editor_folder = Get_Video_Editor_Folder()
@@ -887,7 +926,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 return None
 
         # Transcode or Join the selected files
-        checked_items = file_grid.checkitems_get
+        checked_items = self._file_grid.checkitems_get
 
         if not checked_items:
             popups.PopError(
@@ -964,8 +1003,8 @@ class Video_File_Grid(DVD_Archiver_Base):
         video_file_data = []
         removed_files = []
         output_file = ""
-        vd_id = -1
-        button_title = ""
+        # vd_id = -1
+        # button_title = ""
         transcode_format = "mp4"  # TODO Make user selectable - mpg, mp4
 
         for item in checked_items:
@@ -973,8 +1012,8 @@ class Video_File_Grid(DVD_Archiver_Base):
             video_data: Video_Data = item.user_data
 
             if not output_file:  # Happens on first iteration
-                vd_id = video_data.vd_id
-                button_title = video_data.video_file_settings.button_title
+                # vd_id = video_data.vd_id
+                # button_title = video_data.video_file_settings.button_title
                 output_file = file_handler.file_join(
                     dir_path=transcode_folder,
                     file_name=f"{video_data.video_file}_joined",
@@ -1109,7 +1148,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                             ) in transcoded_files:
                                 result, message = self._processed_trimmed(
                                     vd_id=vd_id,
-                                    file_grid=file_grid,
                                     updated_file=transcoded_file,
                                     button_title=button_title,
                                 )
@@ -1157,7 +1195,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                             button_title = video_data.video_file_settings.button_title
 
                             result, message = self._processed_trimmed(
-                                file_grid=file_grid,
                                 vd_id=vd_id,
                                 updated_file=output_file,
                                 button_title=button_title,
@@ -1165,7 +1202,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                             for item in reversed(checked_items):
                                 if item.user_data and vd_id != item.user_data.vd_id:
-                                    file_grid.row_delete(item.row_index)
+                                    self._file_grid.row_delete(item.row_index)
 
         if result == -1:
             popups.PopError(
@@ -1193,26 +1230,18 @@ class Video_File_Grid(DVD_Archiver_Base):
             f"{event=}. Must be an instance of qtg.Action"
         )
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
-
         if (
-            file_grid.row_count > 0
-            and file_grid.checkitems_get
+            self._file_grid.row_count > 0
+            and self._file_grid.checkitems_get
             and popups.PopYesNo(
                 title="Remove Selected...",
                 message="Remove The Selected Files?",
             ).show()
             == "yes"
         ):
-            for item in reversed(file_grid.checkitems_get):
+            for item in reversed(self._file_grid.checkitems_get):
                 item: qtg.Grid_Item
-                file_grid.row_delete(item.row_index)
+                self._file_grid.row_delete(item.row_index)
             self._save_grid(event)
 
         self.set_project_standard_duration(event)
@@ -1235,18 +1264,10 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         assert isinstance(up, bool), f"{up=}. Must be bool"
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
-
         checked_items: tuple[qtg.Grid_Item] = (
-            file_grid.checkitems_get
+            self._file_grid.checkitems_get
             if up
-            else tuple(reversed(file_grid.checkitems_get))
+            else tuple(reversed(self._file_grid.checkitems_get))
         )
 
         assert all(isinstance(item, qtg.Grid_Item) for item in checked_items), (
@@ -1281,40 +1302,42 @@ class Video_File_Grid(DVD_Archiver_Base):
                 if checked_item.row_index == 0:
                     break
             else:
-                if checked_item.row_index == file_grid.row_count - 1:
+                if checked_item.row_index == self._file_grid.row_count - 1:
                     break
 
-            file_grid.checkitemrow_set(
-                False, checked_item.row_index, file_grid.colindex_get("video_file")
+            self._file_grid.checkitemrow_set(
+                False,
+                checked_item.row_index,
+                self._file_grid.colindex_get(self.VIDEO_FILE_COL),
             )
-            file_grid.select_row(checked_item.row_index)
+            self._file_grid.select_row(checked_item.row_index)
 
             current_row = checked_item.row_index
-            group_disp = file_grid.value_get(
-                current_row, file_grid.colindex_get("group")
+            group_disp = self._file_grid.value_get(
+                current_row, self._file_grid.colindex_get(self.GROUP_COL)
             )
             group_id = int(group_disp) if group_disp else -1
-            current_video_data: Video_Data = file_grid.userdata_get(
-                current_row, file_grid.colindex_get("group")
+            current_video_data: Video_Data = self._file_grid.userdata_get(
+                current_row, self._file_grid.colindex_get(self.GROUP_COL)
             )
 
             if up and current_row > 1:
                 # look backward for group id to use if no group id is found in the current row
                 look_backward_group_id = ""
                 if current_row > 2:
-                    look_backward_group_id = file_grid.value_get(
-                        current_row - 2, file_grid.colindex_get("group")
+                    look_backward_group_id = self._file_grid.value_get(
+                        current_row - 2, self._file_grid.colindex_get(self.GROUP_COL)
                     )
 
-                prev_group_id = file_grid.value_get(
-                    current_row - 1, file_grid.colindex_get("group")
+                prev_group_id = self._file_grid.value_get(
+                    current_row - 1, self._file_grid.colindex_get(self.GROUP_COL)
                 )
                 if not prev_group_id and look_backward_group_id:
                     prev_group_id = look_backward_group_id
 
                 if prev_group_id:
-                    prev_video_data: Video_Data = file_grid.userdata_get(
-                        current_row - 1, file_grid.colindex_get("group")
+                    prev_video_data: Video_Data = self._file_grid.userdata_get(
+                        current_row - 1, self._file_grid.colindex_get(self.GROUP_COL)
                     )
                     group_id = int(prev_group_id)
                     current_video_data.video_file_settings.menu_group = (
@@ -1323,23 +1346,23 @@ class Video_File_Grid(DVD_Archiver_Base):
                 else:
                     group_id = -1
 
-            elif not up and current_row < file_grid.row_count - 1:
+            elif not up and current_row < self._file_grid.row_count - 1:
                 # look ahead for group id to use if no group id is found in the current row
                 look_forward_group_id = ""
-                if current_row < file_grid.row_count - 2:
-                    look_forward_group_id = file_grid.value_get(
-                        current_row + 2, file_grid.colindex_get("group")
+                if current_row < self._file_grid.row_count - 2:
+                    look_forward_group_id = self._file_grid.value_get(
+                        current_row + 2, self._file_grid.colindex_get(self.GROUP_COL)
                     )
 
-                next_group_id = file_grid.value_get(
-                    current_row + 1, file_grid.colindex_get("group")
+                next_group_id = self._file_grid.value_get(
+                    current_row + 1, self._file_grid.colindex_get(self.GROUP_COL)
                 )
                 if not next_group_id and look_forward_group_id:
                     next_group_id = look_forward_group_id
 
                 if next_group_id:
-                    next_video_data: Video_Data = file_grid.userdata_get(
-                        current_row + 1, file_grid.colindex_get("group")
+                    next_video_data: Video_Data = self._file_grid.userdata_get(
+                        current_row + 1, self._file_grid.colindex_get(self.GROUP_COL)
                     )
                     group_id = int(next_group_id)
                     current_video_data.video_file_settings.menu_group = (
@@ -1348,39 +1371,42 @@ class Video_File_Grid(DVD_Archiver_Base):
                 else:
                     group_id = -1
 
-            file_grid.value_set(
+            self._file_grid.value_set(
                 row=current_row,
-                col=file_grid.colindex_get("group"),
+                col=self._file_grid.colindex_get(self.GROUP_COL),
                 value=str(group_id) if group_id >= 0 else "",
                 user_data=current_video_data,
             )
 
-            for col in range(file_grid.col_count):
-                file_grid.userdata_set(
+            for col in range(self._file_grid.col_count):
+                self._file_grid.userdata_set(
                     row=current_row,
                     col=col,
                     user_data=current_video_data,
                 )
 
             new_row = (
-                file_grid.move_row_up(current_row)
+                self._file_grid.move_row_up(current_row)
                 if up
-                else file_grid.move_row_down(current_row)
+                else self._file_grid.move_row_down(current_row)
             )
 
             if new_row >= 0:
-                file_grid.checkitemrow_set(
-                    True, new_row, file_grid.colindex_get("video_file")
+                self._file_grid.checkitemrow_set(
+                    True, new_row, self._file_grid.colindex_get(self.VIDEO_FILE_COL)
                 )
-                file_grid.select_col(new_row, file_grid.colindex_get("video_file"))
+                self._file_grid.select_col(
+                    new_row, self._file_grid.colindex_get(self.VIDEO_FILE_COL)
+                )
             else:
-                file_grid.checkitemrow_set(
+                self._file_grid.checkitemrow_set(
                     True,
                     checked_items[0].row_index,
-                    file_grid.colindex_get("video_file"),
+                    self._file_grid.colindex_get(self.VIDEO_FILE_COL),
                 )
-                file_grid.select_col(
-                    checked_items[0].row_index, file_grid.colindex_get("video_file")
+                self._file_grid.select_col(
+                    checked_items[0].row_index,
+                    self._file_grid.colindex_get(self.VIDEO_FILE_COL),
                 )
 
         return None
@@ -1397,14 +1423,6 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         file_handler = file_utils.File()
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
-
         removed_files = []
 
         with qtg.sys_cursor(qtg.Cursor.hourglass):
@@ -1419,7 +1437,8 @@ class Video_File_Grid(DVD_Archiver_Base):
             grid_row = 0
             for shelf_item in shelf_list:
                 if (
-                    shelf_item["video_data"] is None or shelf_item["duration"] is None
+                    shelf_item["video_data"] is None
+                    or shelf_item[self.DURATION_COL] is None
                 ):  # This is an error and should not happen
                     continue
 
@@ -1428,13 +1447,12 @@ class Video_File_Grid(DVD_Archiver_Base):
                     continue
 
                 video_data: Video_Data = shelf_item["video_data"]
-                duration: str = shelf_item["duration"]
+                duration: str = shelf_item[self.DURATION_COL]
 
                 if video_data is None or duration is None:
                     continue
 
                 self._populate_grid_row(
-                    file_grid=file_grid,
                     row_index=grid_row,
                     video_data=video_data,
                     duration=duration,
@@ -1446,22 +1464,22 @@ class Video_File_Grid(DVD_Archiver_Base):
                     else "",
                 )
                 toolbox = self._get_toolbox(shelf_item["video_data"])
-                file_grid.row_widget_set(
+                self._file_grid.row_widget_set(
                     row=grid_row,
-                    col=file_grid.colindex_get("settings"),
+                    col=self._file_grid.colindex_get(self.SETTINGS_COL),
                     widget=toolbox,
                 )
 
                 grid_row += 1
 
-            file_grid.row_scroll_to(0)
+            self._file_grid.row_scroll_to(0)
             self.set_project_standard_duration(event)
 
             # Cleanup pass to ensure correctness of grid
             for check_row_index in reversed(range(self._file_grid.row_count)):
                 grid_video_data: Video_Data = self._file_grid.userdata_get(
                     row=check_row_index,
-                    col=self._file_grid.colindex_get("video_file"),
+                    col=self._file_grid.colindex_get(self.VIDEO_FILE_COL),
                 )
 
                 # If grid_video_data is None, something went off the rails badly
@@ -1472,7 +1490,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 if check_row_index > 0:
                     prior_grid_video_data: Video_Data = self._file_grid.userdata_get(
                         row=check_row_index - 1,
-                        col=self._file_grid.colindex_get("video_file"),
+                        col=self._file_grid.colindex_get(self.VIDEO_FILE_COL),
                     )
 
                     if prior_grid_video_data is None:
@@ -1525,14 +1543,6 @@ class Video_File_Grid(DVD_Archiver_Base):
 
         error_title: Final[str] = "File Grid Save Error..."
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
-
         sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
 
         if sql_shelf.error.code == -1:
@@ -1553,18 +1563,18 @@ class Video_File_Grid(DVD_Archiver_Base):
                 return None
 
             row_data = []
-            for row in range(file_grid.row_count):
+            for row in range(self._file_grid.row_count):
                 if (
-                    file_grid.userdata_get(row=row, col=0) is None
-                    or file_grid.colindex_get("duration") is None
+                    self._file_grid.userdata_get(row=row, col=0) is None
+                    or self._file_grid.colindex_get(self.DURATION_COL) is None
                 ):
                     continue  # This is an error and should not happen
 
                 row_data.append({
                     "row_index": row,
-                    "video_data": file_grid.userdata_get(row=row, col=0),
-                    "duration": file_grid.value_get(
-                        row=row, col=file_grid.colindex_get("duration")
+                    "video_data": self._file_grid.userdata_get(row=row, col=0),
+                    "duration": self._file_grid.value_get(
+                        row=row, col=self._file_grid.colindex_get(self.DURATION_COL)
                     ),
                 })
 
@@ -1588,14 +1598,9 @@ class Video_File_Grid(DVD_Archiver_Base):
         """
         file_handler = file_utils.File()
 
-        file_grid: qtg.Grid = event.widget_get(
-            container_tag="video_file_controls",
-            tag="video_input_files",
-        )
-
-        for row_index in range(file_grid.row_count):
-            grid_video_data: Video_Data = file_grid.userdata_get(
-                row=row_index, col=file_grid.colindex_get("video_file")
+        for row_index in range(self._file_grid.row_count):
+            grid_video_data: Video_Data = self._file_grid.userdata_get(
+                row=row_index, col=self._file_grid.colindex_get(self.VIDEO_FILE_COL)
             )
 
             if grid_video_data is None:  # Error loading grid
@@ -1607,48 +1612,47 @@ class Video_File_Grid(DVD_Archiver_Base):
                 )
 
             if self._display_filename:
-                file_grid.value_set(
+                self._file_grid.value_set(
                     row=row_index,
-                    col=file_grid.colindex_get("video_file"),
+                    col=self._file_grid.colindex_get(self.VIDEO_FILE_COL),
                     value=(
                         f"{grid_video_data.video_file}{grid_video_data.video_extension}"
                     ),
                     user_data=grid_video_data,
                 )
             else:
-                file_grid.value_set(
+                self._file_grid.value_set(
                     row=row_index,
-                    col=file_grid.colindex_get("video_file"),
+                    col=self._file_grid.colindex_get(self.VIDEO_FILE_COL),
                     value=grid_video_data.video_file_settings.button_title,
                     user_data=grid_video_data,
                 )
 
-            for col in range(file_grid.col_count):
-                file_grid.userdata_set(
+            for col in range(self._file_grid.col_count):
+                self._file_grid.userdata_set(
                     row=row_index, col=col, user_data=grid_video_data
                 )
 
         return None
 
-    def _get_max_group_num(self, file_grid: qtg.Grid) -> int:
+    def _get_max_group_num(self) -> int:
         """
         Scan all items in the file_grid and return the maximum menu_group number.
 
         Args:
-            file_grid (qtg.Grid): The grid containing the items.
 
         Returns:
             int: The maximum menu_group number.
         """
-        assert isinstance(file_grid, qtg.Grid), (
-            f"{file_grid=}. Must be an instance of qtg.Grid"
+        assert isinstance(self._file_grid, qtg.Grid), (
+            f"{self._file_grid=}. Must be an instance of qtg.Grid"
         )
 
         max_group_num = 0
 
-        for row in range(file_grid.row_count):
-            video_item = file_grid.userdata_get(
-                row=row, col=file_grid.colindex_get("video_file")
+        for row in range(self._file_grid.row_count):
+            video_item = self._file_grid.userdata_get(
+                row=row, col=self._file_grid.colindex_get(self.VIDEO_FILE_COL)
             )
             if isinstance(video_item, Video_Data):
                 menu_group = video_item.video_file_settings.menu_group
@@ -1665,15 +1669,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             event (qtg.Action): The event triggering the grouping.
         """
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
-
-        checked_items = file_grid.checkitems_get
+        checked_items = self._file_grid.checkitems_get
 
         if not checked_items:
             popups.PopError(
@@ -1685,7 +1681,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         ungrouped = []
         group_id = -1
         group_aspect_ratio = ""  # All group members must be the same aspect ratio
-        max_group_val = self._get_max_group_num(file_grid)
+        max_group_val = self._get_max_group_num()
 
         for item in checked_items:
             video_item: Video_Data = item.user_data
@@ -1735,13 +1731,18 @@ class Video_File_Grid(DVD_Archiver_Base):
                 continue
 
             video_item.video_file_settings.menu_group = group_value
-            file_grid.value_set(
+            self._file_grid.value_set(
                 row=item.row_index,
-                col=file_grid.colindex_get("group"),
+                col=self._file_grid.colindex_get(self.GROUP_COL),
                 value=f"{group_value}",
                 user_data=video_item,
             )
-        file_grid.checkitems_all(checked=False)
+        self._file_grid.checkitems_all(checked=False)
+        for row in range(self._file_grid.row_count):
+            self._row_checked[row] = False
+        event.value_set(
+            container_tag="video_file_controls", tag="bulk_select", value=False
+        )
 
         return None
 
@@ -1760,15 +1761,7 @@ class Video_File_Grid(DVD_Archiver_Base):
             f"{event=}. Must be an instance of qtg.Action"
         )
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
-
-        checked_items = file_grid.checkitems_get
+        checked_items = self._file_grid.checkitems_get
 
         if not checked_items:
             popups.PopError(
@@ -1785,12 +1778,19 @@ class Video_File_Grid(DVD_Archiver_Base):
             for item in checked_items:
                 video_item: Video_Data = item.user_data
                 video_item.video_file_settings.menu_group = -1
-                file_grid.value_set(
+                self._file_grid.value_set(
                     row=item.row_index,
-                    col=file_grid.colindex_get("group"),
+                    col=self._file_grid.colindex_get(self.GROUP_COL),
                     value="",
                     user_data=video_item,
                 )
+
+        self._file_grid.checkitems_all(checked=False)
+        for row in range(self._file_grid.row_count):
+            self._row_checked[row] = False
+        event.value_set(
+            container_tag="video_file_controls", tag="bulk_select", value=False
+        )
 
         return None
 
@@ -1812,23 +1812,16 @@ class Video_File_Grid(DVD_Archiver_Base):
         ).show()
 
         if video_file_list:
-            file_grid: qtg.Grid = cast(
-                qtg.Grid,
-                event.widget_get(
-                    container_tag="video_file_controls",
-                    tag="video_input_files",
-                ),
-            )
-
             with qtg.sys_cursor(qtg.Cursor.hourglass):
                 # Performs grid cleansing
                 rejected = self._insert_files_into_grid(video_file_list)
 
-            if file_grid.row_count > 0:
+            if self._file_grid.row_count > 0:
                 loaded_files = []
-                for row_index in reversed(range(file_grid.row_count)):
-                    grid_video_data: Video_Data = file_grid.userdata_get(
-                        row=row_index, col=file_grid.colindex_get("settings")
+                for row_index in reversed(range(self._file_grid.row_count)):
+                    grid_video_data: Video_Data = self._file_grid.userdata_get(
+                        row=row_index,
+                        col=self._file_grid.colindex_get(self.SETTINGS_COL),
                     )
 
                     if grid_video_data is None:
@@ -1838,7 +1831,7 @@ class Video_File_Grid(DVD_Archiver_Base):
                 self._save_grid(event)
 
                 # Keep a list of words common to all file names
-                self.common_words = utils.Find_Common_Words(loaded_files)
+                self._common_words = utils.Find_Common_Words(loaded_files)
 
             self._toggle_file_button_names(event)
             self.set_project_standard_duration(event)
@@ -1882,7 +1875,7 @@ class Video_File_Grid(DVD_Archiver_Base):
         # Get video_standard - PAL/NTSC
         while self._file_grid.row_count > 0:
             grid_video_data = self._file_grid.userdata_get(
-                row=0, col=self._file_grid.colindex_get("video_file")
+                row=0, col=self._file_grid.colindex_get(self.VIDEO_FILE_COL)
             )
 
             if grid_video_data is None:  # The First row is invalid, so remove it
@@ -1895,7 +1888,8 @@ class Video_File_Grid(DVD_Archiver_Base):
             # Check if file already loaded in grid and cleanse the grid of bad data
             for check_row_index in reversed(range(self._file_grid.row_count)):
                 grid_video_data: Video_Data = self._file_grid.userdata_get(
-                    row=check_row_index, col=self._file_grid.colindex_get("video_file")
+                    row=check_row_index,
+                    col=self._file_grid.colindex_get(self.VIDEO_FILE_COL),
                 )
 
                 if grid_video_data is None:  # Invalid row so remove it
@@ -2036,7 +2030,6 @@ class Video_File_Grid(DVD_Archiver_Base):
                     print(f"DBG PGR {file_video_data}")
 
                 self._populate_grid_row(
-                    file_grid=self._file_grid,
                     row_index=rows_loaded + row_index,
                     video_data=file_video_data,
                     duration=duration,
@@ -2044,7 +2037,7 @@ class Video_File_Grid(DVD_Archiver_Base):
 
                 self._file_grid.row_widget_set(
                     row=rows_loaded + row_index,
-                    col=self._file_grid.colindex_get("settings"),
+                    col=self._file_grid.colindex_get(self.SETTINGS_COL),
                     widget=toolbox,
                 )
 
@@ -2080,7 +2073,6 @@ class Video_File_Grid(DVD_Archiver_Base):
 
     def _populate_grid_row(
         self,
-        file_grid: qtg.Grid,
         row_index: int,
         video_data: Video_Data,
         duration: str,
@@ -2090,16 +2082,12 @@ class Video_File_Grid(DVD_Archiver_Base):
         """Populates the grid row with the video information.
 
         Args:
-            file_grid (qtg.Grid): The grid to populate.
             row_index (int): The index of the row to populate.
             video_data (File_Control.Video_Data): The video data to populate.
             duration (str): The duration of the video.
             italic (bool): Whether the text should be italic. Defaults to False.
             tooltip (str): The tooltip text. Defaults to "".
         """
-        assert isinstance(file_grid, qtg.Grid), (
-            f"{file_grid=}. Must be an instance of qtg.Grid"
-        )
         assert isinstance(video_data, Video_Data), (
             f"{video_data=}. Must be an instance of File_Control.Video_Data"
         )
@@ -2114,30 +2102,30 @@ class Video_File_Grid(DVD_Archiver_Base):
                 f"{sys_consts.SDELIM}{video_data.video_path}{sys_consts.SDELIM}"
             )
 
-        file_grid.value_set(
+        self._file_grid.value_set(
             value=(
                 f"{video_data.video_file}{video_data.video_extension}"
                 if self._display_filename
                 else video_data.video_file_settings.button_title
             ),
             row=row_index,
-            col=file_grid.colindex_get("video_file"),
+            col=self._file_grid.colindex_get(self.VIDEO_FILE_COL),
             user_data=video_data,
             tooltip=value_tooltip,
             italic=italic,
         )
 
-        file_grid.value_set(
+        self._file_grid.value_set(
             value=str(video_data.encoding_info.video_width),
             row=row_index,
-            col=file_grid.colindex_get("width"),
+            col=self._file_grid.colindex_get(self.WIDTH_COL),
             user_data=video_data,
         )
 
-        file_grid.value_set(
+        self._file_grid.value_set(
             value=str(video_data.encoding_info.video_height),
             row=row_index,
-            col=file_grid.colindex_get("height"),
+            col=self._file_grid.colindex_get(self.HEIGHT_COL),
             user_data=video_data,
         )
 
@@ -2151,46 +2139,46 @@ class Video_File_Grid(DVD_Archiver_Base):
             )
         )
 
-        cur_value = file_grid.trans_get
-        file_grid.trans_set(False)
+        cur_value = self._file_grid.trans_get
+        self._file_grid.trans_set(False)
 
-        file_grid.value_set(
+        self._file_grid.value_set(
             value=encoder_str,
             tooltip=encoder_str,
             row=row_index,
-            col=file_grid.colindex_get("encoder"),
+            col=self._file_grid.colindex_get(self.ENCODER_COL),
             user_data=video_data,
         )
-        file_grid.trans_set(cur_value)
+        self._file_grid.trans_set(cur_value)
 
-        file_grid.value_set(
+        self._file_grid.value_set(
             value=duration,
             row=row_index,
-            col=file_grid.colindex_get("duration"),
+            col=self._file_grid.colindex_get(self.DURATION_COL),
             user_data=video_data,
         )
 
-        file_grid.value_set(
+        self._file_grid.value_set(
             value=video_data.encoding_info.video_standard,
             row=row_index,
-            col=file_grid.colindex_get("standard"),
+            col=self._file_grid.colindex_get(self.STANDARD_COL),
             user_data=video_data,
         )
 
-        file_grid.value_set(
+        self._file_grid.value_set(
             value=(
                 f"{video_data.video_file_settings.menu_group}"
                 if video_data.video_file_settings.menu_group >= 0
                 else ""
             ),
             row=row_index,
-            col=file_grid.colindex_get("group"),
+            col=self._file_grid.colindex_get(self.GROUP_COL),
             user_data=video_data,
         )
 
-        file_grid.userdata_set(
+        self._file_grid.userdata_set(
             row=row_index,
-            col=file_grid.colindex_get("settings"),
+            col=self._file_grid.colindex_get(self.SETTINGS_COL),
             user_data=video_data,
         )
 
@@ -2208,20 +2196,13 @@ class Video_File_Grid(DVD_Archiver_Base):
             f"{event=}. Must be an instance of qtg.Action"
         )
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
         total_duration = 0.0
         self.project_video_standard = ""
         self._project_duration = ""
         self.dvd_percent_used = 0
 
-        if file_grid.row_count > 0:
-            for checked_item in file_grid.checkitems_get:
+        if self._file_grid.row_count > 0:
+            for checked_item in self._file_grid.checkitems_get:
                 checked_item: qtg.Grid_Item
                 video_data: Video_Data = checked_item.user_data
 
@@ -2236,16 +2217,16 @@ class Video_File_Grid(DVD_Archiver_Base):
 
             # If something broke on grid load and grid data is corrupt, then delete those rows
             while (
-                file_grid.row_count > 0
-                and file_grid.userdata_get(
-                    row=0, col=file_grid.colindex_get("settings")
+                self._file_grid.row_count > 0
+                and self._file_grid.userdata_get(
+                    row=0, col=self._file_grid.colindex_get(self.SETTINGS_COL)
                 )
                 is None
             ):
-                file_grid.row_delete(0)
+                self._file_grid.row_delete(0)
 
-            user_data = file_grid.userdata_get(
-                row=0, col=file_grid.colindex_get("settings")
+            user_data = self._file_grid.userdata_get(
+                row=0, col=self._file_grid.colindex_get(self.SETTINGS_COL)
             )
 
             if user_data is not None:
@@ -2426,56 +2407,56 @@ class Video_File_Grid(DVD_Archiver_Base):
         file_col_def = (
             qtg.Col_Def(
                 label="",
-                tag="settings",
+                tag=self.SETTINGS_COL,
                 width=1,
                 editable=False,
                 checkable=False,
             ),
             qtg.Col_Def(
                 label="Grp",
-                tag="group",
+                tag=self.GROUP_COL,
                 width=3,
                 editable=False,
                 checkable=False,
             ),
             qtg.Col_Def(
                 label="Video File",
-                tag="video_file",
+                tag=self.VIDEO_FILE_COL,
                 width=80,
                 editable=False,
                 checkable=True,
             ),
             qtg.Col_Def(
                 label="Width",
-                tag="width",
+                tag=self.WIDTH_COL,
                 width=6,
                 editable=False,
                 checkable=False,
             ),
             qtg.Col_Def(
                 label="Height",
-                tag="height",
+                tag=self.HEIGHT_COL,
                 width=6,
                 editable=False,
                 checkable=False,
             ),
             qtg.Col_Def(
                 label="Encoder",
-                tag="encoder",
+                tag=self.ENCODER_COL,
                 width=7,
                 editable=False,
                 checkable=False,
             ),
             qtg.Col_Def(
                 label="System",
-                tag="standard",
+                tag=self.STANDARD_COL,
                 width=7,
                 editable=False,
                 checkable=False,
             ),
             qtg.Col_Def(
                 label="Duration",
-                tag="duration",
+                tag=self.DURATION_COL,
                 width=7,
                 editable=False,
                 checkable=False,
