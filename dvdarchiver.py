@@ -287,374 +287,358 @@ class DVD_Archiver(DVD_Archiver_Base):
                     f" {error_status.message}"
                 )
 
-    def event_handler(self, event: qtg.Action) -> int | None:
+    def event_handler(self, event: qtg.Action) -> None:
         """Handles application events
 
         Args:
-            event (Action): The triggering event
-        """
-        if self._file_control:
-            self._file_control.event_handler(event)
-
-        match event.event:
-            case qtg.Sys_Events.APPINIT:
-                pass
-            case qtg.Sys_Events.APPEXIT | qtg.Sys_Events.APPCLOSED:
-                if not self._shutdown:  # Prevent getting called twice
-                    self._shutdown = True
-                    if (
-                        popups.PopYesNo(
-                            title="Exit Application...",
-                            message=(
-                                "Exit The"
-                                f" {sys_consts.SDELIM}{sys_consts.PROGRAM_NAME}?{sys_consts.SDELIM}"
-                            ),
-                        ).show()
-                        == "yes"
-                    ):
-                        if (
-                            self._video_editor.shutdown() == 1
-                            # and self._file_control.shutdown() == 1
-                        ):
-                            # Remove the temporary DVD Build Folder subdirectories
-                            with qtg.sys_cursor(qtg.Cursor.hourglass):
-                                if self._db_settings.setting_exist(
-                                    sys_consts.DVD_BUILD_FOLDER_DBK
-                                ):
-                                    file_handler = file_utils.File()
-
-                                    working_folder = self._db_settings.setting_get(
-                                        sys_consts.DVD_BUILD_FOLDER_DBK
-                                    )
-
-                                    dvd_working_folder = file_handler.file_join(
-                                        working_folder, sys_consts.DVD_BUILD_FOLDER_NAME
-                                    )
-
-                                    file_handler.remove_dir_contents(
-                                        dvd_working_folder, keep_parent=True
-                                    )
-
-                            return 1
-                        else:
-                            self._shutdown = False
-                            return -1
-                    else:
-                        self._shutdown = False
-                        return -1
-            case qtg.Sys_Events.APPPOSTINIT:
-                pass  # Consumed in video_file_grid caught in CUSTOM/project_changed below
-            case qtg.Sys_Events.CHANGED:  # Tab changed!
-                match event.tag:
-                    case "control_tab":
-                        with qtg.sys_cursor(qtg.Cursor.hourglass):
-                            self._video_editor.video_pause()
-                            self._video_editor.archive_edit_list_write()
-
-                        if self._video_editor.video_file_input:
-                            self._file_control.process_edited_video_files(
-                                video_file_input=self._video_editor.video_file_input
-                            )
-
-                            self._tab_enable_handler(event=event, enable=True)
-                    case "video_editor_tab":
-                        with qtg.sys_cursor(qtg.Cursor.hourglass):
-                            self._tab_enable_handler(event=event, enable=False)
-
-            case qtg.Sys_Events.CLICKED:
-                match event.tag:
-                    case "archive_folder_select":
-                        self._archive_folder_select(event)
-                    case "backup_bluray":
-                        self._db_settings.setting_set(
-                            sys_consts.ARCHIVE_DISK_SIZE_DBK,
-                            sys_consts.BLUERAY_ARCHIVE_SIZE,
-                        )
-                    case "backup_dvd":
-                        self._db_settings.setting_set(
-                            sys_consts.ARCHIVE_DISK_SIZE_DBK,
-                            sys_consts.DVD_ARCHIVE_SIZE,
-                        )
-                    case "delete_dvd_layout":
-                        self._delete_dvd_layout(event)
-                    case "delete_project":
-                        self._delete_project(event)
-                    case "dvd_folder_select":
-                        self._dvd_folder_select(event)
-                    case "exit_app":
-                        self._DVD_Arch_App.app_exit()
-                    case "langtran":
-                        popups.Langtran_Popup().show()
-                    case "make_dvd":
-                        self._make_dvd(event)
-                    case "new_dvd_layout":
-                        self._new_dvd_layout(event)
-                    case "new_project":
-                        self._new_project(event)
-                    case "streaming_folder_select":
-                        self._streaming_folder_select(event)
-                    case "task_manager":
-                        if self._video_editor.get_task_manager:
-                            Task_Manager_Popup(
-                                title="Task Manager",
-                                task_manager=self._video_editor.get_task_manager,
-                            ).show()
-                    case "transcode_none":
-                        self._db_settings.setting_set(
-                            sys_consts.ARCHIVE_DISK_TRANSCODE_DBK,
-                            sys_consts.TRANSCODE_NONE,
-                        )
-                    case "transcode_archival":
-                        self._db_settings.setting_set(
-                            sys_consts.ARCHIVE_DISK_TRANSCODE_DBK,
-                            sys_consts.TRANSCODE_FFV1ARCHIVAL,
-                        )
-                    case "transcode_h264":
-                        self._db_settings.setting_set(
-                            sys_consts.ARCHIVE_DISK_TRANSCODE_DBK,
-                            sys_consts.TRANSCODE_H264,
-                        )
-                    case "transcode_h265":
-                        self._db_settings.setting_set(
-                            sys_consts.ARCHIVE_DISK_TRANSCODE_DBK,
-                            sys_consts.TRANSCODE_H265,
-                        )
-                    case "video_editor":  # Signal from file_grid
-                        video_edit_folder = Get_Video_Editor_Folder()
-                        video_data: list[Video_Data] = event.value
-
-                        if video_data[0].encoding_info.error.strip():
-                            popups.PopError(
-                                title="Video File Is Not Supported Or Corrupt...",
-                                message=(
-                                    "Selected Video File Is Not  Supported Or Corrupt"
-                                    f" ({sys_consts.SDELIM}{video_data[0].encoding_info.error}{sys_consts.SDELIM})"
-                                    f" : {sys_consts.SDELIM}{video_data[0].video_path}{sys_consts.SDELIM} "
-                                ),
-                            ).show()
-
-                            return None
-
-                        if (
-                            video_data[0].encoding_info.video_duration
-                            < 5  # 5 seconds seems a reasonable minimum
-                        ):
-                            if (
-                                popups.PopYesNo(
-                                    title="Video File Is Too Short...",
-                                    message=(
-                                        "Open Selected Short Video File ?"
-                                        f" ({sys_consts.SDELIM}{video_data[0].encoding_info.video_duration}{sys_consts.SDELIM} seconds)"
-                                        f" : {sys_consts.SDELIM}{video_data[0].video_path}{sys_consts.SDELIM} "
-                                    ),
-                                ).show()
-                                == "no"
-                            ):
-                                return None
-
-                        if video_edit_folder.strip() == "":
-                            popups.PopError(
-                                title="DVD Build Folder Not Set...",
-                                message=(
-                                    "Please Enter The DVD Build Folder To Edit Video"
-                                    " Files"
-                                ),
-                            ).show()
-                            return None
-
-                        self._video_editor.set_source(
-                            video_file_input=video_data,
-                            output_folder=video_edit_folder,
-                            project_name=self._file_control.project_name,
-                        )
-                        self._control_tab.select_tab(tag_name="video_editor_tab")
-                        self._control_tab.enable_set(
-                            tag="video_editor_tab", enable=True
-                        )
-
-            case (
-                qtg.Sys_Events.CUSTOM
-            ):  # APPPOSTINIT is consumed and CUSTOM is emitted in its place
-                match event.tag:
-                    case "project_changed":
-                        if event.widget_exist(
-                            container_tag="main_controls", tag="existing_projects"
-                        ):
-                            project_combo: qtg.ComboBox = cast(
-                                qtg.ComboBox,
-                                event.widget_get(
-                                    container_tag="main_controls",
-                                    tag="existing_projects",
-                                ),
-                            )
-
-                            project_combo.select_text(
-                                self._file_control.project_name, partial_match=False
-                            )
-
-                        self._control_tab.select_tab(tag_name="control_tab")
-                        self._control_tab.enable_set(
-                            tag="video_editor_tab", enable=False
-                        )
-
-                        # Because APPPOSTINIT is consumed in the video file grid, this is how we achieve the same thing
-                        # as CUSTOM is emitted at startup
-                        if self._startup:
-                            self._startup_handler(event)
-
-                        self._startup = False
-
-            case qtg.Sys_Events.INDEXCHANGED:  # Combobox changes
-                match event.tag:
-                    case "existing_projects":
-                        self._project_combo_change(event)
-                    case "countries":
-                        if not self._startup:
-                            self._language_setting_handler(event)
-
-        return None
-
-    def _language_setting_handler(self, event: qtg.Action) -> None:
-        """Handles the setting of the application language
-
-        Args:
             event (qtg.Action): The triggering event
         """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
 
-        combo_data: qtg.Combo_Data = event.value
-        if combo_data.data == "N/A":  # Sets default language - untranslated is English
-            self._db_settings.setting_set(
-                setting_name=sys_consts.APP_LANG_DBK,
-                setting_value="",
-            )
+        #### Helper
+        def _handle_app_init_event() -> None:
+            """Handles the APPINIT event.
 
-            self._db_settings.setting_set(
-                setting_name=sys_consts.APP_COUNTRY_DBK,
-                setting_value="",
-            )
-        else:
-            self._db_settings.setting_set(
-                setting_name=sys_consts.APP_LANG_DBK,
-                setting_value=combo_data.data,
-            )
-            self._db_settings.setting_set(
-                setting_name=sys_consts.APP_COUNTRY_DBK,
-                setting_value=combo_data.display,
-            )
+            This function is called when the application is initializing.
+            """
+            pass
 
-    def _startup_handler(self, event: qtg.Action) -> None:
-        """Performs activities that have to happen at startup
+            return None
 
-        Args:
-            event (qtg.Action): The triggering event
-        """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+        def _handle_app_exit_event() -> int:
+            """Handles the APPEXIT and APPCLOSED events.
 
-        if event.widget_exist(
-            container_tag="app_lang", tag="countries"
-        ):  # Selects tha app language
-            country_combo: qtg.ComboBox = cast(
-                qtg.ComboBox,
-                event.widget_get(container_tag="app_lang", tag="countries"),
-            )
+            This method is called when the application is exiting or closing.
+            It displays a confirmation dialog, shuts down the video editor,
+            and removes temporary DVD build folder subdirectories.
 
-            if self._db_settings.setting_exist(setting_name=sys_consts.APP_COUNTRY_DBK):
-                app_country = self._db_settings.setting_get(
-                    setting_name=sys_consts.APP_COUNTRY_DBK
+            Returns:
+                int : 1 if the application exits successfully, -1 if the
+                    exit is canceled or fails, 1 otherwise.
+            """
+            if self._shutdown:
+                return 1  # Exit if already shutting down
+
+            self._shutdown = True
+
+            if (
+                popups.PopYesNo(
+                    title="Exit Application...",
+                    message=(
+                        "Exit The"
+                        f" {sys_consts.SDELIM}{sys_consts.PROGRAM_NAME}?{sys_consts.SDELIM}"
+                    ),
+                ).show()
+                == "yes"
+            ):
+                if self._video_editor.shutdown() == 1:
+                    # Remove the temporary DVD Build Folder subdirectories
+                    with qtg.sys_cursor(qtg.Cursor.hourglass):
+                        if self._db_settings.setting_exist(
+                            sys_consts.DVD_BUILD_FOLDER_DBK
+                        ):
+                            file_handler = file_utils.File()
+                            working_folder = self._db_settings.setting_get(
+                                sys_consts.DVD_BUILD_FOLDER_DBK
+                            )
+                            dvd_working_folder = file_handler.file_join(
+                                working_folder, sys_consts.DVD_BUILD_FOLDER_NAME
+                            )
+                            file_handler.remove_dir_contents(
+                                dvd_working_folder, keep_parent=True
+                            )
+                    return 1
+
+            self._shutdown = False
+
+            return -1
+
+        def _handle_app_post_init_event() -> None:
+            """Handles the APPPOSTINIT event.
+
+            This method is called after the application is initialized.
+            It is currently consumed in the video_file_grid.
+
+            Args:
+
+            """
+            pass  # Consumed in video_file_grid caught in CUSTOM/project_changed below
+
+        def _handle_changed_event(event: qtg.Action) -> int | None:
+            """Handles the CHANGED event (tab changes).
+
+            This method is called when a tab is changed. It calls the
+            appropriate handler method based on the tab.
+
+            Args:
+                event (qtg.Action): The event triggering the tab change.
+
+            Returns:
+                int | None: The return value of the called handler method, or None.
+            """
+            if event.tag == "control_tab":
+                return _handle_control_tab_changed(event)
+            elif event.tag == "video_editor_tab":
+                return _handle_video_editor_tab_changed(event)
+            return None
+
+        def _handle_control_tab_changed(event: qtg.Action) -> None:
+            """Handles the control_tab CHANGED event.
+
+            This method is called when the control tab is changed. It pauses
+            the video editor, writes the archive edit list, and processes
+            the edited video files.
+
+            Args:
+                event (qtg.Action): The event triggering the control tab change.
+            """
+            with qtg.sys_cursor(qtg.Cursor.hourglass):
+                self._video_editor.video_pause()
+                self._video_editor.archive_edit_list_write()
+
+            if self._video_editor.video_file_input:
+                self._file_control.process_edited_video_files(
+                    video_file_input=self._video_editor.video_file_input
                 )
+                _tab_enable_handler(event=event, enable=True)
 
-                if app_country:
-                    country_combo.select_text(
-                        select_text=app_country,
-                        case_sensitive=False,
-                        partial_match=False,
-                    )
+        def _handle_video_editor_tab_changed(event: qtg.Action) -> None:
+            """Handles the video_editor_tab CHANGED event.
 
-    def _tab_enable_handler(self, event: qtg.Action, enable: bool):
-        """Enables or disables the tab dependent controls
+            This method is called when the video editor tab is changed.
+            It disables certain UI elements.
 
-        Args:
-            event (qtg.Action): The triggering event
-            enable (bool): True - enables tab sensitive controls, False - disables tab sensitive controls
-        """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
-        assert isinstance(enable, bool), f"{enable=}. Must be bool"
+            Args:
+                event (qtg.Action): The event triggering the video editor tab change.
+            """
+            with qtg.sys_cursor(qtg.Cursor.hourglass):
+                _tab_enable_handler(event=event, enable=False)
 
-        if event.widget_exist(
-            container_tag="main_controls", tag="existing_projects"
-        ):  # Buttons are buddies so must exist
-            project_combo: qtg.ComboBox = cast(
-                qtg.ComboBox,
-                event.widget_get(
-                    container_tag="main_controls", tag="existing_projects"
-                ),
+        def _handle_clicked_event(event: qtg.Action) -> int | None:
+            """Handles the CLICKED event.
+
+            This method is called when a UI element is clicked. It calls the
+            appropriate handler method based on the clicked element's tag.
+
+            Args:
+                event (qtg.Action): The event triggering the click.
+
+            Returns:
+                int | None: The return value of the called handler method, or None.
+            """
+            match event.tag:
+                case "archive_folder_select":
+                    _archive_folder_select(event)
+                case "backup_bluray":
+                    _handle_backup_bluray_clicked()
+                case "backup_dvd":
+                    _handle_backup_dvd_clicked()
+                case "delete_dvd_layout":
+                    _delete_dvd_layout(event)
+                case "delete_project":
+                    _delete_project(event)
+                case "dvd_folder_select":
+                    _dvd_folder_select(event)
+                case "exit_app":
+                    _handle_exit_app_clicked()
+                case "langtran":
+                    _handle_langtran_clicked()
+                case "make_dvd":
+                    _make_dvd(event)
+                case "new_dvd_layout":
+                    _new_dvd_layout(event)
+                case "new_project":
+                    _new_project(event)
+                case "streaming_folder_select":
+                    _streaming_folder_select(event)
+                case "task_manager":
+                    _handle_task_manager_clicked()
+                case "transcode_none":
+                    _handle_transcode_none_clicked()
+                case "transcode_archival":
+                    _handle_transcode_archival_clicked()
+                case "transcode_h264":
+                    _handle_transcode_h264_clicked()
+                case "transcode_h265":
+                    _handle_transcode_h265_clicked()
+                case "video_editor":
+                    return _handle_video_editor_clicked(event)
+            return None
+
+        def _handle_backup_bluray_clicked() -> None:
+            """Handles the backup_bluray CLICKED event.
+
+            Sets the archive disk size to Blu-ray.
+            """
+            self._db_settings.setting_set(
+                sys_consts.ARCHIVE_DISK_SIZE_DBK,
+                sys_consts.BLUERAY_ARCHIVE_SIZE,
             )
 
-            delete_button: qtg.Button = cast(
-                qtg.Button,
-                event.widget_get(container_tag="main_controls", tag="delete_project"),
+        def _handle_backup_dvd_clicked() -> None:
+            """Handles the backup_dvd CLICKED event.
+
+            Sets the archive disk size to DVD.
+            """
+            self._db_settings.setting_set(
+                sys_consts.ARCHIVE_DISK_SIZE_DBK,
+                sys_consts.DVD_ARCHIVE_SIZE,
             )
 
-            new_button: qtg.Button = cast(
-                qtg.Button,
-                event.widget_get(container_tag="main_controls", tag="new_project"),
+        def _handle_exit_app_clicked() -> None:
+            """Handles the exit_app CLICKED event.
+
+            Exits the application.
+            """
+            self._DVD_Arch_App.app_exit()
+
+        def _handle_langtran_clicked() -> None:
+            """Handles the langtran CLICKED event.
+
+            Shows the language translation popup.
+            """
+            popups.Langtran_Popup().show()
+
+        def _handle_task_manager_clicked() -> None:
+            """Handles the task_manager CLICKED event.
+
+            Shows the task manager popup.
+            """
+            if self._video_editor.get_task_manager:
+                Task_Manager_Popup(
+                    title="Task Manager",
+                    task_manager=self._video_editor.get_task_manager,
+                ).show()
+
+        def _handle_transcode_none_clicked() -> None:
+            """Handles the transcode_none CLICKED event.
+
+            Sets the archive disk transcode setting to none.
+            """
+            self._db_settings.setting_set(
+                sys_consts.ARCHIVE_DISK_TRANSCODE_DBK,
+                sys_consts.TRANSCODE_NONE,
             )
 
-            delete_button.enable_set(enable)
-            new_button.enable_set(enable)
+        def _handle_transcode_archival_clicked() -> None:
+            """Handles the transcode_archival CLICKED event.
 
-            project_combo.enable_set(enable)
-
-        if event.widget_exist(container_tag="main_controls", tag="existing_layouts"):
-            dvd_layout_combo: qtg.ComboBox = cast(
-                qtg.ComboBox,
-                event.widget_get(container_tag="main_controls", tag="existing_layouts"),
-            )
-            delete_button: qtg.Button = cast(
-                qtg.Button,
-                event.widget_get(
-                    container_tag="main_controls", tag="delete_dvd_layout"
-                ),
+            Sets the archive disk transcode setting to FFV1 archival.
+            """
+            self._db_settings.setting_set(
+                sys_consts.ARCHIVE_DISK_TRANSCODE_DBK,
+                sys_consts.TRANSCODE_FFV1ARCHIVAL,
             )
 
-            new_button: qtg.Button = cast(
-                qtg.Button,
-                event.widget_get(container_tag="main_controls", tag="new_dvd_layout"),
+        def _handle_transcode_h264_clicked() -> None:
+            """Handles the transcode_h264 CLICKED event.
+
+            Sets the archive disk transcode setting to H.264.
+            """
+            self._db_settings.setting_set(
+                sys_consts.ARCHIVE_DISK_TRANSCODE_DBK,
+                sys_consts.TRANSCODE_H264,
             )
-            make_button: qtg.Button = cast(
-                qtg.Button,
-                event.widget_get(container_tag="main_controls", tag="make_dvd"),
+
+        def _handle_transcode_h265_clicked() -> None:
+            """Handles the transcode_h265 CLICKED event.
+
+            Sets the archive disk transcode setting to H.265.
+            """
+            self._db_settings.setting_set(
+                sys_consts.ARCHIVE_DISK_TRANSCODE_DBK,
+                sys_consts.TRANSCODE_H265,
             )
 
-            make_button.enable_set(enable)
-            delete_button.enable_set(enable)
-            new_button.enable_set(enable)
+        def _handle_video_editor_clicked(event: qtg.Action) -> int | None:
+            """Handles the video_editor CLICKED event.
 
-            dvd_layout_combo.enable_set(enable)
+            This method is called when a video file is selected in the file grid
+            and the user wants to edit it. It performs checks on the video file,
+            sets the video source in the video editor, and switches to the
+            video editor tab.
 
-    def _project_combo_change(self, event: qtg.Action):
-        """Handles the change of a project combo item
+            Args:
+                event (qtg.Action): The event triggering the video editor action.
 
-        Args:
-            event (qtg.Action): Triggering event (INDEXCHANGED in this case)
-        """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+            Returns:
+                int | None: None if the video file is not supported, too short,
+                    or the DVD build folder is not set, or the return value from
+                    another called function.
+            """
+            video_edit_folder = Get_Video_Editor_Folder()
+            video_data: list[Video_Data] = event.value
 
-        new_project: qtg.Combo_Item = event.value
+            if video_data[0].encoding_info.error.strip():
+                popups.PopError(
+                    title="Video File Is Not Supported Or Corrupt...",
+                    message=(
+                        "Selected Video File Is Not  Supported Or Corrupt"
+                        f" ({sys_consts.SDELIM}{video_data[0].encoding_info.error}{sys_consts.SDELIM})"
+                        f" : {sys_consts.SDELIM}{video_data[0].video_path}{sys_consts.SDELIM} "
+                    ),
+                ).show()
+                return None
 
-        if (
-            not self._startup
-            and new_project.display.strip()
-            and self._file_control.project_name.strip() != new_project.display.strip()
-        ):
-            self._file_control.project_changed(
-                event, new_project.display, self._save_existing_project
+            if (
+                video_data[0].encoding_info.video_duration
+                < 5  # 5 seconds seems a reasonable minimum
+            ):
+                if (
+                    popups.PopYesNo(
+                        title="Video File Is Too Short...",
+                        message=(
+                            "Open Selected Short Video File ?"
+                            f" ({sys_consts.SDELIM}{video_data[0].encoding_info.video_duration}{sys_consts.SDELIM} seconds)"
+                            f" : {sys_consts.SDELIM}{video_data[0].video_path}{sys_consts.SDELIM} "
+                        ),
+                    ).show()
+                    == "no"
+                ):
+                    return None
+
+            if video_edit_folder.strip() == "":
+                popups.PopError(
+                    title="DVD Build Folder Not Set...",
+                    message="Please Enter The DVD Build Folder To Edit Video Files",
+                ).show()
+                return None
+
+            self._video_editor.set_source(
+                video_file_input=video_data,
+                output_folder=video_edit_folder,
+                project_name=self._file_control.project_name,
             )
+            self._control_tab.select_tab(tag_name="video_editor_tab")
+            self._control_tab.enable_set(tag="video_editor_tab", enable=True)
+            return None
+
+        def _handle_custom_event(event: qtg.Action) -> int | None:
+            """Handles the CUSTOM event.
+
+            This method is called when a custom event is triggered. It calls the
+            appropriate handler method based on the event's tag.
+
+            Args:
+                event (qtg.Action): The custom event.
+
+            Returns:
+                int | None: The return value of the called handler method, or None.
+            """
+            if event.tag == "project_changed":
+                return _handle_project_changed_event(event)
+            return None
+
+        def _handle_project_changed_event(event: qtg.Action) -> None:
+            """Handles the project_changed CUSTOM event.
+
+            This method is called when the project is changed. It updates the
+            project combo box and tab states.
+
+            Args:
+                event (qtg.Action): The event triggering the project change.
+            """
             if event.widget_exist(
                 container_tag="main_controls", tag="existing_projects"
-            ) and event.widget_exist(
-                container_tag="main_controls", tag="existing_layouts"
             ):
                 project_combo: qtg.ComboBox = cast(
                     qtg.ComboBox,
@@ -663,543 +647,154 @@ class DVD_Archiver(DVD_Archiver_Base):
                         tag="existing_projects",
                     ),
                 )
-                layout_combo: qtg.ComboBox = cast(
-                    qtg.ComboBox,
-                    event.widget_get(
-                        container_tag="main_controls",
-                        tag="existing_layouts",
-                    ),
-                )
-
-                layout_combo.clear()
 
                 project_combo.select_text(
                     self._file_control.project_name, partial_match=False
                 )
 
-                _, layout_items, _ = Get_Project_Layout_Names(
-                    self._file_control.project_name
-                )
+            self._control_tab.select_tab(tag_name="control_tab")
+            self._control_tab.enable_set(tag="video_editor_tab", enable=False)
 
-                layout_combo_items = [
-                    qtg.Combo_Data(
-                        index=-1,
-                        display=item.replace("_", " "),
-                        data=item.replace("_", " "),
-                        user_data=None,
-                    )
-                    for item in layout_items
-                ]
+            # Because APPPOSTINIT is consumed in the video file grid, this is how we achieve the same thing
+            # as CUSTOM is emitted at startup
+            if self._startup:
+                _startup_handler(event)
 
-                for item in layout_combo_items:
-                    layout_combo.value_set(item)
+            self._startup = False
 
-    def _archive_folder_select(self, event: qtg.Action) -> None:
-        """Select an archive folder and updates the settings in the database with the selected folder.
-
-        Args:
-            event (qtg.Action): The triggering event
-
-        Note:
-            The selected folder is saved in the database settings for future use.
-
-        """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
-
-        folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER_DBK)
-
-        if folder is None or folder.strip() == "":
-            folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
-
-        folder = popups.PopFolderGet(
-            title="Select An Archive Folder....",
-            root_dir=folder,
-            create_folder=True,
-            folder_edit=False,
-        ).show()
-
-        if folder.strip() != "":
-            self._db_settings.setting_set(sys_consts.ARCHIVE_FOLDER_DBK, folder)
-
-            event.value_set(
-                container_tag="dvd_properties",
-                tag="archive_path",
-                value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
-            )
-
-    def _streaming_folder_select(self, event: qtg.Action) -> None:
-        """Select a streaming folder and updates the settings in the database with the selected folder.
-
-        Args:
-            event (qtg.Action): The triggering event
-
-        Note:
-            The selected folder is saved in the database settings for future use.
-
-        """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
-
-        folder = self._db_settings.setting_get(sys_consts.STREAMING_FOLDER_DBK)
-
-        if folder is None or folder.strip() == "":
-            folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
-
-        folder = popups.PopFolderGet(
-            title="Select A Streaming Folder....",
-            root_dir=folder,
-            create_folder=True,
-            folder_edit=False,
-        ).show()
-
-        if folder.strip() != "":
-            self._db_settings.setting_set(sys_consts.STREAMING_FOLDER_DBK, folder)
-
-            event.value_set(
-                container_tag="dvd_properties",
-                tag="streaming_path",
-                value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
-            )
-
-    def _delete_dvd_layout(self, event: qtg.Action) -> None:
-        """Deletes a dvd layout by removing the corresponding python shelf files
-
-        Args:
-            event (qtg.Action): Triggering event
-        """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
-
-        dvd_layout_combo: qtg.ComboBox = cast(
-            qtg.ComboBox,
-            event.widget_get(container_tag="main_controls", tag="existing_layouts"),
-        )
-
-        layout_data = dvd_layout_combo.value_get()
-
-        if (
-            popups.PopYesNo(
-                title="Delete DVD Layout...",
-                message=(
-                    "Delete DVD Layout"
-                    f" {sys_consts.SDELIM}{layout_data.display}{sys_consts.SDELIM} ? "
-                ),
-            ).show()
-            == "no"
-        ):
             return None
 
-        if (
-            self._file_control.project_name.strip() and layout_data.display.strip()
-        ):  # Should always have
-            result, message = Delete_DVD_Layout(
-                project_name=self._file_control.project_name,
-                layout_name=layout_data.display,
+        def _handle_index_changed_event(event: qtg.Action) -> int | None:
+            """Handles the INDEXCHANGED event.
+
+            This method is called when the selected index of a combobox is changed.
+            It calls the appropriate handler based on which combobox was changed
+
+            Args:
+                event (qtg.Action): The event triggering the index change.
+
+            Returns:
+                int | None: The return value of the called handler, or None
+            """
+            if event.tag == "existing_projects":
+                _project_combo_change(event)
+            elif event.tag == "countries":
+                if not self._startup:
+                    _language_setting_handler(event)
+            return None
+
+        def _delete_dvd_layout(event: qtg.Action) -> None:
+            """Deletes a dvd layout by removing the corresponding python shelf files
+
+            Args:
+                event (qtg.Action): Triggering event
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
+            dvd_layout_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(container_tag="main_controls", tag="existing_layouts"),
             )
 
-            if result == -1:
-                popups.PopError(
-                    title="DB Error...",
+            layout_data = dvd_layout_combo.value_get()
+
+            if (
+                popups.PopYesNo(
+                    title="Delete DVD Layout...",
                     message=(
-                        "Failed To Delete DVD Layout"
-                        f" {sys_consts.SDELIM}{layout_data.display}{sys_consts.SDELIM} - {message}!"
+                        "Delete DVD Layout"
+                        f" {sys_consts.SDELIM}{layout_data.display}{sys_consts.SDELIM} ? "
                     ),
-                )
+                ).show()
+                == "no"
+            ):
                 return None
 
-            # Remove from layout combo
-            dvd_layout_combo.value_remove(layout_data.index)
-
-            if dvd_layout_combo.count_items == 0:
-                dvd_layout_combo.value_set(
-                    qtg.Combo_Data(
-                        index=-1,
-                        display=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
-                        data=f"{self._file_control.project_name}.{sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK}",
-                        user_data=None,
-                    )
-                )
-                result, message = Set_Shelved_DVD_Layout(
+            if (
+                self._file_control.project_name.strip() and layout_data.display.strip()
+            ):  # Should always have
+                result, message = Delete_DVD_Layout(
                     project_name=self._file_control.project_name,
-                    dvd_layout_name=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
-                    dvd_menu_layout=[],
+                    layout_name=layout_data.display,
                 )
 
                 if result == -1:
                     popups.PopError(
                         title="DB Error...",
-                        message="Failed To Create Default DVD Layout - {message}!",
+                        message=(
+                            "Failed To Delete DVD Layout"
+                            f" {sys_consts.SDELIM}{layout_data.display}{sys_consts.SDELIM} - {message}!"
+                        ),
                     )
+                    return None
 
-        return None
+                # Remove from layout combo
+                dvd_layout_combo.value_remove(layout_data.index)
 
-    def _dvd_folder_select(self, event) -> None:
-        """Select a DVD build folder and updates the settings in the database with the selected folder.
-
-        Args:
-            event (Event): The triggering event
-
-        Note:
-            The selected folder is saved in the database settings for future use.
-
-        """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
-
-        folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER_DBK)
-
-        if folder is None or folder.strip() == "":
-            folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
-
-        folder = popups.PopFolderGet(
-            title="Select A DVD Build Folder....",
-            root_dir=folder,
-            create_folder=True,
-            folder_edit=False,
-        ).show()
-
-        if folder.strip() != "":
-            self._db_settings.setting_set(sys_consts.DVD_BUILD_FOLDER_DBK, folder)
-
-            event.value_set(
-                container_tag="dvd_properties",
-                tag="dvd_path",
-                value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
-            )
-
-    def _generate_dvd_serial_number(
-        self, product_code: str = "HV", product_description="Home Video"
-    ) -> str:
-        """
-        Generates a DVD serial number with the format "DVD-AB-000001-5"
-
-        Parameters:
-            product_code (str): A string that identifies the product code, e.g. "HV" for home video.
-            product_description (str): A string that describes the product code, e.g. "Home Video" for home video.
-
-        Returns:
-            str: A string containing the generated DVD serial number.
-        """
-        assert isinstance(product_code, str) and product_code.strip() != "", (
-            f"{product_code=}. Must be a non-empty string"
-        )
-        assert (
-            isinstance(product_description, str) and product_description.strip() != ""
-        ), f"{product_description=}. Must be a non-empty string"
-
-        # Increment the sequential number for each DVD produced
-        if not self._db_settings.setting_exist(sys_consts.SERIAL_NUMBER_DBK):
-            self._db_settings.setting_set(sys_consts.SERIAL_NUMBER_DBK, 0)
-
-        serial_number: int = cast(
-            int, self._db_settings.setting_get(sys_consts.SERIAL_NUMBER_DBK)
-        )
-        serial_number += 1
-        self._db_settings.setting_set(sys_consts.SERIAL_NUMBER_DBK, serial_number)
-
-        # Generate the serial number string
-        serial_number_str = "{:06d}".format(serial_number)
-
-        # TODO: Remove this code, and associated variables, in the future if it proves unnecessary
-        # 17/01/2024 DAW On consideration this seems unnecessary and complicates things
-        # serial_number_checksum = hashlib.md5(serial_number_str.encode()).hexdigest()[0]
-        # serial_number_str = (
-        #     f"DVD-{product_code}-{serial_number_str}-{serial_number_checksum}"
-        # )
-
-        serial_number_str = f"DVD-{serial_number_str}"
-
-        return serial_number_str
-
-    def _make_dvd(self, event: qtg.Action) -> None:
-        """
-        Builds a DVD with the given video files and menu attributes.
-
-        Args:
-            event (Action): The triggering event
-
-        Returns:
-            None.
-
-        Note:
-            - The menu attributes are obtained from the ComboBox instances.
-            - The video input files and menu labels are obtained from the Grid instance.
-            - The DVD is built using the DVD class and the DVD_Config instance created from the inputs.
-            - The result and error message are used to show an error dialog if the build fails.
-
-        """
-
-        assert isinstance(event, qtg.Action), (
-            f"{event} is not an instance of qtg.Action"
-        )
-
-        project_combo: qtg.ComboBox = cast(
-            qtg.ComboBox,
-            event.widget_get(container_tag="main_controls", tag="existing_projects"),
-        )
-
-        project_name = project_combo.value_get().display
-
-        dvd_layout_combo: qtg.ComboBox = cast(
-            qtg.ComboBox,
-            event.widget_get(container_tag="main_controls", tag="existing_layouts"),
-        )
-
-        dvd_layout_name = dvd_layout_combo.value_get().display
-
-        if self._file_control.dvd_percent_used + sys_consts.PERCENT_SAFTEY_BUFFER > 100:
-            popups.PopError(
-                title="DVD Build Error...",
-                message="Selected Files Will Not Fit On A DVD!",
-            ).show()
-            return None
-
-        dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER_DBK)
-
-        if dvd_folder is None or dvd_folder.strip() == "":
-            popups.PopError(
-                title="DVD Build Folder Error...",
-                message="A DVD Build Folder Must Be Entered Before Making A DVD!",
-            ).show()
-            return None
-
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
-
-        checked_items: tuple[qtg.Grid_Item] = file_grid.checkitems_get
-
-        menu_video_data: list[Video_Data] = [file.user_data for file in checked_items]
-        menu_layout: list[tuple[str, list[Video_Data], any]] = []
-        if (
-            Menu_Page_Title_Popup(
-                title=(
-                    "DVD Layout -"
-                    f" {sys_consts.SDELIM}{dvd_layout_combo.value_get().display}{sys_consts.SDELIM}"
-                ),
-                video_data_list=menu_video_data,  # Pass by reference
-                menu_layout=menu_layout,  # Pass by reference
-                project_name=project_name,
-                dvd_layout_name=dvd_layout_name,
-            ).show()
-            == "cancel"
-        ):
-            return None
-
-        video_files: list[Video_Data] = []
-        menu_title: list[str] = []
-        disk_title = ""
-        dvd_menu_settings = DVD_Menu_Settings()
-
-        with qtg.sys_cursor(qtg.Cursor.hourglass):
-            file_grid.checkitems_all(checked=False, col_tag="video_file")
-            for menu_item in menu_layout:
-                menu_title.append(menu_item[0])
-                video_data_items: list[Video_Data] = menu_item[1]
-
-                if (
-                    len(menu_item) >= 3 and disk_title.strip() == ""
-                ):  # Disk title is a later add-on so need this to set it
-                    disk_title = menu_item[2]["disk_title"]
-
-                for video_item in video_data_items:
-                    video_files.append(video_item)
-
-        if video_files:
-            dvd_config = DVD_Config()
-
-            dvd_config.menu_aspect_ratio = self._db_settings.setting_get(
-                sys_consts.MENU_ASPECT_RATIO_DBK
-            )
-
-            dvd_config.project_name = (
-                self._file_control.project_name
-                if disk_title.strip() == ""
-                else Text_To_File_Name(disk_title)
-            )
-
-            if self._db_settings.setting_exist(sys_consts.ARCHIVE_FOLDER_DBK):
-                dvd_config.archive_folder = self._db_settings.setting_get(
-                    sys_consts.ARCHIVE_FOLDER_DBK
-                )
-            if self._db_settings.setting_exist(sys_consts.STREAMING_FOLDER_DBK):
-                dvd_config.streaming_folder = self._db_settings.setting_get(
-                    sys_consts.STREAMING_FOLDER_DBK
-                )
-            if self._db_settings.setting_exist(sys_consts.ARCHIVE_DISK_SIZE_DBK):
-                dvd_config.archive_size = self._db_settings.setting_get(
-                    sys_consts.ARCHIVE_DISK_SIZE_DBK
-                )
-            else:
-                dvd_config.archive_size = sys_consts.DVD_ARCHIVE_SIZE
-
-            if self._db_settings.setting_exist(sys_consts.ARCHIVE_DISK_TRANSCODE_DBK):
-                dvd_config.transcode_type = self._db_settings.setting_get(
-                    sys_consts.ARCHIVE_DISK_TRANSCODE_DBK
-                )
-            else:
-                dvd_config.transcode_type = sys_consts.TRANSCODE_NONE
-
-            # TODO: Remove this code, and associated variables, in the future if it proves unnecessary
-            # 17/01/2024 DAW On consideration this seems unnecessary and complicates things
-            # sql_result = self._app_db.sql_select(
-            #     col_str="code,description",
-            #     table_str=sys_consts.PRODUCT_LINE,
-            #     where_str="code='HV'",
-            # )
-
-            # if sql_result:  # Expect only one result
-            #     product_code = sql_result[0][0]
-            #     product_description = sql_result[0][1]
-
-            dvd_serial_number = self._generate_dvd_serial_number(
-                # product_code=product_code,
-                # product_description=product_description,
-            )
-            dvd_config.serial_number = dvd_serial_number
-
-            dvd_config.input_videos = video_files
-
-            dvd_config.menu_title = menu_title
-            dvd_config.menu_background_color = dvd_menu_settings.menu_background_color
-            dvd_config.menu_font = dvd_menu_settings.menu_font
-            dvd_config.menu_font_color = dvd_menu_settings.menu_font_color
-            dvd_config.menu_font_point_size = dvd_menu_settings.menu_font_point_size
-            dvd_config.page_pointer_left_file = dvd_menu_settings.page_pointer_left
-            dvd_config.page_pointer_right_file = dvd_menu_settings.page_pointer_right
-            dvd_config.button_background_color = (
-                dvd_menu_settings.button_background_color
-            )
-            dvd_config.button_font = dvd_menu_settings.button_font
-            dvd_config.button_font_color = dvd_menu_settings.button_font_color
-            dvd_config.button_font_point_size = dvd_menu_settings.button_font_point_size
-            dvd_config.button_background_transparency = (
-                dvd_menu_settings.button_background_transparency / 100
-            )
-
-            dvd_config.timestamp_font = self._default_font
-            dvd_config.timestamp_font_point_size = self._timestamp_font_point_size
-
-            dvd_config.video_standard = self._file_control.project_video_standard
-
-            dvd_config.menu_buttons_across = dvd_menu_settings.buttons_across
-            dvd_config.menu_buttons_per_page = dvd_menu_settings.buttons_per_page
-
-            dvd_creator = DVD()
-            dvd_creator.dvd_config = dvd_config
-            dvd_creator.working_folder = dvd_folder
-
-            if self._video_editor.get_task_manager is None:
-                with qtg.sys_cursor(qtg.Cursor.hourglass):
-                    result, message = dvd_creator.build()
+                if dvd_layout_combo.count_items == 0:
+                    dvd_layout_combo.value_set(
+                        qtg.Combo_Data(
+                            index=-1,
+                            display=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
+                            data=f"{self._file_control.project_name}.{sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK}",
+                            user_data=None,
+                        )
+                    )
+                    result, message = Set_Shelved_DVD_Layout(
+                        project_name=self._file_control.project_name,
+                        dvd_layout_name=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
+                        dvd_menu_layout=[],
+                    )
 
                     if result == -1:
                         popups.PopError(
-                            title="DVD Build Error...",
-                            message=(
-                                "Failed To Create A"
-                                f" DVD!!\n{sys_consts.SDELIM}{message}{sys_consts.SDELIM}"
-                            ),
-                        ).show()
-            else:
-                task_name = dvd_config.project_name
+                            title="DB Error...",
+                            message="Failed To Create Default DVD Layout - {message}!",
+                        )
 
-                if task_name.strip() == "":  # Should not happen!
-                    task_name = dvd_config.serial_number
+            return None
 
-                if task_name in self._task_stack:
-                    for task_index in range(len(self._task_stack.items())):
-                        temp_name = f"{task_name}_{task_index}"
-                        if temp_name not in self._task_stack:
-                            task_name = temp_name
-                            break
+        def _dvd_folder_select(event) -> None:
+            """Select a DVD build folder and updates the settings in the database with the selected folder.
 
-                self._task_stack[task_name] = (dvd_creator, menu_layout)
+            Args:
+                event (Event): The triggering event
 
-                self._video_editor.get_task_manager.set_error_callback(Error_Callback)
+            Note:
+                The selected folder is saved in the database settings for future use.
 
-                self._video_editor.get_task_manager.add_task(
-                    name=task_name,
-                    method=Run_DVD_Build,
-                    arguments=(dvd_creator,),
-                    callback=Notification_Call_Back,
-                )
-        return None
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
 
-    def _new_dvd_layout(self, event: qtg.Action) -> None:
-        """
-        Creates A New DVD layout.
+            folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER_DBK)
 
-        Args:
-            event (qtg.Action): The triggering event.
-        """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+            if folder is None or folder.strip() == "":
+                folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
 
-        file_grid: qtg.Grid = cast(
-            qtg.Grid,
-            event.widget_get(
-                container_tag="video_file_controls",
-                tag="video_input_files",
-            ),
-        )
+            folder = popups.PopFolderGet(
+                title="Select A DVD Build Folder....",
+                root_dir=folder,
+                create_folder=True,
+                folder_edit=False,
+            ).show()
 
-        dvd_layout_combo: qtg.ComboBox = cast(
-            qtg.ComboBox,
-            event.widget_get(container_tag="main_controls", tag="existing_layouts"),
-        )
+            if folder.strip() != "":
+                self._db_settings.setting_set(sys_consts.DVD_BUILD_FOLDER_DBK, folder)
 
-        layout_name = popups.PopTextGet(
-            title="Enter DVD Layout Name...",
-            label="DVD Layout Name:",
-            label_above=True,
-        ).show()
-
-        if self._file_control.project_name.strip() and layout_name.strip():
-            if dvd_layout_combo.select_text(layout_name, partial_match=False) >= 0:
-                popups.PopMessage(
-                    title="Invalid DVD Layout Name",
-                    message="A DVD Layout Wih That Name Already Exists!",
-                ).show()
-            else:
-                result, message = Set_Shelved_DVD_Layout(
-                    project_name=self._file_control.project_name,
-                    dvd_layout_name=layout_name,
-                    dvd_menu_layout=[],
+                event.value_set(
+                    container_tag="dvd_properties",
+                    tag="dvd_path",
+                    value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
                 )
 
-                if result == -1:
-                    popups.PopError(title="DB Error...", message=message)
-                    return None
+        def _delete_project(event: qtg.Action) -> None:
+            """Deletes a project by removing the corresponding python sql shelf data
 
-                dvd_layout_combo.value_set(
-                    qtg.Combo_Data(
-                        index=-1,
-                        display=layout_name,
-                        data=layout_name,
-                        user_data=None,
-                    )
-                )
+            Args:
+                event (qtg.Action): Triggering event
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
 
-                dvd_layout_combo.select_text(layout_name, partial_match=False)
-                file_grid.checkitems_all(checked=False, col_tag="video_file")
-                self._file_control.set_project_standard_duration(event)
-        return None
-
-    def _new_project(self, event: qtg.Action):
-        """Create a new project
-        Args:
-            event:qtg.Action: The triggering event
-        """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
-
-        project_name = popups.PopTextGet(
-            title="Enter Project Name",
-            label="Project Name:",
-            label_above=True,
-        ).show()
-
-        if project_name.strip():
             project_combo: qtg.ComboBox = cast(
                 qtg.ComboBox,
                 event.widget_get(
@@ -1207,122 +802,756 @@ class DVD_Archiver(DVD_Archiver_Base):
                 ),
             )
 
-            if project_combo.select_text(project_name, partial_match=False) >= 0:
-                popups.PopMessage(
-                    title="Invalid Project Name",
-                    message="A Project With That Name Already Exists!",
+            dvd_layout_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(container_tag="main_controls", tag="existing_layouts"),
+            )
+
+            if (
+                popups.PopYesNo(
+                    title="Delete Project...",
+                    message=(
+                        "Delete Project"
+                        f" {sys_consts.SDELIM}{self._file_control.project_name}{sys_consts.SDELIM} "
+                        "And All Project Data Except Source Video Files ?"
+                    ),
                 ).show()
-            else:
-                Set_Shelved_Project(
-                    project_name=project_name,
-                    dvd_menu_layout_names=[sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK],
+                == "no"
+            ):
+                return None
+
+            result, message = Delete_Project(
+                project_name=self._file_control.project_name
+            )
+
+            if result == -1:
+                popups.PopError(
+                    title="DB Error...", message=f"Failed To Delete Project : {message}"
+                )
+                return None
+
+            combo_data: qtg.Combo_Data = project_combo.value_get()
+
+            if (
+                combo_data.display == self._file_control.project_name
+                and combo_data.index >= 0
+            ):
+                # A hack to get around the triggered indexchanged event in the combobox control which re-saves the
+                # deleted project!
+                self._save_existing_project = False
+                project_combo.value_remove(combo_data.index)
+                self._save_existing_project = True
+
+            if self._db_settings.setting_exist(sys_consts.LATEST_PROJECT_DBK):
+                if project_combo.count_items > 0:
+                    self._db_settings.setting_set(
+                        sys_consts.LATEST_PROJECT_DBK, self._file_control.project_name
+                    )
+                else:
+                    project_combo.value_set(
+                        qtg.Combo_Data(
+                            index=-1,
+                            display=sys_consts.DEFAULT_PROJECT_NAME_DBK,
+                            data="",
+                            user_data=None,
+                        )
+                    )
+
+                    dvd_layout_combo.value_set(
+                        qtg.Combo_Data(
+                            index=-1,
+                            display=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
+                            data="",
+                            user_data=None,
+                        )
+                    )
+
+                    Set_Shelved_DVD_Layout(
+                        project_name=sys_consts.DEFAULT_PROJECT_NAME_DBK,
+                        dvd_layout_name=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
+                        dvd_menu_layout=[],
+                    )
+                    self._db_settings.setting_set(
+                        sys_consts.LATEST_PROJECT_DBK,
+                        sys_consts.DEFAULT_PROJECT_NAME_DBK,
+                    )
+
+                    popups.PopMessage(
+                        message="Added Default Project...",
+                        text="A Default Project Has Been Created",
+                    ).show()
+
+            return None
+
+        def _language_setting_handler(event: qtg.Action) -> None:
+            """Handles the setting of the application language
+
+            Args:
+                event (qtg.Action): The triggering event
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
+            combo_data: qtg.Combo_Data = event.value
+            if (
+                combo_data.data == "N/A"
+            ):  # Sets default language - untranslated is English
+                self._db_settings.setting_set(
+                    setting_name=sys_consts.APP_LANG_DBK,
+                    setting_value="",
                 )
 
-                project_combo.value_set(
-                    qtg.Combo_Data(
-                        index=-1,
-                        display=project_name,
-                        data=project_name,
-                        user_data=None,
-                    )
+                self._db_settings.setting_set(
+                    setting_name=sys_consts.APP_COUNTRY_DBK,
+                    setting_value="",
                 )
-                file_grid: qtg.Grid = cast(
-                    qtg.Grid,
+            else:
+                self._db_settings.setting_set(
+                    setting_name=sys_consts.APP_LANG_DBK,
+                    setting_value=combo_data.data,
+                )
+                self._db_settings.setting_set(
+                    setting_name=sys_consts.APP_COUNTRY_DBK,
+                    setting_value=combo_data.display,
+                )
+
+        def _startup_handler(event: qtg.Action) -> None:
+            """Performs activities that have to happen at startup
+
+            Args:
+                event (qtg.Action): The triggering event
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
+            if event.widget_exist(
+                container_tag="app_lang", tag="countries"
+            ):  # Selects tha app language
+                country_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(container_tag="app_lang", tag="countries"),
+                )
+
+                if self._db_settings.setting_exist(
+                    setting_name=sys_consts.APP_COUNTRY_DBK
+                ):
+                    app_country = self._db_settings.setting_get(
+                        setting_name=sys_consts.APP_COUNTRY_DBK
+                    )
+
+                    if app_country:
+                        country_combo.select_text(
+                            select_text=app_country,
+                            case_sensitive=False,
+                            partial_match=False,
+                        )
+
+        def _tab_enable_handler(event: qtg.Action, enable: bool):
+            """Enables or disables the tab dependent controls
+
+            Args:
+                event (qtg.Action): The triggering event
+                enable (bool): True - enables tab sensitive controls, False - disables tab sensitive controls
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+            assert isinstance(enable, bool), f"{enable=}. Must be bool"
+
+            if event.widget_exist(
+                container_tag="main_controls", tag="existing_projects"
+            ):  # Buttons are buddies so must exist
+                project_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
                     event.widget_get(
-                        container_tag="video_file_controls", tag="video_input_files"
+                        container_tag="main_controls", tag="existing_projects"
                     ),
                 )
 
-                file_grid.clear()
+                delete_button: qtg.Button = cast(
+                    qtg.Button,
+                    event.widget_get(
+                        container_tag="main_controls", tag="delete_project"
+                    ),
+                )
 
-    def _delete_project(self, event: qtg.Action) -> None:
-        """Deletes a project by removing the corresponding python sql shelf data
+                new_button: qtg.Button = cast(
+                    qtg.Button,
+                    event.widget_get(container_tag="main_controls", tag="new_project"),
+                )
 
-        Args:
-            event (qtg.Action): Triggering event
-        """
-        assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+                delete_button.enable_set(enable)
+                new_button.enable_set(enable)
 
-        project_combo: qtg.ComboBox = cast(
-            qtg.ComboBox,
-            event.widget_get(container_tag="main_controls", tag="existing_projects"),
-        )
+                project_combo.enable_set(enable)
 
-        dvd_layout_combo: qtg.ComboBox = cast(
-            qtg.ComboBox,
-            event.widget_get(container_tag="main_controls", tag="existing_layouts"),
-        )
+            if event.widget_exist(
+                container_tag="main_controls", tag="existing_layouts"
+            ):
+                dvd_layout_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(
+                        container_tag="main_controls", tag="existing_layouts"
+                    ),
+                )
+                delete_button: qtg.Button = cast(
+                    qtg.Button,
+                    event.widget_get(
+                        container_tag="main_controls", tag="delete_dvd_layout"
+                    ),
+                )
 
-        if (
-            popups.PopYesNo(
-                title="Delete Project...",
-                message=(
-                    "Delete Project"
-                    f" {sys_consts.SDELIM}{self._file_control.project_name}{sys_consts.SDELIM} "
-                    "And All Project Data Except Source Video Files ?"
-                ),
+                new_button: qtg.Button = cast(
+                    qtg.Button,
+                    event.widget_get(
+                        container_tag="main_controls", tag="new_dvd_layout"
+                    ),
+                )
+                make_button: qtg.Button = cast(
+                    qtg.Button,
+                    event.widget_get(container_tag="main_controls", tag="make_dvd"),
+                )
+
+                make_button.enable_set(enable)
+                delete_button.enable_set(enable)
+                new_button.enable_set(enable)
+
+                dvd_layout_combo.enable_set(enable)
+
+        def _project_combo_change(event: qtg.Action):
+            """Handles the change of a project combo item
+
+            Args:
+                event (qtg.Action): Triggering event (INDEXCHANGED in this case)
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
+            new_project: qtg.Combo_Item = event.value
+
+            if (
+                not self._startup
+                and new_project.display.strip()
+                and self._file_control.project_name.strip()
+                != new_project.display.strip()
+            ):
+                self._file_control.project_changed(
+                    event, new_project.display, self._save_existing_project
+                )
+                if event.widget_exist(
+                    container_tag="main_controls", tag="existing_projects"
+                ) and event.widget_exist(
+                    container_tag="main_controls", tag="existing_layouts"
+                ):
+                    project_combo: qtg.ComboBox = cast(
+                        qtg.ComboBox,
+                        event.widget_get(
+                            container_tag="main_controls",
+                            tag="existing_projects",
+                        ),
+                    )
+                    layout_combo: qtg.ComboBox = cast(
+                        qtg.ComboBox,
+                        event.widget_get(
+                            container_tag="main_controls",
+                            tag="existing_layouts",
+                        ),
+                    )
+
+                    layout_combo.clear()
+
+                    project_combo.select_text(
+                        self._file_control.project_name, partial_match=False
+                    )
+
+                    _, layout_items, _ = Get_Project_Layout_Names(
+                        self._file_control.project_name
+                    )
+
+                    layout_combo_items = [
+                        qtg.Combo_Data(
+                            index=-1,
+                            display=item.replace("_", " "),
+                            data=item.replace("_", " "),
+                            user_data=None,
+                        )
+                        for item in layout_items
+                    ]
+
+                    for item in layout_combo_items:
+                        layout_combo.value_set(item)
+
+        def _archive_folder_select(event: qtg.Action) -> None:
+            """Select an archive folder and updates the settings in the database with the selected folder.
+
+            Args:
+                event (qtg.Action): The triggering event
+
+            Note:
+                The selected folder is saved in the database settings for future use.
+
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
+            folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER_DBK)
+
+            if folder is None or folder.strip() == "":
+                folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
+
+            folder = popups.PopFolderGet(
+                title="Select An Archive Folder....",
+                root_dir=folder,
+                create_folder=True,
+                folder_edit=False,
             ).show()
-            == "no"
-        ):
-            return None
 
-        result, message = Delete_Project(project_name=self._file_control.project_name)
+            if folder.strip() != "":
+                self._db_settings.setting_set(sys_consts.ARCHIVE_FOLDER_DBK, folder)
 
-        if result == -1:
-            popups.PopError(
-                title="DB Error...", message=f"Failed To Delete Project : {message}"
+                event.value_set(
+                    container_tag="dvd_properties",
+                    tag="archive_path",
+                    value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
+                )
+
+        def _streaming_folder_select(event: qtg.Action) -> None:
+            """Select a streaming folder and updates the settings in the database with the selected folder.
+
+            Args:
+                event (qtg.Action): The triggering event
+
+            Note:
+                The selected folder is saved in the database settings for future use.
+
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
+            folder = self._db_settings.setting_get(sys_consts.STREAMING_FOLDER_DBK)
+
+            if folder is None or folder.strip() == "":
+                folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
+
+            folder = popups.PopFolderGet(
+                title="Select A Streaming Folder....",
+                root_dir=folder,
+                create_folder=True,
+                folder_edit=False,
+            ).show()
+
+            if folder.strip() != "":
+                self._db_settings.setting_set(sys_consts.STREAMING_FOLDER_DBK, folder)
+
+                event.value_set(
+                    container_tag="dvd_properties",
+                    tag="streaming_path",
+                    value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
+                )
+
+        def _make_dvd(event: qtg.Action) -> None:
+            """
+            Builds a DVD with the given video files and menu attributes.
+
+            Args:
+                event (Action): The triggering event
+
+            Returns:
+                None.
+
+            Note:
+                - The menu attributes are obtained from the ComboBox instances.
+                - The video input files and menu labels are obtained from the Grid instance.
+                - The DVD is built using the DVD class and the DVD_Config instance created from the inputs.
+                - The result and error message are used to show an error dialog if the build fails.
+
+            """
+
+            def _generate_dvd_serial_number(
+                product_code: str = "HV", product_description="Home Video"
+            ) -> str:
+                """
+                Generates a DVD serial number with the format "DVD-AB-000001-5"
+
+                Parameters:
+                    product_code (str): A string that identifies the product code, e.g. "HV" for home video.
+                    product_description (str): A string that describes the product code, e.g. "Home Video" for home video.
+
+                Returns:
+                    str: A string containing the generated DVD serial number.
+                """
+                assert isinstance(product_code, str) and product_code.strip() != "", (
+                    f"{product_code=}. Must be a non-empty string"
+                )
+                assert (
+                    isinstance(product_description, str)
+                    and product_description.strip() != ""
+                ), f"{product_description=}. Must be a non-empty string"
+
+                # Increment the sequential number for each DVD produced
+                if not self._db_settings.setting_exist(sys_consts.SERIAL_NUMBER_DBK):
+                    self._db_settings.setting_set(sys_consts.SERIAL_NUMBER_DBK, 0)
+
+                serial_number: int = cast(
+                    int, self._db_settings.setting_get(sys_consts.SERIAL_NUMBER_DBK)
+                )
+                serial_number += 1
+                self._db_settings.setting_set(
+                    sys_consts.SERIAL_NUMBER_DBK, serial_number
+                )
+
+                # Generate the serial number string
+                serial_number_str = "{:06d}".format(serial_number)
+
+                # TODO: Remove this code, and associated variables, in the future if it proves unnecessary
+                # 17/01/2024 DAW On consideration this seems unnecessary and complicates things
+                # serial_number_checksum = hashlib.md5(serial_number_str.encode()).hexdigest()[0]
+                # serial_number_str = (
+                #     f"DVD-{product_code}-{serial_number_str}-{serial_number_checksum}"
+                # )
+
+                serial_number_str = f"DVD-{serial_number_str}"
+
+                return serial_number_str
+
+            assert isinstance(event, qtg.Action), (
+                f"{event} is not an instance of qtg.Action"
             )
+
+            project_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(
+                    container_tag="main_controls", tag="existing_projects"
+                ),
+            )
+
+            project_name = project_combo.value_get().display
+
+            dvd_layout_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(container_tag="main_controls", tag="existing_layouts"),
+            )
+
+            dvd_layout_name = dvd_layout_combo.value_get().display
+
+            if (
+                self._file_control.dvd_percent_used + sys_consts.PERCENT_SAFTEY_BUFFER
+                > 100
+            ):
+                popups.PopError(
+                    title="DVD Build Error...",
+                    message="Selected Files Will Not Fit On A DVD!",
+                ).show()
+                return None
+
+            dvd_folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER_DBK)
+
+            if dvd_folder is None or dvd_folder.strip() == "":
+                popups.PopError(
+                    title="DVD Build Folder Error...",
+                    message="A DVD Build Folder Must Be Entered Before Making A DVD!",
+                ).show()
+                return None
+
+            file_grid: qtg.Grid = cast(
+                qtg.Grid,
+                event.widget_get(
+                    container_tag="video_file_controls",
+                    tag="video_input_files",
+                ),
+            )
+
+            checked_items: tuple[qtg.Grid_Item] = file_grid.checkitems_get
+
+            menu_video_data: list[Video_Data] = [
+                file.user_data for file in checked_items
+            ]
+            menu_layout: list[tuple[str, list[Video_Data], any]] = []
+            if (
+                Menu_Page_Title_Popup(
+                    title=(
+                        "DVD Layout -"
+                        f" {sys_consts.SDELIM}{dvd_layout_combo.value_get().display}{sys_consts.SDELIM}"
+                    ),
+                    video_data_list=menu_video_data,  # Pass by reference
+                    menu_layout=menu_layout,  # Pass by reference
+                    project_name=project_name,
+                    dvd_layout_name=dvd_layout_name,
+                ).show()
+                == "cancel"
+            ):
+                return None
+
+            video_files: list[Video_Data] = []
+            menu_title: list[str] = []
+            disk_title = ""
+            dvd_menu_settings = DVD_Menu_Settings()
+
+            with qtg.sys_cursor(qtg.Cursor.hourglass):
+                file_grid.checkitems_all(checked=False, col_tag="video_file")
+                for menu_item in menu_layout:
+                    menu_title.append(menu_item[0])
+                    video_data_items: list[Video_Data] = menu_item[1]
+
+                    if (
+                        len(menu_item) >= 3 and disk_title.strip() == ""
+                    ):  # Disk title is a later add-on so need this to set it
+                        disk_title = menu_item[2]["disk_title"]
+
+                    for video_item in video_data_items:
+                        video_files.append(video_item)
+
+            if video_files:
+                dvd_config = DVD_Config()
+
+                dvd_config.menu_aspect_ratio = self._db_settings.setting_get(
+                    sys_consts.MENU_ASPECT_RATIO_DBK
+                )
+
+                dvd_config.project_name = (
+                    self._file_control.project_name
+                    if disk_title.strip() == ""
+                    else Text_To_File_Name(disk_title)
+                )
+
+                if self._db_settings.setting_exist(sys_consts.ARCHIVE_FOLDER_DBK):
+                    dvd_config.archive_folder = self._db_settings.setting_get(
+                        sys_consts.ARCHIVE_FOLDER_DBK
+                    )
+                if self._db_settings.setting_exist(sys_consts.STREAMING_FOLDER_DBK):
+                    dvd_config.streaming_folder = self._db_settings.setting_get(
+                        sys_consts.STREAMING_FOLDER_DBK
+                    )
+                if self._db_settings.setting_exist(sys_consts.ARCHIVE_DISK_SIZE_DBK):
+                    dvd_config.archive_size = self._db_settings.setting_get(
+                        sys_consts.ARCHIVE_DISK_SIZE_DBK
+                    )
+                else:
+                    dvd_config.archive_size = sys_consts.DVD_ARCHIVE_SIZE
+
+                if self._db_settings.setting_exist(
+                    sys_consts.ARCHIVE_DISK_TRANSCODE_DBK
+                ):
+                    dvd_config.transcode_type = self._db_settings.setting_get(
+                        sys_consts.ARCHIVE_DISK_TRANSCODE_DBK
+                    )
+                else:
+                    dvd_config.transcode_type = sys_consts.TRANSCODE_NONE
+
+                # TODO: Remove this code, and associated variables, in the future if it proves unnecessary
+                # 17/01/2024 DAW On consideration this seems unnecessary and complicates things
+                # sql_result = self._app_db.sql_select(
+                #     col_str="code,description",
+                #     table_str=sys_consts.PRODUCT_LINE,
+                #     where_str="code='HV'",
+                # )
+
+                # if sql_result:  # Expect only one result
+                #     product_code = sql_result[0][0]
+                #     product_description = sql_result[0][1]
+
+                dvd_serial_number = _generate_dvd_serial_number(
+                    # product_code=product_code,
+                    # product_description=product_description,
+                )
+                dvd_config.serial_number = dvd_serial_number
+
+                dvd_config.input_videos = video_files
+
+                dvd_config.menu_title = menu_title
+                dvd_config.menu_background_color = (
+                    dvd_menu_settings.menu_background_color
+                )
+                dvd_config.menu_font = dvd_menu_settings.menu_font
+                dvd_config.menu_font_color = dvd_menu_settings.menu_font_color
+                dvd_config.menu_font_point_size = dvd_menu_settings.menu_font_point_size
+                dvd_config.page_pointer_left_file = dvd_menu_settings.page_pointer_left
+                dvd_config.page_pointer_right_file = (
+                    dvd_menu_settings.page_pointer_right
+                )
+                dvd_config.button_background_color = (
+                    dvd_menu_settings.button_background_color
+                )
+                dvd_config.button_font = dvd_menu_settings.button_font
+                dvd_config.button_font_color = dvd_menu_settings.button_font_color
+                dvd_config.button_font_point_size = (
+                    dvd_menu_settings.button_font_point_size
+                )
+                dvd_config.button_background_transparency = (
+                    dvd_menu_settings.button_background_transparency / 100
+                )
+
+                dvd_config.timestamp_font = self._default_font
+                dvd_config.timestamp_font_point_size = self._timestamp_font_point_size
+
+                dvd_config.video_standard = self._file_control.project_video_standard
+
+                dvd_config.menu_buttons_across = dvd_menu_settings.buttons_across
+                dvd_config.menu_buttons_per_page = dvd_menu_settings.buttons_per_page
+
+                dvd_creator = DVD()
+                dvd_creator.dvd_config = dvd_config
+                dvd_creator.working_folder = dvd_folder
+
+                if self._video_editor.get_task_manager is None:
+                    with qtg.sys_cursor(qtg.Cursor.hourglass):
+                        result, message = dvd_creator.build()
+
+                        if result == -1:
+                            popups.PopError(
+                                title="DVD Build Error...",
+                                message=(
+                                    "Failed To Create A"
+                                    f" DVD!!\n{sys_consts.SDELIM}{message}{sys_consts.SDELIM}"
+                                ),
+                            ).show()
+                else:
+                    task_name = dvd_config.project_name
+
+                    if task_name.strip() == "":  # Should not happen!
+                        task_name = dvd_config.serial_number
+
+                    if task_name in self._task_stack:
+                        for task_index in range(len(self._task_stack.items())):
+                            temp_name = f"{task_name}_{task_index}"
+                            if temp_name not in self._task_stack:
+                                task_name = temp_name
+                                break
+
+                    self._task_stack[task_name] = (dvd_creator, menu_layout)
+
+                    self._video_editor.get_task_manager.set_error_callback(
+                        Error_Callback
+                    )
+
+                    self._video_editor.get_task_manager.add_task(
+                        name=task_name,
+                        method=Run_DVD_Build,
+                        arguments=(dvd_creator,),
+                        callback=Notification_Call_Back,
+                    )
             return None
 
-        combo_data: qtg.Combo_Data = project_combo.value_get()
+        def _new_dvd_layout(event: qtg.Action) -> None:
+            """
+            Creates A New DVD layout.
 
-        if (
-            combo_data.display == self._file_control.project_name
-            and combo_data.index >= 0
-        ):
-            # A hack to get around the triggered indexchanged event in the combobox control which re-saves the
-            # deleted project!
-            self._save_existing_project = False
-            project_combo.value_remove(combo_data.index)
-            self._save_existing_project = True
+            Args:
+                event (qtg.Action): The triggering event.
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
 
-        if self._db_settings.setting_exist(sys_consts.LATEST_PROJECT_DBK):
-            if project_combo.count_items > 0:
-                self._db_settings.setting_set(
-                    sys_consts.LATEST_PROJECT_DBK, self._file_control.project_name
-                )
-            else:
-                project_combo.value_set(
-                    qtg.Combo_Data(
-                        index=-1,
-                        display=sys_consts.DEFAULT_PROJECT_NAME_DBK,
-                        data="",
-                        user_data=None,
+            file_grid: qtg.Grid = cast(
+                qtg.Grid,
+                event.widget_get(
+                    container_tag="video_file_controls",
+                    tag="video_input_files",
+                ),
+            )
+
+            dvd_layout_combo: qtg.ComboBox = cast(
+                qtg.ComboBox,
+                event.widget_get(container_tag="main_controls", tag="existing_layouts"),
+            )
+
+            layout_name = popups.PopTextGet(
+                title="Enter DVD Layout Name...",
+                label="DVD Layout Name:",
+                label_above=True,
+            ).show()
+
+            if self._file_control.project_name.strip() and layout_name.strip():
+                if dvd_layout_combo.select_text(layout_name, partial_match=False) >= 0:
+                    popups.PopMessage(
+                        title="Invalid DVD Layout Name",
+                        message="A DVD Layout Wih That Name Already Exists!",
+                    ).show()
+                else:
+                    result, message = Set_Shelved_DVD_Layout(
+                        project_name=self._file_control.project_name,
+                        dvd_layout_name=layout_name,
+                        dvd_menu_layout=[],
                     )
-                )
 
-                dvd_layout_combo.value_set(
-                    qtg.Combo_Data(
-                        index=-1,
-                        display=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
-                        data="",
-                        user_data=None,
+                    if result == -1:
+                        popups.PopError(title="DB Error...", message=message)
+                        return None
+
+                    dvd_layout_combo.value_set(
+                        qtg.Combo_Data(
+                            index=-1,
+                            display=layout_name,
+                            data=layout_name,
+                            user_data=None,
+                        )
                     )
+
+                    dvd_layout_combo.select_text(layout_name, partial_match=False)
+                    file_grid.checkitems_all(checked=False, col_tag="video_file")
+                    self._file_control.set_project_standard_duration(event)
+            return None
+
+        def _new_project(event: qtg.Action):
+            """Creates a new project
+            Args:
+                event:qtg.Action: The triggering event
+            """
+            assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+
+            project_name = popups.PopTextGet(
+                title="Enter Project Name",
+                label="Project Name:",
+                label_above=True,
+            ).show()
+
+            if project_name.strip():
+                project_combo: qtg.ComboBox = cast(
+                    qtg.ComboBox,
+                    event.widget_get(
+                        container_tag="main_controls", tag="existing_projects"
+                    ),
                 )
 
-                Set_Shelved_DVD_Layout(
-                    project_name=sys_consts.DEFAULT_PROJECT_NAME_DBK,
-                    dvd_layout_name=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
-                    dvd_menu_layout=[],
-                )
-                self._db_settings.setting_set(
-                    sys_consts.LATEST_PROJECT_DBK, sys_consts.DEFAULT_PROJECT_NAME_DBK
-                )
+                if project_combo.select_text(project_name, partial_match=False) >= 0:
+                    popups.PopMessage(
+                        title="Invalid Project Name",
+                        message="A Project With That Name Already Exists!",
+                    ).show()
+                else:
+                    Set_Shelved_Project(
+                        project_name=project_name,
+                        dvd_menu_layout_names=[sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK],
+                    )
 
-                popups.PopMessage(
-                    message="Added Default Project...",
-                    text="A Default Project Has Been Created",
-                ).show()
+                    project_combo.value_set(
+                        qtg.Combo_Data(
+                            index=-1,
+                            display=project_name,
+                            data=project_name,
+                            user_data=None,
+                        )
+                    )
+                    file_grid: qtg.Grid = cast(
+                        qtg.Grid,
+                        event.widget_get(
+                            container_tag="video_file_controls", tag="video_input_files"
+                        ),
+                    )
+
+                    file_grid.clear()
+
+        #### Main
+        if self._file_control:
+            self._file_control.event_handler(event)
+
+        match event.event:
+            case qtg.Sys_Events.APPINIT:
+                _handle_app_init_event()
+            case qtg.Sys_Events.APPEXIT | qtg.Sys_Events.APPCLOSED:
+                _handle_app_exit_event()
+            case qtg.Sys_Events.APPPOSTINIT:
+                _handle_app_post_init_event()
+            case qtg.Sys_Events.CHANGED:
+                _handle_changed_event(event)
+            case qtg.Sys_Events.CLICKED:
+                _handle_clicked_event(event)
+            case qtg.Sys_Events.CUSTOM:
+                _handle_custom_event(event)
+            case qtg.Sys_Events.INDEXCHANGED:
+                _handle_index_changed_event(event)
 
         return None
 
