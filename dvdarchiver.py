@@ -29,6 +29,7 @@ import QTPYGUI.popups as popups
 import QTPYGUI.qtpygui as qtg
 import QTPYGUI.utils as utils
 import QTPYGUI.sqldb as sqldb
+
 import sys_consts
 from background_task_manager import Task_Manager_Popup
 from dvd import DVD, DVD_Config
@@ -307,7 +308,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         def _handle_app_exit_event() -> int:
             """Handles the APPEXIT and APPCLOSED events.
 
-            This method is called when the application is exiting or closing.
+            This function is called when the application is exiting or closing.
             It displays a confirmation dialog, shuts down the video editor,
             and removes temporary DVD build folder subdirectories.
 
@@ -355,7 +356,7 @@ class DVD_Archiver(DVD_Archiver_Base):
         def _handle_app_post_init_event() -> None:
             """Handles the APPPOSTINIT event.
 
-            This method is called after the application is initialized.
+            This function is called after the application is initialized.
             It is currently consumed in the video_file_grid.
 
             Args:
@@ -363,34 +364,41 @@ class DVD_Archiver(DVD_Archiver_Base):
             """
             pass  # Consumed in video_file_grid caught in CUSTOM/project_changed below
 
-        def _handle_changed_event(event: qtg.Action) -> int | None:
+            return None
+
+        def _handle_changed_event(event: qtg.Action) -> None:
             """Handles the CHANGED event (tab changes).
 
-            This method is called when a tab is changed. It calls the
+            This function is called when a tab is changed. It calls the
             appropriate handler method based on the tab.
 
             Args:
                 event (qtg.Action): The event triggering the tab change.
 
             Returns:
-                int | None: The return value of the called handler method, or None.
+                 None
             """
+            assert isinstance(event, qtg.Action), f"{event=}. Must be qtg.Action"
+
             if event.tag == "control_tab":
                 return _handle_control_tab_changed(event)
             elif event.tag == "video_editor_tab":
                 return _handle_video_editor_tab_changed(event)
+
             return None
 
         def _handle_control_tab_changed(event: qtg.Action) -> None:
             """Handles the control_tab CHANGED event.
 
-            This method is called when the control tab is changed. It pauses
+            This function is called when the control tab is changed. It pauses
             the video editor, writes the archive edit list, and processes
             the edited video files.
 
             Args:
                 event (qtg.Action): The event triggering the control tab change.
             """
+            assert isinstance(event, qtg.Action), f"{event=}. Must be qtg.Action"
+
             with qtg.sys_cursor(qtg.Cursor.hourglass):
                 self._video_editor.video_pause()
                 self._video_editor.archive_edit_list_write()
@@ -401,30 +409,38 @@ class DVD_Archiver(DVD_Archiver_Base):
                 )
                 _tab_enable_handler(event=event, enable=True)
 
+            return None
+
         def _handle_video_editor_tab_changed(event: qtg.Action) -> None:
             """Handles the video_editor_tab CHANGED event.
 
-            This method is called when the video editor tab is changed.
+            This function is called when the video editor tab is changed.
             It disables certain UI elements.
 
             Args:
                 event (qtg.Action): The event triggering the video editor tab change.
             """
+            assert isinstance(event, qtg.Action), f"{event=}. Must be qtg.Action"
+
             with qtg.sys_cursor(qtg.Cursor.hourglass):
                 _tab_enable_handler(event=event, enable=False)
 
-        def _handle_clicked_event(event: qtg.Action) -> int | None:
+            return None
+
+        def _handle_clicked_event(event: qtg.Action) -> None:
             """Handles the CLICKED event.
 
-            This method is called when a UI element is clicked. It calls the
+            This function is called when a UI element is clicked. It calls the
             appropriate handler method based on the clicked element's tag.
 
             Args:
                 event (qtg.Action): The event triggering the click.
 
             Returns:
-                int | None: The return value of the called handler method, or None.
+                None
             """
+            assert isinstance(event, qtg.Action), f"{event=}. Must be qtg.Action"
+
             match event.tag:
                 case "archive_folder_select":
                     _archive_folder_select(event)
@@ -461,7 +477,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 case "transcode_h265":
                     _handle_transcode_h265_clicked()
                 case "video_editor":
-                    return _handle_video_editor_clicked(event)
+                    _handle_video_editor_clicked(event)
             return None
 
         def _handle_backup_bluray_clicked() -> None:
@@ -474,6 +490,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                 sys_consts.BLUERAY_ARCHIVE_SIZE,
             )
 
+            return None
+
         def _handle_backup_dvd_clicked() -> None:
             """Handles the backup_dvd CLICKED event.
 
@@ -484,6 +502,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                 sys_consts.DVD_ARCHIVE_SIZE,
             )
 
+            return None
+
         def _handle_exit_app_clicked() -> None:
             """Handles the exit_app CLICKED event.
 
@@ -491,12 +511,16 @@ class DVD_Archiver(DVD_Archiver_Base):
             """
             self._DVD_Arch_App.app_exit()
 
+            return None
+
         def _handle_langtran_clicked() -> None:
             """Handles the langtran CLICKED event.
 
             Shows the language translation popup.
             """
             popups.Langtran_Popup().show()
+
+            return None
 
         def _handle_task_manager_clicked() -> None:
             """Handles the task_manager CLICKED event.
@@ -509,6 +533,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                     task_manager=self._video_editor.get_task_manager,
                 ).show()
 
+            return None
+
         def _handle_transcode_none_clicked() -> None:
             """Handles the transcode_none CLICKED event.
 
@@ -518,6 +544,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                 sys_consts.ARCHIVE_DISK_TRANSCODE_DBK,
                 sys_consts.TRANSCODE_NONE,
             )
+
+            return None
 
         def _handle_transcode_archival_clicked() -> None:
             """Handles the transcode_archival CLICKED event.
@@ -529,6 +557,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                 sys_consts.TRANSCODE_FFV1ARCHIVAL,
             )
 
+            return None
+
         def _handle_transcode_h264_clicked() -> None:
             """Handles the transcode_h264 CLICKED event.
 
@@ -538,6 +568,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                 sys_consts.ARCHIVE_DISK_TRANSCODE_DBK,
                 sys_consts.TRANSCODE_H264,
             )
+
+            return None
 
         def _handle_transcode_h265_clicked() -> None:
             """Handles the transcode_h265 CLICKED event.
@@ -549,10 +581,12 @@ class DVD_Archiver(DVD_Archiver_Base):
                 sys_consts.TRANSCODE_H265,
             )
 
-        def _handle_video_editor_clicked(event: qtg.Action) -> int | None:
+            return None
+
+        def _handle_video_editor_clicked(event: qtg.Action) -> None:
             """Handles the video_editor CLICKED event.
 
-            This method is called when a video file is selected in the file grid
+            This function is called when a video file is selected in the file grid
             and the user wants to edit it. It performs checks on the video file,
             sets the video source in the video editor, and switches to the
             video editor tab.
@@ -561,10 +595,10 @@ class DVD_Archiver(DVD_Archiver_Base):
                 event (qtg.Action): The event triggering the video editor action.
 
             Returns:
-                int | None: None if the video file is not supported, too short,
-                    or the DVD build folder is not set, or the return value from
-                    another called function.
+                None:
             """
+            assert isinstance(event, qtg.Action), f"{event=}. Must be qtg.Action"
+
             video_edit_folder = Get_Video_Editor_Folder()
             video_data: list[Video_Data] = event.value
 
@@ -610,33 +644,39 @@ class DVD_Archiver(DVD_Archiver_Base):
             )
             self._control_tab.select_tab(tag_name="video_editor_tab")
             self._control_tab.enable_set(tag="video_editor_tab", enable=True)
+
             return None
 
-        def _handle_custom_event(event: qtg.Action) -> int | None:
+        def _handle_custom_event(event: qtg.Action) -> None:
             """Handles the CUSTOM event.
 
-            This method is called when a custom event is triggered. It calls the
+            This function is called when a custom event is triggered. It calls the
             appropriate handler method based on the event's tag.
 
             Args:
                 event (qtg.Action): The custom event.
 
             Returns:
-                int | None: The return value of the called handler method, or None.
+                None
             """
+            assert isinstance(event, qtg.Action), f"{event=}. Must be qtg.Action"
+
             if event.tag == "project_changed":
-                return _handle_project_changed_event(event)
+                _handle_project_changed_event(event)
+
             return None
 
         def _handle_project_changed_event(event: qtg.Action) -> None:
             """Handles the project_changed CUSTOM event.
 
-            This method is called when the project is changed. It updates the
+            This function is called when the project is changed. It updates the
             project combo box and tab states.
 
             Args:
                 event (qtg.Action): The event triggering the project change.
             """
+            assert isinstance(event, qtg.Action), f"{event=}. Must be qtg.Action"
+
             if event.widget_exist(
                 container_tag="main_controls", tag="existing_projects"
             ):
@@ -664,23 +704,26 @@ class DVD_Archiver(DVD_Archiver_Base):
 
             return None
 
-        def _handle_index_changed_event(event: qtg.Action) -> int | None:
+        def _handle_index_changed_event(event: qtg.Action) -> None:
             """Handles the INDEXCHANGED event.
 
-            This method is called when the selected index of a combobox is changed.
+            This function is called when the selected index of a combobox is changed.
             It calls the appropriate handler based on which combobox was changed
 
             Args:
                 event (qtg.Action): The event triggering the index change.
 
             Returns:
-                int | None: The return value of the called handler, or None
+                None
             """
+            assert isinstance(event, qtg.Action), f"{event=}. Must be qtg.Action"
+
             if event.tag == "existing_projects":
                 _project_combo_change(event)
             elif event.tag == "countries":
                 if not self._startup:
                     _language_setting_handler(event)
+
             return None
 
         def _delete_dvd_layout(event: qtg.Action) -> None:
@@ -786,6 +829,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                     tag="dvd_path",
                     value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
                 )
+
+            return None
 
         def _delete_project(event: qtg.Action) -> None:
             """Deletes a project by removing the corresponding python sql shelf data
@@ -914,6 +959,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                     setting_value=combo_data.display,
                 )
 
+            return None
+
         def _startup_handler(event: qtg.Action) -> None:
             """Performs activities that have to happen at startup
 
@@ -944,7 +991,9 @@ class DVD_Archiver(DVD_Archiver_Base):
                             partial_match=False,
                         )
 
-        def _tab_enable_handler(event: qtg.Action, enable: bool):
+            return None
+
+        def _tab_enable_handler(event: qtg.Action, enable: bool) -> None:
             """Enables or disables the tab dependent controls
 
             Args:
@@ -1014,7 +1063,9 @@ class DVD_Archiver(DVD_Archiver_Base):
 
                 dvd_layout_combo.enable_set(enable)
 
-        def _project_combo_change(event: qtg.Action):
+            return None
+
+        def _project_combo_change(event: qtg.Action) -> None:
             """Handles the change of a project combo item
 
             Args:
@@ -1076,6 +1127,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                     for item in layout_combo_items:
                         layout_combo.value_set(item)
 
+            return None
+
         def _archive_folder_select(event: qtg.Action) -> None:
             """Select an archive folder and updates the settings in the database with the selected folder.
 
@@ -1109,6 +1162,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                     value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
                 )
 
+            return None
+
         def _streaming_folder_select(event: qtg.Action) -> None:
             """Select a streaming folder and updates the settings in the database with the selected folder.
 
@@ -1141,6 +1196,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                     tag="streaming_path",
                     value=f"{sys_consts.SDELIM}{folder}{sys_consts.SDELIM}",
                 )
+
+            return None
 
         def _make_dvd(event: qtg.Action) -> None:
             """
@@ -1533,6 +1590,8 @@ class DVD_Archiver(DVD_Archiver_Base):
 
                     file_grid.clear()
 
+            return None
+
         #### Main
         if self._file_control:
             self._file_control.event_handler(event)
@@ -1555,7 +1614,16 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         return None
 
-    def _processed_files_handler(self, video_file_input: list[Video_Data]):
+    def _processed_files_handler(self, video_file_input: list[Video_Data]) -> None:
+        """
+        Handles the event when video files have been processed.
+
+        Args:
+            video_file_input (list[Video_Data]): The list of Video_Data objects that have been processed.
+
+        Returns:
+            None
+        """
         assert isinstance(video_file_input, list), f"{video_file_input=}. Must be list"
         assert all(
             isinstance(video_file, Video_Data) for video_file in video_file_input
@@ -1566,6 +1634,8 @@ class DVD_Archiver(DVD_Archiver_Base):
         # self._file_control.process_edited_video_files(video_file_input=video_file_input)
         self._control_tab.select_tab(tag_name="control_tab")
         self._control_tab.enable_set(tag="video_editor_tab", enable=False)
+
+        return None
 
     def layout(self) -> qtg.FormContainer:
         """Returns the Black DVD Archiver application ui layout

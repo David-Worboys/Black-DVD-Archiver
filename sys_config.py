@@ -439,7 +439,7 @@ def Delete_Project(project_name: str) -> tuple[int, str]:
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
 
     if (
-        sql_shelf.error == -1
+        sql_shelf.error.code == -1
     ):  # This should not happen unless the system goes off the rails
         return -1, sql_shelf.error.message
 
@@ -519,7 +519,7 @@ def Remove_Project_Files(project_name: str, file_paths: list[str]) -> tuple[int,
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
     if (
-        sql_shelf.error == -1
+        sql_shelf.error.code == -1
     ):  # This should not happen unless the system goes off the rails
         return -1, sql_shelf.error.message
 
@@ -744,9 +744,7 @@ def Get_Shelved_DVD_Layout(
 
     key = f"{project_name}.{dvd_layout_name}"
 
-    dvd_menu_layout: list[
-        str, tuple[tuple[str, "Video_Data"], ...], dict[str, str] | DVD_Menu_Page
-    ] = []
+    dvd_menu_layout = []
 
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
     if sql_shelf.error.code == -1:
@@ -815,7 +813,7 @@ def Set_Shelved_Project(
     sql_shelf = sqldb.SQL_Shelf(db_name=sys_consts.PROGRAM_NAME)
 
     if (
-        sql_shelf.error == -1
+        sql_shelf.error.code == -1
     ):  # This should not happen unless the system goes off the rails
         RuntimeError(f"{sql_shelf.error.code} {sql_shelf.error.message}")
 
@@ -903,7 +901,7 @@ def Set_Shelved_DVD_Layout(
 class DVD_Archiver_Base:
     def event_handler(self, event: Action) -> None:
         """
-        The event_handler methodused to handle GUI events.
+        The event_handler method used to handle GUI events.
 
         Args:
             event (Action): The event that was triggered
@@ -916,41 +914,103 @@ class DVD_Archiver_Base:
 
 @dataclasses.dataclass(slots=True)
 class DVD_Menu_Page:
+    """
+    Represents a page within a DVD menu.
+
+    Attributes:
+        _menu_title (str): The title of the menu page.
+        _user_data (dict): A dictionary for storing arbitrary user-defined data associated with the page.
+        _button_title (dict[int, tuple[str, Video_Data]]): A dictionary mapping button indices to tuples
+            containing the button title and its associated Video_Data.
+    """
+
     _menu_title: str = ""
     _user_data: dict = dataclasses.field(default_factory=dict)
     _button_title: dict[int, tuple[str, "Video_Data"]] = dataclasses.field(
         default_factory=dict
     )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """
+        Initializes the DVD_Menu_Page object.  This method is automatically called after the dataclass's
+        __init__ method.  Currently, it performs no actions.
+        """
         pass
+
+        return None
 
     @property
     def menu_title(self) -> str:
+        """
+        Gets the title of the menu page.
+
+        Returns:
+            str: The menu title.
+        """
         return self._menu_title
 
     @menu_title.setter
-    def menu_title(self, menu_title: str):
-        assert isinstance(menu_title, str), f"{menu_title=}. Myst be str"
+    def menu_title(self, menu_title: str) -> None:
+        """
+        Sets the title of the menu page.
+
+        Args:
+            menu_title (str): The menu title to set.
+
+        Raises:
+            AssertionError: If the provided menu_title is not a string.
+        """
+        assert isinstance(menu_title, str), f"{menu_title=}. Must be str"
 
         self._menu_title = menu_title
 
     @property
     def get_button_titles(self) -> dict[int, tuple[str, "Video_Data"]]:
+        """
+        Gets the dictionary of button titles and their associated Video_Data.
+
+        Returns:
+            dict[int, tuple[str, Video_Data]]: A dictionary where keys are button indices (integers)
+                and values are tuples containing the button title (string) and the associated
+                Video_Data object.
+        """
         return self._button_title
 
     @property
-    def user_data(self):
+    def user_data(self) -> dict:
+        """
+        Gets the user-defined data associated with the menu page.
+
+        Returns:
+            dict: The user-defined data dictionary.
+        """
         return self._user_data
 
     @user_data.setter
-    def user_data(self, user_data: dict):
+    def user_data(self, user_data: dict) -> None:
+        """
+        Sets the user-defined data associated with the menu page.
+
+        Args:
+            user_data (dict): The user-defined data dictionary to set.
+
+        """
         assert isinstance(user_data, dict), f"{user_data=}. Must be dict"
+
         self._user_data = user_data
 
     def add_button_title(
         self, button_index: int, button_title: str, button_video_data: "Video_Data"
-    ):
+    ) -> None:
+        """
+        Adds a button title and its associated Video_Data to the menu page.
+
+        Args:
+            button_index (int): The index of the button.
+            button_title (str): The title of the button.
+            button_video_data (Video_Data): The Video_Data object associated with the button.
+
+        """
         assert isinstance(button_index, int) and button_index >= 0, (
             f"{button_index=}. Must be int >= 0"
         )
@@ -958,7 +1018,10 @@ class DVD_Menu_Page:
         assert isinstance(button_video_data, Video_Data), (
             f"{button_video_data=}. Must be Video_Data"
         )
+
         self._button_title[button_index] = (button_title, button_video_data)
+
+        return None
 
 
 @dataclasses.dataclass

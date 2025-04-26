@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import dataclasses
-import multiprocessing.dummy as multiprocessing
+import multiprocessing as multiprocessing
 import signal
 import threading
 from multiprocessing.shared_memory import SharedMemory
@@ -36,10 +36,25 @@ class _Task:
     """
     Represents a task to be executed by the task manager.
 
+    Attributes:
+        name (str): The name of the task.
+        method (Callable): The callable (function, method, etc.) that performs the task.
+        arguments (any): The arguments to pass to the `method`.
+        callback (Callable[[int, str, str, str], None]): A callable that is invoked
+            when the task completes (successfully or with an error).  It should
+            accept four arguments:
+            -  An integer status code (0 for success, non-zero for error).
+            -  A string indicating the outcome ("ok", "error", "crash", "killed").
+            -  A string with output from the task (if any) or an error message.
+            -  The name of the task.
+        crashed (bool):  A flag indicating whether the task has crashed.
+        kill_signal (bool): A flag indicating that the task should be terminated.
+        process (Optional[multiprocessing.Process]): The `multiprocessing.Process`
+            instance associated with the task's execution.
+
     Note:
         The `stop` method can be used to forcefully terminate a task's associated process.
         It is important to handle task termination carefully to prevent resource leaks.
-
     """
 
     name: str
@@ -63,31 +78,52 @@ class Task_Manager:
     A class that represents a background task manager.
 
     Attributes:
-        error_callback (Callable[[str], None]): The callback to call when the task manager crashes.
+        error_callback (Callable[[str], None] | None): The callback to call when the task manager crashes.
+        _throw_errors (bool): A flag indicating whether the task manager should raise errors.
+        _task_queue (multiprocessing.Queue): A queue to hold tasks that are waiting to be executed.
+        _task_list (list[_Task]): A list to hold tasks that are currently running.
+        _running_tasks_dict (dict[str, _Task]): A dictionary to hold tasks that are currently running, keyed by task name.
+        _thread (threading.Thread | None): The thread in which the task handler runs.
+        _crash_event (threading.Event | None): An event that is set when the task manager crashes.
+        _lock (threading.Lock): A lock to protect access to shared resources.
+        _stop_event (threading.Event): An event that is set when the task manager is stopped.
+        _running_tasks_updated (multiprocessing.Event): An event that is set when the list of running tasks is updated.
+        _manager (multiprocessing.Manager):  A manager object (currently unused).  Consider its purpose.
+        _running_tasks (multiprocessing.Queue[str]): A queue containing the names of the running tasks.
+        _update_event (multiprocessing.Event): An event used to signal that the task queue has been updated.
     """
 
     def __init__(self):
         self.error_callback = None
         self._throw_errors = True
         self._task_queue = multiprocessing.Queue()
-        self._task_list = []
         self._running_tasks_dict = {}
         self._thread = None
         self._crash_event = None
         self._lock = threading.Lock()
-
         self._stop_event = threading.Event()
         self._running_tasks_updated = multiprocessing.Event()
-        self._manager = multiprocessing.Manager()
         self._running_tasks = multiprocessing.Queue()
         self._update_event = multiprocessing.Event()
 
     @property
     def throw_errors(self) -> bool:
+        """
+        Gets or sets whether the task manager should raise errors.
+
+        Returns:
+            bool: True if errors should be raised, False otherwise.
+        """
         return self._throw_errors
 
     @throw_errors.setter
     def throw_errors(self, value: bool):
+        """
+        Sets whether the task manager should raise errors.
+
+        Args:
+            value (bool): True to raise errors, False otherwise.
+        """
         assert isinstance(value, bool), f"{value=}. Must be bool"
         self._throw_errors = value
 
@@ -95,15 +131,18 @@ class Task_Manager:
         """
         Handles a SIGSEGV (signal 9) signal and call the error_callback if it is registered.
 
+        This method is registered as a signal handler for SIGSEGV.  When the
+        TaskManager receives this signal (typically indicating a crash),
+        this method is invoked.  It sets the `_crash_event` and, if an
+        error callback is set, calls it with an error message.
+
         Args:
             signum (int): Is the signal number.
             frame (any): Is frame
 
         """
         print("Task Manager has crashed with SIGSEGV (signal 9)")
-
         self._crash_event.set()
-
         if self.error_callback is not None and self.throw_errors:
             self.error_callback("Task Manager has crashed with SIGSEGV (signal 9)")
 
@@ -115,6 +154,7 @@ class Task_Manager:
 
         Args:
             task (_Task): The task object to be executed.
+            args (any):  The arguments to pass to the task's method.
         """
 
         shared_mem_name = task.name
@@ -126,8 +166,9 @@ class Task_Manager:
             task.process = multiprocessing.Process(
                 target=task.method, args=(task.arguments,)
             )
-
-            status, output = task.method(*task.arguments)
+            # task.process.start() # removed start and join
+            # task.process.join()
+            status, output = task.method(*task.arguments)  # added this back
 
             if task.crashed:
                 if self.throw_errors:
@@ -196,9 +237,7 @@ class Task_Manager:
 
                         task.process.start()
                     except Exception as e:
-                        print(f"_Task_Handler Error {e}")
-
-            sleep(0.1)
+                        print(f"_Task_Handler Error {e}")  # Log the error
 
             if self._running_tasks_updated.wait(timeout=1):  # Wait for up to 1 second
                 for task_name in self._running_tasks_dict.copy().keys():
@@ -223,7 +262,7 @@ class Task_Manager:
                             if debug:
                                 print(f"Ignoring memory block '{task_name}'  {e}")
                             else:
-                                pass
+                                pass  # Log the error
             try:
                 for task_name, task in list(self._running_tasks_dict.items()):
                     if task.kill_signal:
@@ -239,7 +278,7 @@ class Task_Manager:
                                 self._update_event.set()  # Signal the update event
 
             except Exception as e:
-                print(f"_Task_Handler {e=}")
+                print(f"_Task_Handler {e=}")  # Log the error
 
     def _write_to_shared_memory(self, shared_mem_name: str, message: str):
         """Writes a message to a shared memory block, creating it if necessary.
@@ -268,7 +307,7 @@ class Task_Manager:
             shared_mem.buf[: len(data_bytes)] = data_bytes
 
         except Exception as e:
-            print(f"Unexpected error writing to shared memory: {e}")
+            print(f"Unexpected error writing to shared memory: {e}")  # Log the error
         finally:
             shared_mem.close()
             if not shared_mem.name.startswith("__"):  # Avoid unlinking temporary blocks
@@ -288,7 +327,7 @@ class Task_Manager:
             name (str): The name of the task.
             method: (Callable): The method/function to be called. By default, this is Execute_Check_Output
             arguments (any): The arguments to be passed to the method.
-            callback (Callable[[int, str, str, str], None]): The callback function to be called when the task is finished.
+            callback (Callable[[int, str, str, str], None]): The function to be called when the task is finished.
 
         """
 
@@ -320,6 +359,10 @@ class Task_Manager:
 
         if task is not None:
             task.kill_signal = True
+            if task.process:  # check if the process exists
+                task.process.terminate()  # added terminate
+                task.process.join()  # and join
+            task.callback(-1, "killed", "", task.name)  # Added callback
 
     def set_error_callback(self, callback: Callable[[str], None]):
         """
@@ -514,7 +557,6 @@ class Task_Manager_Popup(qtg.PopContainer):
         control_container = qtg.VBoxContainer(
             tag="form_controls", align=qtg.Align.TOPRIGHT
         )
-
         control_container.add_row(
             task_control_container,
             qtg.HBoxContainer(tag="command_buttons", margin_right=5).add_row(
@@ -530,5 +572,4 @@ class Task_Manager_Popup(qtg.PopContainer):
                 ),
             ),
         )
-
         return control_container

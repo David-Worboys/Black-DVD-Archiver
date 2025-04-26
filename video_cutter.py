@@ -144,7 +144,15 @@ def Error_Callback(error_message: str):
 @dataclasses.dataclass(slots=True)
 class Edit_List:
     """
-    Stores, updates and deletes the edit list
+    Stores, updates, and deletes the edit list.
+
+    Attributes:
+        _error_message (str):  Stores the last error message.
+        _error_code (int): Stores the last error code (0 for success, non-zero for error).
+        _archive_folder (str):  The folder where archived videos are stored.
+        _db_settings (sqldb.App_Settings):  An instance of the application settings database class.
+        _json_edit_cuts_file (str):  The name of the JSON file used to store edit cuts (currently unused & will ve removed in future).
+        _video_shelf_name (Final[str]): The name of the SQL Shelf used to store video cut data.
     """
 
     _error_message: str = ""
