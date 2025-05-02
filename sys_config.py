@@ -348,10 +348,10 @@ def Delete_DVD_Layout(project_name: str, layout_name: str) -> tuple[int, str]:
         layout_name (str): The name of the DVD layout which will be deleted
 
     Returns:
-    tuple[int, Optional[float]]: tuple containing result code and
+        tuple[int, str]: tuple containing result code and message
 
-        - arg 1: If the status code is 1, the operation was successful otherwise it failed.
-        - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.:
 
     """
     assert isinstance(project_name, str) and project_name.strip() != "", (
@@ -407,10 +407,10 @@ def Delete_Project(project_name: str) -> tuple[int, str]:
         project_name (str): The project name
 
     Returns:
-    tuple[int, Optional[float]]: tuple containing result code and
+        tuple[int, str]: tuple containing result code and message
 
-        - arg 1: If the status code is 1, the operation was successful otherwise it failed.
-        - arg 2: If the status code is -1, an error occurred, and the message provides details.:
+            - arg 1: If the status code is 1, the operation was successful otherwise it failed.
+            - arg 2: If the status code is -1, an error occurred, and the message provides details.:
 
     """
     assert isinstance(project_name, str) and project_name.strip() != "", (
@@ -580,16 +580,22 @@ def Remove_Project_Files(project_name: str, file_paths: list[str]) -> tuple[int,
 
 def Get_Project_Files(
     project_name: str,
-) -> tuple[int, list[dict[int, str, "Video_Data"] | dict[int, str, "Video_Data", str]]]:
-    """Retrieves video files associated with a given project, removing duplicates and updating relevant data sources.
+) -> tuple[int, list[dict]]:
+    """
+    Retrieves video files associated with a given project, removing duplicates and updating relevant data sources.
 
     Args:
         project_name (str): The name of the project to retrieve files for.
 
     Returns:
-        tuple[int, list[dict[int, str, Video_Data]]]:
+        tuple[int, list[dict]]:
             - int: Indicates success (1) or failure (-1).
-            - list[dict[int, str, "Video_Data"]]: A list of video data dictionaries, with updated with row indices.
+            - list[dict]:
+                A list of video data dictionaries, with updated row indices and the following keys:
+                    row_index
+                    duration
+                    video_data
+                    dvdmenu [optional]
 
     """
 

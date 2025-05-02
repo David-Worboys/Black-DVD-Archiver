@@ -229,12 +229,51 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 buttons_per_page (int): Number of buttons allowed on a DVD page
                 video_data (list[Video_Data]): THe video files on a DVD page
                 menu_pages (list[list[Video_Data]]): The DVD menu layout
-                page_title (list[tuple[str, dict, list[Video_Data]]]): Thr title of each DVD menu page and associated
+                page_title (list[tuple[str, dict, list[Video_Data]]]): The title of each DVD menu page and associated
                     variables
 
             Returns:
 
             """
+            assert isinstance(menu_title, str), f"{menu_title=}. Must be a str"
+            assert isinstance(menu_dict, dict), f"{menu_dict=}. Must be a dict"
+            assert isinstance(buttons_per_page, int) and buttons_per_page > 0, (
+                f"{buttons_per_page=}. Must be an int > 0"
+            )
+            assert isinstance(video_data, list) and all(
+                isinstance(item, Video_Data) for item in video_data
+            ), f"{video_data=}.  Must be a list of Video_Data"
+
+            assert isinstance(menu_pages, list), f"{menu_pages=}. Must be a list."
+            assert all(isinstance(page, list) for page in menu_pages), (
+                f"Each element in {menu_pages=} must be a list."
+            )
+            assert all(
+                isinstance(item, Video_Data) for page in menu_pages for item in page
+            ), (
+                f"All items within the inner lists of {menu_pages=} must be Video_Data objects."
+            )
+            assert isinstance(page_title, list), f"{page_title=}. Must be a list"
+            assert all(isinstance(item, tuple) for item in page_title), (
+                f"{page_title=}. All elements must be tuples."
+            )
+            assert all(len(item) == 3 for item in page_title), (
+                f"{page_title=}. All tuples must have exactly 3 elements."
+            )
+            assert all(isinstance(item[0], str) for item in page_title), (
+                f"{page_title=}. The first element of each tuple in {page_title=} must be a str."
+            )
+            assert all(isinstance(item[1], dict) for item in page_title), (
+                f"{page_title=}. The second element of each tuple in {page_title=} must be a dict."
+            )
+            assert all(
+                isinstance(item[2], list)
+                and all(isinstance(video_item, Video_Data) for video_item in item[2])
+                for item in page_title
+            ), (
+                f"{page_title=}. The third element of each tuple must be a list of Video_Data objects."
+            )
+
             if len(video_data) >= buttons_per_page:
                 page_data_list: list[Video_Data] = []
                 title_count = 0
@@ -264,6 +303,9 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             return None
 
         # #### Main
+        assert isinstance(event, qtg.Action), (
+            f"{event=}. Must be an instance of qtg.Action"
+        )
         menu_title_grid: qtg.Grid = cast(
             qtg.Grid,
             event.widget_get(
@@ -282,7 +324,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         buttons_per_page = DVD_Menu_Settings().buttons_per_page
 
-        dvd_menu_layout: list[DVD_Menu_Page] = self._load_DVD_menu(event)
+        dvd_menu_layout: list[DVD_Menu_Page] = self._load_DVD_menu()
 
         files_in_dvd_layout: list[tuple[str, dict, list[Video_Data]]] = []
         files_not_in_dvd_layout: list[tuple[str, dict, list[Video_Data]]] = []
@@ -517,11 +559,10 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         return None
 
-    def _load_DVD_menu(self, event: qtg.Action) -> list[DVD_Menu_Page]:
+    def _load_DVD_menu(self) -> list[DVD_Menu_Page]:
         """Reads the DVD menu pages Video_Data definitions from the project database shelve file
 
         Args:
-            event (qtg.Action): The event that triggered the load of the DVD menu
 
         Returns:
             list[DVD_Menu_Page]: The DVD menu page Video_Data definitions loaded from the database
@@ -629,11 +670,14 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
 
         if not changed:
             for row in range(menu_title_grid.row_count):
-                row_grid: qtg.Grid | None = menu_title_grid.row_widget_get(
-                    row=row,
-                    col=video_titles_col_index,
-                    container_tag="control_box",
-                    tag="row_grid",
+                row_grid = cast(
+                    qtg.Grid,
+                    menu_title_grid.row_widget_get(
+                        row=row,
+                        col=video_titles_col_index,
+                        container_tag="control_box",
+                        tag="row_grid",
+                    ),
                 )
 
                 if row_grid is not None and row_grid.changed:
@@ -698,8 +742,6 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             return -1
 
         for row_index, menu_item in enumerate(self.menu_layout):
-            # Keeping pycharm types happy
-            row_index: int
             menu_item: tuple[str, list[Video_Data]]
 
             if not menu_item[0].strip():
@@ -730,11 +772,14 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             else:
                 menu_title_user_data["disk_title"] = disk_title_lineedit.value_get()
 
-            row_grid: qtg.Grid | None = menu_title_grid.row_widget_get(
-                row=row,
-                col=video_titles_col_index,
-                container_tag="control_box",
-                tag="row_grid",
+            row_grid = cast(
+                qtg.Grid,
+                menu_title_grid.row_widget_get(
+                    row=row,
+                    col=video_titles_col_index,
+                    container_tag="control_box",
+                    tag="row_grid",
+                ),
             )
 
             menu_items = []
@@ -802,8 +847,6 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             == "yes"
         ):
             for item in reversed(menu_title_grid.checkitems_get):
-                item: qtg.Grid_Item
-
                 menu_title_grid.row_delete(item.row_index)
 
         return None
@@ -837,7 +880,6 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             == "yes"
         ):
             for item in reversed(button_title_grid.checkitems_get):
-                item: qtg.Grid_Item
                 button_title_grid.row_delete(item.row_index)
 
         return None
@@ -882,7 +924,6 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
             menu_title_user_data = {}
 
             for col in range(menu_title_grid.col_count):
-                # grid_user_data = menu_title_grid.userdata_get(row=row, col=col)
                 if col == menu_titles_col_index:
                     menu_title: str = menu_title_grid.value_get(row=row, col=col)
                     menu_title_user_data: dict[str, str] = menu_title_grid.userdata_get(
@@ -904,11 +945,14 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                         )
 
                 elif col == video_titles_col_index:
-                    row_grid: qtg.Grid | None = menu_title_grid.row_widget_get(
-                        row=row,
-                        col=video_titles_col_index,
-                        container_tag="control_box",
-                        tag="row_grid",
+                    row_grid = cast(
+                        qtg.Grid,
+                        menu_title_grid.row_widget_get(
+                            row=row,
+                            col=video_titles_col_index,
+                            container_tag="control_box",
+                            tag="row_grid",
+                        ),
                     )
 
                     button_list: list[tuple[str, Video_Data]] = []
@@ -1017,11 +1061,14 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                             )
 
                     elif col == video_titles_col_index:
-                        row_grid: qtg.Grid | None = menu_title_grid.row_widget_get(
-                            row=row,
-                            col=video_titles_col_index,
-                            container_tag="control_box",
-                            tag="row_grid",
+                        row_grid = cast(
+                            qtg.Grid,
+                            menu_title_grid.row_widget_get(
+                                row=row,
+                                col=video_titles_col_index,
+                                container_tag="control_box",
+                                tag="row_grid",
+                            ),
                         )
 
                         button_list: list[tuple[str, Video_Data]] = []

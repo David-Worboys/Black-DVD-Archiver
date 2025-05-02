@@ -929,7 +929,7 @@ def Create_DVD_Case_Insert(
 
     Args:
         title (str): Title of the DVD.
-        menu_pages list[DVD_Menu_Page]: List of menu pages to be displayed on the insert.
+        menu_pages (list[DVD_Menu_Page]): List of menu pages to be displayed on the insert.
         insert_width (int): Width of the DVD case insert.
         insert_height (int): Height of the DVD case insert.
         insert_colour (str): Background colour of the insert.
@@ -1040,10 +1040,12 @@ def Create_DVD_Case_Insert(
             )
 
             for line_index, menu_line in enumerate(wrapped_text):
-                dvd_text.append(f"{menu_line}" if line_index == 0 else f"\ {menu_line}")
+                dvd_text.append(
+                    f"{menu_line}" if line_index == 0 else rf"\ {menu_line}"
+                )
 
             for button_item in menu_title.get_button_titles.values():
-                button_title = f"\  - {button_item[0]}"  # Button titles are indented 4 spaces (\ required!)
+                button_title = rf"\  - {button_item[0]}"  # Button titles are indented 4 spaces (\ required!)
 
                 width, _ = Get_Text_Dims(
                     text=f"{button_title}",
@@ -1060,7 +1062,7 @@ def Create_DVD_Case_Insert(
 
                     for line_index, button_line in enumerate(wrapped_text):
                         dvd_text.append(
-                            f"{button_line}" if line_index == 0 else f"\ {button_line}"
+                            f"{button_line}" if line_index == 0 else rf"\ {button_line}"
                         )
 
                 else:
@@ -1666,11 +1668,11 @@ def Create_DVD_Label(
 
             # leading \ is required for menu line!
             for line_index, menu_line in enumerate(wrapped_text):
-                dvd_text.append(menu_line if line_index == 0 else f"\ {menu_line}")
+                dvd_text.append(menu_line if line_index == 0 else rf"\ {menu_line}")
 
             # menu button title text is indented 4 spaces and leading \ is required!
             for button_item in menu_title.get_button_titles.values():
-                button_title = f"\  - {button_item[0]}"
+                button_title = rf"\  - {button_item[0]}"
 
                 wrapped_text = textwrap.wrap(
                     button_title,
@@ -1681,7 +1683,7 @@ def Create_DVD_Label(
                 # leading \ is required for button line!
                 for line_index, button_line in enumerate(wrapped_text):
                     dvd_text.append(
-                        f"{button_line}" if line_index == 0 else f"\ {button_line}"
+                        f"{button_line}" if line_index == 0 else rf"\ {button_line}"
                     )
 
             dvd_text.append(" ")
@@ -4777,7 +4779,7 @@ def Generate_Menu_Image_From_File(
         "-i",
         video_file,
         "-vf",
-        f"select=eq(n\,{frame_number}) , scale=-1:{str(button_height)}",
+        rf"select=eq(n\,{frame_number}) , scale=-1:{str(button_height)}",
         "-vframes",
         "1",
         image_file,

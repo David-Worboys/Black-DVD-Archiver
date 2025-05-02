@@ -81,14 +81,12 @@ class Task_Manager:
         error_callback (Callable[[str], None] | None): The callback to call when the task manager crashes.
         _throw_errors (bool): A flag indicating whether the task manager should raise errors.
         _task_queue (multiprocessing.Queue): A queue to hold tasks that are waiting to be executed.
-        _task_list (list[_Task]): A list to hold tasks that are currently running.
         _running_tasks_dict (dict[str, _Task]): A dictionary to hold tasks that are currently running, keyed by task name.
         _thread (threading.Thread | None): The thread in which the task handler runs.
         _crash_event (threading.Event | None): An event that is set when the task manager crashes.
         _lock (threading.Lock): A lock to protect access to shared resources.
         _stop_event (threading.Event): An event that is set when the task manager is stopped.
         _running_tasks_updated (multiprocessing.Event): An event that is set when the list of running tasks is updated.
-        _manager (multiprocessing.Manager):  A manager object (currently unused).  Consider its purpose.
         _running_tasks (multiprocessing.Queue[str]): A queue containing the names of the running tasks.
         _update_event (multiprocessing.Event): An event used to signal that the task queue has been updated.
     """

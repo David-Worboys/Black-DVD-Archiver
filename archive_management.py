@@ -51,6 +51,15 @@ class Archive_Manager:
     _backup_folders: tuple[str, ...] = (DVD_IMAGE, ISO_IMAGE, VIDEO_SOURCE, MISC)
 
     def __post_init__(self) -> None:
+        """
+        Validates and sets default values for the Archive_Manager instance.
+
+        Ensures that the archive_folder, streaming_folder, archive_size, and
+        transcode_type are valid and assigns default values if necessary.
+        Creates the folder structure for archiving and initializes error
+        messages if folder creation fails.
+
+        """
         assert (
             isinstance(self.archive_folder, str) and self.archive_folder.strip() != ""
         ), f"{self.archive_folder=}. Must Be non-empty str"
@@ -79,10 +88,22 @@ class Archive_Manager:
 
     @property
     def get_error(self) -> str:
+        """
+        Returns the last error message encountered during archive folder creation.
+
+        Returns:
+            str: The last error message encountered. Empty string if no errors.
+        """
         return self._error_message
 
     @property
     def get_error_code(self) -> int:
+        """
+        Returns the last error code encountered during archive folder creation.
+
+        Returns:
+            int: The last error code encountered. -1 if no errors.
+        """
         return self._error_code
 
     def _make_folder_structure(self) -> str:

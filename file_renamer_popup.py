@@ -17,8 +17,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# Tell Black to leave this block alone (realm of isort)
-# fmt: off
 import dataclasses
 from typing import cast
 
@@ -28,8 +26,6 @@ import QTPYGUI.qtpygui as qtg
 import QTPYGUI.sqldb as sqldb
 import sys_consts
 from sys_config import Video_Data
-
-# fmt: on
 
 
 @dataclasses.dataclass
@@ -61,6 +57,7 @@ class File_Renamer_Popup(qtg.PopContainer):
 
     def event_handler(self, event: qtg.Action) -> None:
         """Handles  form events
+
         Args:
             event (qtg.Action): The triggering event
         """
@@ -104,8 +101,10 @@ class File_Renamer_Popup(qtg.PopContainer):
     def _is_changed(self, event: qtg.Action) -> bool:
         """
         Check if any file names in the video_input_files Grid have been changed.
+
         Args:
             event (qtg.Action): The event that triggered this method.
+
         Returns:
             bool: True if any file names have been changed, False otherwise.
         """
@@ -135,8 +134,10 @@ class File_Renamer_Popup(qtg.PopContainer):
     def _load_files(self, event: qtg.Action) -> int:
         """
         Load the list of video input files into the GUI file controls grid.
+
         Args:
             event (qtg.Action): The event that triggered the method.
+
         Returns:
             int: The number of files loaded.
         """
@@ -166,6 +167,7 @@ class File_Renamer_Popup(qtg.PopContainer):
     def _package_files(self, event: qtg.Action) -> None:
         """
         Package the video input files into the video_data_list.
+
         Args:
             event (qtg.Action): The event that triggered this method.
         """
@@ -198,8 +200,10 @@ class File_Renamer_Popup(qtg.PopContainer):
     def _process_cancel(self, event: qtg.Action) -> int:
         """
         Handles processing the cancel button.
+
         Args:
             event (qtg.Action): The triggering event.
+
         Returns:
             int: Returns 1 if cancel process is ok, -1 otherwise.
         """
@@ -226,8 +230,10 @@ class File_Renamer_Popup(qtg.PopContainer):
     def _process_ok(self, event: qtg.Action) -> int:
         """
         Handles processing the ok button.
+
         Args:
             event (qtg.Action): The triggering event.
+
         Returns:
             int: Returns 1 if the ok process id good, -1 otherwise
         """
@@ -252,8 +258,10 @@ class File_Renamer_Popup(qtg.PopContainer):
     def _rename_files(self, event: qtg.Action) -> int:
         """
         Handles renaming of video file if needed.
+
         Args:
             event (qtg.Action): The triggering event.
+
         Returns:
             int: Returns 1 if all file names are valid and files are, if needed, renamed successfully, -1 otherwise.
         """
