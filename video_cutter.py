@@ -1107,9 +1107,14 @@ class Video_Editor(DVD_Archiver_Base):
                 ].video_file_settings.button_title = self._menu_title.value_get()
 
             if self._menu_frame.modified:
-                self._video_file_input[0].video_file_settings.menu_button_frame = int(
-                    self._menu_frame.value_get()
-                )
+                if self._menu_frame.value_get().isascii():  # Should not happen
+                    self._video_file_input[0].video_file_settings.menu_button_frame = 0
+                else:
+                    self._video_file_input[
+                        0
+                    ].video_file_settings.menu_button_frame = int(
+                        self._menu_frame.value_get()
+                    )
 
             self._video_file_input[
                 0
