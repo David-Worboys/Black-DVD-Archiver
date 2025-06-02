@@ -44,8 +44,8 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
         assert isinstance(self.title, str) and self.title.strip() != "", (
             f"{self.title=}. Must be a non-empty str"
         )
-
-        self.container = self.layout()
+        with qtg.sys_cursor(qtg.Cursor.hourglass):
+            self.container = self.layout()
 
         super().__post_init__()  # This statement must be last
 
@@ -59,7 +59,8 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
 
         match event.event:
             case qtg.Sys_Events.WINDOWPOSTOPEN:
-                self._font_combo_init(event)
+                with qtg.sys_cursor(qtg.Cursor.hourglass):
+                    self._font_combo_init(event)
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
                     case "ok":
@@ -467,6 +468,7 @@ class DVD_Menu_Config_Popup(qtg.PopContainer):
         if result.files:
             for file in result.files:
                 file_path = file_handler.file_join(sys_consts.ICON_PATH, file)
+
                 if "left" in file.lower():
                     left_page_pointer_list.append(
                         qtg.Combo_Item(
