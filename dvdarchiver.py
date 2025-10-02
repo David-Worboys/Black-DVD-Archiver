@@ -20,7 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from typing import cast
+from typing import cast, Any
 
 import platformdirs
 
@@ -51,84 +51,7 @@ from QTPYGUI.utils import Countries, Text_To_File_Name
 from video_cutter import Video_Editor
 from video_file_grid import Video_File_Grid
 
-# These global functions and variables are only used by the multi-thread task_manager process and exist by
-# necessity as this seems the only way to communicate the variable values to the rest of the dvdarchiver code
-gi_task_error_code = -1
-gi_thread_status = -1
-gs_thread_error_message = ""
-gs_task_error_message = ""
-gs_thread_status = ""
-gs_thread_message = ""
-gs_thread_output = ""
-gs_thread_task_name = ""
-
-
-def Run_DVD_Build(dvd_instance: DVD) -> tuple[int, str]:
-    """This is a wrapper function used hy the multi-thread task_manager to run the DVD build process
-
-    Args:
-        dvd_instance (DVD): The DVD instance that creates the DVD files and folders.
-
-    Returns:
-        tuple[int, str]:
-        - arg1 1: ok, -1: fail
-        - arg2: error message or "" if ok
-    """
-    global gi_task_error_code
-    global gs_task_error_message
-
-    gi_task_error_code, gs_task_error_message = dvd_instance.build()
-
-    if not utils.Is_Complied():
-        print(f"DBG Run_DVD_Build {gi_task_error_code=} {gs_task_error_message=}")
-
-    return gi_task_error_code, gs_task_error_message
-
-
-def Notification_Call_Back(status: int, message: str, output: str, name):
-    """
-    The notification_call_back function is called by the multi-thread task_manager when a task completes
-
-
-    Args:
-        status: int: Determine if the task was successful or not
-        message: str: Pass a message to the user
-        output: str: Return the output of the task
-        name: Identify the task that has completed
-
-    """
-    global gs_thread_status
-    global gs_thread_message
-    global gs_thread_output
-    global gs_thread_task_name
-
-    gs_thread_status = status
-    gs_thread_message = message
-    gs_thread_output = output
-    gs_thread_task_name = name
-
-    if not utils.Is_Complied():
-        print(
-            "DBG Notification_Call_Back"
-            f" {gs_thread_status=} {gs_thread_message=} {gs_thread_output=} {gs_thread_task_name=}"
-        )
-
-
-# self._tasks_submitted -= 1
-def Error_Callback(error_message: str):
-    """The Error_Callback function is called by the multi-thread task_manager when a task errors
-
-    Args:
-        error_message (str): The error message generated when the calling thread broke
-    """
-    global gs_thread_error_message
-
-    gs_thread_error_message = error_message
-    if not utils.Is_Complied():
-        print(f"DBG Error_Callback {gs_thread_error_message=}")
-
-
-################################
+DEBUG = False if utils.Is_Complied() else True
 
 
 class DVD_Archiver(DVD_Archiver_Base):
@@ -162,9 +85,13 @@ class DVD_Archiver(DVD_Archiver_Base):
         self._shutdown = False
         self._control_tab: qtg.Tab | None = None
 
+        self._file_handler: file_utils.File = file_utils.File()
+
         self._data_path: str = platformdirs.user_data_dir(sys_consts.PROGRAM_NAME)
 
-        self._file_control = Video_File_Grid(parent=self)
+        self._video_file_grid = Video_File_Grid(parent=self)
+        self._system_notifications: qtg.Label | None = None
+        self._dvd_layout_combo: qtg.ComboBox | None = None
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
 
         # A problem in the next 3 lines can shut down startup as database initialization failed
@@ -192,7 +119,7 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         self._video_editor: Video_Editor | None = None
         self._save_existing_project = True
-        self._task_stack = {}  # Used to keep track of running tasks
+        self._button_container: dict = {}
 
     def db_init(self) -> sqldb.SQLDB:
         """
@@ -202,13 +129,11 @@ class DVD_Archiver(DVD_Archiver_Base):
             sqldb.SQLDB: A SQLDB object representing the application database.
 
         """
-        file_handler = file_utils.File()
-
-        if not file_handler.path_exists(self._data_path):
+        if not self._file_handler.path_exists(self._data_path):
             print(f"*** Need To Create {self._data_path}")
-            file_handler.make_dir(self._data_path)
+            self._file_handler.make_dir(self._data_path)
 
-            if not file_handler.path_exists(self._data_path):
+            if not self._file_handler.path_exists(self._data_path):
                 raise RuntimeError(
                     f"Failed To Create {sys_consts.PROGRAM_NAME} Data Folder"
                 )
@@ -288,8 +213,35 @@ class DVD_Archiver(DVD_Archiver_Base):
                     f" {error_status.message}"
                 )
 
+    def component_event_handler(self, message_id: int, message: str):
+        """
+        Handles application component events
+
+        Args:
+            message_id (int): The application event id
+            message (str): The message bing sent
+        """
+        assert isinstance(message_id, int) and message_id >= 0, (
+            f"{message_id=}. Must be int >= 0"
+        )
+        assert isinstance(message, str), f"{message=}. Must be str"
+
+        match message_id:
+            case sys_consts.NOTIFICATION_EVENT:
+                if self._system_notifications:
+                    message = message.replace(sys_consts.SDELIM, "")
+                    self._system_notifications.value_set(message)
+            case sys_consts.NOTIFICATION_ERROR_EVENT:
+                if self._system_notifications:
+                    message = message.replace(sys_consts.SDELIM, "")
+                popups.PopError(title="Error...", message=message).show()
+            case sys_consts.NOTIFICATION_MESSAGE_EVENT:
+                if self._system_notifications:
+                    message = message.replace(sys_consts.SDELIM, "")
+                popups.PopMessage(title="Message...", message=message).show()
+
     def event_handler(self, event: qtg.Action) -> None:
-        """Handles application events
+        """Handles system application events
 
         Args:
             event (qtg.Action): The triggering event
@@ -331,40 +283,23 @@ class DVD_Archiver(DVD_Archiver_Base):
                 ).show()
                 == "yes"
             ):
-                if self._video_editor.shutdown() == 1:
+                with qtg.sys_cursor(qtg.Cursor.hourglass):
                     # Remove the temporary DVD Build Folder subdirectories
-                    with qtg.sys_cursor(qtg.Cursor.hourglass):
-                        if self._db_settings.setting_exist(
+                    if self._db_settings.setting_exist(sys_consts.DVD_BUILD_FOLDER_DBK):
+                        working_folder = self._db_settings.setting_get(
                             sys_consts.DVD_BUILD_FOLDER_DBK
-                        ):
-                            file_handler = file_utils.File()
-                            working_folder = self._db_settings.setting_get(
-                                sys_consts.DVD_BUILD_FOLDER_DBK
-                            )
-                            dvd_working_folder = file_handler.file_join(
-                                working_folder, sys_consts.DVD_BUILD_FOLDER_NAME
-                            )
-                            file_handler.remove_dir_contents(
-                                dvd_working_folder, keep_parent=True
-                            )
-                    return 1
+                        )
+                        dvd_working_folder = self._file_handler.file_join(
+                            working_folder, sys_consts.DVD_BUILD_FOLDER_NAME
+                        )
+                        self._file_handler.remove_dir_contents(
+                            dvd_working_folder, keep_parent=True
+                        )
+                return 1
 
             self._shutdown = False
 
             return -1
-
-        def _handle_app_post_init_event() -> None:
-            """Handles the APPPOSTINIT event.
-
-            This function is called after the application is initialized.
-            It is currently consumed in the video_file_grid.
-
-            Args:
-
-            """
-            pass  # Consumed in video_file_grid caught in CUSTOM/project_changed below
-
-            return None
 
         def _handle_changed_event(event: qtg.Action) -> None:
             """Handles the CHANGED event (tab changes).
@@ -404,7 +339,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 self._video_editor.archive_edit_list_write()
 
             if self._video_editor.video_file_input:
-                self._file_control.process_edited_video_files(
+                self._video_file_grid.process_edited_video_files(
                     video_file_input=self._video_editor.video_file_input
                 )
                 _tab_enable_handler(event=event, enable=True)
@@ -527,11 +462,9 @@ class DVD_Archiver(DVD_Archiver_Base):
 
             Shows the task manager popup.
             """
-            if self._video_editor.get_task_manager:
-                Task_Manager_Popup(
-                    title="Task Manager",
-                    task_manager=self._video_editor.get_task_manager,
-                ).show()
+            Task_Manager_Popup(
+                title="Task Manager",
+            ).show()
 
             return None
 
@@ -611,6 +544,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                         f" : {sys_consts.SDELIM}{video_data[0].video_path}{sys_consts.SDELIM} "
                     ),
                 ).show()
+
                 return None
 
             if (
@@ -635,12 +569,13 @@ class DVD_Archiver(DVD_Archiver_Base):
                     title="DVD Build Folder Not Set...",
                     message="Please Enter The DVD Build Folder To Edit Video Files",
                 ).show()
+
                 return None
 
             self._video_editor.set_source(
                 video_file_input=video_data,
                 output_folder=video_edit_folder,
-                project_name=self._file_control.project_name,
+                project_name=self._video_file_grid.project_name,
             )
             self._control_tab.select_tab(tag_name="video_editor_tab")
             self._control_tab.enable_set(tag="video_editor_tab", enable=True)
@@ -689,18 +624,11 @@ class DVD_Archiver(DVD_Archiver_Base):
                 )
 
                 project_combo.select_text(
-                    self._file_control.project_name, partial_match=False
+                    self._video_file_grid.project_name, partial_match=False
                 )
 
             self._control_tab.select_tab(tag_name="control_tab")
             self._control_tab.enable_set(tag="video_editor_tab", enable=False)
-
-            # Because APPPOSTINIT is consumed in the video file grid, this is how we achieve the same thing
-            # as CUSTOM is emitted at startup
-            if self._startup:
-                _startup_handler(event)
-
-            self._startup = False
 
             return None
 
@@ -754,10 +682,11 @@ class DVD_Archiver(DVD_Archiver_Base):
                 return None
 
             if (
-                self._file_control.project_name.strip() and layout_data.display.strip()
+                self._video_file_grid.project_name.strip()
+                and layout_data.display.strip()
             ):  # Should always have
                 result, message = Delete_DVD_Layout(
-                    project_name=self._file_control.project_name,
+                    project_name=self._video_file_grid.project_name,
                     layout_name=layout_data.display,
                 )
 
@@ -779,12 +708,12 @@ class DVD_Archiver(DVD_Archiver_Base):
                         qtg.Combo_Data(
                             index=-1,
                             display=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
-                            data=f"{self._file_control.project_name}.{sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK}",
+                            data=f"{self._video_file_grid.project_name}.{sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK}",
                             user_data=None,
                         )
                     )
                     result, message = Set_Shelved_DVD_Layout(
-                        project_name=self._file_control.project_name,
+                        project_name=self._video_file_grid.project_name,
                         dvd_layout_name=sys_consts.DEFAULT_DVD_LAYOUT_NAME_DBK,
                         dvd_menu_layout=[],
                     )
@@ -797,7 +726,7 @@ class DVD_Archiver(DVD_Archiver_Base):
 
             return None
 
-        def _dvd_folder_select(event) -> None:
+        def _dvd_folder_select(event: qtg.Action) -> None:
             """Select a DVD build folder and updates the settings in the database with the selected folder.
 
             Args:
@@ -812,7 +741,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             folder = self._db_settings.setting_get(sys_consts.DVD_BUILD_FOLDER_DBK)
 
             if folder is None or folder.strip() == "":
-                folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
+                folder = qtg.Special_Path(qtg.Special_Path.VIDEOS)
 
             folder = popups.PopFolderGet(
                 title="Select A DVD Build Folder....",
@@ -857,7 +786,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     title="Delete Project...",
                     message=(
                         "Delete Project"
-                        f" {sys_consts.SDELIM}{self._file_control.project_name}{sys_consts.SDELIM} "
+                        f" {sys_consts.SDELIM}{self._video_file_grid.project_name}{sys_consts.SDELIM} "
                         "And All Project Data Except Source Video Files ?"
                     ),
                 ).show()
@@ -866,7 +795,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 return None
 
             result, message = Delete_Project(
-                project_name=self._file_control.project_name
+                project_name=self._video_file_grid.project_name
             )
 
             if result == -1:
@@ -878,7 +807,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             combo_data: qtg.Combo_Data = project_combo.value_get()
 
             if (
-                combo_data.display == self._file_control.project_name
+                combo_data.display == self._video_file_grid.project_name
                 and combo_data.index >= 0
             ):
                 # A hack to get around the triggered indexchanged event in the combobox control which re-saves the
@@ -890,7 +819,8 @@ class DVD_Archiver(DVD_Archiver_Base):
             if self._db_settings.setting_exist(sys_consts.LATEST_PROJECT_DBK):
                 if project_combo.count_items > 0:
                     self._db_settings.setting_set(
-                        sys_consts.LATEST_PROJECT_DBK, self._file_control.project_name
+                        sys_consts.LATEST_PROJECT_DBK,
+                        self._video_file_grid.project_name,
                     )
                 else:
                     project_combo.value_set(
@@ -968,6 +898,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 event (qtg.Action): The triggering event
             """
             assert isinstance(event, qtg.Action), f"{qtg.Action=}. Must be a qtg.Action"
+            self._video_file_grid.component_event_handler = self.component_event_handler
 
             if event.widget_exist(
                 container_tag="app_lang", tag="countries"
@@ -1078,10 +1009,10 @@ class DVD_Archiver(DVD_Archiver_Base):
             if (
                 not self._startup
                 and new_project.display.strip()
-                and self._file_control.project_name.strip()
+                and self._video_file_grid.project_name.strip()
                 != new_project.display.strip()
             ):
-                self._file_control.project_changed(
+                self._video_file_grid.project_changed(
                     event, new_project.display, self._save_existing_project
                 )
                 if event.widget_exist(
@@ -1107,11 +1038,11 @@ class DVD_Archiver(DVD_Archiver_Base):
                     layout_combo.clear()
 
                     project_combo.select_text(
-                        self._file_control.project_name, partial_match=False
+                        self._video_file_grid.project_name, partial_match=False
                     )
 
                     _, layout_items, _ = Get_Project_Layout_Names(
-                        self._file_control.project_name
+                        self._video_file_grid.project_name
                     )
 
                     layout_combo_items = [
@@ -1144,7 +1075,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER_DBK)
 
             if folder is None or folder.strip() == "":
-                folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
+                folder = qtg.Special_Path(qtg.Special_Path.VIDEOS)
 
             folder = popups.PopFolderGet(
                 title="Select An Archive Folder....",
@@ -1179,7 +1110,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             folder = self._db_settings.setting_get(sys_consts.STREAMING_FOLDER_DBK)
 
             if folder is None or folder.strip() == "":
-                folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
+                folder = qtg.Special_Path(qtg.Special_Path.VIDEOS)
 
             folder = popups.PopFolderGet(
                 title="Select A Streaming Folder....",
@@ -1285,7 +1216,8 @@ class DVD_Archiver(DVD_Archiver_Base):
             dvd_layout_name = dvd_layout_combo.value_get().display
 
             if (
-                self._file_control.dvd_percent_used + sys_consts.PERCENT_SAFTEY_BUFFER
+                self._video_file_grid.dvd_percent_used
+                + sys_consts.PERCENT_SAFTEY_BUFFER
                 > 100
             ):
                 popups.PopError(
@@ -1303,6 +1235,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                 ).show()
                 return None
 
+            self._video_file_grid.save_grid()
+
             file_grid: qtg.Grid = cast(
                 qtg.Grid,
                 event.widget_get(
@@ -1316,7 +1250,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             menu_video_data: list[Video_Data] = [
                 file.user_data for file in checked_items
             ]
-            menu_layout: list[tuple[str, list[Video_Data], any]] = []
+            menu_layout: list[tuple[str, list[Video_Data], Any]] = []
             if (
                 Menu_Page_Title_Popup(
                     title=(
@@ -1358,8 +1292,11 @@ class DVD_Archiver(DVD_Archiver_Base):
                     sys_consts.MENU_ASPECT_RATIO_DBK
                 )
 
+                if disk_title.strip():
+                    dvd_config.disk_title = disk_title
+
                 dvd_config.project_name = (
-                    self._file_control.project_name
+                    self._video_file_grid.project_name
                     if disk_title.strip() == ""
                     else Text_To_File_Name(disk_title)
                 )
@@ -1434,52 +1371,28 @@ class DVD_Archiver(DVD_Archiver_Base):
                 dvd_config.timestamp_font = self._default_font
                 dvd_config.timestamp_font_point_size = self._timestamp_font_point_size
 
-                dvd_config.video_standard = self._file_control.project_video_standard
+                dvd_config.video_standard = self._video_file_grid.project_video_standard
 
                 dvd_config.menu_buttons_across = dvd_menu_settings.buttons_across
                 dvd_config.menu_buttons_per_page = dvd_menu_settings.buttons_per_page
 
                 dvd_creator = DVD()
+                dvd_creator.component_event_handler = self.component_event_handler
                 dvd_creator.dvd_config = dvd_config
                 dvd_creator.working_folder = dvd_folder
 
-                if self._video_editor.get_task_manager is None:
-                    with qtg.sys_cursor(qtg.Cursor.hourglass):
-                        result, message = dvd_creator.build()
+                with qtg.sys_cursor(qtg.Cursor.hourglass):
+                    result, message = dvd_creator.build()
 
-                        if result == -1:
-                            popups.PopError(
-                                title="DVD Build Error...",
-                                message=(
-                                    "Failed To Create A"
-                                    f" DVD!!\n{sys_consts.SDELIM}{message}{sys_consts.SDELIM}"
-                                ),
-                            ).show()
-                else:
-                    task_name = dvd_config.project_name
+                if result == -1:
+                    popups.PopError(
+                        title="DVD Build Error...",
+                        message=(
+                            "Failed To Create A"
+                            f" DVD!!\n{sys_consts.SDELIM}{message}{sys_consts.SDELIM}"
+                        ),
+                    ).show()
 
-                    if task_name.strip() == "":  # Should not happen!
-                        task_name = dvd_config.serial_number
-
-                    if task_name in self._task_stack:
-                        for task_index in range(len(self._task_stack.items())):
-                            temp_name = f"{task_name}_{task_index}"
-                            if temp_name not in self._task_stack:
-                                task_name = temp_name
-                                break
-
-                    self._task_stack[task_name] = (dvd_creator, menu_layout)
-
-                    self._video_editor.get_task_manager.set_error_callback(
-                        Error_Callback
-                    )
-
-                    self._video_editor.get_task_manager.add_task(
-                        name=task_name,
-                        method=Run_DVD_Build,
-                        arguments=(dvd_creator,),
-                        callback=Notification_Call_Back,
-                    )
             return None
 
         def _new_dvd_layout(event: qtg.Action) -> None:
@@ -1510,7 +1423,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                 label_above=True,
             ).show()
 
-            if self._file_control.project_name.strip() and layout_name.strip():
+            if self._video_file_grid.project_name.strip() and layout_name.strip():
                 if dvd_layout_combo.select_text(layout_name, partial_match=False) >= 0:
                     popups.PopMessage(
                         title="Invalid DVD Layout Name",
@@ -1518,7 +1431,7 @@ class DVD_Archiver(DVD_Archiver_Base):
                     ).show()
                 else:
                     result, message = Set_Shelved_DVD_Layout(
-                        project_name=self._file_control.project_name,
+                        project_name=self._video_file_grid.project_name,
                         dvd_layout_name=layout_name,
                         dvd_menu_layout=[],
                     )
@@ -1538,7 +1451,7 @@ class DVD_Archiver(DVD_Archiver_Base):
 
                     dvd_layout_combo.select_text(layout_name, partial_match=False)
                     file_grid.checkitems_all(checked=False, col_tag="video_file")
-                    self._file_control.set_project_standard_duration(event)
+                    self._video_file_grid.set_project_standard_duration(event)
             return None
 
         def _new_project(event: qtg.Action):
@@ -1553,6 +1466,8 @@ class DVD_Archiver(DVD_Archiver_Base):
                 label="Project Name:",
                 label_above=True,
             ).show()
+
+            project_name = project_name.replace("_", " ")  # Underscores are not allowed
 
             if project_name.strip():
                 project_combo: qtg.ComboBox = cast(
@@ -1593,8 +1508,8 @@ class DVD_Archiver(DVD_Archiver_Base):
             return None
 
         #### Main
-        if self._file_control:
-            self._file_control.event_handler(event)
+        if self._video_file_grid:
+            self._video_file_grid.event_handler(event)
 
         match event.event:
             case qtg.Sys_Events.APPINIT:
@@ -1602,12 +1517,20 @@ class DVD_Archiver(DVD_Archiver_Base):
             case qtg.Sys_Events.APPEXIT | qtg.Sys_Events.APPCLOSED:
                 _handle_app_exit_event()
             case qtg.Sys_Events.APPPOSTINIT:
-                _handle_app_post_init_event()
+                pass
+                # Use _startup_handler method
             case qtg.Sys_Events.CHANGED:
                 _handle_changed_event(event)
             case qtg.Sys_Events.CLICKED:
                 _handle_clicked_event(event)
             case qtg.Sys_Events.CUSTOM:
+                # Because APPPOSTINIT is consumed in the video file grid, this is how we achieve the same thing
+                # as CUSTOM is emitted at startup
+                if self._startup:
+                    _startup_handler(event)
+
+                self._startup = False
+
                 _handle_custom_event(event)
             case qtg.Sys_Events.INDEXCHANGED:
                 _handle_index_changed_event(event)
@@ -1631,7 +1554,7 @@ class DVD_Archiver(DVD_Archiver_Base):
 
         # Note when changing tabpages I call process_edited_video_files and that makes this call
         # redundant - worse it would fire twice!. TODO Consider This Unintended Consequence!
-        # self._file_control.process_edited_video_files(video_file_input=video_file_input)
+        # self._video_file_grid.process_edited_video_files(video_file_input=video_file_input)
         self._control_tab.select_tab(tag_name="control_tab")
         self._control_tab.enable_set(tag="video_editor_tab", enable=False)
 
@@ -1673,17 +1596,17 @@ class DVD_Archiver(DVD_Archiver_Base):
         )
 
         if streaming_folder is None or streaming_folder.strip() == "":
-            streaming_folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
+            streaming_folder = qtg.Special_Path(qtg.Special_Path.VIDEOS)
             self._db_settings.setting_set(
                 sys_consts.STREAMING_FOLDER_DBK, streaming_folder
             )
 
         if archive_folder is None or archive_folder.strip() == "":
-            archive_folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
+            archive_folder = qtg.Special_Path(qtg.Special_Path.VIDEOS)
             self._db_settings.setting_set(sys_consts.ARCHIVE_FOLDER_DBK, archive_folder)
 
         if dvd_build_folder is None or dvd_build_folder.strip() == "":
-            dvd_build_folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
+            dvd_build_folder = qtg.Special_Path(qtg.Special_Path.VIDEOS)
             self._db_settings.setting_set(
                 sys_consts.DVD_BUILD_FOLDER_DBK, dvd_build_folder
             )
@@ -1815,6 +1738,19 @@ class DVD_Archiver(DVD_Archiver_Base):
             ),
         )
 
+        self._system_notifications = qtg.Label(
+            label="Notifications:",
+            label_font=qtg.Font(weight=qtg.Font_Weight.MEDIUM),
+            tag="notification",
+            width=120,
+            frame=qtg.Widget_Frame(
+                frame_style=qtg.Frame_Style.PANEL,
+                frame=qtg.Frame.SUNKEN,
+                line_width=2,
+            ),
+            translate=False,
+        )
+
         main_control_container = qtg.VBoxContainer(
             tag="control_buttons",
             align=qtg.Align.TOPLEFT,
@@ -1822,7 +1758,9 @@ class DVD_Archiver(DVD_Archiver_Base):
         ).add_row(
             dvd_properties,
             qtg.Spacer(),
-            self._file_control.layout(),
+            self._video_file_grid.layout(),
+            qtg.Spacer(pixel_unit=True, height=4),
+            self._system_notifications,
         )
 
         self._video_editor = Video_Editor(
@@ -2011,6 +1949,15 @@ class DVD_Archiver(DVD_Archiver_Base):
             enabled=True,
         )
 
+        self._dvd_layout_combo = qtg.ComboBox(
+            tag="existing_layouts",
+            width=30,
+            items=layout_combo_items,
+            translate=False,
+            display_na=False,
+            callback=self.event_handler,
+        )
+
         buttons_container = qtg.HBoxContainer(
             tag="main_controls", margin_right=0
         ).add_row(
@@ -2057,14 +2004,7 @@ class DVD_Archiver(DVD_Archiver_Base):
             qtg.Label(
                 text="DVD Layout:",
                 buddy_control=qtg.HBoxContainer().add_row(
-                    qtg.ComboBox(
-                        tag="existing_layouts",
-                        width=30,
-                        items=layout_combo_items,
-                        translate=False,
-                        display_na=False,
-                        callback=self.event_handler,
-                    ),
+                    self._dvd_layout_combo,
                     qtg.Button(
                         icon=file_utils.App_Path("x.svg"),
                         tag="delete_dvd_layout",

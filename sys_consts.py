@@ -37,11 +37,11 @@ def COPYRIGHT_YEAR() -> str:
 
 
 executable_folder = file_utils.App_Path()
-
 file_sep = file_utils.File().ossep
 
+# Program Details
 PROGRAM_NAME: Final[str] = "Black DVD Archiver"
-PROGRAM_VERSION: Final[str] = "β4.0.0"
+PROGRAM_VERSION: Final[str] = "β5.0.0"
 AUTHOR: Final[str] = "David Worboys"
 LICENCE: Final[str] = "GNU V3 GPL"
 
@@ -50,9 +50,10 @@ VERSION_TAG = (
     " Primary School et al.:-)"
 )
 
-SDELIM = (  # Used to delimit strings - particularly non-translatable sections of strings
-    "||"
-)
+# Used to delimit strings - particularly non-translatable sections of strings
+SDELIM = "||"
+
+# Video Details
 PAL: Final[str] = "PAL"
 NTSC: Final[str] = "NTSC"
 AR169: Final[str] = "16:9"
@@ -118,6 +119,7 @@ tool_app_folder: Final[str] = (
     f"{executable_folder}{file_sep}tool_apps{file_sep}usr{file_sep}bin{file_sep}"
 )
 
+# App paths
 COMPOSITE: Final[str] = f"{tool_app_folder}composite"
 CONVERT: Final[str] = f"{tool_app_folder}magick"
 DVDAUTHOR: Final[str] = f"{tool_app_folder}dvdauthor"
@@ -128,6 +130,7 @@ MPLEX: Final[str] = f"{tool_app_folder}mplex"
 SPUMUX: Final[str] = f"{tool_app_folder}spumux"
 GENISOIMAGE: Final[str] = f"{tool_app_folder}genisoimage"
 
+# Graphic file paths
 ICON_PATH: Final[str] = f"{executable_folder}{file_sep}icons"
 
 # Database tables
@@ -216,8 +219,16 @@ DVD_MENU_SHELF: Final[str] = "dvdmenu"
 PROJECTS_SHELF: Final[str] = "projects"
 VIDEO_CUTTER_SHELF: Final[str] = "video_cutter"
 VIDEO_GRID_SHELF: Final[str] = "video_grid"
+VIDEO_FILE_SETTINGS: Final[str] = "video_file_settings"
 
 PERCENT_SAFTEY_BUFFER: Final[int] = (
     5  # Used to limit DVD size so that it never exceeds 100%
 )
+
+# Font details
 DEFAULT_FONT: Final[str] = "IBMPlexMono-SemiBold.ttf"  # Packaged with DVD Archiver
+
+# Component event constants
+NOTIFICATION_EVENT: Final[int] = 1
+NOTIFICATION_ERROR_EVENT: Final[int] = 2
+NOTIFICATION_MESSAGE_EVENT: Final[int] = 3

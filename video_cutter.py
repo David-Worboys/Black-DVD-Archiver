@@ -32,8 +32,8 @@ import QTPYGUI.qtpygui as qtg
 import QTPYGUI.sqldb as sqldb
 import sys_consts
 import QTPYGUI.utils as utils
-from archive_management import Archive_Manager
-from background_task_manager import Task_Manager
+from background_task_manager import Task_QManager, Task_Dispatcher, Unpack_Result_Tuple
+from break_circular import Task_Def
 from dvdarch_utils import Get_File_Encoding_Info
 from file_renamer_popup import File_Renamer_Popup
 from sys_config import (
@@ -41,106 +41,18 @@ from sys_config import (
     Video_Data,
     Video_File_Settings,
 )
+from video_file_picker import Video_File_Picker_Popup
 
-# These global functions and variables are only used by the hy the multi-thread task_manager process and exist by
-# necessity as this seems the only way to communicate the variable values to rest of the dvdarchiver code
-gi_task_error_code = -1
-gi_thread_status = -1
-gs_thread_error_message = ""
-gs_task_error_message = ""
-gs_thread_status = ""
-gs_thread_message = ""
-gs_thread_output = ""
-gs_thread_task_name = ""
+DEBUG: bool = False
+CUT_PREFIX: Final[str] = "VE_CT"
+EDIT_LIST_EXTENSION: Final[str] = "edit_list_txt"
 
-gb_task_errored = False
-gi_tasks_completed = -1
+# Cut Oprion Constants.
+DELETE_SEGMENTS = "Delete_Segments"
+AS_A_SINGLE_FILE = "As_A_Single_File"
+AS_INDIVIDUAL_FILES = "As_Individual_Files"
 
 
-def Run_Video_Cuts(cut_video_def: dvdarch_utils.Cut_Video_Def) -> tuple[int, str]:
-    """This is a wrapper function used hy the multi-thread task_manager to run the Execute_Check_Output process
-
-    Args:
-        cut_video_def (dvdarch_utils.Cut_Video_Def): Defines video cut parameters
-
-    Returns:
-        tuple[int, str]:
-        - arg1 1: ok, -1: fail
-        - arg2: error message or "" if ok
-    """
-    global gi_task_error_code
-    global gs_task_error_message
-
-    if not utils.Is_Complied():
-        print(f"DBG {cut_video_def=}")
-
-    gi_task_error_code, gs_task_error_message = dvdarch_utils.Cut_Video(
-        cut_video_def=cut_video_def
-    )
-
-    if not utils.Is_Complied():
-        print(f"DBG Run_DVD_Build {gi_task_error_code=} {gs_task_error_message=}")
-
-    return gi_task_error_code, gs_task_error_message
-
-
-def Notification_Call_Back(status: int, message: str, output: str, name):
-    """
-    The notification_call_back function is called by the multi-thread task_manager when a task completes
-
-
-    Args:
-        status: int: Determine if the task was successful or not
-        message: str: Pass a message to the user
-        output: str: Return the output of the task
-        name: Identify the task that has completed
-
-    """
-    global gs_thread_status
-    global gs_thread_message
-    global gs_thread_output
-    global gs_thread_task_name
-
-    global gi_tasks_completed
-    global gb_task_errored
-
-    gs_thread_status = status
-    gs_thread_message = "" if message is None else message
-    gs_thread_output = "" if gs_thread_output is None else gs_thread_output
-    gs_thread_task_name = name
-
-    if status == -1:
-        gb_task_errored = True
-    else:
-        gi_tasks_completed += 1
-
-    if not utils.Is_Complied():
-        print(
-            "DBG Notification_Call_Back"
-            f" {gs_thread_status=} {gs_thread_message=} {gs_thread_output=} {gs_thread_task_name=}"
-        )
-
-    return None
-
-
-# self._tasks_submitted -= 1
-def Error_Callback(error_message: str):
-    """The Error_Callback function is called by the multi-thread task_manager when a task errors
-
-    Args:
-        error_message (str): The error message generated when the calling thread broke
-    """
-    global gs_thread_error_message
-
-    gs_thread_error_message = error_message
-
-    if not utils.Is_Complied():
-        print(f"DBG Error_Callback {gs_thread_error_message=}")
-
-    return None
-
-
-################################
 @dataclasses.dataclass(slots=True)
 class Edit_List:
     """
@@ -192,9 +104,6 @@ class Edit_List:
         """
         assert isinstance(project, str), f"{project=}. Must be a str"
         # Make sure we have a layout with a project and vice versa
-        # assert (
-        #    not project or layout
-        # ), f"{layout=}. Must not be empty if {project=} is provided"
         assert not layout.strip() or project.strip(), (
             f"{project=}. Must not be empty if {layout=} is provided"
         )
@@ -265,9 +174,6 @@ class Edit_List:
         )
         assert isinstance(project, str), f"{project=}. Must be a str"
         # Make sure we have a layout with a project and vice versa
-        # assert (
-        #    not project or layout
-        # ), f"{layout=}. Must not be empty if {project=} is provided"
         assert not layout.strip() or project.strip(), (
             f"{project=}. Must not be empty if {layout=} is provided"
         )
@@ -323,10 +229,6 @@ class Edit_List:
             f"{file_path=}. Must be a str"
         )
         assert isinstance(project, str), f"{project=}. Must be a str"
-        # Make sure we have a layout with a project and vice versa
-        # assert (
-        #    not project or layout
-        # ), f"{layout=}. Must not be empty if {project=} is provided"
         assert not layout.strip() or project.strip(), (
             f"{project=}. Must not be empty if {layout=} is provided"
         )
@@ -525,7 +427,6 @@ class Edit_List:
 
                     edit_cuts.append(tuple(json_edit_cuts))
                 else:  # All good
-                    # if utils.Is_Complied():  # Remove file_path from JSON file
                     json_data_dict.pop(file_path)
                     try:
                         with open(json_cuts_file, "w") as json_file:
@@ -605,9 +506,6 @@ class Edit_List:
             assert isinstance(cut[2], str), f"{cut[2]=}. Must be str"
 
         # Make sure we have a layout with a project and vice versa
-        # assert (
-        #    not project or layout
-        # ), f"{layout=}. Must not be empty if {project=} is provided"
         assert not layout.strip() or project.strip(), (
             f"{project=}. Must not be empty if {layout=} is provided"
         )
@@ -677,13 +575,14 @@ class Video_Editor(DVD_Archiver_Base):
 
     # Private instance variables
     _aspect_ratio: str = sys_consts.AR43
-    _archive_manager: Archive_Manager | None = None
-    _background_task_manager: Task_Manager | None = None
+    _background_task_qmanager: Task_QManager = Task_QManager()
     _current_frame: int = -1
     _display_height: int = -1
     _display_width: int = -1
-    _edit_list_grid: qtg.Grid | None = None
+    _edit_list_grid: qtg.Grid = None
     _edit_list: Edit_List = dataclasses.field(default_factory=Edit_List)
+    _error_message: str = ""
+    _file_handler = file_utils.File()
     _file_system_init: bool = False
     _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
     _frame_rate: float = sys_consts.PAL_SPECS.frame_rate
@@ -691,22 +590,23 @@ class Video_Editor(DVD_Archiver_Base):
     _frame_height: int = sys_consts.PAL_SPECS.height_43
     _frame_count: int = -1
     _output_folder: str = ""
-    _video_cutter_container: qtg.HBoxContainer | None = None
-    _video_display: qtg.Label | None = None
-    _video_slider: qtg.Slider | None = None
-    _frame_display: qtg.LCD | None = None
-    _menu_frame: qtg.LineEdit | None = None
-    _menu_title: qtg.LineEdit | None = None
-    _progress_bar: qtg.ProgressBar | None = None
-    _all_projects_rb: qtg.RadioButton | None = None
-    _this_project_rb: qtg.RadioButton | None = None
-    _source_file_label: qtg.Label | None = None
-    _video_editor: qtg.HBoxContainer | None = None
-    _video_filter_container: qtg.HBoxContainer | None = None
+    _edit_list_scope_container: qtg.HBoxContainer = None
+    _video_cutter_container: qtg.HBoxContainer = None
+    _video_display: qtg.Label = None
+    _video_slider: qtg.Slider = None
+    _frame_display: qtg.LCD = None
+    _menu_frame: qtg.LineEdit = None
+    _menu_title: qtg.LineEdit = None
+    _progress_bar: qtg.ProgressBar = None
+    _all_projects_rb: qtg.RadioButton = None
+    _this_project_rb: qtg.RadioButton = None
+    _source_file_label: qtg.Label = None
+    _video_editor: qtg.HBoxContainer = None
+    _video_filter_container: qtg.HBoxContainer = None
     _sliding: bool = False
     _source_state = "no_media"
     _step_value: int = 1
-    _video_handler: qtg.Video_Player | None = None
+    _video_handler: qtg.Video_Player = None
     _edit_folder: str = sys_consts.EDIT_FOLDER_NAME
     _transcode_folder: str = sys_consts.TRANSCODE_FOLDER_NAME
     _video_file_input: list[Video_Data] = dataclasses.field(default_factory=list)
@@ -730,9 +630,6 @@ class Video_Editor(DVD_Archiver_Base):
             display_width=self.display_width, display_height=self.display_height
         )
 
-        self._background_task_manager: Task_Manager = Task_Manager()
-        self._background_task_manager.start()
-
         if self._user_lambda:  # Not really lambda, but same effect, with earlier versions of pyside > 6 5.1 and
             # Nuitka < 1.8.4 == boom! (And nope after a long session finally locked)
             self._video_handler.frame_changed_handler.connect(self._frame_handler)
@@ -753,41 +650,7 @@ class Video_Editor(DVD_Archiver_Base):
                 functools.partial(self._position_changed)
             )
 
-        archive_folder = self._db_settings.setting_get(sys_consts.ARCHIVE_FOLDER_DBK)
-
-        if archive_folder:
-            self._archive_manager = Archive_Manager(archive_folder=archive_folder)
-
         return None
-
-    def shutdown(self) -> int:
-        """
-        Shuts down the instance
-
-        Returns:
-            int: 1:Ok, -1 Shutdown terminated
-        """
-        self._background_task_manager.throw_errors = False
-
-        if self._background_task_manager.list_running_tasks():
-            if (
-                popups.PopYesNo(
-                    title="Background Tasks Running...",
-                    message="Kill Background Tasks And Exit?",
-                ).show()
-                == "no"
-            ):
-                return -1
-        with qtg.sys_cursor(qtg.Cursor.hourglass):
-            if self._video_file_input:
-                self.archive_edit_list_write()
-                self._get_dvd_settings()
-                self.processed_files_callback(self._video_file_input)
-
-            self._background_task_manager.stop()
-            self._video_handler.stop()
-
-        return 1
 
     def event_handler(self, event: qtg.Action) -> None:
         """Handles the events of the video editor
@@ -797,6 +660,26 @@ class Video_Editor(DVD_Archiver_Base):
         match event.event:
             case qtg.Sys_Events.CLICKED:
                 match event.tag:
+                    case "auto_levels":
+                        self._video_file_input[
+                            0
+                        ].video_file_settings.auto_bright = event.value
+                    case "denoise":
+                        self._video_file_input[
+                            0
+                        ].video_file_settings.denoise = event.value
+                    case "normalise":
+                        self._video_file_input[
+                            0
+                        ].video_file_settings.normalise = event.value
+                    case "sharpen":
+                        self._video_file_input[
+                            0
+                        ].video_file_settings.sharpen = event.value
+                    case "white_balance":
+                        self._video_file_input[
+                            0
+                        ].video_file_settings.white_balance = event.value
                     case "backward":
                         self._step_backward()
                     case "bulk_select":
@@ -889,6 +772,10 @@ class Video_Editor(DVD_Archiver_Base):
                         self._assemble_segments(event)
                     case "delete_segments":
                         self._delete_segments(event)
+                    case "export_edit_list":
+                        self._export_edit_list()
+                    case "import_edit_list":
+                        self._import_edit_list()
                     case "mark_in" | "mark_out":  # Edit List Seek
                         self._edit_list_seek(event)
                     case "move_edit_point_down":
@@ -972,16 +859,6 @@ class Video_Editor(DVD_Archiver_Base):
 
         return None
 
-    @property
-    def get_task_manager(self) -> Task_Manager:
-        """Returns the task manager instance
-
-        Returns:
-            Task_Manager : The task manager instance
-
-        """
-        return self._background_task_manager
-
     def is_available(self) -> bool:
         """Checks if the media player is supported on the platform
         Returns:
@@ -1013,28 +890,30 @@ class Video_Editor(DVD_Archiver_Base):
         self._output_folder = output_folder
         self._project_name = project_name
 
-        if self._video_file_input:
-            self._get_dvd_settings()
-            self.processed_files_callback(self._video_file_input)
-
         self._edit_list_grid.clear()
         self._menu_frame.value_set("")
 
         self._video_file_input = video_file_input
-        self._all_projects_rb.enable_set(False)
-        self._this_project_rb.enable_set(False)
 
-        # if not self._file_system_init:
+        # self._all_projects_rb.enable_set(False)
+        # self._this_project_rb.enable_set(True)
+
         result = self._video_file_system_maker()
 
         if result == -1:
             return None
 
+        if self._video_file_input[0].video_file_settings.menu_button_frame >= 0:
+            self._menu_frame.value_set(
+                str(self._video_file_input[0].video_file_settings.menu_button_frame)
+            )
+
         if self._video_file_input[0].video_path.startswith(self._edit_folder):
-            self._this_project_rb.value_set(True)
+            pass
+            # self._this_project_rb.value_set(True)
         else:
-            self._all_projects_rb.enable_set(True)
-            self._this_project_rb.enable_set(True)
+            # self._all_projects_rb.enable_set(True)
+            # self._this_project_rb.enable_set(True)
 
             result, _, edit_list_visibility = self._edit_list.get_edit_cuts_visibility(
                 file_path=self._video_file_input[0].video_path,
@@ -1046,9 +925,11 @@ class Video_Editor(DVD_Archiver_Base):
                 return None
 
             if edit_list_visibility == "global":
-                self._all_projects_rb.value_set(True)
+                pass
+                # self._all_projects_rb.value_set(True)
             else:
-                self._this_project_rb.value_set(True)
+                pass
+                # self._this_project_rb.value_set(True)
 
         self._archive_edit_list_read()
 
@@ -1068,11 +949,6 @@ class Video_Editor(DVD_Archiver_Base):
         )  # Interesting, video_frame_count was not quite accurate on some video files, this seems to be better
 
         self._set_dvd_settings()
-
-        self._video_filter_container.widget_get(
-            container_tag="video_filters",
-            tag="white_balance",
-        ).value_set(self._video_file_input[0].video_file_settings.white_balance)
 
         if self._frame_count > 0:
             self._video_handler.set_source(
@@ -1094,66 +970,22 @@ class Video_Editor(DVD_Archiver_Base):
         Returns:
             list[Video_Data]: The input video information
         """
-        self._get_dvd_settings()
+
+        # Update menu_title and menu_frame as needed
+        if self._menu_title.modified:
+            self._video_file_input[
+                0
+            ].video_file_settings.button_title = self._menu_title.value_get()
+
+        if self._menu_frame.modified:
+            if self._menu_frame.value_get().isalpha():  # Should not happen
+                self._video_file_input[0].video_file_settings.menu_button_frame = 0
+            elif self._menu_frame.value_get().strip() != "":
+                self._video_file_input[0].video_file_settings.menu_button_frame = int(
+                    self._menu_frame.value_get()
+                )
 
         return self._video_file_input
-
-    def _get_dvd_settings(self):
-        """Populates DVD settings with values sourced from self.video_file_input"""
-        if self._video_file_input:
-            if self._menu_title.modified:
-                self._video_file_input[
-                    0
-                ].video_file_settings.button_title = self._menu_title.value_get()
-
-            if self._menu_frame.modified:
-                if self._menu_frame.value_get().isascii():  # Should not happen
-                    self._video_file_input[0].video_file_settings.menu_button_frame = 0
-                else:
-                    self._video_file_input[
-                        0
-                    ].video_file_settings.menu_button_frame = int(
-                        self._menu_frame.value_get()
-                    )
-
-            self._video_file_input[
-                0
-            ].video_file_settings.normalise = self._video_filter_container.widget_get(
-                container_tag="video_filters",
-                tag="normalise",
-            ).value_get()
-
-            self._video_file_input[
-                0
-            ].video_file_settings.denoise = self._video_filter_container.widget_get(
-                container_tag="video_filters",
-                tag="denoise",
-            ).value_get()
-
-            self._video_file_input[
-                0
-            ].video_file_settings.white_balance = (
-                self._video_filter_container.widget_get(
-                    container_tag="video_filters",
-                    tag="white_balance",
-                ).value_get()
-            )
-
-            self._video_file_input[
-                0
-            ].video_file_settings.auto_bright = self._video_filter_container.widget_get(
-                container_tag="video_filters",
-                tag="auto_levels",
-            ).value_get()
-
-            self._video_file_input[
-                0
-            ].video_file_settings.sharpen = self._video_filter_container.widget_get(
-                container_tag="video_filters",
-                tag="sharpen",
-            ).value_get()
-
-        return None
 
     def video_pause(self):
         """Pause video playback"""
@@ -1163,16 +995,13 @@ class Video_Editor(DVD_Archiver_Base):
 
     def _set_dvd_settings(self):
         """Writes DVD settings into the appropriate values of self.video_file_input"""
-
-        file_handler = file_utils.File()
-
         if (
             self._video_file_input[0].video_file_settings.button_title.strip() == ""
         ):  # Attempt to extract the title from the input file name.
-            _, file_name, _ = file_handler.split_file_path(
+            _, file_name, _ = self._file_handler.split_file_path(
                 self._video_file_input[0].video_path
             )
-            dvd_menu_title = file_handler.extract_title(file_name)
+            dvd_menu_title = self._file_handler.extract_title(file_name)
         else:
             dvd_menu_title = self._video_file_input[0].video_file_settings.button_title
 
@@ -1211,26 +1040,27 @@ class Video_Editor(DVD_Archiver_Base):
         return None
 
     def _archive_edit_list_read(self) -> None:
-        """Reads edit cuts from the archive manager and populates the edit list grid with the data. If both the
-        archive manager and the edit list grid exist, reads edit cuts for the input file from the archive manager
-        using the `read_edit_cuts` method. Then, for each cut tuple in the edit cuts list, sets the `mark_in` and
-        `mark_out` values of the corresponding row in the edit list grid using the `value_set` method.
+        """
+        Reads edit cuts from the sql shelf via read_edit_cuts and populates the edit list grid with the data.
+        Then, for each cut tuple in the edit cuts list, sets the `mark_in` and`mark_out` values of the corresponding
+        row in the edit list grid using the `value_set` method.
         """
 
         if self._edit_list_grid:
             result, message, edit_cuts = self._edit_list.read_edit_cuts(
                 self._video_file_input[0].video_path,
-                "" if self._all_projects_rb.value_get() is True else self._project_name,
+                # "" if self._all_projects_rb.value_get() is True else self._project_name,
+                self._project_name,
                 layout="",
             )
 
             if result == -1:
-                if self._archive_manager.get_error_code == -1:
-                    popups.PopError(
-                        title="Archive Edit List",
-                        message=f"Read Failed : {message}",
-                    ).show()
-                    return None
+                popups.PopError(
+                    title="Archive Edit List",
+                    message=f"Read Failed : {message}",
+                ).show()
+
+                return None
 
             mark_in = self._edit_list_grid.colindex_get("mark_in")
             mark_out = self._edit_list_grid.colindex_get("mark_out")
@@ -1252,48 +1082,228 @@ class Video_Editor(DVD_Archiver_Base):
         return None
 
     def archive_edit_list_write(self) -> None:
-        """Writes the edit list from the GUI grid to the archive manager for the current video file.
+        """Writes the edit list from the GUI grid to a shelf.
 
         The edit list is read from the GUI grid, which has columns for the mark in, mark out,
         and cut name for each cut in the edit list. These values are extracted from the grid and
-        stored in a list of tuples. The list is then written to the archive manager for the current
-        video file.
-
-        If the archive manager has not been set up, this method does nothing.
+        stored in a list of tuples. The list is then written to a sql shelf via write/delete_edit_cuts.
 
         """
-        if self._archive_manager:
-            if self._get_edit_list():
-                if self._all_projects_rb.value_get():
-                    result, message = self._edit_list.write_edit_cuts(
-                        file_path=self._video_file_input[0].video_path,
-                        project="",
-                        layout="",
-                        file_cuts=self._get_edit_list(),
-                    )
-                else:
-                    result, message = self._edit_list.write_edit_cuts(
-                        file_path=self._video_file_input[0].video_path,
-                        project=self._project_name,
-                        layout="",
-                        file_cuts=self._get_edit_list(),
-                    )
-            elif self._video_file_input:
-                result, message = self._edit_list.delete_edit_cuts(
-                    self._video_file_input[0].video_path,
-                    project=""
-                    if self._all_projects_rb.value_get()
-                    else self._project_name,
+
+        if self._get_edit_list():
+            if False:  # self._all_projects_rb.value_get():
+                result, message = self._edit_list.write_edit_cuts(
+                    file_path=self._video_file_input[0].video_path,
+                    project="",
                     layout="",
+                    file_cuts=self._get_edit_list(),
                 )
             else:
-                result = 1
-                message = ""
+                result, message = self._edit_list.write_edit_cuts(
+                    file_path=self._video_file_input[0].video_path,
+                    project=self._project_name,
+                    layout="",
+                    file_cuts=self._get_edit_list(),
+                )
+        elif self._video_file_input:
+            result, message = self._edit_list.delete_edit_cuts(
+                self._video_file_input[0].video_path,
+                # project="" if self._all_projects_rb.value_get() else self._project_name,
+                self._project_name,
+                layout="",
+            )
+        else:
+            result = 1
+            message = ""
+
+        if result == -1:
+            popups.PopError(
+                title="Archive Edit List", message=f"Write Failed : {message}"
+            ).show()
+        return None
+
+    def _individual_files_handler(
+        self, result: int, message: str, video_files: list[str]
+    ):
+        """
+        Handles the process of preparing individual video files to be renamed, if needed, and displayed in the main
+        file list tab.
+
+        Args:
+            result (int): The outcome status from the preceding video processing operation.
+                          A value of -1 indicates an error.
+            message (str): An associated error message string, if 'the result' is -1 otherwise "".
+            video_files (list[str]): A list of full paths to the video files that
+                                     were generated or processed by the preceding operation.
+
+        Returns:
+            None
+        """
+
+        video_data = []
+
+        if result == -1:
+            popups.PopError(
+                title="Error Cutting File...",
+                message=f"<{message}>",
+            ).show()
+        else:
+            for video_file_path in video_files:
+                (
+                    video_path,
+                    video_file,
+                    video_extension,
+                ) = self._file_handler.split_file_path(video_file_path)
+
+                video_file_settings = Video_File_Settings()
+                encoding_info = Get_File_Encoding_Info(video_file_path)
+
+                if encoding_info.error:
+                    popups.PopError(
+                        title="Error Getting Encoder Info...",
+                        message=f"{sys_consts.SDELIM}{video_file_path}{sys_consts.SDELIM}\n<{encoding_info.error}>",
+                    ).show()
+                    return None
+
+                if self._db_settings.setting_exist(sys_consts.VF_NORMALISE_DBK):
+                    video_file_settings.normalise = self._db_settings.setting_get(
+                        sys_consts.VF_NORMALISE_DBK
+                    )
+
+                if self._db_settings.setting_exist(sys_consts.VF_DENOISE_DBK):
+                    video_file_settings.denoise = self._db_settings.setting_get(
+                        sys_consts.VF_DENOISE_DBK
+                    )
+
+                if self._db_settings.setting_exist(sys_consts.VF_WHITE_BALANCE_DBK):
+                    video_file_settings.white_balance = self._db_settings.setting_get(
+                        sys_consts.VF_WHITE_BALANCE_DBK
+                    )
+
+                if self._db_settings.setting_exist(sys_consts.VF_SHARPEN_DBK):
+                    video_file_settings.sharpen = self._db_settings.setting_get(
+                        sys_consts.VF_SHARPEN_DBK
+                    )
+
+                if self._db_settings.setting_exist(sys_consts.VF_AUTO_LEVELS_DBK):
+                    video_file_settings.auto_bright = self._db_settings.setting_get(
+                        sys_consts.VF_AUTO_LEVELS_DBK
+                    )
+
+                video_file_settings.button_title = self._file_handler.extract_title(
+                    video_file
+                )
+
+                video_data.append(
+                    Video_Data(
+                        video_folder=video_path,
+                        video_file=video_file,
+                        video_extension=video_extension,
+                        encoding_info=encoding_info,
+                        video_file_settings=video_file_settings,
+                    )
+                )
+
+            if video_data:
+                result = File_Renamer_Popup(
+                    video_data_list=video_data, container_tag="file_renamer"
+                ).show()
+
+                for video_file in video_data:
+                    self._video_file_input.append(video_file)
+
+                self.processed_files_callback(self._video_file_input)
+
+        return None
+
+    def _delete_segments_handler(
+        self, result: int, message: str, video_files: list[str]
+    ):
+        assert isinstance(result, int), f"{result=}. Must be type int"
+        assert isinstance(message, str), f"{message=}. Must be type str"
+        assert isinstance(video_files, list), f"{video_files=}. Must be type list"
+
+        if result == -1:  #
+            popups.PopError(
+                title="Error Cutting File...",
+                message=f"<{message}>",
+            ).show()
+        else:
+            trimmed_file = video_files[0]  # Can only be one file at this point
+
+            (
+                trimmed_path,
+                trimmed_filename,
+                trimmed_extension,
+            ) = self._file_handler.split_file_path(trimmed_file)
+
+            trimmed_video = Video_Data(
+                video_folder=trimmed_path,
+                video_file=trimmed_filename,
+                video_extension=trimmed_extension,
+                encoding_info=dvdarch_utils.Get_File_Encoding_Info(trimmed_file),
+                video_file_settings=self._video_file_input[0].video_file_settings,
+            )
+            self._video_file_input.append(trimmed_video)
+            self.processed_files_callback(self._video_file_input)
+
+        return None
+
+    def _assembled_file_handler(
+        self, result: int, message: str, assembled_file: str, video_files: list[str]
+    ):
+        assert isinstance(result, int), f"{result=}. Must be type int"
+        assert isinstance(message, str), f"{message=}. Must be type str"
+        assert isinstance(assembled_file, str), f"{assembled_file=}. Must be type str"
+        assert isinstance(video_files, list), f"{video_files=}. Must be type list"
+
+        if result == -1:  #
+            popups.PopError(
+                title="Error Cutting File...",
+                message=f"<{message}>",
+            ).show()
+        else:
+            result, message, _ = dvdarch_utils.Concatenate_Videos(
+                video_files=video_files,
+                output_file=assembled_file,
+                delete_temp_files=True,
+            )
 
             if result == -1:
                 popups.PopError(
-                    title="Archive Edit List", message=f"Write Failed : {message}"
+                    title="Error Concatenating Files...",
+                    message=f"<{message}>",
                 ).show()
+
+                return None
+
+            (
+                assembled_path,
+                assembled_filename,
+                assembled_extension,
+            ) = self._file_handler.split_file_path(assembled_file)
+
+            encoding_info = Get_File_Encoding_Info(assembled_file)
+
+            if encoding_info.error:
+                popups.PopError(
+                    title="Error Getting Encoder Info...",
+                    message=f"{sys_consts.SDELIM}{assembled_file}{sys_consts.SDELIM}\n<{encoding_info.error}>",
+                ).show()
+                return None
+
+            self._video_file_input.append(
+                Video_Data(
+                    video_folder=assembled_path,
+                    video_file=assembled_filename,
+                    video_extension=assembled_extension,
+                    encoding_info=encoding_info,
+                    video_file_settings=self._video_file_input[0].video_file_settings,
+                )
+            )
+
+            self.processed_files_callback(self._video_file_input)
+
         return None
 
     def _assemble_segments(self, event: qtg.Action) -> None:
@@ -1306,8 +1316,6 @@ class Video_Editor(DVD_Archiver_Base):
         """
         assert isinstance(event, qtg.Action), f"{event=}. Must be type qtg.Action"
 
-        file_handler = file_utils.File()
-
         edit_list = self._get_edit_list()
 
         if edit_list:
@@ -1315,196 +1323,50 @@ class Video_Editor(DVD_Archiver_Base):
                 title="Choose Clip Assembly Method...",
                 message="Please Choose How To Assemble Clips",
                 options={
-                    "As A Single File": "As_A_Single_File",
-                    "As Individual Files": "As_Individual_Files",
+                    "As A Single File": AS_A_SINGLE_FILE,
+                    "As Individual Files": AS_INDIVIDUAL_FILES,
                 },
             ).show()
 
-            match result:
-                case "As_Individual_Files":
-                    _, filename, extension = file_handler.split_file_path(
-                        self._video_file_input[0].video_path
-                    )
+            if result == AS_INDIVIDUAL_FILES:
+                _, filename, extension = self._file_handler.split_file_path(
+                    self._video_file_input[0].video_path
+                )
 
-                    assembled_file = file_handler.file_join(
-                        self._edit_folder, f"{filename}_", extension
-                    )
+                assembled_file = self._file_handler.file_join(
+                    self._edit_folder, f"{filename}_", extension
+                )
 
-                    video_data = []
+                video_data = []
 
-                    with qtg.sys_cursor(qtg.Cursor.hourglass):
-                        result, video_files_string, video_files = (
-                            self._cut_video_with_editlist(
-                                input_file=self._video_file_input[0].video_path,
-                                output_file=assembled_file,
-                                cut_out=False,
-                            )
-                        )
+                self._cut_video_with_editlist(
+                    input_file=self._video_file_input[0].video_path,
+                    output_file=assembled_file,
+                    operation=result,
+                    cut_out=False,
+                )
 
-                        if result == -1:
-                            popups.PopError(
-                                title="Error Cutting File...",
-                                message=f"<{video_files_string}>",
-                            ).show()
-                        else:
-                            for video_file_path in video_files:
-                                (
-                                    video_path,
-                                    video_file,
-                                    video_extension,
-                                ) = file_handler.split_file_path(video_file_path)
+            elif result == AS_A_SINGLE_FILE:
+                _, filename, extension = self._file_handler.split_file_path(
+                    self._video_file_input[0].video_path
+                )
 
-                                video_file_settings = Video_File_Settings()
-                                encoding_info = Get_File_Encoding_Info(video_file_path)
+                assembled_file = self._file_handler.file_join(
+                    self._edit_folder, f"{filename}_assembled", extension
+                )
 
-                                if encoding_info.error:
-                                    popups.PopError(
-                                        title="Error Getting Encoder Info...",
-                                        message=f"{sys_consts.SDELIM}{video_file_path}{sys_consts.SDELIM}\n<{encoding_info.error}>",
-                                    ).show()
-                                    return None
+                self._cut_video_with_editlist(
+                    input_file=self._video_file_input[0].video_path,
+                    output_file=assembled_file,
+                    operation=result,
+                    cut_out=False,
+                )
 
-                                if self._db_settings.setting_exist(
-                                    sys_consts.VF_NORMALISE_DBK
-                                ):
-                                    video_file_settings.normalise = (
-                                        self._db_settings.setting_get(
-                                            sys_consts.VF_NORMALISE_DBK
-                                        )
-                                    )
-
-                                if self._db_settings.setting_exist(
-                                    sys_consts.VF_DENOISE_DBK
-                                ):
-                                    video_file_settings.denoise = (
-                                        self._db_settings.setting_get(
-                                            sys_consts.VF_DENOISE_DBK
-                                        )
-                                    )
-
-                                if self._db_settings.setting_exist(
-                                    sys_consts.VF_WHITE_BALANCE_DBK
-                                ):
-                                    video_file_settings.white_balance = (
-                                        self._db_settings.setting_get(
-                                            sys_consts.VF_WHITE_BALANCE_DBK
-                                        )
-                                    )
-
-                                if self._db_settings.setting_exist(
-                                    sys_consts.VF_SHARPEN_DBK
-                                ):
-                                    video_file_settings.sharpen = (
-                                        self._db_settings.setting_get(
-                                            sys_consts.VF_SHARPEN_DBK
-                                        )
-                                    )
-
-                                if self._db_settings.setting_exist(
-                                    sys_consts.VF_AUTO_LEVELS_DBK
-                                ):
-                                    video_file_settings.auto_bright = (
-                                        self._db_settings.setting_get(
-                                            sys_consts.VF_AUTO_LEVELS_DBK
-                                        )
-                                    )
-
-                                video_file_settings.button_title = (
-                                    file_handler.extract_title(video_file)
-                                )
-
-                                video_data.append(
-                                    Video_Data(
-                                        video_folder=video_path,
-                                        video_file=video_file,
-                                        video_extension=video_extension,
-                                        encoding_info=encoding_info,
-                                        video_file_settings=video_file_settings,
-                                    )
-                                )
-                    if video_data:
-                        result = File_Renamer_Popup(
-                            video_data_list=video_data, container_tag="file_renamer"
-                        ).show()
-
-                        for video_file in video_data:
-                            self._video_file_input.append(video_file)
-
-                        self.processed_files_callback(self._video_file_input)
-
-                case "As_A_Single_File":
-                    _, filename, extension = file_handler.split_file_path(
-                        self._video_file_input[0].video_path
-                    )
-
-                    assembled_file = file_handler.file_join(
-                        self._edit_folder, f"{filename}_assembled", extension
-                    )
-
-                    with qtg.sys_cursor(qtg.Cursor.hourglass):
-                        result, message, video_files = self._cut_video_with_editlist(
-                            input_file=self._video_file_input[0].video_path,
-                            output_file=assembled_file,
-                            cut_out=False,
-                        )
-
-                        if result == -1:  #
-                            popups.PopError(
-                                title="Error Cutting File...",
-                                message=f"<{message}>",
-                            ).show()
-                        else:
-                            result, message, _ = dvdarch_utils.Concatenate_Videos(
-                                temp_files=video_files,
-                                output_file=assembled_file,
-                                delete_temp_files=True,
-                            )
-
-                            if result == -1:
-                                popups.PopError(
-                                    title="Error Concatenating Files...",
-                                    message=f"<{message}>",
-                                ).show()
-
-                                return None
-
-                            (
-                                assembled_path,
-                                assembled_filename,
-                                assembled_extension,
-                            ) = file_handler.split_file_path(assembled_file)
-
-                            encoding_info = Get_File_Encoding_Info(assembled_file)
-
-                            if encoding_info.error:
-                                popups.PopError(
-                                    title="Error Getting Encoder Info...",
-                                    message=f"{sys_consts.SDELIM}{assembled_file}{sys_consts.SDELIM}\n<{encoding_info.error}>",
-                                ).show()
-                                return None
-
-                            self._video_file_input.append(
-                                Video_Data(
-                                    video_folder=assembled_path,
-                                    video_file=assembled_filename,
-                                    video_extension=assembled_extension,
-                                    encoding_info=encoding_info,
-                                    video_file_settings=self._video_file_input[
-                                        0
-                                    ].video_file_settings,
-                                )
-                            )
-                            self.processed_files_callback(self._video_file_input)
-                case _:
-                    popups.PopMessage(
-                        title="No Assembly Method Selected...",
-                        message="No Output As No Assembly Method Selected!",
-                    ).show()
-        else:
-            popups.PopMessage(
-                title="No Entries In The Edit List...",
-                message="Please Mark Edit List Entries With The [ and ] Button!",
-            ).show()
+            else:
+                popups.PopMessage(
+                    title="No Entries In The Edit List...",
+                    message="Please Mark Edit List Entries With The [ and ] Button!",
+                ).show()
 
         return None
 
@@ -1536,8 +1398,6 @@ class Video_Editor(DVD_Archiver_Base):
 
             if mark_in_frame < 0:
                 mark_in_frame = 0
-            # else:
-            #    mark_in_frame += 1
 
             if mark_out_frame == 0:
                 mark_out_frame = self._frame_count
@@ -1562,10 +1422,7 @@ class Video_Editor(DVD_Archiver_Base):
         return edit_list
 
     def _cut_video_with_editlist(
-        self,
-        input_file: str,
-        output_file: str,
-        cut_out: bool = True,
+        self, input_file: str, output_file: str, operation: str, cut_out: bool = True
     ) -> tuple[int, str, list[str]]:
         """
         Cuts a video file based on a given edit list of start and end frames.
@@ -1573,6 +1430,7 @@ class Video_Editor(DVD_Archiver_Base):
         Args:
             input_file (str): Path of the input video file.
             output_file (str): Path of the output video file.
+            operation (str) : The operation to perform on the video_files
             cut_out (bool, optional): Whether to cut out the edit points of the video. Defaults to True.
 
         Returns:
@@ -1586,20 +1444,8 @@ class Video_Editor(DVD_Archiver_Base):
                 - arg 2 (str): An error message.
                 - arg 3 (list[str]): List of video files
         """
-        # Used for background task information
-        global gi_task_error_code
-        global gi_thread_status
-        global gs_thread_error_message
-        global gs_task_error_message
-        global gs_thread_status
-        global gs_thread_message
-        global gs_thread_output
-        global gs_thread_task_name
 
-        global gb_task_errored
-        global gi_tasks_completed
-
-        # ===== Helper
+        # #### Helper Functions
 
         def transform_cut_in_to_cut_out(
             edit_list: list[tuple[int, int, str]], frame_count: int
@@ -1662,16 +1508,179 @@ class Video_Editor(DVD_Archiver_Base):
 
             return cut_out_list
 
-        # ===== Main
+        def _start_task(
+            task_def: Task_Def, edit_list: list[tuple[int, int, str]]
+        ) -> None:
+            """
+            Starts a task to cut a video file based on a given edit list of start and end frames.
+
+            Args:
+                task_def (Task_Def): The task definition.
+                edit_list (list[tuple[int, int, str]]): The list of tuples representing the cut in/out points and cut
+                name of the video.
+
+            """
+            assert isinstance(task_def, Task_Def), f"{task_def=}. Must be Task_Def"
+            assert isinstance(edit_list, list), f"{edit_list=}. Must be a list"
+            assert edit_list, f"{edit_list=}. Must not be empty"
+            assert all(isinstance(x, tuple) and len(x) == 3 for x in edit_list), (
+                f"{edit_list=}. Must contain tuples of size 3"
+                " [start_frame, end_frame, cut name]"
+            )
+
+            nonlocal task_count
+
+            if DEBUG:
+                print(f"DBG VC ST Started {task_id=}")
+
+            self._progress_bar.range_set(0, len(edit_list))
+            self._progress_bar.value_set(len(edit_list))
+
+        def _finish_task(task_def: Task_Def, temp_files: list[str]) -> None:
+            """
+            Finishes a task to cut a video file based on a given edit list of start and end frames.
+
+            Note: A group cuts are completed when the result_tuple message contains: "all done"
+
+            Args:
+                task_def (Task_Def): The task definition.
+                temp_files (list[str]): The list of temporary files.
+            """
+            assert isinstance(task_def, Task_Def), f"{task_def=}. Must be Task_Def"
+            assert "result_tuple" in task_def.cargo
+
+            if DEBUG:
+                print(f"DBG VC FC {task_def=}")
+
+            nonlocal task_count
+
+            if "result_tuple" in task_def.cargo:
+                if DEBUG:
+                    print(
+                        f"DBG VC FC Finished {task_id=} {task_def.cargo['result_tuple']=}"
+                    )
+
+                assert isinstance(task_def.cargo["result_tuple"], tuple), (
+                    f"{task_def.cargo['result_tuple']=}. Must be tuple"
+                )
+
+                task_error_no, task_message, worker_error_no, worker_message = (
+                    Unpack_Result_Tuple(task_def)
+                )
+
+                if task_error_no == -1 or worker_error_no == -1:
+                    if "json decode error" in worker_message.lower():
+                        self._background_task_qmanager.cancel_task_by_prefix(
+                            task_def.task_prefix
+                        )
+
+                        popups.PopError(
+                            title="Error",
+                            message=(
+                                f"Corrupt Video File!\n\n"
+                                f"{sys_consts.SDELIM}{task_def.cargo['input_file']}{sys_consts.SDELIM}!"
+                                f"\n\n Please Transcode Video File To An Edit File!\n\n Attempting To Cancel Edit Tasks "
+                                f"Please Wait!"
+                            ),
+                            width=120,
+                            height=8,
+                        ).show()
+                    else:
+                        popups.PopError(
+                            title="Error",
+                            message=f" {task_message} \n {worker_message=}",
+                            width=80,
+                            height=8,
+                        ).show()
+
+                    self._error_code = worker_error_no
+                    self._error_message = worker_message
+            else:  # Error, should not happen
+                if DEBUG:
+                    print(f"DBG VC FC Finished {task_id=}. No result_tuple")
+
+                return None
+
+            task_count -= 1
+
+            self._progress_bar.value_set(task_count)
+
+            if (
+                task_error_no == 1
+                and worker_error_no == 1
+                and task_message.lower() == "all done"
+            ):  # Entire video cut group completed
+                self._progress_bar.value_set(0)
+
+                if task_def.cargo["operation"] == AS_A_SINGLE_FILE:
+                    self._assembled_file_handler(
+                        worker_error_no, worker_message, output_file, temp_files
+                    )
+
+                    return None
+
+                elif task_def.cargo["operation"] == AS_INDIVIDUAL_FILES:
+                    # We keep the temp files, as they are the new videos
+                    self._individual_files_handler(
+                        worker_error_no, worker_message, temp_files
+                    )
+
+                    return None
+                elif task_def.cargo["operation"] == DELETE_SEGMENTS:
+                    result, message, _ = dvdarch_utils.Concatenate_Videos(
+                        video_files=task_def.cargo["temp_files"],
+                        output_file=output_file,
+                        delete_temp_files=True,
+                        debug=False,
+                    )
+
+                    if result == -1:
+                        self._error_code = -1
+                        self._error_message = message
+                    self._delete_segments_handler(result, message, [output_file])
+
+                    return None
+                else:
+                    raise ValueError(
+                        f"Unknown file operation {task_def.cargo['file_operation']}"
+                    )
+
+            return None
+
+        def _error_task(task_def: Task_Def) -> None:
+            assert isinstance(task_def, Task_Def), f"{task_def=}. Must be Task_Def"
+
+            if DEBUG:
+                print(f"DBG VC EC {task_def=}")
+
+            return None
+
+        def _abort_task(task_def: Task_Def) -> None:
+            assert isinstance(task_def, Task_Def), f"{task_def=}. Must be Task_Def"
+
+            if DEBUG:
+                print(f"DBG VC AB {task_def=}")
+
+            return None
+
+        #### Main
         assert isinstance(input_file, str), f"{input_file=}. Must be str"
         assert isinstance(output_file, str), f"{output_file=} must be str"
+        assert isinstance(operation, str) and operation in (
+            DELETE_SEGMENTS,
+            AS_A_SINGLE_FILE,
+            AS_INDIVIDUAL_FILES,
+        ), (
+            f"{operation=}. Must be {DELETE_SEGMENTS} | {AS_A_SINGLE_FILE} | {AS_INDIVIDUAL_FILES}"
+        )
         assert isinstance(cut_out, bool), f"{cut_out=}. Must be a bool"
 
-        file_handler = file_utils.File()
         edit_list = self._get_edit_list()
+        task_count = 0
+        all_done = False
 
         for edit_tuple in edit_list:
-            if edit_tuple[2] != "" and not file_handler.filename_validate(
+            if edit_tuple[2] != "" and not self._file_handler.filename_validate(
                 edit_tuple[2]
             ):
                 return (
@@ -1683,7 +1692,7 @@ class Video_Editor(DVD_Archiver_Base):
                     [],
                 )
 
-        out_path, out_file, out_extn = file_handler.split_file_path(output_file)
+        out_path, out_file, out_extn = self._file_handler.split_file_path(output_file)
 
         temp_files = []
 
@@ -1694,8 +1703,8 @@ class Video_Editor(DVD_Archiver_Base):
 
         self._progress_bar.range_set(0, len(edit_list))
         self._progress_bar.value_set(len(edit_list))
-
         task_list = []
+
         for cut_index, (start_frame, end_frame, clip_name) in enumerate(edit_list):
             if end_frame - start_frame <= 0:  # Probably should not happen
                 continue
@@ -1703,16 +1712,18 @@ class Video_Editor(DVD_Archiver_Base):
             if clip_name.strip() != "":
                 out_file = clip_name
             else:
-                out_file = f"{file_handler.extract_title(out_file)}_{cut_index:03d}"
+                out_file = (
+                    f"{self._file_handler.extract_title(out_file)}_{cut_index:03d}"
+                )
 
             if cut_out:
-                temp_file = file_handler.file_join(
+                temp_file = self._file_handler.file_join(
                     out_path,
                     f"{out_file}({cut_index})",
                     out_extn,
                 )
             else:
-                temp_file = file_handler.file_join(
+                temp_file = self._file_handler.file_join(
                     out_path,
                     out_file,
                     out_extn,
@@ -1720,8 +1731,8 @@ class Video_Editor(DVD_Archiver_Base):
 
             temp_files.append(temp_file)
 
-            if file_handler.file_exists(temp_file):
-                result = file_handler.remove_file(temp_file)
+            if self._file_handler.file_exists(temp_file):
+                result = self._file_handler.remove_file(temp_file)
 
                 if result == -1:
                     return (
@@ -1733,90 +1744,83 @@ class Video_Editor(DVD_Archiver_Base):
                         [],
                     )
 
+            task_id = f"VE_VC_{cut_index}"
             cut_def = dvdarch_utils.Cut_Video_Def(
                 input_file=input_file,
                 output_file=temp_file,
                 start_cut=start_frame,
                 end_cut=end_frame,
                 frame_rate=self._frame_rate,
-                tag=str(cut_index),
+                tag=task_id,
             )
 
-            task_list.append((cut_index, cut_def))
+            task_list.append({
+                "task_id": task_id,
+                "cut_index": cut_index,
+                "file_operation": operation,
+                "task_def": dvdarch_utils.Task_Def(
+                    task_id=task_id,
+                    task_prefix=CUT_PREFIX,
+                    worker_function=dvdarch_utils.Cut_Video,
+                    kwargs={"cut_video_def": cut_def},
+                    cargo={
+                        "operation": operation,
+                        "input_file": input_file,
+                        "temp_files": temp_files,
+                    },
+                ),
+            })
 
-        tasks_submitted = 0
-        run_in_background = False
+        task_dispatcher = Task_Dispatcher()
 
-        # Cut_Video is a resource hog and running in the background actually yields worse performance on my dev computer
-        # TODO revist when Cut_Video adresses the resource issue
-        if run_in_background:
-            for task_tuple in task_list:
-                self._background_task_manager.add_task(
-                    name=f"cut_video_{task_tuple[0]}",
-                    method=Run_Video_Cuts,
-                    arguments=(task_tuple[1],),
-                    callback=Notification_Call_Back,
-                )
-                tasks_submitted += 1
-
-            current_task = 0
-            gi_tasks_completed = 0
-            while gi_tasks_completed < tasks_submitted:
-                if bool(gb_task_errored):
-                    self._progress_bar.reset()
-                    error_str = (
-                        f" {gi_tasks_completed=}, {gi_task_error_code=},"
-                        f" {gi_thread_status=}, {gs_thread_message=},"
-                        f" {gs_thread_output=}, {gs_task_error_message=},"
-                        f" {gs_thread_task_name=}"
-                    )
-
-                    return -1, str(f"Cut Video Failed: {error_str}"), []
-
-                if current_task != gi_tasks_completed:
-                    current_task = gi_tasks_completed
-                    self._progress_bar.value_set(tasks_submitted - current_task)
-        else:
-            self._progress_bar.value_set(tasks_submitted)
-            tasks_submitted = len(task_list)
-            task_index = tasks_submitted
-
-            for task_tuple in task_list:
-                self._progress_bar.value_set(task_index)
-                task_index -= 1
-
-                if (
-                    task_tuple is None or task_tuple[1] is None
-                ):  # This should never happen
-                    continue
-
-                task_error_code, task_error_message = dvdarch_utils.Cut_Video(
-                    cut_video_def=task_tuple[1]
-                )
-
-                if task_error_code == -1:
-                    self._progress_bar.reset()
-                    return -1, task_error_message, []
-
-        self._progress_bar.reset()
-
-        if cut_out:  # Concat temp file for the final file and remove the temp files
-            result, message, _ = dvdarch_utils.Concatenate_Videos(
-                temp_files=temp_files,
-                output_file=output_file,
-                delete_temp_files=True,
-                debug=True,
+        for task_index, task_dict in enumerate(task_list):
+            task_dispatcher.submit_task(
+                task_def=task_dict["task_def"],
+                task_dispatch_methods=[
+                    {
+                        "task_dispatch_name": f"{CUT_PREFIX}_{task_index}",
+                        "callback": "start",
+                        "operation": task_dict["file_operation"],
+                        "method": _start_task,
+                        "kwargs": {
+                            "task_def": task_dict["task_def"],
+                            "edit_list": edit_list,
+                        },
+                    },
+                    {
+                        "task_dispatch_name": f"{CUT_PREFIX}_{task_index}",
+                        "callback": "finish",
+                        "operation": task_dict["file_operation"],
+                        "method": _finish_task,
+                        "kwargs": {
+                            "task_def": task_dict["task_def"],
+                            "temp_files": temp_files,
+                        },
+                    },
+                    {
+                        "task_dispatch_name": f"{CUT_PREFIX}_{task_index}",
+                        "callback": "error",
+                        "operation": task_dict["file_operation"],
+                        "method": _error_task,
+                        "kwargs": {
+                            "task_def": task_dict["task_def"],
+                        },
+                    },
+                    {
+                        "task_dispatch_name": f"{CUT_PREFIX}_{task_index}",
+                        "callback": "abort",
+                        "operation": task_dict["file_operation"],
+                        "method": _abort_task,
+                        "kwargs": {
+                            "task_def": task_dict["task_def"],
+                        },
+                    },
+                ],
             )
 
-            if result == -1:
-                return -1, message, []
-            return 1, "", [output_file]
+            task_count += 1
 
-        else:
-            # We keep the temp files, as they are the new videos
-            output_file = temp_files
-
-        return 1, "", output_file
+        return 1, "", []  # output_file_list
 
     def _delete_segments(self, event: qtg.Action) -> None:
         """
@@ -1829,8 +1833,6 @@ class Video_Editor(DVD_Archiver_Base):
         assert isinstance(event, qtg.Action), f"{event=}. Must be type qtg.Action"
 
         dvd_menu_title = self._menu_title.value_get()
-        file_handler = file_utils.File()
-
         edit_list = self._get_edit_list()
 
         if edit_list:
@@ -1840,59 +1842,24 @@ class Video_Editor(DVD_Archiver_Base):
                 ).show()
                 == "yes"
             ):
-                _, filename, extension = file_handler.split_file_path(
+                _, filename, extension = self._file_handler.split_file_path(
                     self._video_file_input[0].video_path
                 )
 
                 if dvd_menu_title.strip() == "":
                     dvd_menu_title = filename
 
-                output_file = file_handler.file_join(
+                output_file = self._file_handler.file_join(
                     self._edit_folder, f"{filename}_cut", extension
                 )
 
-                with qtg.sys_cursor(qtg.Cursor.hourglass):
-                    result, message, video_files = self._cut_video_with_editlist(
-                        input_file=self._video_file_input[0].video_path,
-                        output_file=output_file,
-                    )
+                # with qtg.sys_cursor(qtg.Cursor.hourglass):
+                self._cut_video_with_editlist(
+                    input_file=self._video_file_input[0].video_path,
+                    output_file=output_file,
+                    operation=DELETE_SEGMENTS,
+                )
 
-                    if not video_files:  # Should never happen
-                        popups.PopError(
-                            title="Error Cutting File...",
-                            message=f"<Cuttiing Failed! {sys_consts.SDELIM} {self._video_file_input[0].video_path} {sys_consts.SDELIM}>",
-                        ).show()
-                        return None
-
-                    if result == -1:
-                        popups.PopError(
-                            title="Error Cutting File...",
-                            message=f"<{message}>",
-                        ).show()
-                    else:
-                        trimmed_file = video_files[
-                            0
-                        ]  # Can only be one file at this point
-
-                        (
-                            trimmed_path,
-                            trimmed_filename,
-                            trimmed_extension,
-                        ) = file_handler.split_file_path(trimmed_file)
-
-                        trimmed_video = Video_Data(
-                            video_folder=trimmed_path,
-                            video_file=trimmed_filename,
-                            video_extension=trimmed_extension,
-                            encoding_info=dvdarch_utils.Get_File_Encoding_Info(
-                                trimmed_file
-                            ),
-                            video_file_settings=self._video_file_input[
-                                0
-                            ].video_file_settings,
-                        )
-                        self._video_file_input.append(trimmed_video)
-                        self.processed_files_callback(self._video_file_input)
         else:
             popups.PopMessage(
                 title="No Entries In The Edit List...",
@@ -1929,6 +1896,212 @@ class Video_Editor(DVD_Archiver_Base):
 
         return None
 
+    def _export_edit_list(self) -> None:
+        """
+        Export the current edit list to a text file.
+
+        """
+
+        edit_list_values = []
+
+        for row in range(self._edit_list_grid.row_count):
+            line = ""
+            for col in range(self._edit_list_grid.col_count):
+                value = self._edit_list_grid.value_get(
+                    row=row,
+                    col=col,
+                )
+                line += f"{value},"
+            edit_list_values.append(line[:-1])
+
+        folder_name = popups.PopFolderGet(
+            title="Get Edit List Folder",
+            root_dir=qtg.Special_Path(qtg.Special_Path.DOCUMENTS),
+        ).show()
+
+        if folder_name.strip() == "":
+            return None
+
+        export_file_name = popups.PopTextGet(
+            title="Enter Edit List Name",
+            label="Edit List Name:",
+            label_above=True,
+        ).show()
+
+        if not export_file_name.strip():
+            return None
+
+        export_file_name = utils.Text_To_File_Name(export_file_name)
+
+        file_name = self._file_handler.file_join(
+            folder_name, export_file_name, EDIT_LIST_EXTENSION
+        )
+
+        if not file_name.strip():
+            return None
+
+        try:
+            with open(file_name, "w", encoding="utf-8") as f:
+                for item in edit_list_values:
+                    f.write(item + "\n")
+        except IOError as e:
+            popups.PopError(
+                title="Error Exporting Edit List",
+                message=f"Error writing to file {sys_consts.SDELIM}{file_name}: \n {e}{sys_consts.SDELIM}",
+            ).show()
+        return None
+
+    def _import_edit_list(self) -> None:
+        """
+        Import an edit list from a text file.
+        """
+        edit_file_list: list[str] = []
+
+        result = Video_File_Picker_Popup(
+            title="Edit List Picker",
+            video_file_list=edit_file_list,
+            return_video_data=False,
+            file_extensions=(EDIT_LIST_EXTENSION,),
+            grid_title="Edit List Files",
+            button_title="Select Folder",
+            multi_select=False,
+            input_folder=qtg.Special_Path(qtg.Special_Path.DOCUMENTS),
+        ).show()
+
+        if result == "ok" and edit_file_list and edit_file_list[0].strip():
+            file_name = edit_file_list[0]
+            raw_edit_list_lines = []
+
+            try:
+                with open(file_name, "r", encoding="utf-8") as f:
+                    for line in f:
+                        raw_edit_list_lines.append(line.strip())
+
+                result = popups.PopYesNo(
+                    title="Import Edit List",
+                    message=f"This will overwrite the current edit list. \n\n"
+                    f" Are you sure you want to import the edit list from \n\n"
+                    f" {sys_consts.SDELIM}{file_name}{sys_consts.SDELIM}?",
+                    width=80,
+                    height=6,
+                ).show()
+
+                if result == "no":
+                    return None
+
+                cut_tuples = []
+                validation_errors = []
+
+                for row_idx, line_item in enumerate(raw_edit_list_lines):
+                    temp_list = []
+                    parts = line_item.split(",")
+
+                    if len(parts) != 3:
+                        validation_errors.append(
+                            f"Line {row_idx + 1}: Not enough fields. Expected at 3."
+                        )
+                        continue
+
+                    for col_item in parts:
+                        if col_item.isnumeric():
+                            temp_list.append(int(col_item))
+                        else:
+                            temp_list.append(col_item)
+
+                    cut_tuple = tuple(temp_list)
+
+                    if len(cut_tuple) == 3:
+                        start_frame = cut_tuple[0]
+                        end_frame = cut_tuple[1]
+
+                        if not isinstance(start_frame, int) or not isinstance(
+                            end_frame, int
+                        ):
+                            validation_errors.append(
+                                f"Line {row_idx + 1}: Start or end frame is not a number."
+                            )
+                        elif (
+                            start_frame < 0
+                            or start_frame > self._frame_count
+                            or end_frame < 0
+                            or end_frame > self._frame_count
+                        ):
+                            validation_errors.append(
+                                f"Line {row_idx + 1}: Frames ({start_frame}, {end_frame}) are out of video range "
+                                f"(0-{self._frame_count})."
+                            )
+                        elif start_frame > end_frame:
+                            validation_errors.append(
+                                f"Line {row_idx + 1}: Start frame ({start_frame}) is after end frame ({end_frame})."
+                            )
+                    else:
+                        validation_errors.append(
+                            f"Line {row_idx + 1}: Invalid cut format. Expected at least two numeric frames."
+                        )
+
+                    cut_tuples.append(cut_tuple)
+
+                if validation_errors:
+                    popups.PopError(
+                        title="Edit List Import Errors",
+                        message="The following errors were found in the edit list:\n\n"
+                        + "\n".join(validation_errors),
+                    ).show()
+                    return None
+
+                self._edit_list_grid.clear()
+
+                for row, cut_tuple in enumerate(cut_tuples):
+                    for col_index, col_value in enumerate(cut_tuple):
+                        self._edit_list_grid.value_set(
+                            row=row,
+                            col=col_index,
+                            value=col_value,
+                            user_data=cut_tuple,
+                        )
+
+                if not self._video_file_input or not hasattr(
+                    self._video_file_input[0], "video_path"
+                ):
+                    popups.PopError(
+                        title="Error Saving Edit List",
+                        message="Video file path not available.",
+                    ).show()
+                    return None
+
+                result, message = self._edit_list.write_edit_cuts(
+                    file_path=self._video_file_input[0].video_path,
+                    project=self._project_name,
+                    layout="",
+                    file_cuts=self._get_edit_list(),
+                )
+
+                if result == -1:
+                    popups.PopError(
+                        title="Error Saving Edit List",
+                        message="Failed To Save Edit List!",
+                    ).show()
+                    return None
+
+                popups.PopMessage(
+                    title="Edit List Imported",
+                    message=f"Edit list successfully imported from:\n\n{sys_consts.SDELIM}{file_name}{sys_consts.SDELIM}",
+                ).show()
+
+            except FileNotFoundError:
+                popups.PopError(
+                    title="Error Importing Edit List",
+                    message=f"File {sys_consts.SDELIM}{file_name}{sys_consts.SDELIM} does not exist",
+                ).show()
+
+            except IOError as e:
+                popups.PopError(
+                    title="Error Importing Edit List",
+                    message=f"Error reading from file {sys_consts.SDELIM}{file_name}: {e}{sys_consts.SDELIM}",
+                ).show()
+
+        return None
+
     def _remove_edit_points(self, event: qtg.Action) -> None:
         """
         Remove checked edit points from a grid widget.
@@ -1961,7 +2134,7 @@ class Video_Editor(DVD_Archiver_Base):
                 self._selection_button_toggle(event=event, init=True)
 
     def _media_status_change(self, media_status: str) -> None:
-        """When the status of the media player changes this methodis called.
+        """When the status of the media player changes this method is called.
         Args:
             media_status (str): The status of the media player
         """
@@ -2118,11 +2291,6 @@ class Video_Editor(DVD_Archiver_Base):
         Args:
             frame: int: Set the current frame to a specific value
 
-        Returns:
-            None
-
-        Doc Author:
-            Trelent
         """
         self._current_frame = frame
         self._video_handler.seek(frame)
@@ -2317,18 +2485,16 @@ class Video_Editor(DVD_Archiver_Base):
             Creates folders as necessary for the video processing task.
 
         """
-        file_handler = file_utils.File()
+        if not self._file_handler.path_exists(self._output_folder):
+            self._file_handler.make_dir(self._output_folder)
 
-        if not file_handler.path_exists(self._output_folder):
-            file_handler.make_dir(self._output_folder)
-
-        if file_handler.path_exists(self._output_folder):
-            self._output_folder = file_handler.file_join(
+        if self._file_handler.path_exists(self._output_folder):
+            self._output_folder = self._file_handler.file_join(
                 self._output_folder, utils.Text_To_File_Name(self._project_name)
             )
-            file_handler.make_dir(self._output_folder)
+            self._file_handler.make_dir(self._output_folder)
 
-        if not file_handler.path_exists(self._output_folder):
+        if not self._file_handler.path_exists(self._output_folder):
             popups.PopError(
                 title="Video Output Folder Does Not Exist",
                 message=(
@@ -2340,11 +2506,11 @@ class Video_Editor(DVD_Archiver_Base):
 
             return -1
 
-        self._edit_folder = file_handler.file_join(
+        self._edit_folder = self._file_handler.file_join(
             self._output_folder, sys_consts.EDIT_FOLDER_NAME
         )
 
-        if self._video_file_input and not file_handler.file_exists(
+        if self._video_file_input and not self._file_handler.file_exists(
             self._video_file_input[0].video_path
         ):
             # This should never happen, unless dev error or mount/drive problems
@@ -2358,7 +2524,7 @@ class Video_Editor(DVD_Archiver_Base):
             ).show()
             return -1
 
-        if not file_handler.path_writeable(self._output_folder):
+        if not self._file_handler.path_writeable(self._output_folder):
             popups.PopError(
                 title="Video Output Folder Write Error",
                 message=(
@@ -2370,8 +2536,8 @@ class Video_Editor(DVD_Archiver_Base):
             ).show()
             return -1
 
-        if not file_handler.path_exists(self._edit_folder):
-            if file_handler.make_dir(self._edit_folder) == -1:
+        if not self._file_handler.path_exists(self._edit_folder):
+            if self._file_handler.make_dir(self._edit_folder) == -1:
                 popups.PopError(
                     title="Video Edit Folder Creation Error",
                     message=(
@@ -2383,12 +2549,12 @@ class Video_Editor(DVD_Archiver_Base):
                 ).show()
                 return -1
 
-        self._transcode_folder = file_handler.file_join(
+        self._transcode_folder = self._file_handler.file_join(
             self._output_folder, sys_consts.TRANSCODE_FOLDER_NAME
         )
 
-        if not file_handler.path_exists(self._transcode_folder):
-            if file_handler.make_dir(self._transcode_folder) == -1:
+        if not self._file_handler.path_exists(self._transcode_folder):
+            if self._file_handler.make_dir(self._transcode_folder) == -1:
                 popups.PopError(
                     title="Video Transcode Folder Creation Error",
                     message=(
@@ -2406,6 +2572,8 @@ class Video_Editor(DVD_Archiver_Base):
         return 1
 
     def layout(self) -> qtg.VBoxContainer:
+        """Generate the video cutter UI layout"""
+
         def assemble_video_cutter_container() -> qtg.VBoxContainer:
             """
             The function assembles the video cutter container.
@@ -2609,7 +2777,7 @@ class Video_Editor(DVD_Archiver_Base):
 
             self._edit_list_grid = qtg.Grid(
                 tag="edit_list_grid",
-                height=self.display_height - 50,
+                height=self.display_height,  # - 50,
                 col_def=edit_list_cols,
                 pixel_unit=True,
                 callback=self.event_handler,
@@ -2618,6 +2786,21 @@ class Video_Editor(DVD_Archiver_Base):
             )
 
             edit_list_buttons = qtg.HBoxContainer(align=qtg.Align.BOTTOMCENTER).add_row(
+                qtg.Button(
+                    icon=file_utils.App_Path("file-import.svg"),
+                    tag="import_edit_list",
+                    callback=self.event_handler,
+                    tooltip="import Edit List",
+                    width=2,
+                ),
+                qtg.Button(
+                    icon=file_utils.App_Path("file-export.svg"),
+                    tag="export_edit_list",
+                    callback=self.event_handler,
+                    tooltip="Export Edit List",
+                    width=2,
+                ),
+                qtg.Spacer(width=4),
                 qtg.Button(
                     icon=file_utils.App_Path("film.svg"),
                     tag="assemble_segments",
@@ -2632,7 +2815,7 @@ class Video_Editor(DVD_Archiver_Base):
                     tooltip="Delete Edit Points From Video",
                     width=2,
                 ),
-                qtg.Spacer(width=5),
+                qtg.Spacer(width=4),
                 qtg.Button(
                     icon=file_utils.App_Path("x.svg"),
                     tag="remove_edit_points",
@@ -2679,15 +2862,17 @@ class Video_Editor(DVD_Archiver_Base):
                 callback=self.event_handler,
             )
 
-            edit_list_visibility = qtg.HBoxContainer(
-                align=qtg.Align.BOTTOMCENTER, text="Visible To"
+            # Removed ability to set project scope from edit list GUI , export and import edit list instead
+            self._edit_list_scope_container = qtg.HBoxContainer(
+                align=qtg.Align.BOTTOMCENTER,
+                text="Visible To",
             ).add_row(
                 self._all_projects_rb,
                 self._this_project_rb,
             )
 
             edit_file_list = qtg.VBoxContainer(align=qtg.Align.TOPLEFT).add_row(
-                edit_list_visibility,
+                # self._edit_list_scope_container,
                 qtg.HBoxContainer(margin_left=4).add_row(
                     qtg.Checkbox(
                         text="Select All",
@@ -2720,18 +2905,21 @@ class Video_Editor(DVD_Archiver_Base):
             qtg.Checkbox(
                 tag="normalise",
                 text="Normalise",
+                callback=self.event_handler,
                 checked=True,
                 tooltip="Bring Out Shadow Details",
             ),
             qtg.Checkbox(
                 tag="denoise",
                 text="Denoise",
+                callback=self.event_handler,
                 checked=True,
                 tooltip="Lightly Reduce Video Noise",
             ),
             qtg.Checkbox(
                 tag="white_balance",
                 text="White Balance",
+                callback=self.event_handler,
                 checked=True,
                 tooltip="Fix White Balance Problems",
                 width=16,
@@ -2739,12 +2927,14 @@ class Video_Editor(DVD_Archiver_Base):
             qtg.Checkbox(
                 tag="sharpen",
                 text="Sharpen",
+                callback=self.event_handler,
                 checked=True,
                 tooltip="Lightly Sharpen Video",
             ),
             qtg.Checkbox(
                 tag="auto_levels",
                 text="Auto Levels",
+                callback=self.event_handler,
                 checked=True,
                 tooltip="Improve Exposure",
             ),

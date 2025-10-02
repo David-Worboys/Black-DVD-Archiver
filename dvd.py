@@ -19,11 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import dataclasses
 import datetime
+import inspect
 import locale
 import math
 import subprocess
 from random import randint
-from typing import Final, Literal
+from typing import Final, Literal, Callable
 
 import xmltodict
 
@@ -32,7 +33,19 @@ import QTPYGUI.file_utils as file_utils
 import sys_consts
 import QTPYGUI.utils as utils
 from archive_management import Archive_Manager
+from background_task_manager import Unpack_Result_Tuple, Task_Dispatcher
+from bkp.utils import Get_Unique_Id
+from break_circular import Execute_Check_Output, Task_Def
 from sys_config import Video_Data
+
+DEBUG: Final[bool] = False
+
+# Note this is the sequence in which operations must happen
+VOB_ENCODING: Final[str] = "vob_encoding"
+EXTRACT_MENU_IMAGES: Final[str] = "extract_menu_images"
+CREATE_DVD_MENU: Final[str] = "create_dvd_menu"
+CREATE_DVD_IMAGE: Final[str] = "create_dvd_image"
+ARCHIVE_DVD_FILES: Final[str] = "archive_dvd_files"
 
 
 @dataclasses.dataclass
@@ -54,6 +67,7 @@ class DVD_Config:
     _button_font_color: str = "white"
     _button_font_point_size: int = 12
     _button_font: str = ""
+    _disk_title: str = ""
     _menu_aspect_ratio: str = sys_consts.AR43  #
     _menu_buttons_across: int = 2
     _menu_buttons_per_page: int = 4
@@ -448,12 +462,15 @@ class DVD_Config:
 
         if file_handler.file_exists(value):
             self._button_font = value
+
             return
+
         else:
             for font in dvdarch_utils.Get_Fonts():
                 if font[0] == value:
                     self._button_font = font[1]
                     return
+
         if file_handler.file_exists(
             file_utils.App_Path(
                 f"IBM-Plex-Mono{file_handler.ossep}{sys_consts.DEFAULT_FONT}"
@@ -476,6 +493,18 @@ class DVD_Config:
             str: The menu font color
         """
         return self._menu_font_color
+
+    @property
+    def disk_title(self) -> str:
+        return self._disk_title
+
+    @disk_title.setter
+    def disk_title(self, disk_title: str):
+        assert isinstance(disk_title, str) and disk_title.strip() != "", (
+            f"{disk_title=}. Must be a non-empty str"
+        )
+
+        self._disk_title = disk_title
 
     @menu_font_color.setter
     def menu_font_color(self, value: str) -> None:
@@ -637,11 +666,14 @@ class DVD_Config:
 
         if file_handler.path_exists(value):
             self._timestamp_font = value
+
             return
+
         else:
             for font in dvdarch_utils.Get_Fonts():
                 if font[0] == value:
                     self._timestamp_font = font[1]
+
                     return
 
         if file_handler.file_exists(
@@ -656,7 +688,6 @@ class DVD_Config:
             return
 
         # At this point, something is really wrong
-
         raise RuntimeError(f"{value=}. Timestamp Font not found")
 
     @property
@@ -839,7 +870,7 @@ class _Cell_Coord:
             )
         else:
             if self.video_data is None:
-                return ("", "", "", "")
+                return "", "", "", ""
 
             path_name, file_name, file_extn = file_handler.split_file_path(
                 self.video_data.menu_image_file_path
@@ -867,7 +898,7 @@ class _Cell_Coord:
 
 
 # ===== Public Class
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class DVD:
     """Does the grunt work needed to automatically turn video files into a
     DVD Folder/File structure with an auto generated menu"""
@@ -878,9 +909,10 @@ class DVD:
     # to this setting
     _SPUMUX_BUFFER: Literal[33, 43] = 43
 
-    # Internal instance vars
+    _component_event_handler: Callable = None
     _dvd_config: DVD_Config = dataclasses.field(default_factory=DVD_Config)
     _dvd_timestamp_x_offset: int = 10  # TODO Make user configurable
+    _session_id: str = ""
 
     # folders
     _working_folder: str = ""
@@ -891,11 +923,22 @@ class DVD:
     _tmp_folder: str = ""
     _vob_folder: str = ""
 
+    _error_messages: list = dataclasses.field(default_factory=list)
+    _errored: bool = False
+    _error_code: int = 1
+    _error_message: str = ""
+    _encode_video_complete: bool = False
+    _extract_menu_images_complete: bool = False
+    _create_dvd_menu_complete: bool = False
+    _create_dvd_image_complete: bool = False
+    _archive_complete: bool = False
+    _final_report_triggered: bool = False
+
     # file names
     _background_canvas_file: str = ""
 
     def __post_init__(self) -> None:
-        pass
+        self._session_id: str = Get_Unique_Id()
 
     @dataclasses.dataclass(slots=True)
     class _Menu_Pointer_Data:
@@ -1235,11 +1278,67 @@ class DVD:
             self._right_y_offset = value
 
     @property
+    def component_event_handler(self) -> Callable:
+        """Returns the component_event_handler method
+
+        Returns:
+            Callable: The component_event_handler method
+        """
+        return self._component_event_handler
+
+    @component_event_handler.setter
+    def component_event_handler(self, value: Callable) -> None:
+        """Sets the component_event_handler method
+
+        Args:
+            value (qtg.Label): The system notifications label
+        """
+        assert isinstance(value, Callable), f"{value=}. Must be an instance of Callable"
+
+        signature = inspect.signature(value)
+        parameters = list(signature.parameters.values())
+
+        # Check number of arguments
+        assert len(parameters) == 2, f"{value=}. Must have 2 parameters"
+
+        arg_1 = parameters[0]
+        arg_2 = parameters[1]
+
+        assert (
+            arg_1.annotation is not inspect.Parameter.empty and arg_1.annotation is int
+        ), (
+            f"First argument '{arg_1.name}' must be annotated as 'int'. Found: {arg_1.annotation}"
+        )
+
+        assert (
+            arg_2.annotation is not inspect.Parameter.empty and arg_2.annotation is str
+        ), (
+            f"Second argument '{arg_2.name}' must be annotated as 'str'. Found: {arg_2.annotation}"
+        )
+
+        self._component_event_handler = value
+
+    @property
     def dvd_config(self) -> DVD_Config:
+        """
+            Gets the DVD configuration.
+
+        Returns:
+            DVD_Config: The DVD configuration
+        """
         return self._dvd_config
 
     @dvd_config.setter
     def dvd_config(self, value: DVD_Config) -> None:
+        """
+            Sets the DVD configuration
+
+        Args:
+            value (DVD_Config):
+
+        Returns:
+
+        """
         assert isinstance(value, DVD_Config), f"{value=}. Must be a DVD_Setup"
 
         self._dvd_config = value
@@ -1254,14 +1353,32 @@ class DVD:
 
     @property
     def dvd_working_folder(self) -> str:
+        """
+            Gets the DVD working folder.
+
+        Returns:
+            str: The DVD working folder.
+        """
         return self._dvd_working_folder
 
     @property
     def working_folder(self) -> str:
+        """
+            Gets the working folder.
+
+        Returns:
+            str: The working folder.
+        """
         return self._working_folder
 
     @working_folder.setter
     def working_folder(self, value: str) -> None:
+        """
+            Sets the working folder.
+
+        Args:
+            value (str): The working folder.
+        """
         assert isinstance(value, str) and value.strip() != "", (
             f"{value=}. Must be a non-empty string"
         )
@@ -1270,10 +1387,22 @@ class DVD:
 
     @property
     def dvd_image_folder(self) -> str:
+        """
+            Gets the DVD image folder.
+
+        Returns:
+            str: The DVD image folder.
+        """
         return self._dvd_out_folder
 
     @property
     def iso_folder(self) -> str:
+        """
+            Gets the ISO folder.
+
+        Returns:
+            str: The ISO folder.
+        """
         return self._iso_out_folder
 
     def build(self) -> tuple[int, str]:
@@ -1288,27 +1417,722 @@ class DVD:
             "Must have at least one input video"
         )
 
+        if DEBUG:
+            print(f"Building DVD {self._session_id=}")
+
+        self._reset_new_state()
+
         error_no, error_message = self._build_working_folders()
 
         if error_no == -1:
             return error_no, error_message
 
-        error_no, error_message = self._encode_video()
+        dvd_dims = dvdarch_utils.Get_DVD_Dims(
+            self.dvd_config.menu_aspect_ratio, self.dvd_config.video_standard
+        )
 
-        if error_no == -1:
-            return error_no, error_message
+        if dvd_dims.display_height == -1:
+            return -1, "Failed To Get DVD Dimensions"
 
-        error_no, error_message = self._extract_menu_images()
+        result, message = self._create_canvas_image(
+            width=dvd_dims.storage_width, height=dvd_dims.storage_height
+        )
 
-        if error_no == -1:
-            return error_no, error_message
+        if result == -1:
+            return -1, message
 
-        error_no, error_message = self._create_dvd_menu()
-
-        if error_no == -1:
-            return error_no, error_message
+        self._build_sequence(VOB_ENCODING)
 
         return 1, ""
+
+    def _build_sequence(self, build_action: str) -> None:
+        """
+        Controls the sequencing of the DVD/Archiving operations. This sequencing is important as most operations depend on
+        external files produced by prior operations - this limits the amount of parallel processing that can be done.
+
+        Note: If then else order must not be changed due to external file dependencies
+
+        Args:
+            build_action (str):  The build operation that needs to be performed. Must be one of VOB_ENCODING,
+                                EXTRACT_MENU_IMAGES, CREATE_DVD_MENU, CREATE_DVD_IMAGE, ARCHIVE_DVD_FILES
+
+        Returns:
+            None
+
+        """
+
+        #### Helper
+        def _start_menu_images_task(task_def: Task_Def) -> None:
+            """
+            Handles the menu image start task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                None
+
+            """
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if DEBUG:
+                print(f"DBG DVD SMIT Started {task_def.task_id=}")
+
+            if self.component_event_handler:
+                self.component_event_handler(
+                    sys_consts.NOTIFICATION_EVENT, "Generating DVD Menu Images"
+                )
+
+            return None
+
+        def _finish_menu_images_task(task_def: Task_Def) -> None:
+            """
+            Handles the menu image finish task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                None
+
+            """
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if DEBUG:
+                print(f"DBG DVD FMIT Started {task_def.task_id=}")
+
+            if self.component_event_handler:
+                self.component_event_handler(
+                    sys_consts.NOTIFICATION_EVENT, "Finished Generating DVD Menu Images"
+                )
+
+            task_error_no, task_message, worker_error_no, worker_message = (
+                Unpack_Result_Tuple(task_def)
+            )
+
+            if (
+                task_error_no == 1
+                and worker_error_no == 1
+                and task_message.lower() == "all done"
+            ):
+                self._create_dvd_menu_complete = True
+
+                if DEBUG:
+                    print(f"DBG DVD FMIT: (prefix '{CREATE_DVD_MENU}') is complete.")
+
+                self._build_sequence(CREATE_DVD_MENU)
+
+            elif task_error_no != 1 or worker_error_no != 1:
+                self._error_messages.append(
+                    f"task {task_def.task_id} reported an error: TaskError={task_error_no}, "
+                    f"WorkerError={worker_error_no}, Message='{task_message}'"
+                )
+
+                self._errored = True
+
+            self._check_all_groups_completed()
+
+            return None
+
+        def _start_dvd_menu_task(task_def: Task_Def) -> None:
+            """
+            Handles the DVD menu generation start task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                None
+
+            """
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if DEBUG:
+                print(f"DBG DVD SDMT Started {task_def.task_id=}")
+
+            if self.component_event_handler:
+                self.component_event_handler(
+                    sys_consts.NOTIFICATION_EVENT, "Started Generating DVD Menu"
+                )
+
+            return None
+
+        def _finish_dvd_menu_task(task_def: Task_Def) -> None:
+            """
+            Handles the DVD menu generation finish task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                None
+
+            """
+
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if DEBUG:
+                print(f"DBG DVD FDNT Started {task_def.task_id=}")
+
+            if self.component_event_handler:
+                self.component_event_handler(
+                    sys_consts.NOTIFICATION_EVENT, "Finished Generating DVD Menu"
+                )
+
+            task_error_no, task_message, worker_error_no, worker_message = (
+                Unpack_Result_Tuple(task_def)
+            )
+
+            if (
+                task_error_no == 1
+                and worker_error_no == 1
+                and task_message.lower() == "all done"
+            ):
+                self._create_dvd_menu_complete = True
+
+                if DEBUG:
+                    print(f"DBG DVD FCDNT: (prefix '{CREATE_DVD_MENU}') is complete.")
+
+                self._build_sequence(CREATE_DVD_IMAGE)
+
+            elif task_error_no != 1 or worker_error_no != 1:
+                self._error_messages.append(
+                    f"Task {task_def.task_id} reported an error: TaskError={task_error_no}, "
+                    f"WorkerError={worker_error_no}, Message='{task_message}'"
+                )
+
+                self._errored = True
+
+            self._check_all_groups_completed()
+
+            return None
+
+        def _start_dvd_image_task(task_def: Task_Def) -> None:
+            """
+            Handles the DVD image (iso) start generation task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                Nome
+
+            """
+
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if DEBUG:
+                print(f"DBG DVD SDIT Started {task_def.task_id=}")
+
+            if self.component_event_handler:
+                self.component_event_handler(
+                    sys_consts.NOTIFICATION_EVENT, "Started Building A DVD ISO"
+                )
+
+            return None
+
+        def _finish_dvd_image_task(task_def: Task_Def) -> None:
+            """
+            Handles the DVD image (iso) finish generation task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                None
+
+            """
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if DEBUG:
+                print(f"DBG DVD FDIT Started {task_def.task_id=}")
+
+            if self.component_event_handler:
+                self.component_event_handler(
+                    sys_consts.NOTIFICATION_EVENT, "Finished Generating A DVD ISO"
+                )
+
+            task_error_no, task_message, worker_error_no, worker_message = (
+                Unpack_Result_Tuple(task_def)
+            )
+
+            if (
+                task_error_no == 1
+                and worker_error_no == 1
+                and task_message.lower() == "all done"
+            ):
+                self._create_dvd_image_complete = True
+
+                if DEBUG:
+                    print(f"DBG DVD FDDIT: (prefix '{CREATE_DVD_IMAGE}') is complete.")
+
+                self._build_sequence(ARCHIVE_DVD_FILES)
+
+            elif task_error_no != 1 or worker_error_no != 1:
+                self._error_messages.append(
+                    f"Task {task_def.task_id} reported an error: TaskError={task_error_no}, "
+                    f"WorkerError={worker_error_no}, Message='{task_message}'"
+                )
+
+                self._errored = True
+
+            self._check_all_groups_completed()
+
+            return None
+
+        def _start_archive_task(task_def: Task_Def) -> None:
+            """
+            Handles the Archive start generation task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+
+            """
+
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if DEBUG:
+                print(f"DBG DVD SARHT Started {task_def.task_id=}")
+
+            if self.component_event_handler:
+                self.component_event_handler(
+                    sys_consts.NOTIFICATION_EVENT, "Started Archiving Task"
+                )
+
+            return None
+
+        def _finish_archive_task(task_def: Task_Def) -> None:
+            """
+            Handles the Archive finish generation task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+
+            """
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if DEBUG:
+                print(f"DBG DVD Fin Arch Tsk Started {task_def.task_id=}")
+
+            if self.component_event_handler:
+                self.component_event_handler(
+                    sys_consts.NOTIFICATION_EVENT, "Finished Archiving Task"
+                )
+
+            task_error_no, task_message, worker_error_no, worker_message = (
+                Unpack_Result_Tuple(task_def)
+            )
+
+            if (
+                task_error_no == 1
+                and worker_error_no == 1
+                and task_message.lower() == "all done"
+            ):
+                self._archive_complete = True
+
+                if DEBUG:
+                    print(
+                        f"DBG DVD Fin Arch Tsk: (prefix '{ARCHIVE_DVD_FILES}') is complete."
+                    )
+
+            elif task_error_no != 1 or worker_error_no != 1:
+                self._error_messages.append(
+                    f"Task {task_def.task_id} reported an error: TaskError={task_error_no}, "
+                    f"WorkerError={worker_error_no}, Message='{task_message}'"
+                )
+
+                self._errored = True
+
+            self._check_all_groups_completed()
+
+            return None
+
+        def _error_task(task_def: Task_Def) -> None:
+            """
+            Handles the Error task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+
+            """
+
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+            if DEBUG:
+                print(f"DBG DVD ET {task_def.task_id=}")
+
+            self._error_code = -1
+            self._errored = True
+
+            if "message" in task_def.cargo:
+                self._error_messages.append(
+                    f"Task '{task_def.task_id} Error {task_def.cargo['message']}"
+                )
+
+            return None
+
+        def _abort_task(task_def: Task_Def) -> None:
+            """
+            Handles the abort task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                None
+
+            """
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if DEBUG:
+                print(f"DBG DVD AT {task_def.task_id=}")
+
+            self._error_code = -1
+            self._errored = True
+
+            if "message" in task_def.cargo:
+                self._error_messages.append(
+                    f"Task '{task_def.task_id} Error {task_def.cargo['message']}"
+                )
+
+            return None
+
+        #### Main
+        assert isinstance(build_action, str) and build_action.strip() != "", (
+            f"{build_action=}. Must be non-empty str"
+        )
+
+        # Note: The if/elif order is the build sequence and must be followed sequentially
+        if not self._errored and build_action == VOB_ENCODING:  # 1
+            self._encode_video()
+        elif not self._errored and build_action == EXTRACT_MENU_IMAGES:  # 2
+            task_id = f"{EXTRACT_MENU_IMAGES}_{self._session_id}"
+            task_dispatch_name = f"D_{EXTRACT_MENU_IMAGES}_{self._session_id}"
+            task_prefix = f"P_EXTRACT_MENU_IMAGES_{self._session_id}"
+
+            task_def = Task_Def(
+                task_id=task_id,
+                task_prefix=task_prefix,
+                worker_function=self._extract_menu_images,
+                kwargs={},
+            )
+
+            Task_Dispatcher().submit_task(
+                task_def=task_def,
+                task_dispatch_methods=[
+                    {
+                        "task_dispatch_name": task_dispatch_name,
+                        "callback": "start",
+                        "operation": task_prefix,
+                        "method": _start_menu_images_task,
+                        "kwargs": {
+                            "task_def": task_def,
+                        },
+                    },
+                    {
+                        "task_dispatch_name": task_dispatch_name,
+                        "callback": "finish",
+                        "operation": task_prefix,
+                        "method": _finish_menu_images_task,
+                        "kwargs": {
+                            "task_def": task_def,
+                        },
+                    },
+                    {
+                        "task_dispatch_name": task_dispatch_name,
+                        "callback": "error",
+                        "operation": task_prefix,
+                        "method": _error_task,
+                        "kwargs": {
+                            "task_def": task_def,
+                        },
+                    },
+                    {
+                        "task_dispatch_name": task_dispatch_name,
+                        "callback": "abort",
+                        "operation": task_prefix,
+                        "method": _abort_task,
+                        "kwargs": {
+                            "task_def": task_def,
+                        },
+                    },
+                ],
+            )
+
+        elif not self._errored and build_action == CREATE_DVD_MENU:  # 3
+            task_id = f"{CREATE_DVD_MENU}_{self._session_id}"
+            task_dispatch_ame = f"D_{CREATE_DVD_MENU}_{self._session_id}"
+            task_prefix = f"P_CREATE_DVD_MENU_{self._session_id}"
+
+            error_no, cell_coords, error_message = self._get_cell_coords()
+
+            if error_no == -1:
+                self._errored = True
+                self._error_code = error_no
+                self._error_messages.append(error_message)
+
+            if not self._errored:
+                task_id = task_id
+                task_dispatch_name = task_dispatch_ame
+                task_def = Task_Def(
+                    task_id=task_id,
+                    task_prefix=task_prefix,
+                    worker_function=self._create_dvd_menu,
+                    kwargs={"cell_coords": cell_coords},
+                )
+
+                Task_Dispatcher().submit_task(
+                    task_def=task_def,
+                    task_dispatch_methods=[
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "start",
+                            "operation": task_prefix,
+                            "method": _start_dvd_menu_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "finish",
+                            "operation": task_prefix,
+                            "method": _finish_dvd_menu_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "error",
+                            "operation": task_prefix,
+                            "method": _error_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "abort",
+                            "operation": task_prefix,
+                            "method": _abort_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                    ],
+                )
+
+        elif not self._errored and build_action == CREATE_DVD_IMAGE:  # 4
+            task_id = f"{CREATE_DVD_IMAGE}_{self._session_id}"
+            task_dispatch_name = f"D_{CREATE_DVD_IMAGE}_{self._session_id}"
+            task_prefix = f"P_CREATE_DVD_IMAGE_{self._session_id}"
+
+            error_no, cell_coords, error_message = self._get_cell_coords()
+
+            if error_no == -1:
+                self._errored = True
+                self._error_code = error_no
+                self._error_messages.append(error_message)
+
+            if not self._errored:
+                task_id = task_id
+                task_def = Task_Def(
+                    task_id=task_id,
+                    task_prefix=task_prefix,
+                    worker_function=self._create_dvd_image,
+                    kwargs={"cell_coords": cell_coords},
+                )
+
+                Task_Dispatcher().submit_task(
+                    task_def=task_def,
+                    task_dispatch_methods=[
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "start",
+                            "operation": task_prefix,
+                            "method": _start_dvd_image_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "finish",
+                            "operation": task_prefix,
+                            "method": _finish_dvd_image_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "error",
+                            "operation": task_prefix,
+                            "method": _error_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "abort",
+                            "operation": task_prefix,
+                            "method": _abort_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                    ],
+                )
+
+        elif not self._errored and build_action == ARCHIVE_DVD_FILES:  # 5
+            task_id = f"{ARCHIVE_DVD_FILES}_{self._session_id}"
+            task_dispatch_name = f"D_{ARCHIVE_DVD_FILES}_{self._session_id}"
+            task_prefix = f"P_{ARCHIVE_DVD_FILES}_{self._session_id}"
+
+            error_no, cell_coords, error_message = self._get_cell_coords()
+
+            if error_no == -1:
+                self._errored = True
+                self._error_code = error_no
+                self._error_messages.append(error_message)
+
+            if not self._errored:
+                task_id = task_id
+                task_def = Task_Def(
+                    task_id=task_id,
+                    task_prefix=task_prefix,
+                    worker_function=self._archive_dvd_files,
+                    kwargs={"cell_coords": cell_coords},
+                )
+
+                Task_Dispatcher().submit_task(
+                    task_def=task_def,
+                    task_dispatch_methods=[
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "start",
+                            "operation": task_prefix,
+                            "method": _start_archive_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "finish",
+                            "operation": task_prefix,
+                            "method": _finish_archive_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "error",
+                            "operation": task_prefix,
+                            "method": _error_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "abort",
+                            "operation": task_prefix,
+                            "method": _abort_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                    ],
+                )
+
+        elif not self._errored:
+            raise RuntimeError(f"DBG unrecognised build action {build_action}")
+
+        return None
+
+    def _reset_new_state(self) -> None:
+        """
+        Resets flags and error messages for a new archiving operation.
+        """
+        self._error_messages = []
+        self._errored = False
+        self._error_code = 1
+        self._error_message = ""
+
+        self._final_report_triggered = False
+
+        self._encode_video_complete = False
+        self._extract_menu_images_complete = False
+        self._create_dvd_menu_complete = False
+        self._create_dvd_image_complete = False
+        self._archive_complete = False
+
+        return None
+
+    def _check_all_groups_completed(self) -> None:
+        """
+        Checks if all major task groups () have
+        signaled completion. If so, triggers the final status report.
+        """
+        if self._final_report_triggered:  # Prevent multiple final popups
+            return None
+
+        if (
+            self._encode_video_complete
+            and self._extract_menu_images_complete
+            and self._create_dvd_menu_complete
+            and self._create_dvd_image_complete
+            and self._archive_complete
+        ):
+            if DEBUG:
+                print(
+                    "DBG DVD: All major task groups are reported complete. Triggering final status."
+                )
+
+            if self._component_event_handler:
+                self.component_event_handler(sys_consts.NOTIFICATION_EVENT, "")
+
+            if self._error_messages:
+                final_error_message = "DVD Build Error...\n"
+
+                for error_message in self._error_messages:
+                    final_error_message += f"    {error_message}\n"
+
+                if self._component_event_handler:
+                    self.component_event_handler(
+                        sys_consts.NOTIFICATION_ERROR_EVENT, final_error_message
+                    )
+
+        return None
 
     def _archive_dvd_files(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:
         """
@@ -1320,7 +2144,7 @@ class DVD:
 
         Returns:
             tuple[int, str]:
-            - arg 1:1 Ok . -1 otherwise.
+            - arg 1:1 Ok. -1 otherwise.
             - arg 2: "" if ok, otherwise an error message
 
         """
@@ -1341,6 +2165,9 @@ class DVD:
                 archive_size=self.dvd_config.archive_size,
                 transcode_type=self.dvd_config.transcode_type,
             )
+
+            archive_manager.component_event_handler = self.component_event_handler
+
             menu_layout: list[tuple[str, list[Video_Data]]] = []
             video_list: list[Video_Data] = []
 
@@ -1408,7 +2235,7 @@ class DVD:
             - arg2: error message or "" if ok
         """
         file_handler = file_utils.File()
-        working_folder_name = utils.Get_Unique_Id()
+        working_folder_name = self._session_id
 
         self._dvd_working_folder = file_handler.file_join(
             self.working_folder, sys_consts.DVD_BUILD_FOLDER_NAME
@@ -1505,287 +2332,240 @@ class DVD:
             - arg1 1: ok, -1: fail
             - arg2: error message or "" if ok
         """
-        file_handler = file_utils.File()
 
-        # Black Video Choices
-        average_bit_rate = sys_consts.AVERAGE_BITRATE
+        #### Helper
+        def _start_encode_video_task(task_def: Task_Def) -> None:
+            """
+            Handles the VOB encoding start task
 
-        black_border_size = 12  # TODO Black choice for now
+            Args:
+                task_def (Task_Def): Task Definition object
 
-        # Black filter Choices for now TODO Allow some user configuration
-        debug = False
-        normalise_video_filter = (  # Try to improve exposure of video
-            "normalize=blackpt=black:whitept=white:smoothing=11:independence=0.5"
-        )
+            Returns:
+                None
 
-        video_denoise_filter = "nlmeans=1.0:7:5:3:3"  # Light but fairly fast denoise
-        # video_denoise_filter = "nlmeans=7.0:7:5:0:9"  # Light but fairly fast denoise
-        # video_denoise_filter ="owdenoise"
-        # video_denoise_filter ="vaguedenoiser"
-        # video_denoise_filter ="atadenoise"
-        # video_denoise_filter="hqdn3d=2.0:3.0:3.0:4.5"
+            """
 
-        color_correct_filter = "colorcorrect=analyze='median'"  # Fixes white balance
-        usharp_filter = "unsharp=luma_amount=0.2"  # Gentle sharpening of luma channel
-
-        # Black frame around the video to hide things like head switching noise
-        filter_commands = [
-            f"drawbox=x=0:y=0:w=iw:h={black_border_size}:color=black:t=fill",
-            f"drawbox=x=0:y=ih-{black_border_size}:w=iw:h={black_border_size}:color=black:t=fill",
-            f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill",
-            f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill",
-        ]
-        black_box_filter = ",".join(filter_commands)
-
-        for video_file in self.dvd_config.input_videos:
-            vob_file = file_handler.file_join(
-                self._vob_folder, video_file.video_file, "vob"
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
             )
 
-            # Tries to dering and lighten dark videos somewhat
-            auto_bright = (
-                "pp=dr/al" if video_file.video_file_settings.auto_bright else "pp=dr"
+            if DEBUG:
+                print(f"DBG DVD SEVT Started {task_def.task_id=}")
+
+            if self._component_event_handler:
+                self.component_event_handler(
+                    sys_consts.NOTIFICATION_EVENT,
+                    f"Start VOB Encoding {sys_consts.SDELIM}{task_def.kwargs['input_file']}{sys_consts.SDELIM}",
+                )
+
+            return None
+
+        def _finish_encode_video_task(task_def: Task_Def) -> None:
+            """
+            Handles the VOB encoding finish task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                None
+
+            """
+
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if DEBUG:
+                print(f"DBG DVD EVT Finished {task_def.task_id=}")
+
+            if self._component_event_handler:
+                self.component_event_handler(
+                    sys_consts.NOTIFICATION_EVENT,
+                    f"Finish VOB Encoding {sys_consts.SDELIM}{task_def.kwargs['input_file']}{sys_consts.SDELIM}",
+                )
+
+            task_error_no, task_message, worker_error_no, worker_message = (
+                Unpack_Result_Tuple(task_def)
             )
 
             if (
-                video_file.encoding_info.video_height <= 0
-                or video_file.encoding_info.video_width <= 0
+                task_error_no == 1
+                and worker_error_no == 1
+                and task_message.lower() == "all done"
             ):
-                return (
-                    -1,
-                    f"{video_file.video_path=}. Does Not Specify Height and/or Width",
-                )
+                self._encode_video_complete = True
 
-            if not video_file.encoding_info.video_ar:
-                return (
-                    -1,
-                    f"Unrecognised Aspect Ratio : {video_file.encoding_info.video_ar}",
-                )
-
-            if video_file.video_file_settings.filters_off:
-                video_filter_options = [
-                    f" {black_box_filter}",  # video filters applied
-                ]
-            else:
-                video_filter_options = [auto_bright]
-
-                if video_file.video_file_settings.normalise:
-                    video_filter_options.append(normalise_video_filter)
-
-                if video_file.video_file_settings.white_balance:
-                    video_filter_options.append(color_correct_filter)
-
-                if video_file.video_file_settings.denoise:
-                    video_filter_options.append(video_denoise_filter)
-
-                if video_file.video_file_settings.sharpen:
-                    video_filter_options.append(usharp_filter)
-
-                video_filter_options.append(black_box_filter)
-
-            video_filters = ["-vf", ",".join(video_filter_options)]
-
-            video_width = video_file.encoding_info.video_width
-            video_height = video_file.encoding_info.video_height
-            video_interlaced = (
-                True
-                if video_file.encoding_info.video_scan_type.lower().startswith(
-                    "interlaced"
-                )
-                else False
-            )
-
-            # Do not forget-widescreen stretches the file on display, so wide screen and standard screen are the
-            # same size here
-            if self.dvd_config.video_standard == sys_consts.PAL:
-                frame_rate = f"{sys_consts.PAL_FRAME_RATE}"
-
-                if (
-                    video_width == sys_consts.PAL_SPECS.width_43
-                    and video_height == sys_consts.PAL_SPECS.height_43
-                ):
-                    video_size = f"{video_width}x{video_height}"
-                else:
-                    if video_height > sys_consts.PAL_SPECS.height_43:
-                        video_size = f"{-1}x{sys_consts.PAL_SPECS.height_43}"
-
-                    elif video_height > sys_consts.PAL_SPECS.height_43:
-                        if not video_interlaced:
-                            video_size = f"{sys_consts.PAL_SPECS.width_43}x{sys_consts.PAL_SPECS.height_43}"
-
-                            if (
-                                video_file.encoding_info.video_frame_rate
-                                == sys_consts.PAL_FIELD_RATE
-                            ):  # We interlace
-                                video_filter_options.append(
-                                    "tinterlace=interleave_bottom"
-                                )
-                                video_filters = ["-vf", ",".join(video_filter_options)]
-                            elif (
-                                video_file.encoding_info.video_frame_rate
-                                == sys_consts.PAL_FRAME_RATE
-                            ):
-                                video_size = f"{sys_consts.PAL_SPECS.width_43}x{sys_consts.PAL_SPECS.height_43}"
-                                frame_rate = str(
-                                    video_file.encoding_info.video_frame_rate
-                                )
-                        elif video_interlaced:
-                            video_size = f"{sys_consts.PAL_SPECS.width_43}x{sys_consts.PAL_SPECS.height_43}"
-                        else:
-                            return (
-                                -1,
-                                (
-                                    "Video can not be made to conform with DVD PAL specifications"
-                                ),
-                            )
-                    else:
-                        return (
-                            -1,
-                            (
-                                f"Video {video_width=}x{video_height} does not conform to PAL specifications"
-                            ),
-                        )
-            else:  # NTSC
-                frame_rate = f"{sys_consts.NTSC_SPECS.frame_rate}"
-
-                if (
-                    video_width == sys_consts.NTSC_SPECS.width_43
-                    and video_height == sys_consts.NTSC_SPECS.height_43
-                ):
-                    video_size = f"{video_width}x{video_height}"
-                elif video_height > sys_consts.NTSC_SPECS.height_43:
-                    if not video_interlaced:
-                        video_size = f"{sys_consts.NTSC_SPECS.width_43}x{sys_consts.NTSC_SPECS.height_43}"
-
-                        if (
-                            video_file.encoding_info.video_frame_rate
-                            == sys_consts.NTSC_FIELD_RATE
-                        ):  # We interlace
-                            video_filter_options.append("tinterlace=interleave_bottom")
-                            video_filters = ["-vf", ",".join(video_filter_options)]
-                        elif video_file.encoding_info.video_frame_rate in (
-                            sys_consts.NTSC_FRAME_RATE,
-                            30,
-                        ):
-                            video_size = f"{sys_consts.NTSC_SPECS.width_43}x{sys_consts.NTSC_SPECS.height_43}"
-                            frame_rate = str(video_file.encoding_info.video_frame_rate)
-                    elif video_interlaced:
-                        video_size = f"{sys_consts.NTSC_SPECS.width_43}x{sys_consts.NTSC_SPECS.height_43}"
-                    else:
-                        return (
-                            -1,
-                            (
-                                "Video can not be made to conform with DVD NTSC specifications"
-                            ),
-                        )
-                else:
-                    return (
-                        -1,
-                        (
-                            f"Video {video_width=}x{video_height} does not conform to NTSC specifications"
-                        ),
+                if DEBUG:
+                    print(
+                        f"DBG AM FEVT: {task_def.task_id} (prefix '{VOB_ENCODING}') is complete."
                     )
 
-            if debug:
-                command_header = [
-                    sys_consts.FFMPG,  # the ffmpeg executable
-                    "-report",  # Generate verbose output for debug
-                ]
-            else:
-                command_header = [sys_consts.FFMPG]
+                self._build_sequence(EXTRACT_MENU_IMAGES)
 
-            interlaced_flags = []
-            if video_interlaced:
-                interlaced_flags = [
-                    "-flags:v:0",  # video flags for the first video stream
-                    "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
-                    "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
-                    "1",  # alternate scan value is 1
-                ]
+            elif task_error_no != 1 or worker_error_no != 1:
+                self._error_messages.append(
+                    f"VOB Encoding task {task_def.task_id} reported an error: TaskError={task_error_no}, "
+                    f"WorkerError={worker_error_no}, Message='{task_message}'"
+                )
 
-            command = (
-                command_header
-                + [
-                    "-fflags",  # set ffmpeg flags
-                    "+genpts",  # generate presentation timestamps
-                    "-threads",
-                    dvdarch_utils.Get_Thread_Count(),
-                    "-i",  # input flag
-                    video_file.video_path,  # path to video file
-                ]
-                + interlaced_flags
-                + [
-                    "-f",  # set output format
-                    "dvd",  # output format is DVD
-                    "-c:v:0",  # codec for the first video stream
-                    "mpeg2video",  # use mpeg2video codec
-                    "-aspect",  # set aspect ratio
-                    video_file.encoding_info.video_ar,  # aspect ratio value
-                    "-s",  # set resolution
-                    video_size,  # resolution value
-                    "-r",  # set frame rate
-                    frame_rate,  # frame rate value
-                    "-g",  # set GOP (group of pictures) size
-                    "15",  # GOP size is 15
-                    "-pix_fmt",  # set pixel format
-                    "yuv420p",  # use YUV 420p pixel format
-                    "-b:v",  # set video bitrate
-                    f"{average_bit_rate}k",  # average video bitrate is kilobits/sec
-                    "-maxrate:v",  # set maximum video rate
-                    "9000k",  # maximum video rate is 9000 kilobits/sec
-                    "-minrate:v",  # set minimum video rate
-                    "0",  # minimum video rate is 0
-                    "-bufsize:v",  # set video buffer size
-                    "1835008",  # video buffer size is 1835008 bits
-                    "-packetsize",  # set packet size
-                    "2048",  # packet size is 2048 bits
-                    "-muxrate",  # set mux rate
-                    "10080000",  # mux rate is 10080000 bits/sec
-                    "-force_key_frames",  # force key frames
-                    "expr:if(isnan(prev_forced_n),1,eq(n,prev_forced_n + 15))",  # set key frame expression (Closes each GOP)
-                ]
-                + video_filters
-                + [
-                    "-b:a",  # set audio bitrate
-                    "192000",  # audio bitrate is 192000 bits/sec
-                    "-ar",  # set audio sample rate
-                    "48000",  # audio sample rate is 48000 samples/sec
-                    "-c:a:0",  # codec for the first audio stream
-                    "ac3",  # use ac3 codec
-                    "-filter:a:0",  # audio filter for the first audio stream
-                    "loudnorm=I=-16:LRA=11:TP=-1.5",  # use loudnorm filter with specified parameters
-                    "-map",  # set mapping
-                    "0:V",  # map first video stream
-                    "-map",  # set mapping
-                    "0:a",  # map first audio stream
-                    "-map",  # set mapping
-                    "-0:s",  # exclude first subtitle stream
-                    "-threads",
-                    dvdarch_utils.Get_Thread_Count(),
-                    vob_file,  # Output encoded VOB file for inclusion in DVD
-                ]
+                if self._component_event_handler:
+                    self.component_event_handler(
+                        sys_consts.NOTIFICATION_EVENT,
+                        self._error_messages[-1],
+                    )
+
+                self._errored = True
+
+            self._check_all_groups_completed()
+
+            return None
+
+        def _error_task(task_def: Task_Def) -> None:
+            """
+            Handles the VOB encoding error task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                None
+
+            """
+
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
             )
 
-            result, message = dvdarch_utils.Execute_Check_Output(
-                commands=command, debug=False
+            if DEBUG:
+                print(f"DBG DVD EEVT {task_def.task_id=}")
+
+            self._error_code = -1
+            self._errored = True
+
+            if "message" in task_def.cargo:
+                self._error_messages.append(
+                    f"Task '{task_def.task_id} Error {task_def.cargo['message']}"
+                )
+
+            return None
+
+        def _abort_task(task_def: Task_Def) -> None:
+            """
+            Handles the VOB encoding abort task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                 None
+
+            """
+
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
             )
 
-            if result == -1:
-                return -1, message
+            if DEBUG:
+                print(f"DBG DVD AEVT {task_def.task_id=}")
+
+            self._error_code = -1
+            self._errored = True
+
+            if "message" in task_def.cargo:
+                self._error_messages.append(
+                    f"Task '{task_def.task_id} Error {task_def.cargo['message']}"
+                )
+
+            return None
+
+        #### Main
+        for video_index, video_file in enumerate(self.dvd_config.input_videos):
+            task_id = f"vob_{video_index}_{self._session_id}"
+            dispatch_name = f"D_{VOB_ENCODING}_{video_index}_{self._session_id}"
+            task_prefix = f"P_{VOB_ENCODING}_{self._session_id}"
+
+            task_def = Task_Def(
+                task_id=task_id,
+                task_prefix=task_prefix,
+                worker_function=dvdarch_utils.Transcode_DVD_VOB,
+                kwargs={
+                    "input_file": video_file.video_path,
+                    "output_folder": self._vob_folder,
+                    "input_video_width": video_file.encoding_info.video_width,
+                    "input_video_height": video_file.encoding_info.video_height,
+                    "input_video_ar": video_file.encoding_info.video_ar,
+                    "input_video_scan_type": video_file.encoding_info.video_scan_type,
+                    "input_video_frame_rate": video_file.encoding_info.video_frame_rate,
+                    "auto_bright": video_file.video_file_settings.auto_bright,
+                    "normalise": video_file.video_file_settings.normalise,
+                    "white_balance": video_file.video_file_settings.white_balance,
+                    "denoise": video_file.video_file_settings.denoise,
+                    "sharpen": video_file.video_file_settings.sharpen,
+                    "filters_off": video_file.video_file_settings.filters_off,
+                    "black_border": True,
+                    "dvd_standard": sys_consts.PAL
+                    if video_file.encoding_info.video_frame_rate == 25
+                    or video_file.encoding_info.video_height
+                    > sys_consts.NTSC_SPECS.height_43
+                    else sys_consts.NTSC,
+                },
+            )
+
+            Task_Dispatcher().submit_task(
+                task_def=task_def,
+                task_dispatch_methods=[
+                    {
+                        "task_dispatch_name": dispatch_name,
+                        "callback": "start",
+                        "operation": VOB_ENCODING,
+                        "method": _start_encode_video_task,
+                        "kwargs": {
+                            "task_def": task_def,
+                        },
+                    },
+                    {
+                        "task_dispatch_name": dispatch_name,
+                        "callback": "finish",
+                        "operation": VOB_ENCODING,
+                        "method": _finish_encode_video_task,
+                        "kwargs": {
+                            "task_def": task_def,
+                        },
+                    },
+                    {
+                        "task_dispatch_name": dispatch_name,
+                        "callback": "error",
+                        "operation": VOB_ENCODING,
+                        "method": _error_task,
+                        "kwargs": {
+                            "task_def": task_def,
+                        },
+                    },
+                    {
+                        "task_dispatch_name": dispatch_name,
+                        "callback": "abort",
+                        "operation": VOB_ENCODING,
+                        "method": _abort_task,
+                        "kwargs": {
+                            "task_def": task_def,
+                        },
+                    },
+                ],
+            )
 
         return 1, ""
 
-    def _create_dvd_menu(self) -> tuple[int, str]:
-        """Creates the DVD menu automagically
+    def _get_cell_coords(self) -> tuple[int, list[_Cell_Coord], str]:
+        """Get the cell coordinates for the menu buttons
 
         Returns:
-            tuple[int,str]:
-            - arg1 1: ok, -1: fail
-            - arg2: error message or "" if ok
+            tuple[int,list[_Cell_Coord],str]:
+                - arg 1: Status code. Returns 1 if the cell coordinates were obtained successfully, -1 otherwise.
+                - arg 2: List of cell coordinates for the menu buttons.
+                - arg 3: Error message if the cell coordinates could not be obtained successfully
         """
-        debug = False
-
-        timestamp_height = 0
         buttons_per_page = self.dvd_config.menu_buttons_per_page
         buttons_across = self.dvd_config.menu_buttons_across
 
@@ -1794,13 +2574,9 @@ class DVD:
         )
 
         if dvd_dims.display_height == -1:
-            return -1, "Failed To Get DVD Dimensions"
+            return -1, [], "Failed To Get DVD Dimensions"
 
-        result, message = self._create_canvas_image(
-            width=dvd_dims.storage_width, height=dvd_dims.storage_height
-        )
-        if result == -1:
-            return result, message
+        timestamp_height = 0
 
         if all(
             file_def.dvd_page >= 0 for file_def in self.dvd_config.input_videos
@@ -1831,7 +2607,22 @@ class DVD:
             )
 
         if not cell_coords:
-            return -1, message
+            return -1, [], message
+
+        return 1, cell_coords, ""
+
+    def _create_dvd_menu(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:
+        """Creates the DVD menu automagically
+
+        Args:
+            cell_coords (list[_Cell_Coord]): The cell coordinates for the menu buttons
+
+        Returns:
+            tuple[int,str]:
+            - arg1 1: ok, -1: fail
+            - arg2: error message or "" if ok
+        """
+        debug = False
 
         result, message = self._resize_menu_button_images(cell_coords=cell_coords)
 
@@ -1870,16 +2661,6 @@ class DVD:
         if result == -1:
             return -1, message
 
-        result, message = self._create_dvd_image(cell_coords=cell_coords)
-
-        if result == -1:
-            return -1, message
-
-        result, message = self._archive_dvd_files(cell_coords=cell_coords)
-
-        if result == -1:
-            return -1, message
-
         if debug and not utils.Is_Complied():
             canvas_height, message = dvdarch_utils.Get_Image_Height(
                 self._background_canvas_file
@@ -1892,12 +2673,6 @@ class DVD:
             )
             if canvas_width == -1:
                 return -1, message
-
-            print("=============================")
-            print(f"DBG  {canvas_height=} {canvas_width=} ")
-            print(f"DBG {dvd_dims=}")
-            print(f"DBG {cell_coords=}")
-            print("=============================")
 
         return 1, ""
 
@@ -1978,7 +2753,8 @@ class DVD:
         buttons_per_page: int,
         buttons_across: int,
     ) -> tuple[list[list], int, int]:
-        """Builds a page grid.  Empty cells are represented by -1, Non-empty cells are represented by 1.
+        """
+         Builds a page grid.  Empty cells are represented by -1, Non-empty cells are represented by 1.
 
         Args:
             num_buttons (int): Total number of buttons in the dvd menu.
@@ -2582,7 +3358,7 @@ class DVD:
             self._background_canvas_file,
         ]
 
-        result, message = dvdarch_utils.Execute_Check_Output(commands=commands)
+        result, message = Execute_Check_Output(commands=commands)
 
         if result == -1:
             return -1, message
@@ -2732,7 +3508,7 @@ class DVD:
                 canvas_images_file,
             ]
 
-            result, message = dvdarch_utils.Execute_Check_Output(commands=command)
+            result, message = Execute_Check_Output(commands=command)
 
             if result == -1:
                 return -1, message, "", "", ""
@@ -2865,14 +3641,14 @@ class DVD:
             return 1, ""
 
         def _overlay_files(
-            x: int, y: int, files: tuple[(str, str), ...]
+            x: int, y: int, files: tuple[tuple[str, str], ...]
         ) -> tuple[int, str]:
             """Places a file on another file at a given x, y coord
 
             Args:
                 x (int): x co-ordinate of image
                 y (int): y co-ordinate of image
-                files (tuple[(str, str), ...]): A tuple of tuples defining the files to be overlaid.
+                files (tuple[tuple[str, str], ...]): A tuple of tuples defining the files to be overlaid.
                 tuple[0] is the file to be overlaid, tuple[1] is the file to overlay it on.
 
 
@@ -2902,7 +3678,7 @@ class DVD:
                 )
 
                 if result == -1:
-                    return 1, message
+                    return -1, message
             return 1, ""
 
         def _write_spumux_xml(
@@ -3040,13 +3816,13 @@ class DVD:
                 button_index += 1
 
             if spu_buttons:  # Write out spumux file
-                resut, message = _write_spumux_xml(
+                result, message = _write_spumux_xml(
                     page=page_number,
                     spu_buttons=spu_buttons,
                     background_path_name=background_path_name,
                 )
 
-                if resut == -1:
+                if result == -1:
                     return -1, message
 
             # Now generate required image files
@@ -3074,12 +3850,15 @@ class DVD:
                 canvas_images_file,
             ]
 
-            result, message = dvdarch_utils.Execute_Check_Output(commands=command)
+            result, message = Execute_Check_Output(commands=command)
 
             if result == -1:
                 return -1, message
 
             menu_title = self.dvd_config.menu_title[page_number]
+
+            if page_number == 0 and self.dvd_config.disk_title.strip() != "":
+                menu_title = f"{self.dvd_config.disk_title}\n{menu_title}"
 
             if menu_title.strip() != "":
                 result, message = dvdarch_utils.Overlay_Text(
@@ -3091,6 +3870,7 @@ class DVD:
                     position="top",
                     background_color=self.dvd_config.menu_background_color,
                     opacity=0.9,
+                    x_offset=0,  # -10 if page_number == 0 else 0,
                 )
 
                 if result == -1:
@@ -3284,12 +4064,23 @@ class DVD:
             - arg2: error message or "" if ok
         """
         for video_data in self.dvd_config.input_videos:
+            # Refresh the encoding info in case of bad data - this should not happen, but I just got bit
+            video_data.encoding_info = dvdarch_utils.Get_File_Encoding_Info(
+                video_data.video_path
+            )
+
+            if video_data.encoding_info.error != "":
+                return -1, video_data.encoding_info.error
+
             if video_data.encoding_info.video_frame_count <= 0:
                 return -1, f"No video frame count found for {video_data.video_path}"
 
             if (
                 video_data.video_file_settings.menu_button_frame == -1
-            ):  # No frame number provided, pick a random frame
+                or video_data.video_file_settings.menu_button_frame
+                > video_data.encoding_info.video_frame_count
+            ):  # No frame number provided, pick a random frame OR the selected menu frame is > number of frames in
+                # the video. so choose a random frame - this is a technical error, but one I can live with
                 menu_image_frame = randint(
                     1, video_data.encoding_info.video_frame_count
                 )
@@ -3321,14 +4112,12 @@ class DVD:
 
         return 1, ""
 
-    def _convert_to_m2v(
-        self, cell_coords: list[_Cell_Coord], frames: int = 300
-    ) -> tuple[int, str]:
-        """Converts the background_canvas_images_file into a short video stream for the DVD menu
+    def _convert_to_m2v(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:
+        """
+        Converts the background_canvas_images_file into a short video stream for the DVD menu
 
         Args:
             cell_coords (list[_Cell_Coord]): The calculated grid layout
-            frames (int, optional): Number of video frames in stream. Defaults to 300
 
         Returns:
             tuple[int,str]:
@@ -3381,10 +4170,9 @@ class DVD:
                     frame_rate = sys_consts.NTSC_SPECS.frame_rate
 
                 # In theory FFMPEG should take png and make this step unnecessary TODO look into how ffmeg was compiled
-                result, message = dvdarch_utils.Execute_Check_Output(
+                result, message = Execute_Check_Output(
                     [sys_consts.CONVERT, background_canvas_images_file, jpg_file],
                     debug=False,
-                    # stderr_to_stdout=True,
                 )
 
                 if result == -1:
@@ -3394,8 +4182,6 @@ class DVD:
                     sys_consts.FFMPG,
                     "-loop",
                     "1",
-                    "-t",
-                    f"{frames}",
                     "-i",
                     jpg_file,
                     "-f",
@@ -3427,16 +4213,12 @@ class DVD:
 
         return 1, ""
 
-    def _convert_audio(
-        self, cell_coords: list[_Cell_Coord], frames: int = 300
-    ) -> tuple[int, str]:
+    def _convert_audio(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:
         """Generates the audio for the DVD menu. By default it is a empty soundtrack
         TODO Allow user selection of an audio file
 
         Args:
             cell_coords (list[_Cell_Coord]): The calculated grid layout
-            frames (int, optional): Number of video frames - determines length of
-            audio. Defaults to 300.
 
         Returns:
             tuple[int,str]:
@@ -3469,13 +4251,6 @@ class DVD:
                     path_name, f"{file_name}_menu_video_{cell_coord.page}", "ac3"
                 )
 
-                if self._dvd_config.video_standard == sys_consts.PAL:
-                    framerate = 25
-                else:
-                    framerate = 30000 / 1001
-
-                duration = math.floor(frames / framerate)
-
                 # TODO Allow an audio file of the users choice
                 # Generate an empty audio file
                 commands = [
@@ -3485,7 +4260,7 @@ class DVD:
                     "-i",
                     "anullsrc=channel_layout=5.1:sample_rate=48000",
                     "-t",
-                    f"{duration}",
+                    "10",
                     "-b:a",
                     "224000",
                     "-c:a",
@@ -3493,7 +4268,7 @@ class DVD:
                     ac3_file,
                 ]
 
-                result, message = dvdarch_utils.Execute_Check_Output(commands=commands)
+                result, message = Execute_Check_Output(commands=commands)
 
                 if result == -1:
                     return -1, message
@@ -3553,7 +4328,7 @@ class DVD:
                     ac3_file,
                 ]
 
-                result, message = dvdarch_utils.Execute_Check_Output(commands=commands)
+                result, message = Execute_Check_Output(commands=commands)
 
                 if result == -1:
                     return -1, message

@@ -33,10 +33,18 @@ class Video_File_Picker_Popup(qtg.PopContainer):
     """This class is a popup that allows the user to select video files"""
 
     title: str = ""
-    video_file_list: list[Video_Data] = dataclasses.field(
+    video_file_list: list[Video_Data] | list[str] = dataclasses.field(
         default_factory=list
     )  # Pass by ref
 
+    return_video_data: bool = True
+    file_extensions: tuple[str, ...] = sys_consts.VIDEO_FILE_EXTNS
+    grid_title: str = "Video File"
+    button_title: str = "Select Video Folder"
+    multi_select: bool = True
+    input_folder: str = ""
+
+    _file_handler: file_utils.File = file_utils.File()
     _row_checked: dict[int, bool] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self):
@@ -45,6 +53,22 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         assert isinstance(self.title, str) and self.title.strip() != "", (
             f"{self.title=}. Must be a non-empty str"
         )
+        assert isinstance(self.return_video_data, bool), (
+            f"{self.return_video_data=}. Must be bool"
+        )
+        assert isinstance(self.file_extensions, tuple) and all(
+            ([isinstance(extension, str)] for extension in self.file_extensions)
+        ), f"{self.file_extensions=}. Must be a tuple[str]"
+        assert isinstance(self.grid_title, str) and self.grid_title.strip() != "", (
+            f"{self.grid_title=}. Must be non-empty str"
+        )
+        assert isinstance(self.button_title, str) and self.button_title.strip() != "", (
+            f"{self.button_title=}. Must be non-empty str"
+        )
+        assert isinstance(self.multi_select, bool), (
+            f"{self.multi_select=}. Must be bool"
+        )
+        assert isinstance(self.input_folder, str), f"{self.input_folder=}. Must be str"
 
         self.container = self.layout()
         self._db_settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
@@ -61,15 +85,19 @@ class Video_File_Picker_Popup(qtg.PopContainer):
 
         match event.event:
             case qtg.Sys_Events.WINDOWOPEN:
-                video_folder = self._db_settings.setting_get(
-                    sys_consts.VIDEO_IMPORT_FOLDER_DBK
-                )
+                if self.input_folder.strip() != "":
+                    video_folder = self.input_folder
 
-                if video_folder is None or video_folder.strip() == "":
-                    video_folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
-                    self._db_settings.setting_set(
-                        sys_consts.VIDEO_IMPORT_FOLDER_DBK, video_folder
+                else:
+                    video_folder = self._db_settings.setting_get(
+                        sys_consts.VIDEO_IMPORT_FOLDER_DBK
                     )
+
+                    if video_folder is None or video_folder.strip() == "":
+                        video_folder = qtg.Special_Path(qtg.Special_Path.VIDEOS)
+                        self._db_settings.setting_set(
+                            sys_consts.VIDEO_IMPORT_FOLDER_DBK, video_folder
+                        )
 
                 self.load_files(video_folder=video_folder, event=event)
             case qtg.Sys_Events.CLICKED:
@@ -99,12 +127,15 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                             self._row_checked[row_index] = event.value
 
                     case "video_import_folder":
-                        video_folder = self._db_settings.setting_get(
-                            sys_consts.VIDEO_IMPORT_FOLDER_DBK
-                        )
+                        if self.input_folder.strip() != "":
+                            video_folder = self.input_folder
+                        else:
+                            video_folder = self._db_settings.setting_get(
+                                sys_consts.VIDEO_IMPORT_FOLDER_DBK
+                            )
 
                         video_folder = popups.PopFolderGet(
-                            title="Select A Video Folder....",
+                            title=f"{self.button_title}....",
                             root_dir=(
                                 f"{sys_consts.SDELIM}{video_folder}{sys_consts.SDELIM}"
                             ),
@@ -140,21 +171,22 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         )
         assert isinstance(event, qtg.Action), f"{event=}. Must be an Action instance"
 
-        file_handler = file_utils.File()
-
-        if not file_handler.path_exists(
+        if not self._file_handler.path_exists(
             video_folder
         ):  # Catch case where folder is not accessible
-            video_folder = file_utils.Special_Path(qtg.Special_Path.VIDEOS)
+            video_folder = qtg.Special_Path(qtg.Special_Path.VIDEOS)
 
         if video_folder.strip() != "":
             with qtg.sys_cursor(qtg.Cursor.hourglass):
-                result = file_handler.filelist(
+                result = self._file_handler.filelist(
                     path=video_folder,
-                    extensions=sys_consts.VIDEO_FILE_EXTNS,
+                    extensions=self.file_extensions,
                 )
 
-                if result.error_code == file_handler.Path_Error.OK and result.files:
+                if (
+                    result.error_code == self._file_handler.Path_Error.OK
+                    and result.files
+                ):
                     file_grid: qtg.Grid = cast(
                         qtg.Grid,
                         event.widget_get(
@@ -164,14 +196,18 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                     )
 
                     file_grid.clear()
+                    row_index = 0
 
-                    for row_index, file in enumerate(result.files):
-                        file_grid.value_set(
-                            value=file,
-                            row=row_index,
-                            col=0,
-                            user_data=video_folder,
-                        )
+                    for file in result.files:
+                        if file.strip() != "":
+                            file_grid.value_set(
+                                value=file,
+                                row=row_index,
+                                col=0,
+                                user_data=video_folder,
+                            )
+
+                            row_index += 1
 
     def layout(self) -> qtg.VBoxContainer:
         """Generate the form UI layout"""
@@ -186,7 +222,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
             align=qtg.Align.BOTTOMRIGHT, tag="command_buttons", margin_right=0
         ).add_row(
             qtg.Button(
-                text="&Select Video Folder",
+                text=f"&{self.button_title}",
                 tag="video_import_folder",
                 callback=self.event_handler,
                 width=20,
@@ -199,7 +235,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
 
         file_col_def = (
             qtg.Col_Def(
-                label="Video File",
+                label=self.grid_title,
                 tag="video_file",
                 width=80,
                 editable=False,
@@ -213,17 +249,23 @@ class Video_File_Picker_Popup(qtg.PopContainer):
             height=15,
             col_def=file_col_def,
             callback=self.grid_events,
+            multiselect=self.multi_select,
         )
 
-        file_control_container.add_row(
-            qtg.Checkbox(
-                text="Select All",
-                tag="bulk_select",
-                callback=self.event_handler,
-                width=11,
-            ),
-            video_input_files,
-        )
+        if self.multi_select:
+            file_control_container.add_row(
+                qtg.Checkbox(
+                    text="Select All",
+                    tag="bulk_select",
+                    callback=self.event_handler,
+                    width=11,
+                ),
+                video_input_files,
+            )
+        else:
+            file_control_container.add_row(
+                video_input_files,
+            )
 
         control_container.add_row(file_control_container, button_container)
 
@@ -238,7 +280,7 @@ class Video_File_Picker_Popup(qtg.PopContainer):
         Returns:
             int: 1 all good, close the window. -1 keep window open
         """
-        file_handler = file_utils.File()
+
         file_grid: qtg.Grid = cast(
             qtg.Grid,
             event.widget_get(
@@ -247,45 +289,46 @@ class Video_File_Picker_Popup(qtg.PopContainer):
             ),
         )
 
-        selected_files = file_grid.checkitems_get
+        for grid_item in file_grid.checkitems_get:
+            grid_item: qtg.Grid_Item
 
-        if selected_files:
-            for grid_item in selected_files:
-                grid_item: qtg.Grid_Item
+            if grid_item.current_value is None:  # Should not happen
+                continue
 
-                _, file_name, file_extn = file_handler.split_file_path(
-                    grid_item.current_value
+            _, file_name, file_extn = self._file_handler.split_file_path(
+                grid_item.current_value
+            )
+
+            video_settings = Video_File_Settings()
+
+            if self._db_settings.setting_exist(sys_consts.VF_NORMALISE_DBK):
+                video_settings.normalise = self._db_settings.setting_get(
+                    sys_consts.VF_NORMALISE_DBK
                 )
 
-                video_settings = Video_File_Settings()
+            if self._db_settings.setting_exist(sys_consts.VF_DENOISE_DBK):
+                video_settings.denoise = self._db_settings.setting_get(
+                    sys_consts.VF_DENOISE_DBK
+                )
 
-                if self._db_settings.setting_exist(sys_consts.VF_NORMALISE_DBK):
-                    video_settings.normalise = self._db_settings.setting_get(
-                        sys_consts.VF_NORMALISE_DBK
-                    )
+            if self._db_settings.setting_exist(sys_consts.VF_WHITE_BALANCE_DBK):
+                video_settings.white_balance = self._db_settings.setting_get(
+                    sys_consts.VF_WHITE_BALANCE_DBK
+                )
 
-                if self._db_settings.setting_exist(sys_consts.VF_DENOISE_DBK):
-                    video_settings.denoise = self._db_settings.setting_get(
-                        sys_consts.VF_DENOISE_DBK
-                    )
+            if self._db_settings.setting_exist(sys_consts.VF_SHARPEN_DBK):
+                video_settings.sharpen = self._db_settings.setting_get(
+                    sys_consts.VF_SHARPEN_DBK
+                )
 
-                if self._db_settings.setting_exist(sys_consts.VF_WHITE_BALANCE_DBK):
-                    video_settings.white_balance = self._db_settings.setting_get(
-                        sys_consts.VF_WHITE_BALANCE_DBK
-                    )
+            if self._db_settings.setting_exist(sys_consts.VF_AUTO_LEVELS_DBK):
+                video_settings.auto_bright = self._db_settings.setting_get(
+                    sys_consts.VF_AUTO_LEVELS_DBK
+                )
 
-                if self._db_settings.setting_exist(sys_consts.VF_SHARPEN_DBK):
-                    video_settings.sharpen = self._db_settings.setting_get(
-                        sys_consts.VF_SHARPEN_DBK
-                    )
+            video_settings.button_title = self._file_handler.extract_title(file_name)
 
-                if self._db_settings.setting_exist(sys_consts.VF_AUTO_LEVELS_DBK):
-                    video_settings.auto_bright = self._db_settings.setting_get(
-                        sys_consts.VF_AUTO_LEVELS_DBK
-                    )
-
-                video_settings.button_title = file_handler.extract_title(file_name)
-
+            if self.return_video_data:
                 self.video_file_list.append(
                     Video_Data(
                         video_folder=grid_item.user_data,
@@ -294,6 +337,12 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                         encoding_info=Encoding_Details(),
                         video_file_settings=video_settings,
                         vd_id=Get_Unique_Int(),
+                    )
+                )
+            else:
+                self.video_file_list.append(
+                    self._file_handler.file_join(
+                        grid_item.user_data, file_name, file_extn
                     )
                 )
 
@@ -314,6 +363,10 @@ class Video_File_Picker_Popup(qtg.PopContainer):
                         container_tag="file_controls", tag="video_input_files"
                     ),
                 )
+
+                if not self.multi_select:
+                    file_grid.checkitems_all(False)
+                    self._row_checked = {}
 
                 row_checked = self._row_checked.get(event.value.row, False)
 

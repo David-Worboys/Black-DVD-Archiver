@@ -18,18 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import dataclasses
+import pprint
 import shelve
 import datetime
-from typing import cast
+from typing import cast, Any
 
 import platformdirs
 
 import QTPYGUI.file_utils as file_utils
 import QTPYGUI.popups as popups
 import QTPYGUI.sqldb as sqldb
+
 import sys_consts
 import QTPYGUI.utils as utils
 from QTPYGUI.qtpygui import Action
+
+from PySide6.QtCore import QObject
 
 
 def Get_Video_Editor_Folder(suppress_error: bool = False) -> str:
@@ -599,6 +603,81 @@ def Get_Project_Files(
 
     """
 
+    #### Helper
+    def _migrate_new_video_data_struct(
+        video_data: Video_Data,
+    ) -> Video_Data:  # TODO remove in future release
+        """
+        Video_File_Setting & Encoding_Details classes were modified and old instances need modifying
+
+
+        Args:
+            video_data (Video_Data): the Video_Data associated with a video file
+
+        Returns:
+
+        """
+        assert isinstance(video_data, Video_Data), (
+            f"{video_data=}. Must Be instance of Video_Data"
+        )
+
+        # Video_File_Settings was modified to have separate settings methods and options, need to migrate old instances
+        if hasattr(video_data.video_file_settings, "_error_no"):
+            pass
+        else:
+            video_file_settings = Video_File_Settings()
+
+            video_file_settings.menu_group = video_data.video_file_settings.menu_group
+            video_file_settings.menu_button_frame = (
+                video_data.video_file_settings.menu_button_frame
+            )
+            video_file_settings.button_title = (
+                video_data.video_file_settings.button_title
+            )
+
+            # Early migration efforts broke menu name, so attempt to extract the title from the input file name.
+            if video_file_settings.button_title.strip() == "":
+                file_handler = file_utils.File()
+                _, file_name, _ = file_handler.split_file_path(video_data.video_path)
+
+                video_file_settings.button_title = file_handler.extract_title(file_name)
+
+            video_file_settings.normalise = video_data.video_file_settings.normalise
+            video_file_settings.white_balance = (
+                video_data.video_file_settings.white_balance
+            )
+            video_file_settings.sharpen = video_data.video_file_settings.sharpen
+            video_file_settings.denoise = video_data.video_file_settings.denoise
+            video_file_settings.auto_bright = video_data.video_file_settings.auto_bright
+
+            video_data.video_file_settings = video_file_settings
+
+        # _all_I_frames and method all_i_frames added to Encoding_Details, need to migrate old instances.
+        if hasattr(video_data.encoding_info, "_all_I_frames"):
+            pass
+        else:
+            new_encoding_info = Encoding_Details()
+
+            for attr in dir(video_data.encoding_info):
+                if attr.startswith("__") and attr.endswith("__"):
+                    continue
+
+                try:
+                    attr_value = getattr(video_data.encoding_info, attr)
+
+                    if callable(attr_value):
+                        continue
+
+                    setattr(new_encoding_info, attr, attr_value)
+                except:
+                    continue
+
+            video_data.encoding_info = new_encoding_info
+
+        return video_data
+
+    #### Main
+
     assert isinstance(project_name, str) and project_name.strip() != "", (
         f"{project_name=}. Must be a non-empty str"
     )
@@ -620,7 +699,8 @@ def Get_Project_Files(
         return -1, []
 
     dvd_layout_videos = []
-    if project_name in project_shelf_dict:
+
+    if project_name in project_shelf_dict.keys():
         for dvd_layout in project_shelf_dict[project_name]:
             dvd_layout_key = f"{project_name}.{dvd_layout}"
 
@@ -629,7 +709,10 @@ def Get_Project_Files(
                     dvd_page: DVD_Menu_Page
 
                     for button_index, button_item in dvd_page.get_button_titles.items():
-                        button_video_data: Video_Data = button_item[1]
+                        button_video_data: Video_Data = _migrate_new_video_data_struct(
+                            button_item[1]
+                        )
+
                         button_video_duration: float = button_item[
                             1
                         ].encoding_info.video_duration
@@ -665,6 +748,10 @@ def Get_Project_Files(
             if video_data["video_data"] is None:  # Off the rails error
                 continue
 
+            video_data["video_data"] = _migrate_new_video_data_struct(
+                video_data["video_data"]
+            )
+
             seen_paths.add(video_data["video_data"].video_path)
             updated_grid_videos.append(video_data)
 
@@ -681,6 +768,11 @@ def Get_Project_Files(
 
         for row_count, video_item in enumerate(video_grid_shelf_dict[project_name]):
             video_item["row_index"] = row_count
+
+        if not utils.Is_Complied():  # Debug dump
+            print("DBG ===========")
+            pprint.pprint(video_grid_shelf_dict[project_name])
+            print("DBG ===========")
 
         return 1, video_grid_shelf_dict[project_name]
     else:
@@ -773,7 +865,6 @@ def Get_Shelved_DVD_Layout(
             menu_page = DVD_Menu_Page()
             menu_page.menu_title = menu_item[0]
             menu_page.user_data = menu_item[2]
-
             for button_index, button_item in enumerate(menu_item[1]):
                 menu_page.add_button_title(
                     button_index=button_index,
@@ -784,8 +875,81 @@ def Get_Shelved_DVD_Layout(
             temp_menu_pages.append(menu_page)
 
         dvd_menu_layout = temp_menu_pages
+    else:
+        changed = False
+        result, project_video_files = Get_Project_Files(project_name)
 
-        # pprint.pprint(dvd_menu_layout)
+        # Class migration : TODO Remove in future release
+        for row_index, menu_item in enumerate(dvd_menu_layout):
+            # menu_item: DVD_Menu_Page
+
+            # An ugly hack, migrating class structures in Get_Project_Files broke button_titles early on
+            for button_key, button_value in menu_item.get_button_titles.items():
+                button_video_data: Video_Data = button_value[1]
+
+                if button_video_data.video_file_settings.button_title == "":
+                    button_video_data.video_file_settings.button_title = button_value[0]
+                    changed = True
+
+        # Align DVD menu_layout video_filter_settings with project  video_filter_settings.
+        # Those settings which can only be changed in the video editor are canonical
+        # In retrospect, video_file_setting should have been stored separately TODO revist implementation
+        for project_video_item in project_video_files:
+            for _, menu_item in enumerate(dvd_menu_layout):
+                # menu_item: DVD_Menu_Page
+
+                for button_key, button_value in menu_item.get_button_titles.items():
+                    button_video_data: Video_Data = button_value[1]
+
+                    if (
+                        button_video_data.video_path
+                        == project_video_item["video_data"].video_path
+                    ):
+                        changed = True
+
+                        # Button titles can be different to project button titles and is canonical
+                        project_video_item[
+                            "video_data"
+                        ].video_file_settings.button_title = (
+                            button_video_data.video_file_settings.button_title
+                        )
+
+                        # Menu button frame numbers can only be set in the editor - so project menu button frame is
+                        # canonical
+                        button_video_data.video_file_settings.menu_button_frame = (
+                            project_video_item[
+                                "video_data"
+                            ].video_file_settings.menu_button_frame
+                        )
+
+                        button_video_data.video_file_settings.normalise = (
+                            project_video_item[
+                                "video_data"
+                            ].video_file_settings.normalise
+                        )
+
+                        button_video_data.video_file_settings.denoise = (
+                            project_video_item["video_data"].video_file_settings.denoise
+                        )
+
+                        button_video_data.video_file_settings.white_balance = (
+                            project_video_item[
+                                "video_data"
+                            ].video_file_settings.white_balance
+                        )
+
+                        button_video_data.video_file_settings.sharpen = (
+                            project_video_item["video_data"].video_file_settings.sharpen
+                        )
+
+                        button_video_data.video_file_settings.auto_bright = (
+                            project_video_item[
+                                "video_data"
+                            ].video_file_settings.auto_bright
+                        )
+
+        if changed:
+            Set_Shelved_DVD_Layout(project_name, dvd_layout_name, dvd_menu_layout)
 
     return dvd_menu_layout, ""
 
@@ -904,7 +1068,19 @@ def Set_Shelved_DVD_Layout(
 
 
 @dataclasses.dataclass
-class DVD_Archiver_Base:
+class DVD_Archiver_Base(QObject):
+    def __init__(self, parent: QObject = None) -> None:
+        """Initializes the DVD_Archiver_Base class.
+
+        Args:
+            parent (QObject, optional): The parent object. Defaults to None.
+        """
+        assert isinstance(parent, QObject) or parent is None, (
+            f"{parent =} must be a QObject Or None"
+        )
+
+        super().__init__(parent)
+
     def event_handler(self, event: Action) -> None:
         """
         The event_handler method used to handle GUI events.
@@ -2147,6 +2323,7 @@ class Encoding_Details:
     """
 
     _error: str = ""
+    _all_I_frames: bool = False
     _audio_tracks: int = 0
     _video_tracks: int = 0
     _audio_format: str = ""
@@ -2174,6 +2351,30 @@ class Encoding_Details:
 
     def __post_init__(self) -> None:
         pass
+
+    @property
+    def all_I_frames(self) -> bool:
+        """
+        Returns the all I frame state of the video
+
+        Returns:
+            bool: True if all I frames, Otherwise False
+
+        """
+        return self._all_I_frames
+
+    @all_I_frames.setter
+    def all_I_frames(self, value: bool) -> None:
+        """
+        Sets the all I frame state of the video.
+
+        Args:
+            value (int): Set the number of audio tracks in the video
+
+        """
+        assert isinstance(value, bool), f"{value=}. Must be bool"
+
+        self._all_I_frames = value
 
     @property
     def error(self) -> str:
@@ -2816,52 +3017,81 @@ class Encoding_Details:
         self._video_scan_type = value
 
 
-@dataclasses.dataclass(slots=True)
-class Video_File_Settings:
-    """Class to hold video file settings for each file comprising the DVD menu buttons"""
+@dataclasses.dataclass
+class Video_File_Settings:  # Can not have slots = True becuase need __dict__ for migration
+    """
+    Encapsulates all video enhancement settings for a specific file,
+    along with the status of the operation that attempted to retrieve them.
+
+    """
+
+    # Private instance variables
+    _error_code: int = 1
+    _error_message: str = ""
+    _menu_button_frame: int = -1
+    _menu_button_title: str = ""
+    _menu_group: int = -1
+    _auto_bright: tuple[bool, dict[str, Any]] = (False, {})
+    _denoise: tuple[bool, dict[str, Any]] = (False, {})
+    _normalise: tuple[bool, dict[str, Any]] = (False, {})
+    _white_balance: tuple[bool, dict[str, Any]] = (False, {})
+    _sharpen: tuple[bool, dict[str, Any]] = (False, {})
 
     _deactivate_filters: bool = False
 
-    _normalise: bool = False
-    _denoise: bool = False
-    _white_balance: bool = False
-    _sharpen: bool = False
-    _auto_bright: bool = False
-    _button_title: str = ""
-    _menu_button_frame: int = -1
-    _menu_group: int = -1
+    @property
+    def error_code(self) -> int:
+        """
+        Gets the status code of the last operation to populate these settings.
 
-    def __post_init__(self) -> None:
-        """Post init to check the file settings are valid"""
+        Returns:
+            int: 1 for success, -1 for error or settings not found.
+        """
+        return self._error_code
 
-        assert isinstance(self._deactivate_filters, bool), (
-            f"{self._deactivate_filters=}. Must be a bool"
+    @error_code.setter
+    def error_code(self, value: int):
+        """
+        Sets the status code for the settings operation.
+
+        Args:
+            value (int): Must be 1 (success) or -1 (error/not found).
+        """
+        assert isinstance(value, int) and value in (1, -1), (
+            f"{value=}. Must be int -1 | 1"
         )
-        assert isinstance(self._normalise, bool), f"{self._normalise=}. Must be a bool"
-        assert isinstance(self._denoise, bool), f"{self._denoise=}. Must be a bool"
-        assert isinstance(self._white_balance, bool), (
-            f"{self._white_balance=}. Must be a bool"
-        )
-        assert isinstance(self._sharpen, bool), f"{self._sharpen=}. Must be a bool"
-        assert isinstance(self._auto_bright, bool), (
-            f"{self._auto_bright=}. Must be a bool"
-        )
-        assert isinstance(self._button_title, str), f"{self._button_title=} must be str"
-        assert (
-            isinstance(self._menu_button_frame, int)
-            and self._menu_button_frame == -1
-            or self._menu_button_frame >= 0
-        ), f"{self._menu_button_frame=}. Must be int"
-        assert (
-            isinstance(self._menu_group, int)
-            and self._menu_group == -1
-            or self._menu_group >= 0
-        ), f"{self._menu_group=}. Must be int >= 0 or == -1"
+
+        self._error_code = value
+
+    @property
+    def error_message(self) -> str:
+        """
+        Gets the error message associated with the last operation, if any.
+
+        Returns:
+            str: An error message string, or an empty string if no error occurred
+                 or if the error code signifies 'not found'.
+        """
+
+        return self._error_message
+
+    @error_message.setter
+    def error_message(self, value: str):
+        """
+        Sets the error message for the settings operation.
+
+        Args:
+            value (str): The error message string.
+
+        """
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._error_message = value
 
     @property
     def deactivate_filters(self) -> bool:
         """
-        The deactivate_filters method overrides  the individual filter settings.
+        Returns the filter deactivation status.
 
         Args:
 
@@ -2874,7 +3104,7 @@ class Video_File_Settings:
     @deactivate_filters.setter
     def deactivate_filters(self, value: bool) -> None:
         """
-        The deactivate_filters method overrides  the individual filter settings..
+        Sets the filter deactivation status.
 
         Args:
             value (bool): True to deactivate all filters via override
@@ -2887,7 +3117,7 @@ class Video_File_Settings:
     @property
     def filters_off(self) -> bool:
         """
-        The filters_off method returns True if all the filter settings are off.
+        Returns True if all the filter settings are off.
 
         Args:
 
@@ -2910,201 +3140,57 @@ class Video_File_Settings:
             )
 
     @property
-    def normalise(self) -> bool:
+    def menu_button_frame(self) -> int:
         """
-        The normalise method is used to normalise the video image.
-        The function returns a boolean value indicating whether video normalisation is set to be performed.
-
-        Args:
+        Gets the frame number to display on a menu button.
 
         Returns:
-            bool : A boolean value
+            int: The frame number of the image to display on a menu button
         """
-        return self._normalise
+        return self._menu_button_frame
 
-    @normalise.setter
-    def normalise(self, value: bool) -> None:
+    @menu_button_frame.setter
+    def menu_button_frame(self, value: int):
         """
-        The normalise method is used to get the video normalisation setting.
+        Sets the frame number of the menu button image.
 
         Args:
-            value (bool): True to normalise the video otherwise False
-
-        Returns:
-            None
-
+            value (int): The frame number >= 0
 
         """
-        assert isinstance(value, bool), f"{value=}. Must be a bool"
+        assert isinstance(value, int) and value == -1 or value >= 0, (
+            f"{value=}. Must be int >= 0"
+        )
 
-        self._normalise = value
-
-    @property
-    def denoise(self) -> bool:
-        """
-        The denoise method is used to get the video denoising setting.
-
-        Args:
-
-        Returns:
-            bool : True to denoise the video otherwise False
-        """
-        return self._denoise
-
-    @denoise.setter
-    def denoise(self, value: bool) -> None:
-        """
-        The denoise method is used to set the video denoising setting.
-
-        Args:
-            value (bool): True to denoise the video otherwise False
-        """
-        assert isinstance(value, bool), f"{value=}. Must be a bool"
-
-        self._denoise = value
-
-    @property
-    def white_balance(self) -> bool:
-        """
-        The white_balance method is used to get the video white balance setting.
-
-        Args:
-
-        Returns:
-            bool : True to white balance the video otherwise False
-        """
-
-        return self._white_balance
-
-    @white_balance.setter
-    def white_balance(self, value: bool) -> None:
-        """
-        The white_balance method is used to set the video white balance setting.
-
-        Args:
-            value (bool): True to white balance the video otherwise False
-        """
-        assert isinstance(value, bool), f"{value=}. Must be a bool"
-
-        self._white_balance = value
-
-    @property
-    def sharpen(self) -> bool:
-        """
-        The sharpen method is used to get the video sharpening setting.
-
-        Args:
-
-        Returns:
-            bool : True to sharpen the video otherwise False
-        """
-        return self._sharpen
-
-    @sharpen.setter
-    def sharpen(self, value: bool) -> None:
-        """
-        The sharpen method is used to set the video sharpening setting.
-
-        Args:
-            value (bool): True to sharpen the video otherwise False
-        """
-
-        assert isinstance(value, bool), f"{value=}. Must be a bool"
-
-        self._sharpen = value
-
-    @property
-    def auto_bright(self) -> bool:
-        """
-        The auto_bright method is used to get the video auto brightness setting.
-
-        Args:
-
-        Returns:
-            bool : True to auto brightness the video otherwise False
-        """
-        return self._auto_bright
-
-    @auto_bright.setter
-    def auto_bright(self, value: bool) -> None:
-        """
-        The auto_bright method is used to set the video auto brightness setting.
-
-        Args:
-            value (bool): True to auto brightness the video otherwise False
-        """
-        assert isinstance(value, bool), f"{value=}. Must be a bool"
-
-        self._auto_bright = value
+        self._menu_button_frame = value
 
     @property
     def button_title(self) -> str:
         """
-        The button_title method is used to get the title of the button.
-
-        Args:
+        Gets the menu button title that is displayed on the menu button.
 
         Returns:
-            str : The title of the button
+            str: menu button title
         """
-        assert isinstance(self._button_title, str), (
-            f"{self._button_title=}. Must be a str"
-        )
-
-        return self._button_title
+        return self._menu_button_title
 
     @button_title.setter
-    def button_title(self, value: str) -> None:
+    def button_title(self, value: str):
         """
-        The button_title method is used to set the title of the button.
+        Sets the menu title that is displayed on the menu button image.
 
         Args:
-            value (str): The title of the button
-        """
-        assert isinstance(value, str), f"{value=}. Must be a str"
-
-        self._button_title = value
-
-    @property
-    def menu_button_frame(self) -> int:
-        """
-        The menu_button_frame method is used to get the frame number of the menu button.
-        if -1 then a menu button frame has not been set and will be extracted automatically
-
-        Args:
-
-        Returns:
-            int : The frame number of the menu button
-        """
-        assert (
-            isinstance(self._menu_button_frame, int)
-            and self._menu_button_frame == -1
-            or self._menu_button_frame >= 0
-        ), f"{self._menu_button_frame=}. Must be int >= 0 or == -1"
-
-        return self._menu_button_frame
-
-    @menu_button_frame.setter
-    def menu_button_frame(self, value: int) -> None:
-        """
-        The menu_button_frame method is used to set the frame number of the menu button.
-
-        Args:
-            value: (int): Check if the value is an integer and that it's greater than or equal to 0 or equal -1 (auto set)
-
-        Returns:
-            None
+            value (str): The menu button title
 
         """
-        assert isinstance(value, int) and value == -1 or value >= 0, (
-            f"{value=}. Must be an int == -1 or >= 0"
-        )
-        self._menu_button_frame = value
+        assert isinstance(value, str), f"{value=}. Must be str"
+
+        self._menu_button_title = value
 
     @property
     def menu_group(self) -> int:
         """
-        The menu_group method is used to get the menu group number.
+        Used to get the menu group number.
         if -1 then a menu group has not been set
 
         Args:
@@ -3123,7 +3209,7 @@ class Video_File_Settings:
     @menu_group.setter
     def menu_group(self, value: int) -> None:
         """
-        The menu_group method is used to set the menu group number.
+        Used to set the menu group number.
 
         Args:
             value: (int): Check if the value is an integer and that it's greater than or equal to 0 or equal -1 (not set)
@@ -3133,6 +3219,300 @@ class Video_File_Settings:
             f"{value=}. Must be an int == -1 or >= 0"
         )
         self._menu_group = value
+
+    @property
+    def auto_bright(self) -> bool:
+        """
+        Gets the boolean value (enabled/disabled) for auto-brightness.
+
+        Returns:
+            bool: True if auto-brightness is enabled, False otherwise.
+        """
+        if isinstance(self._auto_bright, tuple):
+            return self._auto_bright[0]
+        elif isinstance(self._auto_bright, bool):  # Backwards Compatible
+            return self._auto_bright
+        return False
+
+    @auto_bright.setter
+    def auto_bright(self, value: bool):
+        """
+        Sets the boolean value (enabled/disabled) for auto-brightness.
+        Preserves the associated settings dictionary.
+
+        Args:
+            value (bool): True to enable, False to disable.
+
+        """
+        assert isinstance(value, bool), f"{value=}. Must be bool"
+
+        auto_bright_settings = self.auto_bright_settings
+        self._auto_bright = (value, auto_bright_settings)
+
+    @property
+    def auto_bright_settings(self) -> dict:
+        """
+        Gets the dictionary of specific options for auto-brightness.
+
+        Returns:
+            dict: A dictionary containing auto-brightness specific settings.
+        """
+        if isinstance(self._auto_bright, tuple):
+            return self._auto_bright[1]
+        else:  # Backwards Compatible
+            return {}
+
+    @auto_bright_settings.setter
+    def auto_bright_settings(self, value: dict):
+        """
+        Sets the dictionary of specific options for auto-brightness.
+        Preserves the associated boolean value.
+
+        Args:
+            value (dict): The dictionary of settings.
+
+        """
+        assert isinstance(value, dict), f"{value=}. Must be dict"
+
+        auto_bright_value = self.auto_bright
+
+        self._auto_bright = (auto_bright_value, value)
+
+    @property
+    def denoise(self) -> bool:
+        """
+        Gets the boolean value (enabled/disabled) for denoising.
+
+        Returns:
+            bool: True if denoising is enabled, False otherwise.
+        """
+        if isinstance(self._denoise, tuple):
+            return self._denoise[0]
+        elif isinstance(self._denoise, bool):  # Backwards Compatible
+            return self._denoise
+        return False
+
+    @denoise.setter
+    def denoise(self, value: bool):
+        """
+        Sets the boolean value (enabled/disabled) for denoising.
+        Preserves the associated settings dictionary.
+
+        Args:
+            value (bool): True to enable, False to disable.
+
+        """
+        assert isinstance(value, bool), f"{value=}. Must be bool"
+
+        denoise_settings = self.denoise_settings
+
+        self._denoise = (value, denoise_settings)
+
+    @property
+    def denoise_settings(self) -> dict:
+        """
+        Gets the dictionary of specific options for denoising.
+
+        Returns:
+            dict: A dictionary containing denoising specific settings.
+        """
+        if isinstance(self._denoise, tuple):
+            return self._denoise[1]
+        else:  # Backwards Compatible
+            return {}
+
+    @denoise_settings.setter
+    def denoise_settings(self, value: dict):
+        """
+        Sets the dictionary of specific options for denoising.
+        Preserves the associated boolean value.
+
+        Args:
+            value (dict): The dictionary of settings.
+
+        """
+        assert isinstance(value, dict), f"{value=}. Must be dict"
+
+        denoise_value = self.denoise
+
+        self._denoise = (denoise_value, value)
+
+    @property
+    def normalise(self) -> bool:
+        """
+        Gets the boolean value (enabled/disabled) for normalisation.
+
+        Returns:
+            bool: True if normalisation is enabled, False otherwise.
+        """
+        if isinstance(self._normalise, tuple):
+            return self._normalise[0]
+        elif isinstance(self._normalise, bool):  # Backwards Compatible
+            return self._normalise
+        return False
+
+    @normalise.setter
+    def normalise(self, value: bool):
+        """
+        Sets the boolean value (enabled/disabled) for normalisation.
+        Preserves the associated settings dictionary.
+
+        Args:
+            value (bool): True to enable, False to disable.
+
+        """
+        assert isinstance(value, bool), f"{value=}. Must be bool"
+
+        normalise_settings = self.normalise_settings
+
+        self._normalise = (value, normalise_settings)
+
+    @property
+    def normalise_settings(self) -> dict:
+        """
+        Gets the dictionary of specific options for normalisation.
+
+        Returns:
+            dict: A dictionary containing normalisation specific settings.
+        """
+        if isinstance(self._normalise, tuple):
+            return self._normalise[1]
+        else:  # Backwards Compatible
+            return {}
+
+    @normalise_settings.setter
+    def normalise_settings(self, value: dict):
+        """
+        Sets the dictionary of specific options for normalisation.
+        Preserves the associated boolean value.
+
+        Args:
+            value (dict): The dictionary of settings.
+
+        """
+        assert isinstance(value, dict), f"{value=}. Must be dict"
+
+        normalise_value = self.normalise
+
+        self._normalise = (normalise_value, value)
+
+    @property
+    def white_balance(self) -> bool:
+        """
+        Gets the boolean value (enabled/disabled) for white balance.
+
+        Returns:
+            bool: True if white balance is enabled, False otherwise.
+        """
+        if isinstance(self._white_balance, tuple):
+            return self._white_balance[0]
+        elif isinstance(self._white_balance, bool):  # Backwards Compatible
+            return self._white_balance
+        return False
+
+    @white_balance.setter
+    def white_balance(self, value: bool):
+        """
+        Sets the boolean value (enabled/disabled) for white balance.
+        Preserves the associated settings dictionary.
+
+        Args:
+            value (bool): True to enable, False to disable.
+
+        """
+        assert isinstance(value, bool), f"{value=}. Must be bool"
+
+        white_balance_settings = self.white_balance_settings
+
+        self._white_balance = (value, white_balance_settings)
+
+    @property
+    def white_balance_settings(self) -> dict:
+        """
+        Gets the dictionary of specific options for white balance.
+
+        Returns:
+            dict: A dictionary containing white balance specific settings.
+        """
+        if isinstance(self._white_balance, tuple):
+            return self._white_balance[1]
+        else:  # Backwards Compatible
+            return {}
+
+    @white_balance_settings.setter
+    def white_balance_settings(self, value: dict):
+        """
+        Sets the dictionary of specific options for white balance.
+        Preserves the associated boolean value.
+
+        Args:
+            value (dict): The dictionary of settings.
+
+        """
+        assert isinstance(value, dict), f"{value=}. Must be dict"
+
+        white_balance_value = self.white_balance
+
+        self._white_balance = (white_balance_value, value)
+
+    @property
+    def sharpen(self) -> bool:
+        """
+        Gets the boolean value (enabled/disabled) for sharpening.
+
+        Returns:
+            bool: True if sharpening is enabled, False otherwise.
+        """
+        if isinstance(self._sharpen, tuple):
+            return self._sharpen[0]
+        elif isinstance(self._sharpen, bool):  # Backwards Compatible
+            return self._sharpen
+        return False
+
+    @sharpen.setter
+    def sharpen(self, value: bool):
+        """
+        Sets the boolean value (enabled/disabled) for sharpening.
+        Preserves the associated settings dictionary.
+
+        Args:
+            value (bool): True to enable, False to disable.
+
+        """
+        assert isinstance(value, bool), f"{value=}. Must be bool"
+
+        sharpen_settings = self.sharpen_settings
+
+        self._sharpen = (value, sharpen_settings)
+
+    @property
+    def sharpen_settings(self) -> dict:
+        """
+        Gets the dictionary of specific options for sharpening.
+
+        Returns:
+            dict: A dictionary containing sharpening specific settings.
+        """
+        if isinstance(self._sharpen, tuple):
+            return self._sharpen[1]
+        else:  # Backwards Compatible
+            return {}
+
+    @sharpen_settings.setter
+    def sharpen_settings(self, value: dict):
+        """
+        Sets the dictionary of specific options for sharpening.
+        Preserves the associated boolean value.
+
+        Args:
+            value (dict): The dictionary of settings.
+
+        """
+        assert isinstance(value, dict), f"{value=}. Must be dict"
+
+        sharpen_value = self.sharpen
+
+        self._sharpen = (sharpen_value, value)
 
 
 @dataclasses.dataclass(slots=True)
@@ -3177,7 +3557,7 @@ class Video_Data:
             f"{self.encoding_info=}. Must be Encoding_Details"
         )
         assert isinstance(self.video_file_settings, Video_File_Settings), (
-            f"{self.video_file_settings=}. Must be an instance of Video_Filter_Settings"
+            f"{self.video_file_settings=}. Must be an instance of Video_File_Settings"
         )
 
         assert (

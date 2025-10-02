@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import dataclasses
-from typing import Optional, cast
+from typing import Optional, cast, Any
 
 import platformdirs
 
@@ -48,7 +48,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
     video_data_list: list[Video_Data] = dataclasses.field(
         default_factory=list
     )  # Pass by reference
-    menu_layout: list[tuple[str, list[Video_Data], any]] = dataclasses.field(
+    menu_layout: list[tuple[str, list[Video_Data], Any]] = dataclasses.field(
         default_factory=list
     )  # Pass by reference
     project_name: str = ""
@@ -383,6 +383,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         for file_not_in_dvd_layout in files_not_in_dvd_layout:
             for video_item in file_not_in_dvd_layout[2]:
                 found = False
+
                 for file_in_grid in merged_files:
                     for button_video in file_in_grid[2]:
                         if (
@@ -430,8 +431,8 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 menu_dict=item[1],
                 buttons_per_page=buttons_per_page,
                 video_data=item[2],
-                menu_pages=menu_pages,
-                page_title=page_title,
+                menu_pages=menu_pages,  # Pass by Reference
+                page_title=page_title,  # Pass by Reference
             )
 
         self._insert_video_title_control(

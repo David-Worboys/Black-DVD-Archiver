@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import dataclasses
+import fractions
 import glob
 import hashlib
 import json
@@ -26,12 +27,13 @@ import os
 import os.path
 import platform
 import pprint
-import shlex
 import shutil
 import subprocess
 import textwrap
 from enum import Enum
-from typing import Final, Union
+from time import sleep
+from typing import Final, Union, Optional, Callable
+from itertools import filterfalse
 
 import psutil
 
@@ -40,10 +42,18 @@ import QTPYGUI.popups as popups
 
 import sys_consts
 import QTPYGUI.utils as utils
+
+from background_task_manager import Task_QManager, Task_Dispatcher, Unpack_Result_Tuple
+from bkp.utils import Get_Unique_Id
+from break_circular import Execute_Check_Output, Task_Def
 from sys_config import Encoding_Details, DVD_Menu_Page
 
 
 class Color(Enum):
+    """
+    A class that represents different colors as RGB values.
+    """
+
     WHITE = "#ffffff"
     BLACK = "#000000"
     GRAY = "#808080"
@@ -115,6 +125,10 @@ class Color(Enum):
 
 
 class Gravity(Enum):
+    """
+    A class that represents different gravity values.
+    """
+
     CENTER = "center"
     NORTH = "north"
     NORTHEAST = "northeast"
@@ -130,6 +144,8 @@ class Gravity(Enum):
 
 @dataclasses.dataclass(slots=True)
 class Dvd_Dims:
+    """Dimensions of a DVD"""
+
     storage_width: int = -1
     storage_height: int = -1
     display_width: int = -1
@@ -138,6 +154,8 @@ class Dvd_Dims:
 
 @dataclasses.dataclass(slots=True)
 class Cut_Video_Def:
+    """Definition of a cut video"""
+
     input_file: str = ""
     output_file: str = ""
     start_cut: int = 0  # Frame
@@ -171,15 +189,20 @@ class Cut_Video_Def:
 
     @property
     def start_cut_secs(self) -> float:
+        """Returns the start cut in seconds"""
+
         return self.start_cut / self.frame_rate
 
     @property
     def end_cut_secs(self) -> float:
+        """Returns the end cut in seconds"""
+
         return self.end_cut / self.frame_rate
 
 
 def DVD_Percent_Used(total_duration: float, pop_error_message: bool = True):
-    """Calculates the percentage of the DVD used based on the total duration of the videos assigned to that DVD.
+    """
+    Calculates the percentage of the DVD used based on the total duration of the videos assigned to that DVD.
     If the percentage used is > 100 then an error Popup is opened if pop_error_message is True
 
     Args:
@@ -310,6 +333,8 @@ def Mux_Demux_Video(
             "0:a",
             "-c",
             "copy",
+            "-threads",
+            "0",
             audio_file_demuxed,
         ]
         result, message = Execute_Check_Output(commands=commands)
@@ -324,7 +349,8 @@ def Mux_Demux_Video(
             "-map",
             "0:v",
             "-c",
-            "copy",
+            "copy-threads",
+            "0",
             video_file_demuxed,
         ]
         result, message = Execute_Check_Output(commands=commands)
@@ -347,7 +373,7 @@ def Mux_Demux_Video(
             "-i",
             video_file_demuxed,
             "-threads",
-            Get_Thread_Count(),
+            "0",
             "-i",
             audio_file_demuxed,
             "-map",
@@ -360,7 +386,7 @@ def Mux_Demux_Video(
             "+faststart",
             output_file,
             "-threads",
-            Get_Thread_Count(),
+            "0",
             "-y",
         ]
 
@@ -389,10 +415,10 @@ def Mux_Demux_Video(
 
 
 def Concatenate_Videos(
-    temp_files: list[str],
+    video_files: list[str],
     output_file: str,
     audio_codec: str = "",
-    delete_temp_files: bool = False,
+    delete_temp_files: bool = True,
     transcode_format: str = "",
     debug: bool = False,
 ) -> tuple[int, str, str]:
@@ -400,7 +426,7 @@ def Concatenate_Videos(
     Concatenates video files using ffmpeg.
 
     Args:
-        temp_files (list[str]): List of input video files to be concatenated
+        video_files (list[str]): List of input video files to be concatenated
         output_file (str): The joined (concatenated) output file name.
             Note Transcode concats will use the folder and file name but will have the transcode_format extension
         audio_codec (str): The audio codec to checked against (aac is special)
@@ -416,7 +442,7 @@ def Concatenate_Videos(
             - arg 3: container_format  if success otherwise ""
     """
 
-    # Helper functions
+    #### Helper functions
     def _transcode_video(
         input_file: str,
         transcode_path: str,
@@ -447,7 +473,9 @@ def Concatenate_Videos(
         assert isinstance(encoding_info, Encoding_Details), (
             "encoding_info must be an Encoding_Details object."
         )
-        assert isinstance(transcode_format, str) and transcode_format in (
+        assert isinstance(transcode_format, str) and (
+            transcode_format := transcode_format.strip()  # Note assignment
+        ) in (
             "dv",
             "ffv1",
             "h264",
@@ -458,9 +486,9 @@ def Concatenate_Videos(
         ), "transcode_format must be a valid format string."
 
         file_handler = file_utils.File()
-        _, file_name, _ = file_handler.split_file_path(input_file)
+        _, file_name, file_ext = file_handler.split_file_path(input_file)
 
-        match transcode_format:
+        match str(transcode_format):  # Keeps Pycharm happy
             case "dv":
                 transcode_file = file_handler.file_join(
                     transcode_path, file_name, "avi"
@@ -472,6 +500,7 @@ def Concatenate_Videos(
                     frame_rate=encoding_info.video_frame_rate,
                     width=encoding_info.video_width,
                     height=encoding_info.video_height,
+                    black_border=False,
                 )
 
                 if result == -1:
@@ -516,6 +545,7 @@ def Concatenate_Videos(
                     ),
                     h265=False,
                     high_quality=True,
+                    black_border=False,
                 )
 
                 if result == -1:
@@ -543,6 +573,7 @@ def Concatenate_Videos(
                     ),
                     h265=True,
                     high_quality=True,
+                    black_border=False,
                 )
 
                 if result == -1:
@@ -568,6 +599,7 @@ def Concatenate_Videos(
                         if encoding_info.video_scan_order.lower() == "bff"
                         else False
                     ),
+                    black_border=False,
                 )
 
                 if result == -1:
@@ -597,6 +629,8 @@ def Concatenate_Videos(
                         if encoding_info.video_scan_order.lower() == "bff"
                         else False
                     ),
+                    black_border=False,
+                    encode_10bit=True,
                 )
 
                 if result == -1:
@@ -604,15 +638,15 @@ def Concatenate_Videos(
 
             case _:  # Stream Copy
                 transcode_file = file_handler.file_join(
-                    transcode_path, file_name, container_format
+                    transcode_path,
+                    file_name,
+                    file_ext,  # Use input_ext here
                 )
 
                 commands = [
                     sys_consts.FFMPG,
                     "-fflags",
                     "+genpts",  # generate presentation timestamps
-                    "-threads",
-                    Get_Thread_Count(),
                     "-i",
                     input_file,
                     "-map",
@@ -623,7 +657,7 @@ def Concatenate_Videos(
                     "-movflags",
                     "+faststart",
                     "-threads",
-                    Get_Thread_Count(),
+                    "0",
                     transcode_file,
                 ]
 
@@ -664,7 +698,155 @@ def Concatenate_Videos(
 
         transcode_file_list = []
 
-        for video_file in video_files:
+        #### transcoder Helper
+        def _start_transcode_task(task_def: Task_Def) -> None:
+            """
+            Handles the start of a transcode task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+
+            """
+
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if debug:
+                print(f"DBG CV T ST Started {task_def.task_id=}")
+
+            return None
+
+        def _finish_transcode_task(task_def: Task_Def) -> None:
+            """
+            Handles the end of a transcode task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+
+            """
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            # Used in a parent wait loop to determine when all transcoding tasks are done
+            nonlocal transcode_file_list
+            nonlocal transcode_done
+            nonlocal errored
+
+            if debug:
+                print(f"DBG CV T FT {task_def.task_id=}")
+
+            task_error_no, task_message, worker_error_no, worker_message = (
+                Unpack_Result_Tuple(task_def)
+            )
+
+            if task_error_no == 1 and worker_error_no == 1:
+                transcode_file_list.append((
+                    task_def,
+                    worker_message,
+                ))  # Worker message has transcoded file name
+
+            if (
+                task_error_no == 1
+                and worker_error_no == 1
+                and task_message.lower() == "all done"
+            ):
+                if debug:
+                    print(f"DBG CV T : (prefix '{task_def.task_prefix}' is complete.")
+
+                transcode_done = True
+
+            elif task_error_no != 1 or worker_error_no != 1:
+                if debug:
+                    print(f"DBG CV TT Errored! {task_def.task_id=}")
+
+                error_messages.append(
+                    f"task {task_def.task_id} reported an error: TaskError={task_error_no}, "
+                    f"WorkerError={worker_error_no}, Message='{task_message}'"
+                )
+
+                transcode_done = True
+                errored = True
+
+            return None
+
+        def _error_task(task_def: Task_Def) -> None:
+            """
+            Handles the Error task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+
+            """
+
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if debug:
+                print(f"DBG CV T ET {task_def.task_id=}")
+
+            nonlocal transcode_done
+            nonlocal errored
+
+            transcode_done = True
+            errored = True
+
+            if "message" in task_def.cargo:
+                error_messages.append(
+                    f"Task '{task_def.task_id} Error {task_def.cargo['message']}"
+                )
+
+            return None
+
+        def _abort_task(task_def: Task_Def) -> None:
+            """
+            Handles the abort task
+
+            Args:
+                task_def (Task_Def): Task Definition object
+
+            Returns:
+                None
+
+            """
+            assert isinstance(task_def, Task_Def), (
+                f"{task_def=}. Must be an instance of Task_Def"
+            )
+
+            if debug:
+                print(f"DBG CV T AT {task_def.task_id=}")
+
+            nonlocal transcode_done
+            nonlocal errored
+
+            transcode_done = True
+            errored = True
+
+            if "message" in task_def.cargo:
+                error_messages.append(
+                    f"Task '{task_def.task_id} Error {task_def.cargo['message']}"
+                )
+
+            return None
+
+        #### transcoder Main
+        session_id = Get_Unique_Id()
+
+        transcode_file_list = []
+
+        error_messages = []
+        errored = False
+        transcode_done = False
+
+        for video_index, video_file in enumerate(video_files):
             encoding_info: Encoding_Details = Get_File_Encoding_Info(video_file)
 
             if encoding_info.error.strip():
@@ -677,31 +859,103 @@ def Concatenate_Videos(
                     [],
                 )
             else:
-                result, transcode_file = _transcode_video(
-                    input_file=video_file,
-                    transcode_path=transcode_path,
-                    encoding_info=encoding_info,
-                    transcode_format=transcode_format,
+                operation = "transcode_video"
+
+                task_def = Task_Def(
+                    task_id=f"CT_V_{video_index}_{video_file}_{session_id}",
+                    task_prefix=operation,
+                    worker_function=_transcode_video,
+                    kwargs={
+                        "input_file": video_file,
+                        "transcode_path": transcode_path,
+                        "encoding_info": encoding_info,
+                        "transcode_format": transcode_format,
+                    },
+                    cargo={"index": video_index},
                 )
 
-                if result == -1:  # transcode file contains an error message
-                    return -1, transcode_file, []
+                task_dispatch_name = f"CT_DN_{operation}_{session_id}"
 
-                transcode_file_list.append(transcode_file)
+                Task_Dispatcher().submit_task(
+                    task_def=task_def,
+                    task_dispatch_methods=[
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "start",
+                            "operation": operation,
+                            "method": _start_transcode_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "finish",
+                            "operation": operation,
+                            "method": _finish_transcode_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "error",
+                            "operation": operation,
+                            "method": _error_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                        {
+                            "task_dispatch_name": task_dispatch_name,
+                            "callback": "abort",
+                            "operation": operation,
+                            "method": _abort_task,
+                            "kwargs": {
+                                "task_def": task_def,
+                            },
+                        },
+                    ],
+                )
 
-        return 1, "", transcode_file_list
+        # Not optimal, but I do not want to change the structure of Concatenate_Videos, so I spawn multiple trancodes and
+        # wait for them to complete.
+        while not transcode_done and not errored:
+            sleep(1)
 
-    # Main
-    assert isinstance(temp_files, list), (
-        f"{temp_files} Must be a list of input video files"
+        if errored:
+            error_message = ""
+
+            for error in error_messages:
+                error_message += f"{error}\n"
+
+            return -1, error_message, []
+
+        # Return transcoded_file list in the order it was submitted
+        return (
+            1,
+            "",
+            [
+                item_tuple[1]
+                for item_tuple in sorted(
+                    transcode_file_list, key=lambda item: item[0].cargo["index"]
+                )
+            ],
+        )
+
+    #### Main
+    assert isinstance(video_files, list), (
+        f"{video_files} Must be a list of input video files"
     )
-    assert all(isinstance(file, str) for file in temp_files), (
-        "all elements in temp_files must str"
+    assert all(isinstance(file, str) for file in video_files), (
+        f"all elements in {video_files=} must be str"
     )
     assert isinstance(output_file, str), f"{output_file=}. Must be str"
     assert isinstance(audio_codec, str), f"{audio_codec=}. Must be a str"
     assert isinstance(delete_temp_files, bool), f"{delete_temp_files=}. Must be a bool"
-    assert isinstance(transcode_format, str) and transcode_format in (
+    assert isinstance(transcode_format, str) and (
+        transcode_format := transcode_format.strip()  # Note assignment
+    ) in (
         "",
         "dv",
         "h264",
@@ -712,14 +966,16 @@ def Concatenate_Videos(
     ), f"{transcode_format=}. Must be str - dv | h264 | h265 | mpg | mjpeg | ffv1"
 
     if debug and not utils.Is_Complied():
-        print(f"DBG CV {temp_files=} {output_file=} {audio_codec=} {delete_temp_files}")
+        print(
+            f"DBG CV {video_files=} {output_file=} {audio_codec=} {delete_temp_files}"
+        )
 
     file_handler = file_utils.File()
 
-    out_path, _, conainer_format = file_handler.split_file_path(output_file)
+    out_path, _, container_format = file_handler.split_file_path(output_file)
     transcode_path = file_handler.file_join(out_path, "transcode_temp_files")
 
-    container_format = conainer_format.replace(".", "")
+    container_format = container_format.replace(".", "")
     file_list_txt = file_handler.file_join(
         out_path, f"video_data_list_{utils.Get_Unique_Id()}", "txt"
     )
@@ -727,13 +983,13 @@ def Concatenate_Videos(
     if not file_handler.path_writeable(out_path):
         return -1, f"Can Not Be Write To {out_path}!", ""
 
-    for video_file in temp_files:
+    for video_file in video_files:
         if not file_handler.file_exists(video_file):
             return -1, f"File {video_file} Does Not Exist!", ""
 
     transcode_file_list = []
 
-    if transcode_format:  # Very slow on a AMD2400G with 16GB of RAM :-)
+    if transcode_format:
         if transcode_format == "dv":
             container_format = "avi"
         elif transcode_format in ("h264", "h265"):
@@ -743,7 +999,7 @@ def Concatenate_Videos(
         elif (
             transcode_format == "mjpeg"
         ):  # Note I use H264 instead, but mjpeg is still an option
-            container_format = "mkv"  # mkv if use MJPEG
+            container_format = "mkv"  # avi if use MJPEG
         elif transcode_format == "ffv1":
             container_format = "mkv"
         else:
@@ -760,9 +1016,9 @@ def Concatenate_Videos(
         if file_handler.make_dir(transcode_path) == -1:
             return -1, f"Failed To Create {transcode_path}", ""
 
-        result, message, temp_files = _transcoder(
+        result, message, video_files = _transcoder(
             transcode_format=transcode_format,
-            video_files=temp_files,
+            video_files=video_files,
             transcode_path=transcode_path,
         )
 
@@ -770,8 +1026,7 @@ def Concatenate_Videos(
             return -1, message, ""
 
     temp_file_list = []
-
-    for file in temp_files:
+    for file in video_files:
         temp_file_list.append(f"file '{file}'")
 
     # Generate a file list for ffmpeg
@@ -784,7 +1039,7 @@ def Concatenate_Videos(
 
     temp_folder, temp_file, temp_ext = file_handler.split_file_path(output_file)
 
-    if temp_ext.strip(".").lower() in ("mod", "tod"):  # MPG2 Proprietry formats
+    if temp_ext.strip(".").lower() in ("mod", "tod"):  # MPG2 Proprietary formats
         output_file = file_handler.file_join(temp_folder, temp_file, "mpg")
 
     if file_handler.file_exists(output_file):
@@ -804,7 +1059,6 @@ def Concatenate_Videos(
             sys_consts.FFMPG,
             "-fflags",
             "+genpts",  # generate presentation timestamps
-            # "+igndts",
             "-f",
             "concat",
             "-safe",
@@ -812,7 +1066,7 @@ def Concatenate_Videos(
             "-auto_convert",
             "1",
             "-threads",
-            Get_Thread_Count(),
+            "0",
             "-i",
             file_list_txt,
             "-c",
@@ -826,9 +1080,9 @@ def Concatenate_Videos(
             "+faststart",
             output_file,
             "-threads",
-            Get_Thread_Count(),
+            "0",
             "-y",
-        ],
+        ]
     )
 
     if debug and not utils.Is_Complied():
@@ -836,20 +1090,15 @@ def Concatenate_Videos(
 
     if result == -1:
         if not debug:
-            file_handler.remove_file(file_list_txt)
+            if file_handler.file_exists(file_list_txt):
+                file_handler.remove_file(file_list_txt)
         return -1, message, ""
 
     # Remove the file list and temp files
     if not debug and file_handler.remove_file(file_list_txt) == -1:
         return -1, f"Failed to delete text file: {file_list_txt}", ""
 
-    if not debug and delete_temp_files:
-        for file in temp_files:
-            if file_handler.file_exists(file):
-                if file_handler.remove_file(file) == -1:
-                    return -1, f"Failed to delete temp file: {file}", ""
-
-    if transcode_file_list:  # always delete these
+    if not debug and transcode_file_list:  # always delete these
         result, message = file_handler.remove_dir_contents(
             file_path=transcode_path, keep_parent=False
         )
@@ -979,7 +1228,7 @@ def Create_DVD_Case_Insert(
         f"{menu_font_colour=}. Must be a non-empty str"
     )
 
-    assert isinstance(opacity, float) and 0 <= int(opacity) <= 1, (
+    assert isinstance(opacity, float) and 0.0 <= opacity <= 1.0, (
         f"{opacity=}. Must be a float between 0.0 and 1.0"
     )
     assert isinstance(debug, bool), f"{debug=}. Must be a bool"
@@ -1137,13 +1386,14 @@ def Create_DVD_Case_Insert(
         title_font_size: int,
         title_font_colour: str,
         left_y1: int,
-        MAX_TITLE_LINES: int,
+        max_title_lines: int,
     ) -> tuple[int, bytes, int]:
         """
         Writes a title onto a given image background, handling text wrapping and manual spacing.
 
         This function takes image data, title information, and font settings to write a title onto the image.
         It supports both automatic and manual title wrapping using '|' as a manual line break delimiter.
+        Only 4 lines are allowed.
 
         Args:
             image_data (bytes): The image data in bytes format.
@@ -1154,7 +1404,7 @@ def Create_DVD_Case_Insert(
             title_font_size (int): The font size for the title in points.
             title_font_colour (str): The color of the title text.
             left_y1 (int): The starting y-coordinate for the title text.
-            MAX_TITLE_LINES (int): The maximum number of title lines allowed.
+            max_title_lines (int): The maximum number of title lines allowed.
 
         Returns:
             tuple[int, bytes]: A tuple containing the status code and the modified image data.
@@ -1176,8 +1426,8 @@ def Create_DVD_Case_Insert(
         )
         assert isinstance(title_font_colour, str), "title_font_colour must be a string."
         assert isinstance(left_y1, int), "left_y1 must be an integer."
-        assert isinstance(MAX_TITLE_LINES, int) and MAX_TITLE_LINES > 0, (
-            "MAX_TITLE_LINES must be a positive integer."
+        assert isinstance(max_title_lines, int) and max_title_lines > 0, (
+            "max_title_lines must be a positive integer."
         )
 
         # Write title
@@ -1217,7 +1467,7 @@ def Create_DVD_Case_Insert(
         if len(title_wrapped_text) > 4:
             return (
                 -1,
-                f"Menu Title Is {len(title_wrapped_text)} Lines Long And Only {MAX_TITLE_LINES} Are Allowed! Reduce "
+                f"Menu Title Is {len(title_wrapped_text)} Lines Long And Only {max_title_lines} Are Allowed! Reduce "
                 f"Title Font Size Or Change Title Font".encode("utf-8"),
                 -1,
             )
@@ -1512,7 +1762,7 @@ def Create_DVD_Label(
     assert (
         isinstance(spindle_diameter, (int, float)) and 21 <= spindle_diameter <= 45
     ), f"{spindle_diameter=}. Must be a float >= 21 and <= 45"
-    assert isinstance(opacity, float) and 0 <= int(opacity) <= 1, (
+    assert isinstance(opacity, float) and 0.0 <= opacity <= 1.0, (
         f"{opacity=}. Must be a float between 0.0 and 1.0"
     )
 
@@ -2004,7 +2254,8 @@ def Create_DVD_Label(
 
 
 def Get_Space_Available(path: str) -> tuple[int, str]:
-    """Returns the amount of available disk space in bytes for the specified file system path.
+    """
+    Returns the amount of available disk space in bytes for the specified file system path.
 
     Args:
         path (str): A string representing the file system path for which the available disk space is to be determined.
@@ -2028,7 +2279,8 @@ def Get_Space_Available(path: str) -> tuple[int, str]:
 
 
 def Get_Color_Names() -> list[str]:
-    """Return a sorted list of color names from the Color Enum.
+    """
+    Return a sorted list of color names from the Color Enum.
 
     Returns:
         list[str]: A sorted list of color names as strings.
@@ -2037,7 +2289,8 @@ def Get_Color_Names() -> list[str]:
 
 
 def Get_Hex_Color(color: str) -> str:
-    """This function returns the hexadecimal value for a given color name.
+    """
+    This function returns the hexadecimal value for a given color name.
 
     Args:
         color (str): The name of the color to look up.
@@ -2064,7 +2317,8 @@ def Get_Hex_Color(color: str) -> str:
 
 
 def Get_Colored_Rectangle_Example(width: int, height: int, color: str) -> bytes:
-    """Generates a PNG image of a colored rectangle.
+    """
+    Generates a PNG image of a colored rectangle.
 
     Args:
         width (int): The width of the rectangle in pixels.
@@ -2103,7 +2357,8 @@ def Get_Font_Example(
     height: int = -1,
     opacity: float = 1.0,
 ) -> tuple[int, bytes]:
-    """Returns a png byte string an example of what a font looks like
+    """
+    Returns a png byte string an example of what a font looks like
 
     Args:
         font_file (str): The font file path
@@ -2209,7 +2464,8 @@ def Get_Font_Example(
 
 
 def Get_Fonts() -> list[tuple[str, str]]:
-    """Returns a list of built-in fonts
+    """
+    Returns a list of built-in fonts
 
     Returns:
         list[tuple[str, str]]: A list of tuples, where each tuple contains the font name as the first
@@ -2254,7 +2510,8 @@ def Get_Fonts() -> list[tuple[str, str]]:
 
 
 def Make_Opaque(color: str, opacity: float) -> tuple[int, str]:
-    """Makes a hex color value partially opaque.
+    """
+    Makes a hex color value partially opaque.
 
     Args:
         color (str): The color to be made partially opaque.
@@ -2287,7 +2544,8 @@ def Make_Opaque(color: str, opacity: float) -> tuple[int, str]:
 def Create_Transparent_File(
     width: int, height: int, out_file: str, border_color=""
 ) -> tuple[int, str]:
-    """Creates a transparent file of a given width and height.
+    """
+    Creates a transparent file of a given width and height.
     If a border color is provided, a rectangle of that color is drawn
     around the edge of the file
 
@@ -2336,7 +2594,8 @@ def Create_Transparent_File(
 def Overlay_File(
     in_file: str, overlay_file: str, out_file: str, x: int, y: int
 ) -> tuple[int, str]:
-    """Places the overlay_file on the input file at a given x,y co-ord
+    """
+    Places the overlay_file on the input file at a given x,y co-ord
     saves the combined file to the output file
 
     Args:
@@ -2376,9 +2635,11 @@ def Overlay_Text(
     opacity: float = 0.5,
     x_offset: int = 0,
     y_offset: int = 0,
+    pixel_line_spacing: int = 0,
     out_file: str = "",
 ) -> tuple[int, str]:
-    """Overlays text onto an image.
+    """
+    Overlays text onto an image.
 
     Args:
         in_file (str): The path to the image file.
@@ -2393,6 +2654,7 @@ def Overlay_Text(
             0.0 is fully transparent and 1.0 is fully opaque.
         x_offset (int,optional) : The x offset of the text from the center of the text box
         y_offset (int,optional) : The y offset of the text from the center of the text box
+        pixel_line_spacing (int,optional) : The spacing between lines in pixels
         out_file (str,optional): The path to the output file. Optional, sam as in_file if not supplied
 
 
@@ -2424,6 +2686,7 @@ def Overlay_Text(
     assert 0 <= opacity <= 1, f"{opacity=} must be a value between 0 and 1"
     assert isinstance(x_offset, int), f"{x_offset=}. Must be int"
     assert isinstance(y_offset, int), f"{y_offset=}. Must be int"
+    assert isinstance(pixel_line_spacing, int), f"{pixel_line_spacing=}. Must be int"
     assert isinstance(out_file, str), f"{out_file=} must be a string"
 
     if y_offset == 0:  # So text does not sit right on the edge
@@ -2455,47 +2718,526 @@ def Overlay_Text(
     if result == -1:
         return -1, f"Invalid System Color {text_color}"
 
-    text_width, text_height = Get_Text_Dims(
-        text=text, font=text_font, pointsize=text_pointsize
-    )
-
-    if text_width == -1:
-        return -1, "Could Not Get Text Width"
-
     image_width, message = Get_Image_Width(in_file)
 
     if image_width == -1:
         return -1, message
 
+    if "\n" in text:
+        text_lines = text.split("\n")
+        text_width, text_height = Get_Text_Dims(
+            text=text_lines[0], font=text_font, pointsize=text_pointsize
+        )
+
+        y_offset = y_offset
+
+        for line_index, text_line in enumerate(text_lines):
+            result, message = Overlay_Text(
+                in_file=in_file,
+                text=text_line,
+                text_font=text_font,
+                text_pointsize=text_pointsize,
+                text_color=text_color,
+                position=position,
+                background_color=background_color,
+                opacity=opacity,
+                x_offset=x_offset,
+                y_offset=y_offset,
+                out_file=out_file,
+            )
+
+            if result == -1:
+                return -1, message
+
+            y_offset += text_height + pixel_line_spacing
+        return result, message
+    else:
+        text_width, text_height = Get_Text_Dims(
+            text=text, font=text_font, pointsize=text_pointsize
+        )
+
+        if text_width == -1:
+            return -1, "Could Not Get Text Width"
+
+        command = [
+            sys_consts.CONVERT,
+            "-density",
+            "72",
+            "-units",
+            "pixelsperinch",
+            in_file,
+            "-background",
+            background_hex,
+            "-fill",
+            text_hex,
+            "-gravity",
+            justification,
+            "-font",
+            text_font,
+            "-pointsize",
+            f"{text_pointsize}",
+            "-size",
+            f"{image_width}x",
+            f"caption:{text}",
+            "-gravity",
+            gravity,
+            "-geometry",
+            f"+{x_offset}+{y_offset}",
+            "-composite",
+            out_file,
+        ]
+
+        return Execute_Check_Output(commands=command)
+
+
+def Build_Video_Filters(
+    auto_bright: bool,
+    normalise: bool,
+    white_balance: bool,
+    denoise: bool,
+    sharpen: bool,
+    filters_off: bool,
+    black_border: bool,
+    target_width: int = -1,
+    target_height: int = -1,
+    deinterlace_video: bool = False,
+    include_dvd_interlacing: bool = False,
+    apply_spp: bool = False,
+    dehalo: bool = False,
+    input_video_frame_rate: Optional[float] = None,
+    video_interlaced: Optional[bool] = None,
+    dvd_standard: Optional[str] = None,
+) -> list[str]:
+    """
+    Constructs the list of FFmpeg video filter arguments, with an option
+    to include DVD-specific interlacing logic.
+
+    Args:
+        auto_bright (bool): Whether to apply auto-brightening (pp=dr/al).
+        normalise (bool): Whether to apply video normalization.
+        white_balance (bool): Whether to apply color correction (white balance).
+        denoise (bool): Whether to apply video denoising.
+        sharpen (bool): Whether to apply unsharp mask.
+        filters_off (bool): If True, only scaling, deinterlacing, and black borders are applied (if requested),
+                            no other aesthetic filters.
+        black_border (bool): Whether to add black borders to the video for aesthetic masking.
+        target_width (int): The desired output width. If -1, no specific scale is forced.
+        target_height (int): The desired output height. If -1, no specific scale is forced.
+        deinterlace_video (bool): If True, applies a general deinterlacing filter (e.g., yadif). Defaults to False.
+        include_dvd_interlacing (bool): If True, DVD-specific interlacing logic is applied
+                                        to *progressive* input to make it interlaced for DVD. Defaults to False.
+        apply_spp (bool): If True, applies the spp deblocking/denoising filter.
+        dehalo (bool): If True, applies the dehalo filter to reduce halos/ringing.
+        input_video_frame_rate (Optional[float]): The frame rate of the input video.
+                                                    Required if include_dvd_interlacing is True.
+        video_interlaced (Optional[bool]): True if the input video is interlaced.
+                                            Required if include_dvd_interlacing is True.
+        dvd_standard (Optional[str]): The target DVD standard (sys_consts.PAL or sys_consts.NTSC).
+                                        Required if include_dvd_interlacing is True.
+
+    Returns:
+        list[str]: A list containing the "-vf" argument and the joined filter string,
+                   or an empty list if no filters are applied.
+    """
+    # --- Input Validation (Assertions) ---
+    assert isinstance(auto_bright, bool), f"{auto_bright=}. Must be bool"
+    assert isinstance(normalise, bool), f"{normalise=}. Must be bool"
+    assert isinstance(white_balance, bool), f"{white_balance=}. Must be bool"
+    assert isinstance(denoise, bool), f"{denoise=}. Must be bool"
+    assert isinstance(sharpen, bool), f"{sharpen=}. Must be bool"
+    assert isinstance(filters_off, bool), f"{filters_off=}. Must be bool"
+    assert isinstance(black_border, bool), f"{black_border=}. Must be bool"
+    assert isinstance(target_width, int) and (target_width > 0 or target_width == -1), (
+        f"{target_width=}. Must be int > 0 or -1"
+    )
+    assert isinstance(target_height, int) and (
+        target_height > 0 or target_height == -1
+    ), f"{target_height=}. Must be int > 0 or -1"
+    assert isinstance(deinterlace_video, bool), f"{deinterlace_video=}. Must be bool"
+    assert isinstance(include_dvd_interlacing, bool), (
+        f"{include_dvd_interlacing=}. Must be bool"
+    )
+    assert isinstance(apply_spp, bool), f"{apply_spp=}. Must be bool"
+    assert isinstance(dehalo, bool), f"{dehalo=}. Must be bool"
+
+    if include_dvd_interlacing:
+        assert input_video_frame_rate is not None and isinstance(
+            input_video_frame_rate, float
+        ), (
+            "input_video_frame_rate must be provided and be a float if include_dvd_interlacing is True"
+        )
+        assert video_interlaced is not None and isinstance(video_interlaced, bool), (
+            "video_interlaced must be provided and be a bool if include_dvd_interlacing is True"
+        )
+        assert dvd_standard in [sys_consts.PAL, sys_consts.NTSC], (
+            "dvd_standard must be PAL or NTSC if include_dvd_interlacing is True"
+        )
+
+    normalise_video_filter = (
+        "normalize=blackpt=black:whitept=white:smoothing=11:independence=0.5"
+    )
+
+    tv_normalise_video_filter = "normalize=16:235:smoothing=11:independence=0.5"  # "scale=in_range=full:out_range=tv"  # "normalize=16:235:smoothing=11:independence=0.5"
+
+    # "nlmeans=s=5:p=10:pc=10:r=15:rc=15"  # "nlmeans=1.0:7:5:3:3"
+
+    video_denoise_filter = (
+        "nlmeans=s=5:p=15:pc=15:r=5:rc=5"  # s=20 # "nlmeans=1.0:7:5:3:3"
+    )
+    color_correct_filter = "colorcorrect=analyze='median'"
+
+    # "unsharp=7:7:2.5"  # "unsharp=luma_amount=0.2"
+    usharp_filter = "unsharp=luma_amount=0.3"
+
+    spp_filter = "spp=quality=4:qp=6"
+    dehalo_filter = "dehalo=ls=1.5:ld=0.0:es=1.0:ed=0.0"
+
+    black_border_size_lr = 12
+    black_border_size_tb = 12
+
+    black_box_filter_commands = [
+        f"drawbox=x=0:y=0:w=iw:h={black_border_size_tb}:color=black:t=fill",
+        f"drawbox=x=0:y=ih-{black_border_size_tb}:w=iw:h={black_border_size_tb}:color=black:t=fill",
+        (
+            f"drawbox=x=0:y={black_border_size_tb}:w={black_border_size_lr}:"
+            f"h=ih-{black_border_size_tb * 2}:color=black:t=fill"
+        ),
+        (
+            f"drawbox=x=iw-{black_border_size_lr}:y={black_border_size_tb}:w={black_border_size_lr}:"
+            f"h=ih-{black_border_size_tb * 2}:color=black:t=fill"
+        ),
+    ]
+    black_box_filter_str = ",".join(black_box_filter_commands)
+
+    video_filter_options = []
+
+    if deinterlace_video:
+        video_filter_options.append("yadif=0:-1:-1")
+
+    if not filters_off:  # Only apply these if filters are not off
+        if apply_spp:
+            video_filter_options.append(spp_filter)
+
+        if dehalo:
+            video_filter_options.append(dehalo_filter)
+
+        if denoise:
+            video_filter_options.append(video_denoise_filter)
+
+        # Color/Levels Correction
+        if normalise:
+            video_filter_options.append(normalise_video_filter)
+        if white_balance:
+            video_filter_options.append(color_correct_filter)
+        if auto_bright:
+            video_filter_options.append("pp=dr/al")  # normalize can replace pp=dr/al,
+
+    if target_width > 0 and target_height > 0:
+        if (target_width, target_height) not in Standard_Resolutions():
+            resolved_scale_width, resolved_scale_height = min(
+                Standard_Resolutions(),
+                key=lambda res_pair: math.sqrt(
+                    (target_width - res_pair[0]) ** 2
+                    + (target_height - res_pair[1]) ** 2
+                ),
+            )
+            video_filter_options.append(
+                f"scale={resolved_scale_width}:{resolved_scale_height}:flags=lanczos"
+            )
+
+    if not filters_off:  # Only apply if filters are not off
+        if sharpen:
+            video_filter_options.append(usharp_filter)
+
+        # if normalise:
+        #    video_filter_options.append(tv_normalise_video_filter)
+
+    if include_dvd_interlacing:
+        if not video_interlaced:  # Only interlace if input is progressive
+            frame_rate_delta = 0.001
+            if dvd_standard == sys_consts.PAL:
+                if math.isclose(
+                    input_video_frame_rate,
+                    sys_consts.PAL_FIELD_RATE,
+                    rel_tol=frame_rate_delta,
+                ):
+                    video_filter_options.append(
+                        f"fps={sys_consts.PAL_FRAME_RATE},tinterlace=interleave_bottom"
+                    )
+                elif math.isclose(
+                    input_video_frame_rate,
+                    sys_consts.PAL_FRAME_RATE,
+                    rel_tol=frame_rate_delta,
+                ):
+                    video_filter_options.append("tinterlace=interleave_bottom")
+                else:
+                    print(
+                        f"WARNING: Input frame rate {input_video_frame_rate} not standard PAL progressive/field rate for"
+                        f" DVD interlacing. Skipping interlacing."
+                    )
+            elif dvd_standard == sys_consts.NTSC:
+                if math.isclose(
+                    input_video_frame_rate,
+                    sys_consts.NTSC_FIELD_RATE,
+                    rel_tol=frame_rate_delta,
+                ):
+                    video_filter_options.append(
+                        f"fps={sys_consts.NTSC_FRAME_RATE},tinterlace=interleave_bottom"
+                    )
+                elif math.isclose(
+                    input_video_frame_rate,
+                    sys_consts.NTSC_FRAME_RATE,
+                    rel_tol=frame_rate_delta,
+                ):
+                    video_filter_options.append("tinterlace=interleave_bottom")
+                else:
+                    print(
+                        f"WARNING: Input frame rate {input_video_frame_rate} not standard NTSC progressive/field rate "
+                        f"for DVD interlacing. Skipping interlacing."
+                    )
+
+    if black_border:
+        video_filter_options.append(black_box_filter_str)
+
+    vf_string = ",".join(filterfalse(lambda x: not x, video_filter_options))
+
+    return ["-vf", vf_string] if vf_string else []
+
+
+def Transcode_DVD_VOB(
+    input_file: str,
+    output_folder: str,
+    input_video_width: int,
+    input_video_height: int,
+    input_video_ar: str,  # e.g., "4:3", "16:9"
+    input_video_scan_type: str,  # "interlaced" or "progressive"
+    input_video_frame_rate: float,  # Actual frame rate of the input video
+    auto_bright: bool,
+    normalise: bool,
+    white_balance: bool,
+    denoise: bool,
+    sharpen: bool,
+    filters_off: bool,
+    black_border: bool = False,
+    dvd_standard: str = "",
+    task_def: Task_Def = None,
+) -> tuple[int, str]:
+    """
+    Encodes the input video file as a DVD VOB (mpeg2) file.
+
+    Args:
+        input_file (str): The path to the input video file.
+        output_folder (str): The path to the output folder.
+        input_video_width (int): Original width of the input video.
+        input_video_height (int): Original height of the input video.
+        input_video_ar (str): Original aspect ratio of the input video (e.g., "4:3", "16:9").
+        input_video_scan_type (str): Scan type of the input video ("interlaced" or "progressive").
+        input_video_frame_rate (float): Frame rate of the input video.
+        auto_bright (bool): Whether to apply auto-brightening filter.
+        normalise (bool): Whether to apply video normalization filter.
+        white_balance (bool): Whether to apply color correction filter.
+        denoise (bool): Whether to apply denoise filter.
+        sharpen (bool): Whether to apply a sharpen filter.
+        filters_off (bool): If True, skips all video processing filters except black borders.
+        black_border (bool, optional): Whether to add black borders to the video. Defaults to False.
+        dvd_standard (str): The target DVD standard (e.s., sys_consts.PAL, sys_consts.NTSC).
+        task_def (Task_Def, optional): The task definition. If supplied, this becomes a background task. Defaults to None.
+
+    Returns:
+        tuple[int, str]:
+            - arg 1: 1 if ok, -1 if error, 0 if task_def supplied and this becomes a background task.
+            - arg 2: error message if error (-1) else output file path (1 or 0).
+    """
+
+    assert isinstance(input_file, str) and input_file.strip() != "", (
+        f"{input_file=}. Must be a non-empty str"
+    )
+    assert isinstance(output_folder, str) and output_folder.strip() != "", (
+        f"{output_folder=}. Must be a non-empty str"
+    )
+    assert isinstance(input_video_width, int) and input_video_width > 0, (
+        f"{input_video_width=}. Must be int > 0"
+    )
+    assert isinstance(input_video_height, int) and input_video_height > 0, (
+        f"{input_video_height=}. Must be int > 0"
+    )
+    assert isinstance(input_video_ar, str) and input_video_ar.strip() != "", (
+        f"{input_video_ar=}. Must be a non-empty str"
+    )
+    assert (
+        isinstance(input_video_scan_type, str) and input_video_scan_type.strip() != ""
+    ), f"{input_video_scan_type=}. Must be a non-empty str"
+    assert (
+        isinstance(input_video_frame_rate, (float, int)) and input_video_frame_rate > 0
+    ), f"{input_video_frame_rate=}. Must be float/int > 0"
+    assert isinstance(auto_bright, bool), f"{auto_bright=}. Must be bool"
+    assert isinstance(normalise, bool), f"{normalise=}. Must be bool"
+    assert isinstance(white_balance, bool), f"{white_balance=}. Must be bool"
+    assert isinstance(denoise, bool), f"{denoise=}. Must be bool"
+    assert isinstance(sharpen, bool), f"{sharpen=}. Must be bool"
+    assert isinstance(filters_off, bool), f"{filters_off=}. Must be bool"
+    assert isinstance(black_border, bool), f"{black_border=}. Must be bool"
+    assert dvd_standard in [sys_consts.PAL, sys_consts.NTSC], (
+        f"{dvd_standard=}. Must be sys_consts.PAL or sys_consts.NTSC"
+    )
+    assert isinstance(task_def, Task_Def) or task_def is None, (
+        f"{task_def=}. Must be Task_Def or None"
+    )
+
+    file_handler = file_utils.File()
+
+    if not file_handler.path_exists(output_folder):
+        return -1, f"{output_folder} Does not exist"
+
+    if not file_handler.path_writeable(output_folder):
+        return -1, f"{output_folder} Cannot Be Written To"
+
+    if not file_handler.file_exists(input_file):
+        return -1, f"File Does Not Exist {input_file}"
+
+    _, input_file_name_base, _ = file_handler.split_file_path(input_file)
+
+    vob_file = file_handler.file_join(output_folder, f"{input_file_name_base}.vob")
+
+    interlaced_video = input_video_scan_type.lower().startswith("interlaced")
+
+    if input_video_width <= 0 or input_video_height <= 0:
+        return (
+            -1,
+            f"Input video {input_file=} does not specify valid height and/or width.",
+        )
+
+    if not input_video_ar:
+        return -1, f"Unrecognised Aspect Ratio : {input_video_ar} for {input_file=}"
+
+    if dvd_standard == sys_consts.PAL:
+        target_frame_rate = f"{sys_consts.PAL_FRAME_RATE}"
+        target_width = sys_consts.PAL_SPECS.width_43  # PAL DVD width is 720
+        target_height = sys_consts.PAL_SPECS.height_43  # PAL DVD height is 576
+        target_video_size = f"{target_width}x{target_height}"
+
+        if input_video_ar not in ["4:3", "16:9"]:
+            return (
+                -1,
+                f"Video {input_video_width=}x{input_video_height=} with AR {input_video_ar} does not conform to PAL "
+                f"specifications for DVD.",
+            )
+
+    else:  # NTSC
+        target_frame_rate = f"{sys_consts.NTSC_FRAME_RATE}"
+        target_width = sys_consts.NTSC_SPECS.width_43
+        target_height = sys_consts.NTSC_SPECS.height_43
+        target_video_size = f"{target_width}x{target_height}"
+
+    video_filters = Build_Video_Filters(
+        auto_bright=auto_bright,
+        normalise=normalise,
+        white_balance=white_balance,
+        denoise=denoise,
+        sharpen=sharpen,
+        filters_off=filters_off,
+        black_border=black_border,
+        target_width=-1 if target_width == input_video_width else target_width,
+        target_height=-1 if target_height == input_video_height else target_height,
+        include_dvd_interlacing=True,
+        input_video_frame_rate=input_video_frame_rate,
+        video_interlaced=interlaced_video,
+        dvd_standard=dvd_standard,
+    )
+
+    average_bit_rate = sys_consts.AVERAGE_BITRATE
+
+    interlaced_flags = []
+
+    if interlaced_video:
+        interlaced_flags = [
+            "-flags:v:0",
+            "+ilme+ildct",
+            "-alternate_scan:v:0",
+            "1",
+        ]
+
     command = [
-        sys_consts.CONVERT,
-        "-density",
-        "72",
-        "-units",
-        "pixelsperinch",
-        in_file,
-        "-background",
-        background_hex,
-        "-fill",
-        text_hex,
-        "-gravity",
-        justification,
-        "-font",
-        text_font,
-        "-pointsize",
-        f"{text_pointsize}",
-        "-size",
-        f"{image_width}x",
-        f"caption:{text}",
-        "-gravity",
-        gravity,
-        "-geometry",
-        f"+{x_offset}+{y_offset}",
-        "-composite",
-        out_file,
+        sys_consts.FFMPG,
+        "-fflags",
+        "+genpts",
+        "-i",
+        input_file,
+        *interlaced_flags,
+        "-f",
+        "dvd",
+        "-c:v:0",
+        "mpeg2video",
+        "-aspect",
+        input_video_ar,
+        "-s",
+        target_video_size,
+        "-r",
+        target_frame_rate,
+        "-g",
+        "15",
+        "-pix_fmt",
+        "yuv420p",
+        "-b:v",
+        f"{average_bit_rate}k",
+        "-maxrate:v",
+        "9000k",
+        "-minrate:v",
+        "0",
+        "-bufsize:v",
+        "1835008",
+        "-packetsize",
+        "2048",
+        "-muxrate",
+        "10080000",
+        "-force_key_frames",
+        "expr:if(isnan(prev_forced_n),1,eq(n,prev_forced_n + 15))",
+        *video_filters,
+        "-b:a",
+        "192000",
+        "-ar",
+        "48000",
+        "-c:a:0",
+        "ac3",
+        "-filter:a:0",
+        "loudnorm=I=-16:LRA=11:TP=-1.5",
+        "-map",
+        "0:V",
+        "-map",
+        "0:a",
+        "-map",
+        "-0:s",
+        "-threads",
+        "0",
+        vob_file,
     ]
 
-    return Execute_Check_Output(commands=command)
+    if task_def:  # Run as a background task
+        background_task_qmanager = Task_QManager()
+
+        background_task_qmanager.submit_task(
+            worker_function=Execute_Check_Output,
+            commands=command,
+            debug=False,
+            stderr_to_stdout=False,
+            task_id=task_def.task_id,
+            started_callback=task_def.started_callback,
+            progress_callback=task_def.progress_callback,
+            finished_callback=task_def.finished_callback,
+            error_callback=task_def.error_callback,
+            aborted_callback=task_def.aborted_callback,
+        )
+        return 0, vob_file
+
+    else:  # Run in the foreground
+        result, message = Execute_Check_Output(
+            commands=command, debug=False, stderr_to_stdout=False
+        )
+
+        if result == -1:
+            return -1, message
+
+    return 1, vob_file
 
 
 def Transcode_DV(
@@ -2504,22 +3246,43 @@ def Transcode_DV(
     frame_rate: float,
     width: int,
     height: int,
+    interlaced: bool = True,
+    bottom_field_first: bool = True,
+    deinterlace: bool = False,
+    auto_bright: bool = False,
+    normalise: bool = False,
+    white_balance: bool = False,
+    denoise: bool = False,
+    sharpen: bool = False,
+    filters_off: bool = False,
+    black_border: bool = False,
+    task_def: Task_Def = None,
 ) -> tuple[int, str]:
     """
-    Converts an input vile file into an DV avi file.
+    Converts an input video file into a DV AVI file, adhering to standard PAL/NTSC DV specifications.
 
     Args:
         input_file (str): The path to the input video file.
         output_folder (str): The path to the output folder.
-        frame_rate (float): The frame rate to use for the output video.
-        width (int): The width of the video
-        height (int): The height of the video
+        frame_rate (float): The frame rate to use for the output video (will be adjusted to DV standard).
+        width (int): The target width of the output DV video (must be DV standard resolution).
+        height (int): The target height of the output DV video (must be DV standard resolution).
+        interlaced (bool, optional): True if the input video is interlaced, False if progressive. Defaults to True.
+        bottom_field_first (bool, optional): Whether to use bottom field first for interlaced output. Defaults to True.
+        deinterlace (bool, optional): If True, forces deinterlacing of the input video, making the output progressive. Defaults to False.
+        auto_bright (bool): Whether to use auto brightness. Defaults to False.
+        normalise (bool): Whether to use normalise. Defaults to False.
+        white_balance (bool): Whether to use white balance. Defaults to False.
+        denoise (bool): Whether to use denoise. Defaults to False.
+        sharpen (bool): Whether to use sharpen. Defaults to False.
+        filters_off (bool): Whether to disable all filters except scaling and black borders. Defaults to False.
+        black_border (bool, optional): Whether to add black borders to the video. Defaults to False.
+        task_def (Task_Def, optional): The task definition. If supplied, this becomes a background task. Defaults to None.
 
     Returns:
         tuple[int, str]:
-            - arg 1: 1 if ok, -1 if error
-            - arg 2: error message if error (-1) else output file path (1)
-
+            - arg 1: 1 if ok, -1 if error, 0 if task_def supplied and this becomes a background task.
+            - arg 2: error message if error (-1) else output file path (1 or 0).
     """
 
     assert isinstance(input_file, str) and input_file.strip() != "", (
@@ -2533,22 +3296,39 @@ def Transcode_DV(
     )
     assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
     assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
+    assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
+    assert isinstance(bottom_field_first, bool), f"{bottom_field_first=}. Must be bool"
+    assert isinstance(deinterlace, bool), f"{deinterlace=}. Must be bool"
+    assert isinstance(auto_bright, bool), f"{auto_bright=}. Must be bool"
+    assert isinstance(normalise, bool), f"{normalise=}. Must be bool"
+    assert isinstance(white_balance, bool), f"{white_balance=}. Must be bool"
+    assert isinstance(denoise, bool), f"{denoise=}. Must be bool"
+    assert isinstance(sharpen, bool), f"{sharpen=}. Must be bool"
+    assert isinstance(filters_off, bool), f"{filters_off=}. Must be bool"
+    assert isinstance(black_border, bool), f"{black_border=}. Must be bool"
+    assert isinstance(task_def, Task_Def) or task_def is None, (
+        f"{task_def=}. Must be Task_Def or None"
+    )
+
+    if deinterlace and not interlaced:
+        return (
+            -1,
+            "Cannot force deinterlace when input video is progressive. Input is already progressive.",
+        )
 
     file_handler = file_utils.File()
 
     if not file_handler.path_exists(output_folder):
         return -1, f"{output_folder} Does not exist"
-
     if not file_handler.path_writeable(output_folder):
         return -1, f"{output_folder} Cannot Be Written To"
-
     if not file_handler.file_exists(input_file):
         return -1, f"File Does Not Exist {input_file}"
 
     _, input_file_name, _ = file_handler.split_file_path(input_file)
-
     output_file = file_handler.file_join(output_folder, f"{input_file_name}.avi")
 
+    # DV resolutions are fixed based on standard
     if (
         width == sys_consts.PAL_SPECS.width_43
         and height == sys_consts.PAL_SPECS.height_43
@@ -2556,7 +3336,7 @@ def Transcode_DV(
         width == sys_consts.PAL_SPECS.width_169
         and height == sys_consts.PAL_SPECS.height_43
     ):  # Anamorphic PAL
-        frame_rate = 25
+        adjusted_frame_rate = sys_consts.PAL_SPECS.frame_rate
     elif (
         width == sys_consts.NTSC_SPECS.width_43
         and height == sys_consts.NTSC_SPECS.height_43
@@ -2564,36 +3344,96 @@ def Transcode_DV(
         width == sys_consts.NTSC_SPECS.width_169
         and height == sys_consts.NTSC_SPECS.height_43
     ):  # Anamorphic NTSC
-        frame_rate = 30000 / 1001
+        adjusted_frame_rate = sys_consts.NTSC_SPECS.frame_rate
     else:
-        return -1, f"{width=} X {height=} Does Not Meet Standard PAL/NTSC DV specs"
+        return (
+            -1,
+            f"{width=}x{height=} Does Not Meet Standard PAL/NTSC DV specs (e.g., 720x576, 720x480)",
+        )
+
+    # If the provided frame_rate is significantly different from the adjusted DV standard, warn or error
+    if (
+        abs(frame_rate - adjusted_frame_rate) > 0.01
+    ):  # Use a small tolerance for float comparison
+        print(
+            f"Warning: Input frame rate {frame_rate} does not match DV standard {adjusted_frame_rate}. Adjusting."
+        )
+
+    video_filters_arg = Build_Video_Filters(
+        auto_bright=auto_bright,
+        normalise=normalise,
+        white_balance=white_balance,
+        denoise=denoise,
+        sharpen=sharpen,
+        filters_off=filters_off,
+        black_border=black_border,
+        target_width=width,
+        target_height=height,
+        deinterlace_video=deinterlace,
+        include_dvd_interlacing=False,
+    )
+
+    field_order_filter = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
+
+    # DV output is ALWAYS interlaced. So, these flags and field order filter should always be applied.
+    interlaced_flags = [
+        "-flags:v:0",
+        "+ilme+ildct",
+        "-alternate_scan:v:0",
+        "1",
+    ]
+
+    if video_filters_arg:
+        video_filters_arg[1] = f"{field_order_filter},{video_filters_arg[1]}"
+    else:
+        video_filters_arg = ["-vf", field_order_filter]
 
     command = [
         sys_consts.FFMPG,
-        "-threads",
-        str(Get_Thread_Count()),
         "-i",
         input_file,
         "-vsync",
-        "1",
-        "-s",
-        f"{width}x{height}",
+        "1",  # Preserve input timestamps (or 'cfr' for constant frame rate)
+        *video_filters_arg,
+        *interlaced_flags,
         "-r",
-        str(frame_rate),
+        str(adjusted_frame_rate),  # Use the adjusted DV standard frame rate
         "-c:v",
-        "dvvideo",
+        "dvvideo",  # DV video codec
         "-c:a",
-        "pcm_s16le",  # Encode audio to PCM (common for AVI)
-        output_file,
+        "pcm_s16le",  # Uncompressed audio for DV
+        "-threads",
+        "0",
         "-y",
+        output_file,
     ]
 
-    result, message = Execute_Check_Output(commands=command, debug=False)
+    if task_def:  # Run as a background task
+        background_task_qmanager = Task_QManager()
 
-    if result == -1:
-        return -1, message
+        background_task_qmanager.submit_task(
+            worker_function=Execute_Check_Output,
+            commands=command,
+            debug=False,
+            stderr_to_stdout=False,
+            task_id=task_def.task_id,
+            started_callback=task_def.started_callback,
+            progress_callback=task_def.progress_callback,
+            finished_callback=task_def.finished_callback,
+            error_callback=task_def.error_callback,
+            aborted_callback=task_def.aborted_callback,
+        )
 
-    return 1, ""
+        return 0, output_file
+    else:  # Run in the foreground
+        result, message = Execute_Check_Output(
+            commands=command, debug=False, stderr_to_stdout=False
+        )
+
+        if result == -1:
+            return -1, message
+
+    return 1, output_file
 
 
 def Transcode_ffv1_archival(
@@ -2602,25 +3442,165 @@ def Transcode_ffv1_archival(
     frame_rate: float,
     width: int,
     height: int,
+    interlaced: bool = True,
+    bottom_field_first: bool = True,
+    deinterlace: bool = False,
+    auto_bright: bool = False,
+    normalise: bool = False,
+    white_balance: bool = False,
+    denoise: bool = False,
+    sharpen: bool = False,
+    filters_off: bool = False,
+    black_border: bool = False,
+    apply_spp: bool = False,
+    dehalo: bool = False,
+    task_def: Task_Def = None,
 ) -> tuple[int, str]:
     """
-    Converts an input vile file into a lossless ffv1 compressed video suitable for permanent archival storage.
+    Converts an input video file into a lossless FFV1 compressed video suitable for permanent archival storage.
 
-    ffv1 is a permanent archival format widely accepted by archival institutions worldwide
+    FFV1 is a permanent archival format widely accepted by archival institutions worldwide.
 
     Args:
         input_file (str): The path to the input video file.
         output_folder (str): The path to the output folder.
         frame_rate (float): The frame rate to use for the output video.
-        width (int): The width of the video
-        height (int): The height of the video
+        width (int): The target width of the output video.
+        height (int): The target height of the output video.
+        interlaced (bool, optional): True if the input video is interlaced, False if progressive. Defaults to True.
+        bottom_field_first (bool, optional): Whether to use bottom field first for interlaced output. Defaults to True.
+        deinterlace (bool, optional): If True, forces deinterlacing of the input video, making the output progressive. Defaults to False.
+        auto_bright (bool): Whether to use auto brightness. Defaults to False.
+        normalise (bool): Whether to use normalise. Defaults to False.
+        white_balance (bool): Whether to use white balance. Defaults to False.
+        denoise (bool): Whether to use denoise. Defaults to False.
+        sharpen (bool): Whether to use sharpen. Defaults to False.
+        filters_off (bool): Whether to disable all filters except scaling and black borders. Defaults to False.
+        black_border (bool, optional): Whether to add black borders to the video. Defaults to False.
+        apply_spp (bool): Whether to apply the spp deblocking/denoising filter. Defaults to False.
+        dehalo (bool): Whether to apply the dehalo filter to reduce halos/ringing. Defaults to False.
+        task_def (Task_Def): The task definition, if this is supplied, then this becomes a background task. Defaults to None.
 
     Returns:
         tuple[int, str]:
-            - arg 1: 1 if ok, -1 if error
-            - arg 2: error message if error (-1) else output file path (1)
-
+            - arg 1: 1 if ok, -1 if error, 0 if task_def supplied and this becomes a background task
+            - arg 2: error message if error (-1) else output file path (1 or 0)
     """
+
+    # Helper functions for background task management
+    def _started_callback(task_id: str):
+        """
+        Called when pass 1 or pass 2 starts in the background
+
+        Args:
+            task_id (str): Task ID
+        """
+        assert isinstance(task_id, str), f"{task_id=}. Must be str"
+
+        task_def.started_callback(task_def.task_id)
+
+    def _progress_callback(task_id: str, percentage: float, message: str):
+        """
+        Called when pass 1 or pass 2 makes progress in the background
+
+        Args:
+            task_id (str): Task ID
+            percentage (float): Percentage complete
+            message (str): Message
+        """
+        assert isinstance(task_id, str), f"{task_id=}. Must be str"
+        assert isinstance(percentage, float), f"{percentage=}. Must be float"
+        assert isinstance(message, str), f"{message=}. Must be str"
+
+        if task_def.progress_callback:
+            task_def.progress_callback(task_def.task_id, percentage, message)
+
+    def _finished_callback(task_id: str, result: tuple[int, str]):
+        """
+        Called when pass 1 or pass 2 finishes in the background
+
+        Args:
+            task_id (str): Task ID
+            result (tuple[int, str]): Result tuple
+        """
+        assert isinstance(task_id, str), f"{task_id=}. Must be str"
+        assert isinstance(result, tuple), f"{result=}. Must be tuple"
+
+        if task_id.endswith("_pass1"):
+            background_task_qmanager.submit_task(
+                worker_function=Execute_Check_Output,
+                commands=pass_2,
+                debug=False,
+                stderr_to_stdout=False,
+                task_id=f"{task_def.task_id}_pass2",
+                started_callback=_started_callback,
+                error_callback=_error_callback,
+                finished_callback=_finished_callback,
+                # progress_callback=_progress_callback,
+                aborted_callback=_aborted_callback,
+            )
+
+        elif task_id.endswith("_pass2"):
+            if file_handler.remove_file(passlog_del_file) == -1:
+                task_def.finished_callback(
+                    task_def.task_id, (-1, f"Failed To Delete {passlog_del_file}")
+                )
+            else:
+                task_def.finished_callback(task_def.task_id, result)
+
+        return None
+
+    def _error_callback(task_id: str, message: str):
+        """
+        Called when an error occurs in pass 1 or pass 2
+
+        Args:
+            task_id (str): Task ID
+            message (str): Error Message
+        """
+        assert isinstance(task_id, str), f"{task_id=}. Must be str"
+        assert isinstance(message, str), f"{message=}. Must be str"
+
+        path, name, ext = file_handler.split_file_path(passlog_del_file)
+
+        if (
+            file_handler.file_exists(path, name, ext)
+            and file_handler.remove_file(passlog_del_file) == -1
+        ):
+            task_def.finished_callback(
+                task_def.task_id,
+                (-1, f"Failed To Delete {passlog_del_file} \n {message}"),
+            )
+        else:
+            task_def.finished_callback(task_def.task_id, (-1, message))
+
+        task_def.error_callback(task_id, (-1, message))
+
+    def _aborted_callback(task_id: str, message: str):
+        """
+        Called when pass 1 or pass 2 is aborted
+
+        Args:
+            task_id (str): Task ID
+            message (str): Error Message
+        """
+        assert isinstance(task_id, str), f"{task_id=}. Must be str"
+        assert isinstance(message, str), f"{message=}. Must be str"
+
+        path, name, ext = file_handler.split_file_path(passlog_del_file)
+        if (
+            file_handler.file_exists(path, name, ext)
+            and file_handler.remove_file(passlog_del_file) == -1
+        ):
+            task_def.aborted_callback(
+                task_def.task_id,
+                (-1, f"Failed To Delete {passlog_del_file} \n {message}"),
+            )
+        else:
+            task_def.aborted_callback(task_def.task_id, message)
+
+    #### Main
+
     assert isinstance(input_file, str) and input_file.strip() != "", (
         f"{input_file=}. Must be a non-empty str"
     )
@@ -2632,15 +3612,34 @@ def Transcode_ffv1_archival(
     )
     assert isinstance(width, int) and width > 0, f"{width=}. Must be int > 0"
     assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
+    assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
+    assert isinstance(bottom_field_first, bool), f"{bottom_field_first=}. Must be bool"
+    assert isinstance(deinterlace, bool), f"{deinterlace=}. Must be bool"
+    assert isinstance(auto_bright, bool), f"{auto_bright=}. Must be bool"
+    assert isinstance(normalise, bool), f"{normalise=}. Must be bool"
+    assert isinstance(white_balance, bool), f"{white_balance=}. Must be bool"
+    assert isinstance(denoise, bool), f"{denoise=}. Must be bool"
+    assert isinstance(sharpen, bool), f"{sharpen=}. Must be bool"
+    assert isinstance(filters_off, bool), f"{filters_off=}. Must be bool"
+    assert isinstance(black_border, bool), f"{black_border=}. Must be bool"
+    assert isinstance(apply_spp, bool), f"{apply_spp=}. Must be bool"  # NEW: Assertion
+    assert isinstance(dehalo, bool), f"{dehalo=}. Must be bool"  # NEW: Assertion
+    assert isinstance(task_def, Task_Def) or task_def is None, (
+        f"{task_def=}. Must be Task_Def or None"
+    )
+
+    if deinterlace and not interlaced:
+        return (
+            -1,
+            "Cannot force deinterlace when input video is progressive. Input is already progressive.",
+        )
 
     file_handler = file_utils.File()
 
     if not file_handler.path_exists(output_folder):
         return -1, f"{output_folder} Does not exist"
-
     if not file_handler.path_writeable(output_folder):
         return -1, f"{output_folder} Cannot Be Written To"
-
     if not file_handler.file_exists(input_file):
         return -1, f"File Does Not Exist {input_file}"
 
@@ -2648,62 +3647,101 @@ def Transcode_ffv1_archival(
 
     output_file = file_handler.file_join(output_folder, f"{input_file_name}.mkv")
     passlog_file = file_handler.file_join(output_folder, f"{input_file_name}")
-    passlog_del_file = file_handler.file_join(
-        output_folder, f"{input_file_name}-0.log"
-    )  # FFMPEG tacks on video stream
+    passlog_del_file = file_handler.file_join(output_folder, f"{input_file_name}-0.log")
 
-    # Command 1
+    video_filters_arg = Build_Video_Filters(
+        auto_bright=auto_bright,
+        normalise=normalise,
+        white_balance=white_balance,
+        denoise=denoise,
+        sharpen=sharpen,
+        filters_off=filters_off,
+        black_border=black_border,
+        target_width=width,
+        target_height=height,
+        deinterlace_video=deinterlace,
+        include_dvd_interlacing=False,
+        apply_spp=apply_spp,
+        dehalo=dehalo,
+    )
+
+    interlaced_output_flags = []
+    field_order_filter_str = ""
+
+    if interlaced and not deinterlace:
+        field_order_filter_str = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
+        interlaced_output_flags = [
+            "-flags:v",
+            "+ilme+ildct",
+            "-alternate_scan:v",
+            "1",
+        ]
+    all_filters = []
+    if field_order_filter_str:
+        if (
+            video_filters_arg and video_filters_arg[1]
+        ):  # Check if the filter string part exists
+            video_filters_arg[1] = f"{field_order_filter_str},{video_filters_arg[1]}"
+        else:
+            video_filters_arg = ["-vf", field_order_filter_str]
+
+    # Command 1 (Pass 1)
     pass_1 = [
         sys_consts.FFMPG,
-        "-threads",
-        Get_Thread_Count(),
         "-i",
         input_file,
+        "-vsync",
+        "cfr",
         "-max_muxing_queue_size",
         "9999",
         "-pass",
         "1",
         "-passlogfile",
         passlog_file,
+        *video_filters_arg,
+        *interlaced_output_flags,
+        "-r",
+        str(frame_rate),
         "-c:v",
         "ffv1",
         "-level",
         "3",
         "-coder",
-        "1",
+        "1",  # Golomb Rice
         "-context",
-        "1",
+        "1",  # Small context
         "-g",
-        "1",
+        "1",  # All I-frames
         "-slices",
-        "16",
+        "16",  # More slices for parallel processing
         "-slicecrc",
-        "1",
-        "-s",
-        f"{width}x{height}",
-        "-r",
-        str(frame_rate),
+        "1",  # CRC checks for slices
         "-c:a",
-        "flac",
+        "flac",  # Lossless audio
+        "-f",
+        "null",  # Output to null device for pass 1
         "-threads",
-        Get_Thread_Count(),
-        output_file,
-        "-y",
+        "0",
+        str(os.devnull),
     ]
 
-    # Command 2
+    # Command 2 (Pass 2)
     pass_2 = [
         sys_consts.FFMPG,
-        "-threads",
-        Get_Thread_Count(),
         "-i",
         input_file,
+        "-vsync",
+        "cfr",
         "-max_muxing_queue_size",
         "9999",
         "-pass",
         "2",
         "-passlogfile",
         passlog_file,
+        *video_filters_arg,
+        *interlaced_output_flags,
+        "-r",
+        str(frame_rate),
         "-c:v",
         "ffv1",
         "-level",
@@ -2718,116 +3756,51 @@ def Transcode_ffv1_archival(
         "16",
         "-slicecrc",
         "1",
-        "-s",
-        f"{width}x{height}",
-        "-r",
-        f"{frame_rate}",
         "-c:a",
         "flac",
         "-threads",
-        Get_Thread_Count(),
-        output_file,
+        "0",
         "-y",
-    ]
-
-    result, message = Execute_Check_Output(commands=pass_1, debug=False)
-
-    if result == -1:
-        return -1, message
-
-    result, message = Execute_Check_Output(commands=pass_2, debug=False)
-
-    if result == -1:
-        return -1, message
-
-    if file_handler.remove_file(passlog_del_file) == -1:
-        return -1, f"Failed To Delete {passlog_del_file}"
-
-    return 1, output_file
-
-
-def Create_SD_Intermediate_Copy(input_file: str, output_folder: str) -> tuple[int, str]:
-    """Creates an intermediate edit copy in SD resolution.
-
-    Args:
-        input_file (str): The path to the input video file.
-        output_folder (str): The path to the output folder.
-
-    Returns:
-        tuple[int, str]:
-            - arg 1: 1 if successful, -1 if an error occurred
-            - arg 2: error message if error (-1) else output file path (1)
-    """
-    assert isinstance(input_file, str) and input_file.strip() != "", (
-        f"{input_file=}. Must be a non-empty str"
-    )
-
-    assert isinstance(output_folder, str) and output_folder.strip() != "", (
-        f"{output_folder=}. Must be a non-empty str"
-    )
-
-    file_handler = file_utils.File()
-
-    if not file_handler.path_exists(output_folder):
-        return -1, f"{output_folder} Does not exist"
-
-    if not file_handler.path_writeable(output_folder):
-        return -1, f"{output_folder} Cannot Be Written To"
-
-    if not file_handler.file_exists(input_file):
-        return -1, f"File Does Not Exist {input_file}"
-
-    _, input_file_name, _ = file_handler.split_file_path(input_file)
-    output_file = file_handler.file_join(
-        output_folder, f"{input_file_name}_sd_intermediate.mpg"
-    )
-
-    command = [
-        sys_consts.FFMPG,
-        "-threads",
-        Get_Thread_Count(),
-        "-i",
-        input_file,
-        "-max_muxing_queue_size",
-        "9999",
-        "-vf",
-        "scale=720:-1",  # Change 720 to your desired width for SD
-        "-c:v",
-        "mpeg2video",
-        # "-r",
-        # str(frame_rate),  # set frame rate
-        "-b:v",
-        f"{sys_consts.AVERAGE_BITRATE}k",  # average video bitrate is kilobits/sec
-        "-maxrate:v",
-        "9000k",  # maximum video rate is 9000 kilobits/sec
-        "-minrate:v",
-        "0",  # minimum video rate is 0
-        "-bufsize:v",
-        "1835008",  # video buffer size is 1835008 bits
-        "-packetsize",
-        "2048",  # packet size is 2048 bits
-        "-muxrate",
-        "10080000",  # mux rate is 10080000 bits/sec
-        "-g",
-        "15",
-        "-force_key_frames",
-        "expr:if(isnan(prev_forced_n),1,eq(n,prev_forced_n+15))",
-        # set key frame expression (Closes each GOP)
-        "-pix_fmt",
-        "yuv420p",  # use YUV 420p pixel format
-        "-c:a",
-        "pcm_s16le",
-        "-y",
-        "-threads",
-        Get_Thread_Count(),
         output_file,
     ]
 
-    if not file_handler.file_exists(output_file):
-        result, message = Execute_Check_Output(commands=command, debug=False)
+    if task_def:  # Run in the background
+        background_task_qmanager = Task_QManager()
+
+        # Pass 1 submission
+        background_task_qmanager.submit_task(
+            worker_function=Execute_Check_Output,
+            commands=pass_1,
+            debug=False,
+            stderr_to_stdout=False,
+            task_id=f"{task_def.task_id}_pass1",
+            started_callback=_started_callback,
+            error_callback=_error_callback,
+            finished_callback=_finished_callback,
+            # progress_callback=_progress_callback,
+            aborted_callback=_aborted_callback,
+        )
+
+        return 0, output_file
+
+    else:  # Run in the foreground
+        result, message = Execute_Check_Output(
+            commands=pass_1, debug=False, stderr_to_stdout=False
+        )
 
         if result == -1:
             return -1, message
+
+        result, message = Execute_Check_Output(
+            commands=pass_2, debug=False, stderr_to_stdout=False
+        )
+
+        if result == -1:
+            return -1, message
+
+        # Delete passlog file only after successful completion of both passes
+        if file_handler.remove_file(passlog_del_file) == -1:
+            return -1, f"Failed To Delete {passlog_del_file}"
 
     return 1, output_file
 
@@ -2841,29 +3814,51 @@ def Transcode_Mezzanine(
     interlaced: bool = True,
     bottom_field_first: bool = True,
     mjpeg: bool = False,
+    deinterlace: bool = False,
+    auto_bright: bool = False,
+    normalise: bool = False,
+    white_balance: bool = False,
+    denoise: bool = False,
+    sharpen: bool = False,
+    filters_off: bool = False,
+    black_border: bool = False,
+    encode_10bit: bool = False,
+    task_def: Task_Def = None,
 ) -> tuple[int, str]:
-    """Converts an input video to MJPEG or H264 at supplied resolution and frame rate to make an edit copy that minimises
+    """
+    Converts an input video to MJPEG or H264 at supplied resolution and frame rate to make an edit copy that minimises
     generational losses. The video is transcoded to a file in the output folder.
 
        Args:
            input_file (str): The path to the input video file.
            output_folder (str): The path to the output folder.
            frame_rate (float): The frame rate to use for the output video.
-           width (int): The width of the video
-           height (int): The height of the video
-           interlaced (bool, optional): Whether to use interlaced video. Defaults to True.
-           bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
+           width (int): The target width of the output video
+           height (int): The target height of the output video
+           interlaced (bool, optional): True if the input video is interlaced, False if progressive. Defaults to True.
+           bottom_field_first (bool, optional): Whether to use bottom field first for interlaced output. Only relevant
+           if the output remains interlaced (i.e., `deinterlace` is False and `interlaced` is True). Defaults to True.
            mjpeg (bool, optional): True use MJPEG video as a Mezzanine video, False use H264.
+           deinterlace (bool, optional): If True, forces deinterlacing of the input video, making the output progressive.
+           Defaults to False.
+           auto_bright (bool): Whether to use auto brightness. Defaults to False.
+           normalise (bool): Whether to use normalise. Defaults to False.
+           white_balance (bool): Whether to use white balance. Defaults to False.
+           denoise (bool): Whether to use denoise. Defaults to False.
+           sharpen (bool): Whether to use sharpen. Defaults to False.
+           filters_off (bool): Whether to disable all filters except scaling and black borders. Defaults to False.
+           black_border (bool, optional): Whether to add black borders to the video. Defaults to False.
+           encode_10bit (bool, optional): If True, encode video to 10-bit YUV 4:2:2 (yuv422p10le). Defaults to False.
+           task_def (Task_Def): The task definition, if this is supplied, then this becomes a background task. Defaults to None.
 
        Returns:
            tuple[int, str]:
-               - arg 1: 1 if ok, -1 if error
-               - arg 2: error message if error (-1) else output file path (1)
+               - arg 1: 1 if ok, -1 if error, 0 if task_def supplied and this becomes a background task
+               - arg 2: error message if error (-1) else output file path (1 or 0)
     """
     assert isinstance(input_file, str) and input_file.strip() != "", (
         f"{input_file=}. Must be a non-empty str"
     )
-
     assert isinstance(output_folder, str) and output_folder.strip() != "", (
         f"{output_folder=}. Must be a non-empty str"
     )
@@ -2875,149 +3870,195 @@ def Transcode_Mezzanine(
     assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
     assert isinstance(bottom_field_first, bool), f"{bottom_field_first=}. Must be bool"
     assert isinstance(mjpeg, bool), f"{mjpeg=}. Must be bool"
+    assert isinstance(deinterlace, bool), f"{deinterlace=}. Must be bool"
+    assert isinstance(auto_bright, bool), f"{auto_bright=}. Must be bool"
+    assert isinstance(normalise, bool), f"{normalise=}. Must be bool"
+    assert isinstance(white_balance, bool), f"{white_balance=}. Must be bool"
+    assert isinstance(denoise, bool), f"{denoise=}. Must be bool"
+    assert isinstance(sharpen, bool), f"{sharpen=}. Must be bool"
+    assert isinstance(filters_off, bool), f"{filters_off=}. Must be bool"
+    assert isinstance(black_border, bool), f"{black_border=}. Must be bool"
+    assert isinstance(encode_10bit, bool), f"{encode_10bit=}. Must be bool"
+    assert isinstance(task_def, Task_Def) or task_def is None, (
+        f"{task_def=}. Must be Task_Def or None"
+    )
+
+    if deinterlace and not interlaced:
+        return (
+            -1,
+            "Cannot force deinterlace when input video is progressive. Input is already progressive.",
+        )
 
     file_handler = file_utils.File()
 
     if not file_handler.path_exists(output_folder):
         return -1, f"{output_folder} Does not exist"
-
     if not file_handler.path_writeable(output_folder):
         return -1, f"{output_folder} Cannot Be Written To"
-
     if not file_handler.file_exists(input_file):
         return -1, f"File Does Not Exist {input_file}"
 
     _, input_file_name, _ = file_handler.split_file_path(input_file)
 
-    black_border_size = 12
-    field_order = []
-
-    if interlaced:
-        # black_box_filter, most likely dealing with analogue video, head switching noise best removed, and edges
-        # are best covered for optimal compression
-        filter_commands = [
-            f"drawbox=x=0:y=0:w=iw:h={black_border_size}:color=black:t=fill",
-            f"drawbox=x=0:y=ih-{black_border_size}:w=iw:h={black_border_size}:color=black:t=fill",
-            (
-                f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill"
-            ),
-            (
-                f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill"
-            ),
-        ]
-        black_box_filter = ",".join(filter_commands)
-
-        field_order = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
-        video_filter = [
-            "-vf",
-            f"{black_box_filter},scale={width}x{height},{field_order}",
-            "-flags:v:0",  # video flags for the first video stream
-            "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
-            "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
-            "1",  # alternate scan value is 1,
-        ]
+    if encode_10bit:
+        pixel_format = "yuv422p10le"  # 10-bit 4:2:2
     else:
-        video_filter = []
-
-    # Set bit rate based on video height
-    if height <= 576:
-        bit_rate = 25  # Set a lower bit rate for SD
-    else:
-        bit_rate = 35  # Set a higher bit rate for HD ~ 40
+        pixel_format = "yuv420p"  # Default to 8-bit 4:2:0
 
     if mjpeg:
         output_file = file_handler.file_join(output_folder, f"{input_file_name}.avi")
 
-        command = [
-            sys_consts.FFMPG,
-            "-fflags",  # set ffmpeg flags
-            "+genpts",  # generate presentation timestamps
-            "-threads",
-            Get_Thread_Count(),
-            "-i",
-            input_file,
-            "-max_muxing_queue_size",
-            "9999",
-            *video_filter,
-            "-c:v",
-            "mjpeg",
-            "-q:v",
-            "3",  # Adjust quality (lower is higher quality)
-            "-b:v",
-            f"{bit_rate}M",  # Set a high bit rate suitable for an edit master
-            "-maxrate",
-            f"{int(float(bit_rate) * 2)}M",
-            "-bufsize",
-            f"{int(float(bit_rate) * 5)}M",
-            "-sn",  # Remove titles, causes problems sometimes
-            "-r",
-            str(frame_rate),  # set frame rate
-            "-pix_fmt",
-            "yuvj420p",  # use YUV 420p pixel format
-            "-c:a",
-            "aac",
-            "-threads",
-            Get_Thread_Count(),
-            output_file,
-            "-y",
-        ]
-    else:
+        if input_file == output_file:
+            output_file = file_handler.file_join(
+                output_folder, f"{input_file_name}_out.avi"
+            )
+
+        video_codec = "mjpeg"
+
+        # MJPEG specific quality/bitrate settings
+        q_v = "3"
+        crf = None  # CRF not used for MJPEG
+        preset = None  # Preset not used for MJPEG
+        gop_size = 1  # MJPEG is typically I-frame only
+        keyint_min = 1
+        sc_threshold = 0
+
+    else:  # H264 Mezzanine
         output_file = file_handler.file_join(output_folder, f"{input_file_name}.mkv")
 
-        command = [
-            sys_consts.FFMPG,
-            "-fflags",
-            "+genpts",  # generate presentation timestamps
-            "-threads",
-            Get_Thread_Count(),
-            "-i",
-            input_file,
-            "-vsync",
-            "cfr",
-            "-max_muxing_queue_size",
-            "9999",
-            *video_filter,
-            "-r",
-            str(frame_rate),
-            "-c:v",
-            "libx264",
-            "-sn",  # Remove titles
-            "-pix_fmt",
-            "yuv420p",  # Ensure the pixel format is compatible with Blu-ray
-            "-crf",
-            "17",  # Visually Lossless
-            "-preset",
-            "superfast",
-            # "-qp", # Lossless Not needed
-            # "0",
-            "-b:v",
-            f"{bit_rate}M",
-            "-maxrate",
-            f"{int(float(bit_rate) * 2.5)}M",
-            "-bufsize",
-            f"{int(float(bit_rate) * 5)}M",
-            "-g",
-            f"{1}",  # Set the GOP size to match the DVD standard
-            "-keyint_min",
-            f"{1}",  # Set the minimum key frame interval to Match DVD (same as GOP size for closed GOP)
-            "-sc_threshold",
-            "0",  # Set the scene change threshold to 0 for frequent key frames
-            "-c:a",
-            "aac",
-            "-b:a",
-            "128k",
-            "-threads",
-            Get_Thread_Count(),
-            output_file,
-            "-y",
-        ]
+        if input_file == output_file:
+            output_file = file_handler.file_join(
+                output_folder, f"{input_file_name}_out.mkv"
+            )
 
-    result, message = Execute_Check_Output(
-        commands=command, debug=False, stderr_to_stdout=False
+        video_codec = (
+            "libx264"  # Default for H264. If using H265, you'd change this here
+        )
+        q_v = None  # Q:v not used for H264
+        crf = "17"  # Good quality for mezzanine H264
+        preset = "medium"  # Medium preset for good balance
+        gop_size = 1  # Mezzanine is I-frame only
+        keyint_min = 1
+        sc_threshold = 0
+
+    # Set bit rate based on video height (common to both MJPEG and H264 Mezzanine)
+    if height <= 576:  # SD
+        bit_rate = 25
+    else:  # HD
+        bit_rate = 50
+
+    if (width, height) in Standard_Resolutions():
+        scale_width = -1
+        scale_height = -1
+    else:
+        scale_width = width
+        scale_height = height
+
+    video_filters_arg = Build_Video_Filters(
+        auto_bright=auto_bright,
+        normalise=normalise,
+        white_balance=white_balance,
+        denoise=denoise,
+        sharpen=sharpen,
+        filters_off=filters_off,
+        black_border=black_border,
+        target_width=scale_width,
+        target_height=scale_height,
+        deinterlace_video=deinterlace,
     )
 
-    if result == -1:
-        return -1, message
+    interlaced_flags = []
+
+    if not deinterlace and interlaced:
+        interlaced_flags = [
+            "-flags:v:0",
+            "+ilme+ildct",
+            "-alternate_scan:v:0",
+            "1",
+        ]
+
+        field_order_filter = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
+        if video_filters_arg:
+            video_filters_arg[1] = f"{field_order_filter},{video_filters_arg[1]}"
+        else:
+            video_filters_arg = ["-vf", field_order_filter]
+
+    command = [
+        sys_consts.FFMPG,
+        "-fflags",
+        "+genpts",  # generate presentation timestamps
+        "-i",
+        input_file,
+        "-vsync",
+        "cfr",
+        "-max_muxing_queue_size",
+        "9999",
+        *video_filters_arg,
+        *interlaced_flags,
+        "-r",
+        str(frame_rate),
+        "-c:v",
+        video_codec,
+        "-b:v",
+        f"{bit_rate}M",  # High bitrate for edit copy
+        "-maxrate",
+        f"{int(float(bit_rate) * 2)}M",
+        "-bufsize",
+        f"{int(float(bit_rate) * 5)}M",  # Adjusted bufsize for mezzanine
+        "-sn",  # Remove titles
+        "-pix_fmt",
+        pixel_format,
+    ]
+
+    # Add codec-specific arguments
+    if q_v:  # For MJPEG
+        command.extend(["-q:v", q_v])
+    if crf:  # For H264
+        command.extend(["-crf", crf])
+    if preset:  # For H264
+        command.extend(["-preset", preset])
+
+    command.extend([
+        "-g",
+        f"{gop_size}",
+        "-keyint_min",
+        f"{keyint_min}",
+        "-sc_threshold",
+        f"{sc_threshold}",
+        "-c:a",
+        "pcm_s16le",  # Uncompressed audio for mezzanine
+        "-threads",
+        "0",
+        "-y",
+        output_file,
+    ])
+
+    if task_def:  # Run in the background
+        background_task_qmanager = Task_QManager()
+
+        background_task_qmanager.submit_task(
+            worker_function=Execute_Check_Output,
+            commands=command,
+            debug=False,
+            stderr_to_stdout=False,
+            task_id=task_def.task_id,
+            started_callback=task_def.started_callback,
+            progress_callback=task_def.progress_callback,
+            finished_callback=task_def.finished_callback,
+            error_callback=task_def.error_callback,
+            aborted_callback=task_def.aborted_callback,
+        )
+
+        return 0, output_file
+
+    else:  # Run in the foreground
+        result, message = Execute_Check_Output(
+            commands=command, debug=False, stderr_to_stdout=False
+        )
+
+        if result == -1:
+            return -1, message
+
     return 1, output_file
 
 
@@ -3030,29 +4071,48 @@ def Transcode_MPEG2_High_Bitrate(
     interlaced: bool = True,
     bottom_field_first: bool = True,
     iframe_only: bool = False,
+    deinterlace: bool = False,
+    auto_bright: bool = False,
+    normalise: bool = False,
+    white_balance: bool = False,
+    denoise: bool = False,
+    sharpen: bool = False,
+    filters_off: bool = False,
+    black_border: bool = False,
+    task_def: Task_Def = None,
 ) -> tuple[int, str]:
-    """Converts an input video to MPEG2 at supplied resolution and frame rate at a high bit rate to make an edit
+    """
+    Converts an input video to MPEG2 at supplied resolution and frame rate at a high bit rate to make an edit
     copy that minimises generational losses. The video is transcoded to a file in the output folder.
 
         Args:
             input_file (str): The path to the input video file.
             output_folder (str): The path to the output folder.
             frame_rate (float): The frame rate to use for the output video.
-            width (int) : The width of the video
-            height (int) : The height of the video
-            interlaced (bool, optional): Whether to use interlaced video. Defaults to True.
-            bottom_field_first (bool, optional): Whether to use bottom field first. Defaults to True.
-            iframe_only: (bool, optional): Generate iframe only. Defaults to False.
+            width (int) : The target width of the output video
+            height (int) : The target height of the output video
+            interlaced (bool, optional): True if the input video is interlaced, False if progressive. Defaults to True.
+            bottom_field_first (bool, optional): Whether to use bottom field first for interlaced output. Only relevant
+            if the output remains interlaced (i.e., `deinterlace` is False and `input_video_is_interlaced` is True). Defaults to True.
+            iframe_only (bool, optional): Generate iframe only. Defaults to False.
+            deinterlace (bool, optional): If True, forces deinterlacing of the input video, making the output progressive. Defaults to False.
+            auto_bright (bool): Whether to use auto brightness. Defaults to False.
+            normalise (bool): Whether to use normalise. Defaults to False.
+            white_balance (bool): Whether to use white balance. Defaults to False.
+            denoise (bool): Whether to use denoise. Defaults to False.
+            sharpen (bool): Whether to use sharpen. Defaults to False.
+            filters_off (bool): Whether to disable all filters except scaling and black borders. Defaults to False.
+            black_border (bool, optional): Whether to add black borders to the video. Defaults to False.
+            task_def (Task_Def): The task definition, if this is supplied, then this becomes a background task. Defaults to None.
 
         Returns:
             tuple[int, str]:
-                - arg 1: 1 if ok, -1 if error
-                - arg 2: error message if error (-1) else output file path (1)
+                - arg 1: 1 if ok, -1 if error, 0 if task_def supplied and this becomes a background task
+                - arg 2: error message if error (-1) else output file path (1 or 0)
     """
     assert isinstance(input_file, str) and input_file.strip() != "", (
         f"{input_file=}. Must be a non-empty str"
     )
-
     assert isinstance(output_folder, str) and output_folder.strip() != "", (
         f"{output_folder=}. Must be a non-empty str"
     )
@@ -3063,106 +4123,177 @@ def Transcode_MPEG2_High_Bitrate(
     assert isinstance(height, int) and height > 0, f"{height=}. Must be int > 0"
     assert isinstance(interlaced, bool), f"{interlaced=}. Must be bool"
     assert isinstance(bottom_field_first, bool), f"{bottom_field_first=}. Must be bool"
+    assert isinstance(iframe_only, bool), f"{iframe_only=}. Must be bool"
+    assert isinstance(deinterlace, bool), f"{deinterlace=}. Must be bool"
+    assert isinstance(auto_bright, bool), f"{auto_bright=}. Must be bool"
+    assert isinstance(normalise, bool), f"{normalise=}. Must be bool"
+    assert isinstance(white_balance, bool), f"{white_balance=}. Must be bool"
+    assert isinstance(denoise, bool), f"{denoise=}. Must be bool"
+    assert isinstance(sharpen, bool), f"{sharpen=}. Must be bool"
+    assert isinstance(filters_off, bool), f"{filters_off=}. Must be bool"
+    assert isinstance(black_border, bool), f"{black_border=}. Must be bool"
+    assert isinstance(task_def, Task_Def) or task_def is None, (
+        f"{task_def=}. Must be Task_Def or None"
+    )
+
+    if deinterlace and not interlaced:
+        return (
+            -1,
+            "Cannot force deinterlace when input_video_is_interlaced is False. Input is already progressive.",
+        )
 
     file_handler = file_utils.File()
 
     if not file_handler.path_exists(output_folder):
         return -1, f"{output_folder} Does not exist"
-
     if not file_handler.path_writeable(output_folder):
         return -1, f"{output_folder} Cannot Be Written To"
-
     if not file_handler.file_exists(input_file):
         return -1, f"File Does Not Exist {input_file}"
 
     _, input_file_name, _ = file_handler.split_file_path(input_file)
-
     output_file = file_handler.file_join(output_folder, f"{input_file_name}.mpg")
 
-    black_border_size = 12
+    gop_size = 1 if iframe_only else (15 if frame_rate == 25 else 18)
 
-    if interlaced:
-        # black_box_filter, most likely dealing with analogue video, head switching noise best removed, and edges
-        # are best covered for optimal compression
-        filter_commands = [
-            f"drawbox=x=0:y=0:w=iw:h={black_border_size}:color=black:t=fill",
-            f"drawbox=x=0:y=ih-{black_border_size}:w=iw:h={black_border_size}:color=black:t=fill",
-            (
-                f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill"
-            ),
-            (
-                f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill"
-            ),
-        ]
-        black_box_filter = ",".join(filter_commands)
+    if height <= 576:  # SD
+        bit_rate = 9
+    else:  # HD
+        bit_rate = 50
 
-        field_order = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
-        video_filter = [
-            "-vf",
-            f"{black_box_filter},scale={width}x{height},{field_order}",
-            "-flags:v:0",  # video flags for the first video stream
-            "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
-            "-alternate_scan:v:0",  # set alternate scan for the first video stream (interlace)
-            "1",  # alternate scan value is 1,
-        ]
+    if (width, height) in Standard_Resolutions():
+        scale_width = -1
+        scale_height = -1
     else:
-        video_filter = []
+        scale_width = width
+        scale_height = height
 
-    gop_size = 1 if iframe_only else 15
+    video_filters_arg = Build_Video_Filters(
+        auto_bright=auto_bright,
+        normalise=normalise,
+        white_balance=white_balance,
+        denoise=denoise,
+        sharpen=sharpen,
+        filters_off=filters_off,
+        black_border=black_border,
+        target_width=scale_width,
+        target_height=scale_height,
+        deinterlace_video=deinterlace,
+        include_dvd_interlacing=False,
+    )
 
-    # Set bit rate based on video height
-    if height <= 576:
-        bit_rate = 9  # Set a lower bit rate for SD
-    else:
-        bit_rate = 50  # Set a higher bit rate for HD
+    interlaced_flags = []
+
+    if not deinterlace and interlaced:
+        interlaced_flags = [
+            "-flags:v:0",
+            "+ilme+ildct",
+            "-alternate_scan:v:0",
+            "1",
+        ]
+
+        field_order_filter = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
+
+        if video_filters_arg:
+            video_filters_arg[1] = f"{field_order_filter},{video_filters_arg[1]}"
+        else:
+            video_filters_arg = ["-vf", field_order_filter]
 
     command = [
         sys_consts.FFMPG,
-        "-fflags",  # set ffmpeg flags
+        "-fflags",
         "+genpts",  # generate presentation timestamps
-        # "+igndts",
-        "-threads",
-        Get_Thread_Count(),
         "-i",
         input_file,
+        "-vsync",
+        "cfr",
         "-max_muxing_queue_size",
         "9999",
-        "mpeg2video",
-        *video_filter,
+        *video_filters_arg,
+        *interlaced_flags,
+        "-r",
+        str(frame_rate),
         "-c:v",
+        "mpeg2video",  # MPEG2 video codec
         "-b:v",
-        f"{bit_rate}M",  # Set a high bit rate suitable for an edit master
+        f"{bit_rate}M",  # High bitrate for edit copy
         "-maxrate",
         f"{int(float(bit_rate) * 2)}M",
         "-bufsize",
         f"{int(float(bit_rate) * 10)}M",
         "-sn",  # Remove titles
-        "-r",
-        str(frame_rate),  # set frame rate
         "-g",
         f"{gop_size}",
         "-force_key_frames",
-        f"expr:if(isnan(prev_forced_n),1,eq(n,prev_forced_n+{gop_size}))",  # set key frame expression (Closes each GOP)
+        f"expr:if(isnan(prev_forced_n),1,eq(n,prev_forced_n+{gop_size}))",
         "-pix_fmt",
-        "yuv420p",  # use YUV 420p pixel format
+        "yuv420p",  # Standard pixel format for MPEG2
         "-bf",
-        "2",
+        "2",  # Max B-frames for MPEG2
         "-c:a",
-        "aac",
+        "ac3",  # Assuming AC3 audio for MPEG2 output
         "-b:a",
-        "128k",
+        "256k",
         "-threads",
-        Get_Thread_Count(),
+        "0",
+        "-y",
         output_file,
     ]
 
-    if not file_handler.file_exists(output_file):
-        result, message = Execute_Check_Output(commands=command, debug=False)
+    if task_def:  # Run in the background
+        background_task_qmanager = Task_QManager()
 
+        background_task_qmanager.submit_task(
+            worker_function=Execute_Check_Output,
+            commands=command,
+            debug=False,
+            stderr_to_stdout=False,
+            task_id=task_def.task_id,
+            started_callback=task_def.started_callback,
+            progress_callback=task_def.progress_callback,
+            finished_callback=task_def.finished_callback,
+            error_callback=task_def.error_callback,
+            aborted_callback=task_def.aborted_callback,
+        )
+
+        return 0, output_file
+    else:  # Run in the foreground
+        result, message = Execute_Check_Output(
+            commands=command, debug=False, stderr_to_stdout=False
+        )
         if result == -1:
             return -1, message
 
     return 1, output_file
+
+
+def Standard_Resolutions() -> set:
+    """
+    Returns a list of standard resolutions
+
+    Returns:
+        set: List of standard resolutions
+    """
+    return {
+        (
+            sys_consts.PAL_SPECS.width_43,
+            sys_consts.PAL_SPECS.height_43,
+        ),  # 720x576 (PAL 4:3)
+        (
+            sys_consts.PAL_SPECS.width_169,
+            sys_consts.PAL_SPECS.height_169,
+        ),  # 720x576 (PAL 16:9 anamorphic)
+        (
+            sys_consts.NTSC_SPECS.width_43,
+            sys_consts.NTSC_SPECS.height_43,
+        ),  # 720x480 (NTSC 4:3)
+        (
+            sys_consts.NTSC_SPECS.width_169,
+            sys_consts.NTSC_SPECS.height_169,
+        ),  # 720x480 (NTSC 16:9 anamorphic)
+        (1920, 1080),  # Full HD
+        (1280, 720),  # HD
+    }
 
 
 def Transcode_H26x(
@@ -3176,31 +4307,54 @@ def Transcode_H26x(
     h265: bool = False,
     high_quality: bool = True,
     iframe_only: bool = False,
+    deinterlace: bool = False,
+    auto_bright: bool = False,
+    normalise: bool = False,
+    white_balance: bool = False,
+    denoise: bool = False,
+    sharpen: bool = False,
+    filters_off: bool = False,
+    black_border: bool = False,
+    encode_10bit: bool = False,
+    mkv_container: bool = False,
+    task_def: Task_Def = None,
 ) -> tuple[int, str]:
-    """Converts an input video to H.264/5 at supplied resolution and frame rate.
+    """
+    Converts an input video to H.264/5 at supplied resolution and frame rate.
     The video is transcoded to a file in the output folder.
 
     Args:
         input_file (str): The path to the input video file.
         output_folder (str): The path to the output folder.
         frame_rate (float): The frame rate to use for the output video.
-        width (int) : The width of the video
-        height (int) : The height of the video
-        interlaced (bool): Whether to use interlaced video. Defaults to True.
-        bottom_field_first (bool): Whether to use bottom field first. Defaults to True.
+        width (int) : The target width of the output video
+        height (int) : The target height of the output video
+        interlaced (bool): True if the input video is interlaced, False if progressive. Defaults to True.
+        bottom_field_first (bool): Whether to use bottom field first for interlaced output. Only relevant if the output
+        remains interlaced (i.e., `deinterlace` is False and `interlaced` is True). Defaults to True.
         h265 (bool): Whether to use H.265. Defaults to False.
         high_quality (bool): Use a high quality encode. Defaults to True.
-        iframe_only (bool): True id no GOP and all iframe desired else False. Defaults to False
+        iframe_only (bool): True if no GOP and all I-frames desired else False. Defaults to False.
+        deinterlace (bool): If True, forces deinterlacing of the input video, making the output progressive. Defaults to False.
+        auto_bright (bool): Whether to use auto brightness. Defaults to False.
+        normalise (bool): Whether to use normalise. Defaults to False.
+        white_balance (bool): Whether to use white balance. Defaults to False.
+        denoise (bool): Whether to use denoise. Defaults to False.
+        sharpen (bool): Whether to use sharpen. Defaults to False.
+        filters_off (bool): Whether to disable all filters except scaling and black borders. Defaults to False.
+        black_border (bool, optional): Whether to add black borders to the video. Defaults to False.
+        encode_10bit (bool, optional): Encode videos as 10 bit. Defaults to False
+        mkv_container: (bool, optional): Place output file in a mkv container, Otherwise a mp4 container. Defaults to False,
+        task_def (Task_Def): The task definition, if this is supplied, then this becomes a background task. Defaults to None.
 
     Returns:
         tuple[int, str]:
-            - arg 1: 1 if ok, -1 if error
+            - arg 1: 1 if ok, -1 if error, 0 if task_def supplied and this becomes a background task
             - arg 2: error message if error (-1) else output file path (1)
     """
     assert isinstance(input_file, str) and input_file.strip() != "", (
         f"{input_file=}. Must be a non-empty str"
     )
-
     assert isinstance(output_folder, str) and output_folder.strip() != "", (
         f"{output_folder=}. Must be a non-empty str"
     )
@@ -3213,21 +4367,46 @@ def Transcode_H26x(
     assert isinstance(bottom_field_first, bool), f"{bottom_field_first=}. Must be bool"
     assert isinstance(h265, bool), f"{h265=}. Must be bool"
     assert isinstance(high_quality, bool), f"{high_quality=}. Must be bool"
+    assert isinstance(iframe_only, bool), f"{iframe_only=}. Must be bool"
+    assert isinstance(deinterlace, bool), f"{deinterlace=}. Must be bool"
+    assert isinstance(auto_bright, bool), f"{auto_bright=}. Must be bool"
+    assert isinstance(normalise, bool), f"{normalise=}. Must be bool"
+    assert isinstance(white_balance, bool), f"{white_balance=}. Must be bool"
+    assert isinstance(denoise, bool), f"{denoise=}. Must be bool"
+    assert isinstance(sharpen, bool), f"{sharpen=}. Must be bool"
+    assert isinstance(filters_off, bool), f"{filters_off=}. Must be bool"
+    assert isinstance(black_border, bool), f"{black_border=}. Must be bool"
+    assert isinstance(encode_10bit, bool), f"{encode_10bit=}, Must be bool"
+    assert isinstance(mkv_container, bool), f"{mkv_container=}. Must be bool"
+    assert isinstance(task_def, Task_Def) or task_def is None, (
+        f"{task_def=}. Must be Task_Def or None"
+    )
+
+    if deinterlace and not interlaced:
+        return (
+            -1,
+            "Cannot force deinterlace when input video is progressive. Input is already progressive.",
+        )
 
     file_handler = file_utils.File()
 
     if not file_handler.path_exists(output_folder):
         return -1, f"{output_folder} Does not exist"
-
     if not file_handler.path_writeable(output_folder):
         return -1, f"{output_folder} Cannot Be Written To"
-
     if not file_handler.file_exists(input_file):
         return -1, f"File Does Not Exist {input_file}"
 
+    file_extension = "mkv" if mkv_container else "mp4"
     _, input_file_name, _ = file_handler.split_file_path(input_file)
+    output_file = file_handler.file_join(
+        output_folder, f"{input_file_name}.{file_extension}"
+    )
 
-    output_file = file_handler.file_join(output_folder, f"{input_file_name}.mp4")
+    if output_file == input_file:
+        output_file = file_handler.file_join(
+            output_folder, f"{input_file_name}_out.{file_extension}"
+        )
 
     if not utils.Is_Complied():
         print(
@@ -3236,99 +4415,125 @@ def Transcode_H26x(
             f" {'5M' if height <= 576 else '35M'=}"
         )
 
-    gop_size = 1 if iframe_only else 15
+    gop_size = 1 if iframe_only else (15 if frame_rate == 25 else 18)
 
-    # Construct the FFmpeg command
-    if h265:
-        encoder = "libx265"
+    encoder = "libx265" if h265 else "libx264"
+    quality_preset = "slow" if high_quality else "superfast"
+
+    if (width, height) in Standard_Resolutions():
+        scale_width = -1
+        scale_height = -1
     else:
-        encoder = "libx264"
+        scale_width = width
+        scale_height = height
 
-    if high_quality:
-        quality_preset = "slow"
-    else:
-        quality_preset = "superfast"
+    video_filters_arg = Build_Video_Filters(
+        auto_bright=auto_bright,
+        normalise=normalise,
+        white_balance=white_balance,
+        denoise=denoise,
+        sharpen=sharpen,
+        filters_off=filters_off,
+        black_border=black_border,
+        target_width=scale_width,
+        target_height=scale_height,
+        deinterlace_video=deinterlace,
+        include_dvd_interlacing=False,
+    )
 
-    black_border_size = 12
+    interlaced_flags = []
 
-    if interlaced:
-        # black_box_filter, most likely dealing with analogue video, head switching noise best removed, and edges
-        # are best covered for optimal compression
-        filter_commands = [
-            f"drawbox=x=0:y=0:w=iw:h={black_border_size}:color=black:t=fill",
-            f"drawbox=x=0:y=ih-{black_border_size}:w=iw:h={black_border_size}:color=black:t=fill",
-            f"drawbox=x=0:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill",
-            f"drawbox=x=iw-{black_border_size}:y={black_border_size}:w={black_border_size}:h=ih-{black_border_size * 2}:color=black:t=fill",
+    if not deinterlace and interlaced:
+        interlaced_flags = [
+            "-flags:v:0",
+            "+ilme+ildct",
+            "-alternate_scan:v:0",
+            "1",
         ]
-        black_box_filter = ",".join(filter_commands)
 
-        field_order = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
-        video_filter = [
-            "-vf",
-            f"{black_box_filter},scale={width}x{height},{field_order}",
-            "-flags:v:0",  # video flags for the first video stream
-            "+ilme+ildct",  # include interlaced motion estimation and interlaced DCT
-            "-alternate_scan:v:0",  # set alternate scan for first video stream (interlace)
-            "1",  # alternate scan value is 1,
-        ]
-    else:
-        video_filter = []
+        field_order_filter = f"fieldorder={'bff' if bottom_field_first else 'tff'}"
+
+        if video_filters_arg:
+            video_filters_arg[1] = f"{field_order_filter},{video_filters_arg[1]}"
+        else:
+            video_filters_arg = ["-vf", field_order_filter]
+
+    pixel_format = "yuv422p10le" if encode_10bit else "yuv420p"
 
     command = [
         sys_consts.FFMPG,
         "-fflags",
-        "+genpts",  # generate presentation timestamps
-        "-threads",
-        Get_Thread_Count(),
+        "+genpts",
         "-i",
         input_file,
         "-vsync",
         "cfr",
         "-max_muxing_queue_size",
         "9999",
-        *video_filter,
+        *video_filters_arg,
+        *interlaced_flags,
         "-r",
         str(frame_rate),
         "-c:v",
         encoder,
         "-sn",  # Remove titles
         "-pix_fmt",
-        "yuv420p",  # Ensure the pixel format is compatible with Blu-ray
+        pixel_format,
         "-crf",
         "19" if not h265 else "25",
         "-preset",
         quality_preset,
         "-c:a",
-        "aac",
+        "ac3",
         "-b:a",
-        "128k",
+        "256k",
         "-muxrate",
-        "25M",  # Maximum Blu-ray mux rate in bits per second
+        "48M",
         "-bufsize",
-        "30M",
+        "48M",
         "-g",
-        f"{gop_size}",  # Set the GOP size to match the DVD standard
+        f"{gop_size}",
         "-keyint_min",
-        f"{gop_size}",  # Set the minimum key frame interval to Match DVD (same as GOP size for closed GOP)
+        f"{gop_size}",
         "-sc_threshold",
-        "0",  # Set the scene change threshold to 0 for frequent key frames
+        "0",
         "-threads",
-        Get_Thread_Count(),
+        "0",
         output_file,
         "-y",
     ]
 
-    result, message = Execute_Check_Output(commands=command, debug=False)
+    if task_def:  # Run in the background
+        background_task_qmanager = Task_QManager()
 
-    if result == -1:
-        return -1, message
+        background_task_qmanager.submit_task(
+            worker_function=Execute_Check_Output,
+            commands=command,
+            debug=False,
+            stderr_to_stdout=False,
+            task_id=task_def.task_id,
+            started_callback=task_def.started_callback,
+            progress_callback=task_def.progress_callback,
+            finished_callback=task_def.finished_callback,
+            error_callback=task_def.error_callback,
+            aborted_callback=task_def.aborted_callback,
+        )
+
+        return 0, output_file
+
+    else:
+        result, message = Execute_Check_Output(
+            commands=command, debug=True, stderr_to_stdout=False
+        )
+        if result == -1:
+            return -1, message
 
     return 1, output_file
 
 
 def Convert_To_PNG_Stream(
     image_filename: str, width: int, height: int, keep_aspect_ratio: bool = True
-) -> (int, bytes):
+) -> tuple[int, bytes]:
     """
     Converts an image file to PNG format, resizing it, and returns the PNG data as bytes.
 
@@ -3384,7 +4589,7 @@ def Write_Image_On_Image(
     x: int,
     y: int,
     gravity: str = Gravity.NORTHWEST.value,
-) -> (int, bytes):
+) -> tuple[int, bytes]:
     """
     Overlays an image (provided as bytes) onto another base image (provided as bytes)
     using ImageMagick and returns the modified image as a byte string (PNG format).
@@ -3458,8 +4663,9 @@ def Write_Text_On_Image(
     pointsize: int,
     color: str,
     gravity: str = Gravity.NORTHWEST.value,
-) -> (int, bytes):
-    """Writes text on an image (provided as bytes) and returns the modified image as a byte string (PNG format).
+) -> tuple[int, bytes]:
+    """
+    Writes text on an image (provided as bytes) and returns the modified image as a byte string (PNG format).
 
     Args:
         image_data (bytes): The image data in bytes format (e.g., from reading a file)
@@ -3543,7 +4749,8 @@ def Write_Text_On_Image(
 def Write_Text_On_File(
     input_file: str, text: str, x: int, y: int, font: str, pointsize: int, color: str
 ) -> tuple[int, str]:
-    """Writes text on a file
+    """
+    Writes text on a file
 
     Args:
         input_file (str): The file on which the text will be written
@@ -3600,7 +4807,8 @@ def Write_Text_On_File(
 
 
 def Get_Text_Dims(text: str, font: str, pointsize: int) -> tuple[int, int]:
-    """Gets the text dimensions in pixels
+    """
+    Gets the text dimensions in pixels
 
     Args:
         text (str): The text string to be measured
@@ -3856,7 +5064,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
         found_iframe = False
         current_search_start = start_i_time
 
-        # # Find the nearest I-frame after the start_time
+        # Find the nearest I-frame after the start_time
         while not found_iframe and current_search_start < video_duration:
             commands = [
                 sys_consts.FFPROBE,
@@ -3987,6 +5195,8 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             f"{end_time - start_time}",
             "-c",
             "copy",
+            "-threads",
+            "0",
             output_file,
             "-y",
         ]
@@ -4063,8 +5273,6 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             f"{start_time}",
             "-fflags",
             "+genpts",
-            "-threads",
-            Get_Thread_Count(),
             "-i",
             input_file,
             "-vsync",
@@ -4097,7 +5305,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             "-c:a",
             "copy",
             "-threads",
-            Get_Thread_Count(),
+            "0",
             output_file,
             "-y",
         ]
@@ -4263,7 +5471,7 @@ def Cut_Video(cut_video_def: Cut_Video_Def) -> tuple[int, str]:
             # Join re-encoded_start segment, stream_copy segment and re-encoded end segment to make the final frame
             # accurate cut file with nearly no loss
             result, message, _ = Concatenate_Videos(
-                temp_files=concat_files,
+                video_files=concat_files,
                 output_file=temp_output_file,
                 delete_temp_files=True,
                 debug=False,
@@ -4348,7 +5556,7 @@ def Split_Large_Video(
     source: str, output_folder: str, desired_chunk_size_gb: int
 ) -> tuple[int, str]:
     """
-    Splits a large video file into smaller chunks using FFmpeg (stream copy).
+    Splits a large video file into smaller chunks.
 
     Args:
         source (str): The source path of the video file to split.
@@ -4374,88 +5582,155 @@ def Split_Large_Video(
         return -1, f"Video file not found: {source}"
 
     if os.path.isdir(source):
-        return -1, "Source path is a directory: {source}"
+        return -1, f"Source path is a directory: {source}"
 
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    try:
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder, exist_ok=True)
 
-    chunk_file_list = []
+        chunk_file_list = []
 
-    min_chunk_duration_s = 180  # Minimum chunk duration is 3 minutes
+        min_chunk_duration_s = 180  # Minimum chunk duration is 3 minutes
 
-    file_handler = file_utils.File()
+        file_handler = file_utils.File()
 
-    _, source_name, source_extn = file_handler.split_file_path(source)
+        _, source_name, source_extn = file_handler.split_file_path(source)
 
-    encoding_info = Get_File_Encoding_Info(source)
+        encoding_info = Get_File_Encoding_Info(source)
 
-    if encoding_info.error:
-        return -1, encoding_info.error
+        if encoding_info.error:
+            return -1, encoding_info.error
 
-    file_size = os.path.getsize(source)
-
-    num_chunks = math.ceil(
-        file_size / (desired_chunk_size_gb * (1024**3))
-    )  # Convert GB to bytes
-
-    chunk_duration = encoding_info.video_duration / num_chunks
-    chunk_frames = chunk_duration * encoding_info.video_frame_rate // 1
-
-    chunk_adjust = True
-    max_possible_chunks = (
-        encoding_info.video_frame_count
-        // (encoding_info.video_frame_rate * min_chunk_duration_s)
-        + 2
-    )  # Add a small buffer
-
-    while chunk_adjust and num_chunks <= max_possible_chunks:
-        chunk_frames = encoding_info.video_frame_count / num_chunks
-        last_chunk_start_frame = int((num_chunks - 1) * chunk_frames)
-        last_chunk_end_frame = encoding_info.video_frame_count
-        last_chunk_num_frames = last_chunk_end_frame - last_chunk_start_frame
-        last_chunk_duration = last_chunk_num_frames / encoding_info.video_frame_rate
-
-        if (
-            last_chunk_duration < min_chunk_duration_s
-            and num_chunks < max_possible_chunks
-        ):
-            num_chunks += 1
-        else:
-            chunk_adjust = False
-
-    for chunk_index in range(num_chunks):
-        start_frame = int(chunk_index * chunk_frames)
-
-        end_frame = int(
-            (chunk_index + 1) * chunk_frames
-            if chunk_index < num_chunks - 1
-            else encoding_info.video_frame_count
-        )
-
-        chunk_file = file_handler.file_join(
-            output_folder, f"{source_name}_{chunk_index + 1}", source_extn
-        )
-        chunk_file_list.append(chunk_file)
-
-        result, message = Cut_Video(
-            Cut_Video_Def(
-                input_file=source,
-                output_file=chunk_file,
-                start_cut=start_frame,
-                end_cut=end_frame,
-                frame_rate=encoding_info.video_frame_rate,
-                tag=f"chunk_{chunk_index}",
+        if not encoding_info.video_duration or encoding_info.video_duration <= 0:
+            return (
+                -1,
+                f"Invalid or zero video duration detected for {source}. Cannot split.",
             )
-        )
+        if not encoding_info.video_frame_rate or encoding_info.video_frame_rate <= 0:
+            return (
+                -1,
+                f"Invalid or zero video frame rate detected for {source}. Cannot split.",
+            )
+        if not encoding_info.video_frame_count or encoding_info.video_frame_count <= 0:
+            return (
+                -1,
+                f"Invalid or zero video frame count detected for {source}. Cannot split.",
+            )
 
-        if result == -1:
-            return -1, message
+        file_size = os.path.getsize(source)
 
-    return 1, "|".join(chunk_file_list)
+        num_chunks = math.ceil(
+            file_size / (desired_chunk_size_gb * (1024**3))
+        )  # Convert GB to bytes
+
+        # Ensure at least one chunk even for small files
+        if num_chunks == 0:
+            num_chunks = 1
+
+        # Adjust chunking to ensure the last chunk isn't too short.
+
+        chunk_adjust = True
+
+        frames_per_min_chunk = encoding_info.video_frame_rate * min_chunk_duration_s
+
+        if frames_per_min_chunk > 0:
+            max_possible_chunks = (
+                encoding_info.video_frame_count // frames_per_min_chunk
+            )
+
+            if max_possible_chunks == 0:  # If video is shorter than min_chunk_duration
+                max_possible_chunks = 1
+            else:
+                max_possible_chunks += 2  # Add buffer
+
+        else:  # Should not happen if video_frame_rate check passed
+            max_possible_chunks = 1
+
+        while chunk_adjust and num_chunks <= max_possible_chunks:
+            chunk_frames_per_chunk = encoding_info.video_frame_count / num_chunks
+
+            # Calculate duration of the very last chunk based on adjusted num_chunks
+            last_chunk_start_frame = int((num_chunks - 1) * chunk_frames_per_chunk)
+            last_chunk_end_frame = (
+                encoding_info.video_frame_count
+            )  # Always goes to end of video
+
+            last_chunk_num_frames = last_chunk_end_frame - last_chunk_start_frame
+
+            # Ensure last_chunk_num_frames is not negative or zero if division resulted in weirdness
+            if last_chunk_num_frames <= 0:
+                last_chunk_duration = 0.0
+            else:
+                last_chunk_duration = (
+                    last_chunk_num_frames / encoding_info.video_frame_rate
+                )
+
+            if (
+                last_chunk_duration < min_chunk_duration_s
+                and num_chunks
+                < max_possible_chunks  # Only increment if we haven't hit max allowed chunks
+            ):
+                num_chunks += 1
+            else:
+                chunk_adjust = False  # Condition met or max chunks reached
+
+        if num_chunks < 1:
+            num_chunks = 1  # Ensure at least one chunk if video is valid
+
+        # Recalculate exact chunk_frames for final iteration based on adjusted num_chunks
+        chunk_frames = encoding_info.video_frame_count / num_chunks
+
+        for chunk_index in range(num_chunks):
+            start_frame = int(chunk_index * chunk_frames)
+
+            # Ensure end_frame does not exceed total frames for the last chunk
+            end_frame = int(
+                (chunk_index + 1) * chunk_frames
+                if chunk_index < num_chunks - 1
+                else encoding_info.video_frame_count
+            )
+
+            if (
+                start_frame >= end_frame and chunk_index < num_chunks - 1
+            ):  # Check for zero-length chunk
+                continue
+
+            chunk_file = file_handler.file_join(
+                output_folder, f"{source_name}_{chunk_index + 1}", source_extn
+            )
+
+            chunk_file_list.append(chunk_file)
+
+            result, message = Cut_Video(
+                Cut_Video_Def(
+                    input_file=source,
+                    output_file=chunk_file,
+                    start_cut=start_frame,
+                    end_cut=end_frame,
+                    frame_rate=encoding_info.video_frame_rate,
+                    tag=f"chunk_{chunk_index}",
+                )
+            )
+
+            if result == -1:
+                # Clean up any already created chunks if one fails
+                for created_chunk in chunk_file_list:
+                    if os.path.exists(created_chunk):
+                        os.remove(created_chunk)
+                return -1, f"Failed to cut video chunk {chunk_index + 1}: {message}"
+
+        if not chunk_file_list:
+            return -1, "No video chunks were created."
+
+        return 1, "|".join(chunk_file_list)
+
+    except Exception as e:
+        return -1, f"An unexpected error occurred during video splitting: {e}"
 
 
 def Stream_Optimise(output_file: str) -> tuple[int, str]:
-    """Optimizes a video file for streaming.
+    """
+    Optimizes a video file for streaming.
 
     Args:
         output_file (str): The path to the video file to be optimized.
@@ -4478,9 +5753,10 @@ def Stream_Optimise(output_file: str) -> tuple[int, str]:
         "copy",
         "-movflags",
         "+faststart",
+        "-threads",
+        "0",
     ]
 
-    # Run the FFmpeg command
     result, message = Execute_Check_Output(command)
 
     if result == -1:
@@ -4489,107 +5765,9 @@ def Stream_Optimise(output_file: str) -> tuple[int, str]:
     return 1, ""
 
 
-def Execute_Check_Output(
-    commands: list[str],
-    env: dict | None = None,
-    execute_as_string: bool = False,
-    debug: bool = False,
-    shell: bool = False,
-    stderr_to_stdout: bool = False,
-    buffer_size: int = 1000000,
-) -> tuple[int, str]:
-    """Executes the given command(s) with the subprocess.run method.
-
-    This wrapper provides better error and debug handling
-
-    Args:
-        commands (list[str]): non-empty list of commands and options to be executed.
-        env (dict | None): A dictionary of environment variables to be set for the command. Defaults to None
-        execute_as_string (bool): If True, the commands will be executed as a single string. Defaults to False
-        debug (bool): If True, debug information will be printed. Defaults to False
-        shell (bool): If True,  the command will be executed using the shell. Defaults to False
-        stderr_to_stdout (bool): If True, the command will feed the stderr to stdout. Defaults to False.
-        buffer_size (int): The size of the output buffer
-
-    Returns:
-        tuple[int, str]: A tuple containing the status code and the output of the command.
-
-        - arg1: 1 if the command is successful, -1 if the command fails.
-        - arg2: "" if the command is successful, if the command fails, an error message.
-    """
-    if env is None:
-        env = dict()
-
-    assert isinstance(commands, list) and len(commands) > 0, (
-        f"{commands=} must be a non-empty list of commands and options"
-    )
-    assert isinstance(execute_as_string, bool), f"{execute_as_string=} must be bool"
-    assert isinstance(debug, bool), f"{debug=} must be bool"
-    assert isinstance(env, dict), f"{env=} must be dict"
-    assert isinstance(shell, bool), f"{shell=} must be bool"
-    assert isinstance(stderr_to_stdout, bool), f"{stderr_to_stdout=}. Must be bool"
-    assert isinstance(buffer_size, int) and buffer_size > 0, (
-        f"{buffer_size=}. Must be int > 0"
-    )
-
-    if debug and not utils.Is_Complied():
-        print(f"DBG Call command ***   {' '.join(commands)}")
-        print(f"DBG Call commands command list ***   {commands}")
-        print(f"DBG Call commands shlex split  ***   {shlex.split(' '.join(commands))}")
-        print("DBG Lets Do It!")
-
-    # Define subprocess arguments
-    subprocess_args = {
-        "args": commands if not execute_as_string else shlex.split(" ".join(commands)),
-        "shell": shell,
-        "universal_newlines": True,
-        "env": env,
-        "bufsize": buffer_size,
-    }
-
-    # A ffmpeg special - stderr output is sometimes good stuff
-    subprocess_args["stderr"] = (
-        subprocess.STDOUT
-        if stderr_to_stdout
-        else (open(os.devnull, "w") if "posix" in os.name else open("nul", "w"))
-    )
-
-    try:
-        output = subprocess.check_output(**subprocess_args)
-        return 1, output
-
-    except subprocess.CalledProcessError as e:
-        output = e.output
-
-        if e.returncode == 1:
-            return (
-                1,
-                output,
-            )  # ffmpeg is special..again..sometimes return code 1 is a good thing
-        else:
-            if e.returncode == 127:
-                message = (
-                    f"Program Not Found Or Exited Abnormally \n {' '.join(commands)} ::"
-                    f" {output}"
-                )
-            elif e.returncode <= 125:
-                message = (
-                    f"{e.returncode} Command Failed!\n {' '.join(commands)} :: {output}"
-                )
-            else:
-                message = (
-                    f"{e.returncode} Command Crashed!\n {' '.join(commands)} ::"
-                    f" {output}"
-                )
-
-            if debug and not utils.Is_Complied():
-                print(f"DBG {message} {e.returncode=} :: {output}")
-
-            return -1, message  # Return -1 to indicate failure
-
-
 def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> Dvd_Dims:
-    """Returns the DVD image dimensions. The hard-coded values are  mandated by the dvd_format and the
+    """
+    Returns the DVD image dimensions. The hard-coded values are  mandated by the dvd_format and the
     aspect ratio and must not be changed.  PAL is 720 x 576, and NTSC is 720 x 480 and is always stored
     that way on a DVD. But the display aspect ratio can be flagged on a DVD (PAL is 1024 x 576 and NTSC is
     850x480), but it is not stored that way on the DVD
@@ -4645,7 +5823,8 @@ def Get_DVD_Dims(aspect_ratio: str, dvd_format: str) -> Dvd_Dims:
 
 
 def Get_Image_Width(image_file: str) -> tuple[int, str]:
-    """Returns the width of an image file in pixels.
+    """
+    Returns the width of an image file in pixels.
 
     Args:
         image_file (str): The path to the image file.
@@ -4672,7 +5851,8 @@ def Get_Image_Width(image_file: str) -> tuple[int, str]:
 
 
 def Get_Image_Height(image_file: str) -> tuple[int, str]:
-    """Returns the height of an image file in pixels.
+    """
+    Returns the height of an image file in pixels.
 
     Args:
         image_file (str): The path to the image file.
@@ -4699,7 +5879,8 @@ def Get_Image_Height(image_file: str) -> tuple[int, str]:
 
 
 def Get_Image_Size(image_file: str) -> tuple[int, int, str]:
-    """Returns the width and height of an image file in pixels.
+    """
+    Returns the width and height of an image file in pixels.
 
     Args:
         image_file (str): The path to the image file.
@@ -4731,7 +5912,8 @@ def Get_Image_Size(image_file: str) -> tuple[int, int, str]:
 def Generate_Menu_Image_From_File(
     video_file: str, frame_number: int, out_folder: str, button_height: int = 500
 ) -> tuple[int, str]:
-    """Generate the image at the specified frame number from the video file.
+    """
+    Generate the image at the specified frame number from the video file.
 
     Args:
         video_file (str): The input video file
@@ -4764,7 +5946,7 @@ def Generate_Menu_Image_From_File(
         or not file_handler.path_exists(out_folder)
         or not file_handler.path_writeable(out_folder)
     ):
-        return -1, ""
+        return -1, f"{video_file} or {out_folder} does not exist or is not writeable"
 
     image_file = file_handler.file_join(out_folder, video_file_name, "jpg")
 
@@ -4779,8 +5961,10 @@ def Generate_Menu_Image_From_File(
         "-i",
         video_file,
         "-vf",
-        rf"select=eq(n\,{frame_number}) , scale=-1:{str(button_height)}",
+        f"select=eq(n\\,{frame_number}),scale=-1:{button_height}",
         "-vframes",
+        "1",
+        "-update",
         "1",
         image_file,
     ]
@@ -4794,7 +5978,8 @@ def Generate_Menu_Image_From_File(
 
 
 def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
-    """Returns the pertinent file encoding information as required for DVD creation
+    """
+    Returns the pertinent file encoding information
 
     Args:
         video_file (str): The video file being checked
@@ -4804,85 +5989,219 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
 
     """
 
-    # Helper function
-    def _calculate_frame_rate(stream: dict) -> float:
-        """Calculates frame rate, prioritizing avg_frame_rate.
+    #### Helper functions
+    def _calculate_frame_rate(stream: dict, video_scan_type: str = "") -> float:
+        """
+        Calculates frame rate, prioritizing avg_frame_rate and adjusts for interlaced field rates.
 
         Args:
             stream (dict): The video stream dictionary
+            video_scan_type (str): The scan type of the video stream (e.g., 'interlaced', 'progressive').
+                                    Defaults to empty string if not provided.
 
         Returns:
-            float: The calculated frame rate
+            float: The calculated and adjusted frame rate
         """
 
-        #### Helper functions
-        def _extract_frame_rate(key: str) -> float:
-            """Extracts and rounds frame rate from a stream key."""
-            if isinstance(stream.get(key), str) and "/" in stream[key]:
+        def _extract_frame_rate_val(stream: dict, key: str) -> float:
+            """
+            Extracts and rounds frame rate from a stream key.
+
+            Args:
+                stream (dict): The video stream dictionary
+                key (str): The key to extract the frame rate from.
+
+            Returns:
+                float: The extracted frame rate
+            """
+            assert isinstance(stream, dict), f"{stream=}. Must be a dict"
+            assert isinstance(key, str) and key.strip() != "", (
+                f"{key=}. Must be a non-empty str"
+            )
+
+            frame_rate_value = stream.get(key)
+
+            if isinstance(frame_rate_value, str) and "/" in frame_rate_value:
                 try:
-                    num, den = map(int, stream[key].split("/"))
+                    num, den = map(int, frame_rate_value.split("/"))
+                    # Added a sanity check for extremely large numerators which might indicate non-frame-rate values
+                    if num > 100000 and den == 1:
+                        return 0.0  # Force to zero to trigger fallback calculation
                     return round(num / den, 3)
                 except (ValueError, ZeroDivisionError):
                     return 0.0
+
+            if isinstance(frame_rate_value, (int, float)):
+                return float(frame_rate_value)
+
             return 0.0
 
-        def _get_frame_rate(frame_rate: float) -> float:
-            """Returns standard or adjusted near-standard frame rate.
+        def _get_standardized_frame_rate(raw_frame_rate: float) -> float:
+            """
+            Returns standard or adjusted near-standard frame rate,or 0.0 if the raw rate is outside expected video
+            ranges.
+
             Args:
-                frame_rate (float): The frame rate to check
+                raw_frame_rate (float): The raw frame rate value.
 
             Returns:
-                float: The adjusted frame rate
+                float: The adjusted or standard frame rate
             """
-            if frame_rate > 0.0:
-                if 24 < frame_rate < 25:
+            assert isinstance(raw_frame_rate, float) and raw_frame_rate >= 0.0, (
+                f"{raw_frame_rate=}. Must be float >= 0.0"
+            )
+
+            # Insanity check: If frame rate is excessively high, it's likely wrong.
+            if raw_frame_rate > 1000.0:
+                return 0.0
+
+            if raw_frame_rate > 0.0:
+                if 24 < raw_frame_rate < 25:  # For 23.976 (NTSC film) to 25.0 (PAL)
                     return float(sys_consts.PAL_FRAME_RATE)
-                elif 49 < frame_rate < 50:
+                elif 49 < raw_frame_rate < 50:  # For 49.95 to 50.0 (PAL field)
                     return float(sys_consts.PAL_FIELD_RATE)
-                elif 29 < frame_rate < 30:
+                elif (
+                    29 < raw_frame_rate < 30
+                    and raw_frame_rate != sys_consts.NTSC_FRAME_RATE
+                ):  # For 29.97
                     return float(sys_consts.NTSC_FRAME_RATE)
-                elif 59 < frame_rate < 60:
+                elif (
+                    59 < raw_frame_rate < 60
+                    and raw_frame_rate != sys_consts.NTSC_FIELD_RATE
+                ):  # For 59.94
                     return float(sys_consts.NTSC_FIELD_RATE)
-                elif frame_rate in (
+
+                # Check for exact standard values or common integers
+                if raw_frame_rate in (
                     sys_consts.NTSC_FRAME_RATE,
                     sys_consts.NTSC_FIELD_RATE,
                     sys_consts.PAL_FRAME_RATE,
                     sys_consts.PAL_FIELD_RATE,
-                    30,
+                    24.0,  # Common for film
+                    30.0,  # Common integer NTSC-like frame rate
+                    60.0,  # Common integer NTSC-like field rate
                 ):
-                    return float(frame_rate)
+                    return float(raw_frame_rate)
+
+                return float(
+                    raw_frame_rate
+                )  # Return as is if not near a standard or exact match
+
             return 0.0
 
-        #### Main
-        average_frame_rate = _get_frame_rate(_extract_frame_rate("avg_frame_rate"))
-        frame_rate = _get_frame_rate(_extract_frame_rate("r_frame_rate"))
+        assert isinstance(stream, dict), f"{stream=}. Must be a dict"
+        assert isinstance(video_scan_type, str) and video_scan_type in (
+            "interlaced",
+            "progressive",
+        ), f"{video_scan_type=}. Must be 'interlaced' or 'progressive'"
 
-        return average_frame_rate if average_frame_rate > 0.0 else frame_rate
+        average_frame_rate = _get_standardized_frame_rate(
+            _extract_frame_rate_val(stream, "avg_frame_rate")
+        )
+        raw_frame_rate = _get_standardized_frame_rate(
+            _extract_frame_rate_val(stream, "r_frame_rate")
+        )
 
-    def _calculate_aspect_ratio(aspect_ratio_str: str) -> float:
-        """Calculates aspect ratio from string.
+        # Prioritize avg_frame_rate, then raw_frame_rate
+        calculated_fr = (
+            average_frame_rate if average_frame_rate > 0.0 else raw_frame_rate
+        )
+
+        # Apply the interlaced adjustment
+        if video_scan_type == "interlaced" and calculated_fr in (
+            sys_consts.PAL_FIELD_RATE,
+            60.0,
+            sys_consts.NTSC_FIELD_RATE,
+        ):
+            # If it's interlaced and the rate is a field rate, divide by 2 for the frame rate
+            return calculated_fr / 2.0
+
+        return calculated_fr
+
+    def _calculate_aspect_ratio(aspect_ratio: str) -> float:
+        """
+        Calculates aspect ratio from string.
 
         Args:
-            aspect_ratio_str (str): The aspect ratio string
+            aspect_ratio (str): The aspect ratio as a string in the form of "16:9" or "4:3"
 
         Returns:
             float: The calculated aspect ratio
         """
-        if aspect_ratio_str and ":" in aspect_ratio_str:
+        assert isinstance(aspect_ratio, str), f"{aspect_ratio=}. Must be a string"
+
+        if aspect_ratio and ":" in aspect_ratio:
             try:
-                num, den = map(int, aspect_ratio_str.split(":"))
+                num, den = map(int, aspect_ratio.split(":"))
                 float_ar = num / den
                 return round(float_ar, 3)
             except (ValueError, ZeroDivisionError):
                 return 0.0
         return 0.0
 
-    # Main
-    debug = True
-    video_file_details = Encoding_Details()
+    def _get_standard_aspect_ratio_string(
+        width: int, height: int, dar_float: float = 0.0
+    ) -> str:
+        """
+        Returns a standard "X:Y" aspect ratio string based on width, height, or a provided DAR float.
+        Prioritizes a lookup table for common problematic or standard resolutions.
 
-    if debug and utils.Is_Complied():
-        debug = False
+        Args:
+            width (int) : Video width
+            height (int): Video height
+            dar_float (float): The video display aspect ratio
+
+        """
+        if width == 0 or height == 0:
+            return ""
+
+        delta = 0.01
+
+        # First up try comparing with standard resolutions
+        standard_resolution_dar_map = {
+            (720, 576): "4:3",  # Common PAL 4:3 (PAR 16:15)
+            (768, 576): "4:3",  # Square pixel PAL 4:3
+            (1024, 576): "16:9",  # Square pixel PAL 16:9
+            (720, 480): "4:3",  # Common NTSC 4:3 (PAR 8:9)
+            (640, 480): "4:3",  # Square pixel NTSC 4:3
+            (854, 480): "16:9",  # Wide NTSC
+        }
+
+        if (width, height) in standard_resolution_dar_map:
+            return standard_resolution_dar_map[(width, height)]
+
+        # Next try extracting from first principles
+        calculated_float_ar = dar_float if dar_float > 0 else (width / height)
+
+        if abs(calculated_float_ar - (16 / 9)) < delta:
+            return "16:9"
+        elif abs(calculated_float_ar - (4 / 3)) < delta:
+            return "4:3"
+        elif abs(calculated_float_ar - (21 / 9)) < delta:  # Ultrawide
+            return "21:9"
+        elif abs(calculated_float_ar - 1.85) < delta:  # Common theatrical
+            return "1.85:1"
+        elif abs(calculated_float_ar - 2.35) < delta:  # Common anamorphic widescreen
+            return "2.35:1"
+        elif abs(calculated_float_ar - 2.39) < delta:  # Common anamorphic widescreen
+            return "2.39:1"
+
+        # Finally desperation sets in
+        try:
+            fraction_ar = fractions.Fraction(calculated_float_ar).limit_denominator(100)
+
+            if fraction_ar.denominator > 0:
+                return f"{fraction_ar.numerator}:{fraction_ar.denominator}"
+        except (ValueError, ZeroDivisionError, OverflowError):
+            pass
+
+        # If all else fails probably stuffed but return the rounded decimal:1
+        return f"{round(calculated_float_ar, 2)}:1" if calculated_float_ar > 0 else ""
+
+    #### Main
+    debug = False  # Set to False for production
+
+    video_file_details = Encoding_Details()
 
     assert isinstance(video_file, str) and video_file.strip() != "", (
         f"{video_file=}. Must be a path to a file"
@@ -4901,7 +6220,7 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         "-show_streams",
         "-show_frames",
         "-read_intervals",
-        "%+1",
+        "%+2",  # Read first 2 seconds for frame analysis
         video_file,
     ]
 
@@ -4914,8 +6233,8 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         return video_file_details
 
     json_string = message
-    json_data = {}
-    video_frames = []
+    representative_frame = None
+    all_video_i_frames = []
 
     try:
         json_data = json.loads(json_string)
@@ -4923,132 +6242,251 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         audio_track_count = 0
         video_track_count = 0
 
-        video_file_details.video_duration = float(json_data["format"]["duration"])
-        video_frames = [
+        # Safely get duration, default to 0.0 if not found
+        format_data = json_data.get("format", {})
+        video_file_details.video_duration = float(format_data.get("duration", 0.0))
+
+        # Frame Analysis and Representative Frame Selection
+        all_video_i_frames = [
             frame
-            for frame in json_data.get("frames")
+            for frame in json_data.get("frames", [])
             if frame.get("media_type") == "video"
             and frame.get("pict_type") == "I"
             and frame.get("key_frame") == 1
+            and frame.get("width") is not None
+            and frame.get("height") is not None
+            and frame.get("width") > 0
+            and frame.get("height") > 0
         ]
 
-        video_file_details.video_scan_type = (
-            "progressive"
-            if any(frame.get("interlaced_frame") == 0 for frame in video_frames)
-            else "interlaced"
+        total_video_frames_read = len([
+            frame
+            for frame in json_data.get("frames", [])
+            if frame.get("media_type") == "video"
+        ])
+
+        video_file_details.all_I_frames = (
+            total_video_frames_read > 0
+            and total_video_frames_read == len(all_video_i_frames)
         )
 
-        if video_file_details.video_scan_type == "interlaced":
-            video_file_details.video_scan_order = (
-                "tff"
-                if any(
-                    frame.get("top_field_first") == "1"
-                    for frame in video_frames
-                    if frame.get("interlaced_frame") == 1
+        for frame in all_video_i_frames:
+            if frame.get("sample_aspect_ratio", "") != "":
+                representative_frame = frame
+                break  # Found a good one, use it!
+
+        # Fallback if no frame with sample_aspect_ratio was found, but we have other I-frames
+        if representative_frame is None and all_video_i_frames:
+            representative_frame = all_video_i_frames[0]
+
+        video_file_details.video_scan_type = "progressive"
+
+        if representative_frame:
+            if representative_frame.get("interlaced_frame") == 1:
+                video_file_details.video_scan_type = "interlaced"
+                video_file_details.video_scan_order = (
+                    "tff"
+                    if representative_frame.get("top_field_first") == "1"
+                    else "bff"
                 )
-                else "bff"
-            )
 
         video_streams = [
             stream
-            for stream in json_data.get("streams")
+            for stream in json_data.get("streams", [])
             if stream.get("codec_type") == "video"
         ]
 
         audio_streams = [
             stream
-            for stream in json_data.get("streams")
+            for stream in json_data.get("streams", [])
             if stream.get("codec_type") == "audio"
         ]
 
-        if not video_frames:
-            video_file_details.error = "No Video Frames found"
-
+        if not video_streams:
+            video_file_details.error = "No Video Stream found"
             if debug:
                 print(f"==== File Encoding Details {video_file=} ")
                 print("==== JSON DATA")
                 pprint.pprint(json_data)
-
             return video_file_details
 
+        last_processed_video_stream = None
+
+        # Process the first video stream
         for stream in video_streams:
+            last_processed_video_stream = stream
             video_track_count += 1
             video_file_details.video_codec = stream.get("codec_name", "")
             video_file_details.video_format = stream.get("codec_name", "")
-            video_file_details.video_width = int(stream.get("width", 0))
-            video_file_details.video_height = int(stream.get("height", 0))
-            video_file_details.video_frame_rate = _calculate_frame_rate(stream)
-            video_file_details.video_dar = _calculate_aspect_ratio(
-                stream.get("display_aspect_ratio", "")
-            )
-            video_file_details.video_par = _calculate_aspect_ratio(
-                stream.get("sample_aspect_ratio", "")
-            )
-            video_file_details.video_ar = stream.get("display_aspect_ratio", "")
 
-            video_file_details.video_frame_count = int(stream.get("nb_frames", 0))
+            if (
+                representative_frame
+                and representative_frame.get("width", 0) > 0
+                and representative_frame.get("height", 0) > 0
+            ):
+                video_file_details.video_width = int(representative_frame["width"])
+                video_file_details.video_height = int(representative_frame["height"])
+            else:
+                video_file_details.video_width = int(stream.get("width", 0))
+                video_file_details.video_height = int(stream.get("height", 0))
+
+            video_file_details.video_frame_rate = _calculate_frame_rate(
+                stream, video_file_details.video_scan_type
+            )
+
+            # Aspect Ratio (DAR/PAR/AR_string) Determination
+            stream_display_aspect_ratio_str = stream.get("display_aspect_ratio", "")
+            stream_sample_aspect_ratio_str = stream.get("sample_aspect_ratio", "")
+
+            if representative_frame and representative_frame.get(
+                "sample_aspect_ratio", ""
+            ):
+                video_file_details.video_par = _calculate_aspect_ratio(
+                    representative_frame["sample_aspect_ratio"]
+                )
+
+            if video_file_details.video_par == 0.0 and stream_sample_aspect_ratio_str:
+                video_file_details.video_par = _calculate_aspect_ratio(
+                    stream_sample_aspect_ratio_str
+                )
+
+            if (
+                video_file_details.video_par == 0.0
+                and video_file_details.video_width > 0
+                and video_file_details.video_height > 0
+            ):
+                video_file_details.video_par = 1.0  # Default to square pixels
+
+            if stream_display_aspect_ratio_str:
+                video_file_details.video_dar = _calculate_aspect_ratio(
+                    stream_display_aspect_ratio_str
+                )
+                video_file_details.video_ar = stream_display_aspect_ratio_str
+            else:
+                # Fallback: Calculate DAR from (width / height) * PAR
+                if (
+                    video_file_details.video_width > 0
+                    and video_file_details.video_height > 0
+                    and video_file_details.video_par > 0
+                ):
+                    calculated_dar_float = (
+                        video_file_details.video_width / video_file_details.video_height
+                    ) * video_file_details.video_par
+                    video_file_details.video_dar = round(calculated_dar_float, 3)
+
+                    video_file_details.video_ar = _get_standard_aspect_ratio_string(
+                        video_file_details.video_width,
+                        video_file_details.video_height,
+                        video_file_details.video_dar,
+                    )
+
+                    # If the standard string maps to a slightly different float, use that for precision
+                    if (
+                        video_file_details.video_ar
+                        and ":" in video_file_details.video_ar
+                    ):
+                        updated_dar_float = _calculate_aspect_ratio(
+                            video_file_details.video_ar
+                        )
+
+                        if updated_dar_float != 0:
+                            video_file_details.video_dar = updated_dar_float
+
+                # If all else fails and we have dimensions, try to derive from just W/H (square pixel assumption)
+                elif (
+                    video_file_details.video_width > 0
+                    and video_file_details.video_height > 0
+                ):
+                    calculated_dar_float = (
+                        video_file_details.video_width / video_file_details.video_height
+                    )
+                    video_file_details.video_dar = round(calculated_dar_float, 3)
+                    video_file_details.video_ar = _get_standard_aspect_ratio_string(
+                        video_file_details.video_width,
+                        video_file_details.video_height,
+                        calculated_dar_float,
+                    )
+
+            raw_num_frames = int(stream.get("nb_frames", 0))
+            video_file_details.video_frame_count = raw_num_frames
+
+            # Adjust frame count for interlaced video if raw_num_frames looks like field count
+            if (
+                video_file_details.video_scan_type == "interlaced"
+                and video_file_details.video_frame_rate > 0
+                and video_file_details.video_duration > 0
+                and raw_num_frames > 0
+            ):
+                expected_frame_count_if_progressive = (
+                    video_file_details.video_duration
+                    * video_file_details.video_frame_rate
+                )
+
+                # Check if raw_num_frames is approximately double the expected frame count for interlaced
+                if abs(raw_num_frames - (expected_frame_count_if_progressive * 2)) < 2:
+                    video_file_details.video_frame_count = math.floor(
+                        raw_num_frames / 2
+                    )
+
+            # Fallback/recalculation if video_frame_count is still 0
+            if (
+                video_file_details.video_frame_count == 0
+                and video_file_details.video_frame_rate > 0
+                and video_file_details.video_duration > 0
+            ):
+                video_file_details.video_frame_count = math.floor(
+                    video_file_details.video_duration
+                    * video_file_details.video_frame_rate
+                )
+
             video_file_details.video_bitrate = int(stream.get("bit_rate", 0))
             video_file_details.video_profile = stream.get("profile", "")
             video_file_details.video_pix_fmt = stream.get("pix_fmt", "yuv420p")
-            video_file_details.video_level = str(stream.get("level", ""))
+            video_file_details.video_level = str(stream.get("level", "-99"))
 
+            break  # Only the first video stream is relevant
+
+        # --- Audio Stream Processing ---
         for stream in audio_streams:
             audio_track_count += 1
             video_file_details.audio_codec = stream.get("codec_name", "")
-            video_file_details.audio_format = stream.get(
-                "codec_name", ""
-            )  # Sunset this and use audio_codec
+            video_file_details.audio_format = stream.get("codec_name", "")
             video_file_details.audio_sample_rate = int(stream.get("sample_rate", 0))
             video_file_details.audio_channels = int(stream.get("channels", 0))
             video_file_details.audio_bitrate = int(stream.get("bit_rate", 0))
+            break  # Only the first audio stream is relevant
 
         video_file_details.audio_tracks = audio_track_count
         video_file_details.video_tracks = video_track_count
 
-        # Attempted fix-ups
-        if (
-            video_file_details.video_frame_count == 0
-            and video_file_details.video_frame_rate > 0
-        ):
-            video_file_details.video_frame_count = math.floor(
-                video_file_details.video_duration * video_file_details.video_frame_rate
-            )
+        # --- Post-Processing and Final Checks ---
 
+        # Recalculate frame rate if initial determination was 0 but we have count/duration
         if (
             video_file_details.video_frame_rate == 0
             and video_file_details.video_frame_count > 0
             and video_file_details.video_duration > 0
+            and last_processed_video_stream is not None
         ):
-            video_file_details.video_frame_rate = math.floor(
-                video_file_details.video_duration / video_file_details.video_frame_count
+            derived_raw_frame_rate = (
+                video_file_details.video_frame_count / video_file_details.video_duration
             )
 
-        if (
-            video_file_details.video_frame_count == 0
-            and video_file_details.video_frame_rate > 0
-        ):
-            video_file_details.video_frame_count = math.floor(
-                video_file_details.video_duration * video_file_details.video_frame_rate
+            stream_for_recalc = {
+                "avg_frame_rate": str(derived_raw_frame_rate),
+                "r_frame_rate": str(derived_raw_frame_rate),
+            }
+
+            video_file_details.video_frame_rate = _calculate_frame_rate(
+                stream_for_recalc, video_file_details.video_scan_type
             )
 
-        if (
-            video_file_details.video_frame_rate == 0
-            and video_file_details.video_frame_count > 0
-        ):
-            video_file_details.video_frame_rate = math.floor(
-                video_file_details.video_duration / video_file_details.video_frame_count
-            )
-
-        if video_file_details.video_scan_type == "" and (
-            video_file_details.video_scan_order == "tff"
-            or video_file_details.video_scan_order == "bff"
-        ):
-            video_file_details.video_scan_type = "interlaced"
-
+        # Check format-level bitrate if stream bitrate is 0 (final fallback for bitrate)
         if video_file_details.video_bitrate == 0:
-            if "bit_rate" in json_data["format"]:
-                video_file_details.video_bitrate = int(json_data["format"]["bit_rate"])
+            if "bit_rate" in format_data:  # Use format_data directly
+                video_file_details.video_bitrate = int(format_data["bit_rate"])
 
+        # Determine video standard
         if (
             video_file_details.video_frame_rate == sys_consts.PAL_FRAME_RATE
             or video_file_details.video_frame_rate == sys_consts.PAL_FIELD_RATE
@@ -5057,66 +6495,145 @@ def Get_File_Encoding_Info(video_file: str) -> Encoding_Details:
         elif (
             video_file_details.video_frame_rate == sys_consts.NTSC_FRAME_RATE
             or video_file_details.video_frame_rate == sys_consts.NTSC_FIELD_RATE
+            or (29 < video_file_details.video_frame_rate < 30)
+            or (59 < video_file_details.video_frame_rate < 60)
             or video_file_details.video_frame_rate == 30
+            or video_file_details.video_frame_rate == 60
         ):
             video_file_details.video_standard = sys_consts.NTSC
 
+        # Secondary standard detection based on resolution (more definitive for DV than anyting else)
+        if (
+            video_file_details.video_width == 720
+            and video_file_details.video_height == 576
+        ):
+            video_file_details.video_standard = sys_consts.PAL
+
+            if not (
+                (24.0 < video_file_details.video_frame_rate < 30.0)
+                or (48.0 < video_file_details.video_frame_rate < 60.0)
+            ):
+                video_file_details.video_frame_rate = sys_consts.PAL_FRAME_RATE
+
+                if video_file_details.video_duration > 0:
+                    video_file_details.video_frame_count = math.floor(
+                        video_file_details.video_duration
+                        * video_file_details.video_frame_rate
+                    )
+        elif (
+            video_file_details.video_width == 720
+            and video_file_details.video_height == 480
+        ):
+            video_file_details.video_standard = sys_consts.NTSC
+
+            if not (
+                (24.0 < video_file_details.video_frame_rate < 30.0)
+                or (48.0 < video_file_details.video_frame_rate < 60.0)
+            ):
+                video_file_details.video_frame_rate = sys_consts.NTSC_FRAME_RATE
+
+                if video_file_details.video_duration > 0:
+                    video_file_details.video_frame_count = math.floor(
+                        video_file_details.video_duration
+                        * video_file_details.video_frame_rate
+                    )
+
+        if video_file_details.video_standard == "":
+            video_file_details.video_standard = "Unknown"
+
+        # Final validation checks
+        errors = []
         if video_file_details.video_duration == 0:
-            video_file_details.error = "Failed To Determine Duration"
-        elif video_file_details.video_dar == 0:
-            video_file_details.error = "Failed To Determine Display Aspect Ratio"
-        elif video_file_details.video_par == 0:
-            video_file_details.error = "Failed To Determine Pixel Aspect Ratio"
-        elif video_file_details.video_ar == "":
-            video_file_details.error = "Failed To Determine Aspect Ratio"
-        elif video_file_details.video_frame_rate not in (
-            sys_consts.PAL_FRAME_RATE,
-            sys_consts.NTSC_FRAME_RATE,
-            sys_consts.PAL_FIELD_RATE,
-            sys_consts.NTSC_FIELD_RATE,
-            30,
-        ):
-            video_file_details.error = "Failed To Determine Frame Rate"
-        elif video_file_details.video_bitrate == 0:
-            video_file_details.error = "Failed To Determine Video Bit Rate"
-        elif video_file_details.video_frame_count == 0:
-            video_file_details.error = (
-                "Failed To Determine The Number f Frames In The Video"
-            )
-        elif video_file_details.video_height == 0:
-            video_file_details.error = "Failed To Determine The Video Height"
-        elif video_file_details.video_width == 0:
-            video_file_details.error = "Failed To Determine The Video Width"
-        elif video_file_details.video_standard == 0:
-            video_file_details.error = "Failed To Determine The Video Standard"
-        # elif video_file_details.audio_tracks == 0:
-        #    video_file_details.error = "Failed To Determine The Number Of Audio Tracks"
-        elif (
-            video_file_details.audio_tracks > 0
-            and video_file_details.audio_format == ""
-        ):
-            video_file_details.error = "Failed To Determine The Audio Format"
-        elif (
-            video_file_details.audio_tracks > 0
-            and video_file_details.audio_channels == 0
-        ):
-            video_file_details.error = (
-                "Failed To Determine The Number Of Audio Channels"
-            )
-    except Exception as e:
+            errors.append("Failed To Determine Duration")
+        if video_file_details.video_dar == 0:
+            errors.append("Failed To Determine Display Aspect Ratio")
+        if video_file_details.video_par == 0:
+            errors.append("Failed To Determine Pixel Aspect Ratio")
+        if video_file_details.video_ar == "":
+            errors.append("Failed To Determine Aspect Ratio String")
+        if video_file_details.video_width == 0 or video_file_details.video_height == 0:
+            errors.append("Failed To Determine Video Dimensions")
+        if video_file_details.video_frame_rate == 0:
+            errors.append("Failed To Determine Video Frame Rate")
+        if video_file_details.video_bitrate == 0:
+            errors.append("Failed To Determine Video Bitrate")
+        if video_file_details.video_codec == "":
+            errors.append(
+                "Failed To Determine Video Codec"
+            )  # This one is often "unknown" rather than an error for missing codecs
+        if video_file_details.video_frame_count == 0:
+            errors.append("Failed To Determine The Number Of Frames In The Video")
+        if video_file_details.video_standard == "Unknown":
+            errors.append("Failed To Determine The Video Standard")
+
+        # Audio specific checks
+        if video_file_details.audio_tracks > 0:
+            if video_file_details.audio_format == "":
+                errors.append("Failed To Determine The Audio Format")
+            if video_file_details.audio_channels == 0:
+                errors.append("Failed To Determine The Number Of Audio Channels")
+
+        if errors:
+            video_file_details.error = "; ".join(errors)
+
+    except (json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
         video_file_details.error = (
-            f"Failed To Parse File {video_file} Error is {str(e)}"
+            f"Error parsing ffprobe output or processing data: {e}. "
+            f"Raw message start: {json_string[:500]}..."
         )
 
+        if debug:
+            print(f"Error: {e}")
+            print(f"JSON String start: {json_string[:500]}...")
+
+    if debug and video_file_details.error:
+        print(f"Error processing {video_file}: {video_file_details.error}")
+
+    # Debug print the overall results before returning
     if debug:
-        print(f"==== File Encoding Details {video_file=} ")
-        print("==== JSON DATA")
-        pprint.pprint(json_data)
-        print("==== Vide File details ")
-        pprint.pprint(video_file_details)
-        print("==== Vide File Frames ")
-        pprint.pprint(video_frames)
-        print("==== File Encoding Details End ")
+        print(f"==== File Encoding Details for {video_file} ====")
+        # print("==== JSON DATA (first 500 chars) ====")
+        # try:
+        #    pprint.pprint(json.loads(json_string))
+        # except json.JSONDecodeError:
+        #    print("Failed to parse JSON for debug printing. Printing raw string.")
+        #    print(json_string[:500])
+        print("==== Video File Details ====")
+        print(f"DBG = {video_file_details.error=}")
+        print(f"DBG = {video_file_details.video_codec=}")
+        print(f"DBG = {video_file_details.video_level=}")
+        print(f"DBG = {video_file_details.video_format=}")
+        print(f"DBG = {video_file_details.video_tracks=}")
+        print(f"DBG = {video_file_details.video_profile=}")
+        print(f"DBG = {video_file_details.all_I_frames=}")
+        print(f"DBG = {video_file_details.video_frame_count=}")
+        print(f"DBG = {video_file_details.video_frame_rate=}")
+        print(f"DBG = {video_file_details.video_duration=}")
+        print(f"DBG = {video_file_details.video_height=}")
+        print(f"DBG = {video_file_details.video_width=}")
+        print(f"DBG = {video_file_details.video_ar=}")
+        print(f"DBG = {video_file_details.video_dar=}")
+        print(f"DBG = {video_file_details.video_par=}")
+        print(f"DBG = {video_file_details.video_bitrate=}")
+        print(f"DBG = {video_file_details.video_pix_fmt=}")
+        print(f"DBG = {video_file_details.video_scan_order=}")
+        print(f"DBG = {video_file_details.video_scan_type=}")
+        print(f"DBG = {video_file_details.video_standard=}")
+        print(f"DBG = {video_file_details.audio_tracks=}")
+        print(f"DBG = {video_file_details.audio_format=}")
+        print(f"DBG = {video_file_details.audio_bitrate=}")
+        print(f"DBG = {video_file_details.audio_channels=}")
+        print(f"DBG = {video_file_details.audio_codec=}")
+        print(f"DBG = {video_file_details.audio_sample_rate=}")
+        # pprint.pprint(video_file_details.__dir__)  # Access dict for easier viewing
+        print("==== All Video I-Frames (first 2) ====")
+        pprint.pprint(all_video_i_frames[:2])  # Print only a few for brevity
+        if representative_frame:
+            print("==== Representative Frame ====")
+            pprint.pprint(representative_frame)
+        else:
+            print("==== No Representative Frame found ====")
+        print("==== File Encoding Details End ====")
 
     return video_file_details
 
@@ -5132,7 +6649,8 @@ def Resize_Image(
     colors: str = "",
     remap: bool = False,
 ) -> tuple[int, str]:
-    """Resizes an image to a specified size.
+    """
+    Resizes an image to a specified size.
 
     Args:
         width (int): The desired width of the output image in pixels.
@@ -5214,10 +6732,12 @@ def Resize_Image(
 
 
 class Video_File_Copier:
-    """Copies video file folders to an archive location. Files are checksumed to ensure copy is correct"""
+    """Copies video file folders to an archive location. Files are checksummed to ensure copy is correct"""
 
     def __init__(self):
-        pass
+        """Initialize the Video_File_Copier class."""
+
+        self._file_handler = file_utils.File()
 
     def verify_files_integrity(self, folder_path: str, hash_algorithm="sha256") -> bool:
         """
@@ -5246,23 +6766,39 @@ class Video_File_Copier:
                 file_path = os.path.join(root, file)
 
                 if os.path.isfile(file_path):
-                    # Check if the file has a corresponding checksum file
                     checksum_file_path = f"{file_path}.{hash_algorithm}"
+
                     if not os.path.exists(checksum_file_path):
+                        print(
+                            f"Verification Failed: Checksum file not found for {file_path}"
+                        )
                         return False
 
-                    # Read the stored checksum from the checksum file
-                    with open(checksum_file_path, "r") as checksum_file:
-                        expected_checksum = checksum_file.read()
+                    try:
+                        with open(
+                            checksum_file_path, "r", encoding="utf-8"
+                        ) as checksum_file:
+                            expected_checksum = (
+                                checksum_file.read().strip()
+                            )  # .strip() to remove potential newlines
 
-                    # Calculate the checksum of the file
-                    actual_checksum = self.calculate_checksum(file_path, hash_algorithm)
+                        actual_checksum = self.calculate_checksum(
+                            file_path, hash_algorithm
+                        )
 
-                    # Compare the expected and actual checksums
-                    if actual_checksum != expected_checksum:
+                        if actual_checksum != expected_checksum:
+                            print(
+                                f"Verification Failed: Checksum mismatch for {file_path}"
+                            )
+                            print(f"  Expected: {expected_checksum}")
+                            print(f"  Actual:   {actual_checksum}")
+                            return False
+                    except Exception as e:
+                        print(
+                            f"Verification Failed: Error reading/calculating checksum for {file_path}: {e}"
+                        )
                         return False
 
-        # All files have matching checksums
         return True
 
     def calculate_checksum(self, file_path: str, hash_algorithm="sha256") -> str:
@@ -5286,18 +6822,23 @@ class Video_File_Copier:
         ), f"{hash_algorithm=}. Must be a non-empty str md5 or sha256"
 
         if not os.path.exists(file_path):
+            print(f"Checksum calculation failed: File not found {file_path}")
             return ""
 
-        hasher = hashlib.new(hash_algorithm)
+        try:
+            hasher = hashlib.new(hash_algorithm)
 
-        with open(file_path, "rb") as f:
-            while True:
-                data = f.read(65536)  # Read in 64K chunks
-                if not data:
-                    break
-                hasher.update(data)
+            with open(file_path, "rb") as f:
+                while True:
+                    data = f.read(65536)  # Read in 64K chunks
+                    if not data:
+                        break
+                    hasher.update(data)
 
-        return hasher.hexdigest()
+            return hasher.hexdigest()
+        except Exception as e:
+            print(f"Checksum calculation failed for {file_path}: {e}")
+            return ""
 
     def write_checksum_file(self, file_path: str, checksum: str) -> tuple[int, str]:
         """
@@ -5320,11 +6861,11 @@ class Video_File_Copier:
         )
 
         try:
-            with open(file_path, "w") as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(checksum)
             return 1, ""
         except Exception as e:
-            return -1, f"Error writing checksum file: {e}"
+            return -1, f"Error writing checksum file {file_path}: {e}"
 
     def copy_folder_into_folders(
         self,
@@ -5333,6 +6874,8 @@ class Video_File_Copier:
         menu_title: str,
         folder_size_gb: Union[int, float],
         hash_algorithm="sha256",
+        progress_callback: Callable[[str, float, str], None] = None,
+        task_id: str = "",
     ) -> tuple[int, str]:
         """
         Copy the contents of a source folder into subfolders of a specified size (in GB), verify checksum,
@@ -5344,6 +6887,8 @@ class Video_File_Copier:
             menu_title (str): The menu title is used in archive folder naming
             folder_size_gb (Union[int, float]): The maximum size (in GB) of each subfolder.
             hash_algorithm (str): The hash algorithm to use for checksum calculation (e.g., "md5", "sha256").
+            progress_callback (Callable): Callback function for progress updates (task_id, percentage, message).
+            task_id (str): The ID of the task, used for progress callbacks.
 
         Returns:
             tuple[int, str]:
@@ -5367,53 +6912,79 @@ class Video_File_Copier:
             "sha256",
         ), f"{hash_algorithm=}. Must be a non-empty str md5 or sha256"
 
-        file_handler = file_utils.File()
-
         if not os.path.exists(source_folder):
             return -1, f"Source folder not found: {source_folder}"
         if not os.path.isdir(source_folder):
             return -1, f"Source path is not a directory: {source_folder}"
 
         if not os.path.exists(destination_root_folder):
-            os.makedirs(destination_root_folder)
+            try:
+                os.makedirs(destination_root_folder)
+            except Exception as e:
+                return (
+                    -1,
+                    f"Failed to create destination root folder {destination_root_folder}: {e}",
+                )
 
         if os.path.abspath(source_folder) == os.path.abspath(destination_root_folder):
             return -1, "Source and destination paths cannot be the same."
 
         try:
-            # Calculate disk space required for copy
-            folder_size_bytes = folder_size_gb * 1024**3  # Convert GB to bytes
+            total_source_folder_size_bytes = 0
+            all_files_with_size = []
 
-            # Check if there's enough free space on the destination disk
+            for root, _, files in os.walk(source_folder):
+                for file_name in files:
+                    file_path = os.path.join(root, file_name)
+                    if os.path.isfile(file_path):
+                        file_size = os.path.getsize(file_path)
+                        total_source_folder_size_bytes += file_size
+                        file_creation_time = os.path.getctime(file_path)
+                        all_files_with_size.append((
+                            file_path,
+                            file_creation_time,
+                            file_size,
+                        ))
+
             destination_disk_path = os.path.abspath(destination_root_folder)
             free_space, message = Get_Space_Available(destination_disk_path)
 
             if free_space == -1:
                 return -1, message
 
-            if free_space < folder_size_bytes:
-                return -1, "Not enough free space on the destination disk."
+            if free_space < total_source_folder_size_bytes:
+                if total_source_folder_size_bytes > folder_size_gb * 1024**3:
+                    return -1, (
+                        f"Not enough free space on the destination disk ({free_space / 1024**3:.2f} GB "
+                        f"available) for the total source data ({total_source_folder_size_bytes / 1024**3:.2f} GB). "
+                        "Individual chunks may fit, but total storage is insufficient."
+                    )
+                else:
+                    return -1, (
+                        f"Not enough free space on the destination disk ({free_space / 1024**3:.2f} GB "
+                        f"available) for the source data ({total_source_folder_size_bytes / 1024**3:.2f} GB)."
+                    )
+
+            # Sort files by creation time
+            all_files_with_size.sort(key=lambda x: x[1])
 
             subfolder_index = 0
             current_subfolder_size_bytes = 0
+            copied_bytes_total = 0  # For progress reporting
+            destination_folder = ""
 
-            all_files = []
-            for root, _, files in os.walk(source_folder):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    file_creation_time = os.path.getctime(
-                        file_path
-                    )  # Get creation time
-                    all_files.append((file_path, file_creation_time))
-
-            all_files.sort(key=lambda x: x[1])  # Sort by creation time (second element)
-
-            for file_path, _ in all_files:
+            for file_path, _, original_file_size in all_files_with_size:
                 chunked_files = []
                 delete_chunked = False
 
-                # Check if the file is larger than max_chunk_size_gb and split it if needed
-                if os.path.getsize(file_path) > folder_size_gb * 1024**3:
+                if original_file_size > folder_size_gb * 1024**3:
+                    if progress_callback:
+                        progress_callback(
+                            task_id,
+                            (copied_bytes_total / total_source_folder_size_bytes) * 100,
+                            f"Splitting large file: {os.path.basename(file_path)}",
+                        )
+
                     result, message = Split_Large_Video(
                         file_path, destination_root_folder, folder_size_gb
                     )
@@ -5421,23 +6992,28 @@ class Video_File_Copier:
                     if result == -1:
                         return -1, message  # message is error
 
-                    chunked_files = message.split(
-                        "|"
-                    )  # message is a list off chunked files delimitered by |
+                    chunked_files = message.split("|") if "|" in message else [message]
                     delete_chunked = True
                 else:
                     chunked_files.append(file_path)
 
                 for chunked_file in chunked_files:
-                    source_checksum_before = self.calculate_checksum(
+                    source_checksum = self.calculate_checksum(
                         chunked_file, hash_algorithm
                     )
+                    if not source_checksum:  # Check if checksum calculation failed
+                        return (
+                            -1,
+                            f"Failed to calculate checksum for source file: {chunked_file}",
+                        )
 
-                    # Create disk_folder, if adding the file to the current subfolder would exceed the size limit
+                    current_chunk_size = os.path.getsize(chunked_file)
+
+                    # Create new disk_folder, if adding the file to the current subfolder would exceed the size limit
                     if (
-                        subfolder_index == 0  # Always want disk 1 folder
-                        or current_subfolder_size_bytes + os.path.getsize(chunked_file)
-                        > folder_size_bytes
+                        subfolder_index == 0  # Always want disk 1 folder initially
+                        or current_subfolder_size_bytes + current_chunk_size
+                        > folder_size_gb * 1024**3  # Use folder_size_gb directly
                     ):
                         subfolder_index += 1
                         current_subfolder_size_bytes = 0
@@ -5446,47 +7022,97 @@ class Video_File_Copier:
                             f"{menu_title} - Disk_{subfolder_index:02}",
                         )
 
-                        if file_handler.make_dir(destination_folder) == -1:
+                        if self._file_handler.make_dir(destination_folder) == -1:
                             return (
                                 -1,
-                                "Failed to create directory: {destination_folder}",
+                                f"Failed to create directory: {destination_folder}",
                             )
 
-                    # Copy the file to the current subfolder.
-                    # Note: The destination_folder is always set on the first iteration of the loop
-                    destination_file_path = file_handler.file_join(
-                        destination_folder, os.path.basename(chunked_file)
+                    if not destination_folder:
+                        return (
+                            -1,
+                            f"Failed to determine destination folder for {chunked_file}.",
+                        )
+
+                    # Note: The destination_folder is always set on the first iteration of the loop for a new disk.
+                    destination_file_path = (
+                        self._file_handler.file_join(  # Use instance _file_handler
+                            destination_folder, os.path.basename(chunked_file)
+                        )
                     )
+
+                    if progress_callback:
+                        progress_message = f"Copying: {os.path.basename(chunked_file)} to Disk_{subfolder_index:02}"
+                        progress_callback(
+                            task_id,
+                            (copied_bytes_total / total_source_folder_size_bytes) * 100,
+                            progress_message,
+                        )
+
                     shutil.copy2(chunked_file, destination_file_path)
 
-                    destination_checksum_after = self.calculate_checksum(
+                    destination_checksum = self.calculate_checksum(
                         destination_file_path, hash_algorithm
                     )
 
-                    if source_checksum_before != destination_checksum_after:
-                        return -1, "File copy resulted in corruption."
+                    if not destination_checksum:
+                        return (
+                            -1,
+                            f"Failed to calculate checksum for destination file: {destination_file_path}",
+                        )
 
-                    checksum_file_path = f"{destination_file_path}.{hash_algorithm}"
+                    if (
+                        source_checksum != destination_checksum
+                    ):  # Attempt to clean up the partially copied/corrupted file
+                        if os.path.exists(destination_file_path):
+                            os.remove(destination_file_path)
+                        return -1, (
+                            f"File copy resulted in corruption for {os.path.basename(chunked_file)}. "
+                            "Source/Destination checksum mismatch."
+                        )
+
+                    checksum_file_name = (
+                        f"{os.path.basename(destination_file_path)}.{hash_algorithm}"
+                    )
+                    checksum_file_path = self._file_handler.file_join(
+                        destination_folder, checksum_file_name
+                    )
 
                     result, message = self.write_checksum_file(
-                        checksum_file_path, destination_checksum_after
+                        checksum_file_path, destination_checksum
                     )
-                    if result == -1:
-                        return -1, message
 
-                    current_subfolder_size_bytes += os.path.getsize(
-                        destination_file_path
-                    )
+                    if result == -1:
+                        # Attempt to clean up the copied file if checksum file cannot be written
+                        if os.path.exists(destination_file_path):
+                            os.remove(destination_file_path)
+                        return (
+                            -1,
+                            f"Failed to write checksum file for {os.path.basename(destination_file_path)}: {message}",
+                        )
+
+                    current_subfolder_size_bytes += current_chunk_size
+                    copied_bytes_total += current_chunk_size
 
                     if (
                         delete_chunked
                     ):  # Only chunked files created by file splitting are deleted.
-                        result = file_handler.remove_file(chunked_file)
+                        result = self._file_handler.remove_file(chunked_file)
 
                         if result == -1:
-                            return -1, f"Failed to delete chunked file : {chunked_file}"
+                            # This is a cleanup failure, not a primary copy failure.
+                            return (
+                                -1,
+                                f"Failed to delete temporary chunked file : {chunked_file}",
+                            )
+
+            if progress_callback:
+                progress_callback(task_id, 100.0, "Copying complete.")
 
             return 1, ""
 
         except Exception as e:
+            if progress_callback:
+                progress_callback(task_id, 0.0, f"Error: {e}")
+
             return -1, f"Error copying folder into sub-folders: {e}"
