@@ -37,6 +37,7 @@ from sys_config import (
     Video_Data,
     DVD_Menu_Page,
 )
+from sys_consts import SDELIM
 
 
 @dataclasses.dataclass
@@ -407,6 +408,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         item_index = 0
         total_duration = 0.0
         dvd_percent_used = 0
+        trimmed_files_txt = ""
 
         # Check if the files will fit on the DVD
         for item_index, item in enumerate(merged_files):
@@ -423,7 +425,17 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 break
 
         if dvd_percent_used > 100:  # Trim merged files to fit on DVD - bit brutal!
+            trimmed_files = merged_files[item_index:]
+            for file in trimmed_files:
+                trimmed_files_txt += f"{file[2][0].video_file}\n"
+
             merged_files = merged_files[:item_index]
+
+        if trimmed_files_txt:
+            popups.PopMessage(
+                title="Warning Files Will Not Fit...",
+                message=f"The Following Files Will Not Fit On The DVD {SDELIM}:\n{trimmed_files_txt}{SDELIM}",
+            ).show()
 
         for item in merged_files:
             _load_menu_pages(
