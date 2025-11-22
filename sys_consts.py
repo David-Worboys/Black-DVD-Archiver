@@ -62,7 +62,8 @@ PAL_FRAME_RATE: Final[int] = 25
 PAL_FIELD_RATE: Final[int] = 50
 NTSC_FRAME_RATE: Final[float] = 30000 / 1001
 NTSC_FIELD_RATE: Final[float] = 60000 / 1001
-AVERAGE_BITRATE: Final[int] = 5500  # kilobits/sec
+AUDIO_BITRATE: Final[int] = 192  # kbps
+AVERAGE_BITRATE: Final[int] = 5000  # 5500  # kilobits/sec
 SINGLE_SIDED_DVD_SIZE: Final[int] = 40258730  # kb ~ 4.7GB DVD5
 DOUBLE_SIDED_DVD_SIZE: Final[int] = 72453177  # kb ~ 8.5GB DVD9
 BLUERAY_ARCHIVE_SIZE: Final[str] = "25GB"
@@ -222,7 +223,7 @@ VIDEO_GRID_SHELF: Final[str] = "video_grid"
 VIDEO_FILE_SETTINGS: Final[str] = "video_file_settings"
 
 PERCENT_SAFTEY_BUFFER: Final[int] = (
-    5  # Used to limit DVD size so that it never exceeds 100%
+    10  # Used to limit DVD size so that it never exceeds 100%
 )
 
 # Font details
