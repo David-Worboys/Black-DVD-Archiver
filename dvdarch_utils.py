@@ -200,10 +200,9 @@ class Cut_Video_Def:
         return self.end_cut / self.frame_rate
 
 
-def DVD_Percent_Used(total_duration: float, pop_error_message: bool = True):
+def DVD_Percent_Used(total_duration: float, pop_error_message: bool = True) -> int:
     """
     Calculates the percentage of the DVD used based on the total duration of the videos assigned to that DVD.
-    If the percentage used is > 100 then an error Popup is opened if pop_error_message is True
 
     Args:
         total_duration (float): total duration in seconds
@@ -213,27 +212,28 @@ def DVD_Percent_Used(total_duration: float, pop_error_message: bool = True):
         int: percentage of DVD used
 
     """
+
     assert isinstance(total_duration, float) and total_duration >= 0.0, (
         f"{total_duration=}. Must be >= 0.0"
     )
     assert isinstance(pop_error_message, bool), f"{pop_error_message=}. Must be bool"
 
-    dvd_percent_used = (
-        round(
-            (
-                (sys_consts.AVERAGE_BITRATE * total_duration)
-                / sys_consts.SINGLE_SIDED_DVD_SIZE
-            )
-            * 100
-        )
-        + sys_consts.PERCENT_SAFTEY_BUFFER
-    )
+    total_stream_bitrate_kbps = sys_consts.AVERAGE_BITRATE + sys_consts.AUDIO_BITRATE
+    effective_capacity_factor = (100.0 - sys_consts.PERCENT_SAFTEY_BUFFER) / 100.0
+    required_size_kb = total_stream_bitrate_kbps * total_duration
+
+    # The usable capacity in kilobits is the DVD size * the factor.
+    usable_capacity_kb = sys_consts.SINGLE_SIDED_DVD_SIZE * effective_capacity_factor
+
+    dvd_percent_used_float = (required_size_kb / usable_capacity_kb) * 100
+    dvd_percent_used = int(round(dvd_percent_used_float))
 
     if pop_error_message and dvd_percent_used > 100:
         popups.PopError(
             title="DVD Build Error...",
             message="Selected Files Will Not Fit On A DVD!",
         ).show()
+
     return dvd_percent_used
 
 
@@ -3084,6 +3084,38 @@ def Transcode_DVD_VOB(
         f"{task_def=}. Must be Task_Def or None"
     )
 
+    #### Helper
+    def _two_pass_encoder_worker(
+        commands_1: list[str], commands_2: list[str], log_path: str, *args, **kwargs
+    ) -> tuple[int, str]:
+        """
+        Worker function to execute both passes of FFmpeg and handle log cleanup.
+        Note: This is designed to be submitted to Task_QManager.
+        """
+        file_handler = file_utils.File()
+
+        # Execute Pass 1 (Analysis)
+        result_1, message_1 = Execute_Check_Output(commands=commands_1, *args, **kwargs)
+        if result_1 == -1:
+            # Attempt to clean up log file on error
+            if file_handler.file_exists(log_path):
+                file_handler.remove_file(log_path)
+            return result_1, f"Pass 1 Error: {message_1}"
+
+        # Execute Pass 2 (Encoding)
+        result_2, message_2 = Execute_Check_Output(commands=commands_2, *args, **kwargs)
+
+        # Cleanup the log files
+        if file_handler.file_exists(log_path):
+            file_handler.remove_file(log_path)
+
+        if result_2 == -1:
+            return result_2, f"Pass 2 Error: {message_2}"
+
+        return result_2, message_2
+
+    #### Main
+
     file_handler = file_utils.File()
 
     if not file_handler.path_exists(output_folder):
@@ -3099,6 +3131,10 @@ def Transcode_DVD_VOB(
 
     vob_file = file_handler.file_join(output_folder, f"{input_file_name_base}.vob")
 
+    log_file_path = file_handler.file_join(
+        output_folder, f"{input_file_name_base}_2pass.log"
+    )
+
     interlaced_video = input_video_scan_type.lower().startswith("interlaced")
 
     if input_video_width <= 0 or input_video_height <= 0:
@@ -3112,8 +3148,8 @@ def Transcode_DVD_VOB(
 
     if dvd_standard == sys_consts.PAL:
         target_frame_rate = f"{sys_consts.PAL_FRAME_RATE}"
-        target_width = sys_consts.PAL_SPECS.width_43  # PAL DVD width is 720
-        target_height = sys_consts.PAL_SPECS.height_43  # PAL DVD height is 576
+        target_width = sys_consts.PAL_SPECS.width_43
+        target_height = sys_consts.PAL_SPECS.height_43
         target_video_size = f"{target_width}x{target_height}"
 
         if input_video_ar not in ["4:3", "16:9"]:
@@ -3146,6 +3182,7 @@ def Transcode_DVD_VOB(
     )
 
     average_bit_rate = sys_consts.AVERAGE_BITRATE
+    audio_bit_rate_bps = str(sys_consts.AUDIO_BITRATE * 1000)
 
     interlaced_flags = []
 
@@ -3157,7 +3194,8 @@ def Transcode_DVD_VOB(
             "1",
         ]
 
-    command = [
+    # --- 💥 PASS 1: Analysis Command ---
+    command_pass1 = [
         sys_consts.FFMPG,
         "-fflags",
         "+genpts",
@@ -3186,6 +3224,56 @@ def Transcode_DVD_VOB(
         "0",
         "-bufsize:v",
         "1835008",
+        # 2-Pass VBR Settings
+        "-pass",
+        "1",
+        "-passlogfile",
+        log_file_path,
+        "-an",  # Disable audio for Pass 1
+        "-map",
+        "0:V",
+        "-threads",
+        "0",
+        os.devnull,  # Outputs to the null device
+        "-y",
+    ]
+
+    # --- 💥 PASS 2: Encoding Command ---
+    command_pass2 = [
+        sys_consts.FFMPG,
+        "-fflags",
+        "+genpts",
+        "-i",
+        input_file,
+        *interlaced_flags,
+        "-f",
+        "dvd",
+        "-c:v:0",
+        "mpeg2video",
+        "-aspect",
+        input_video_ar,
+        "-s",
+        target_video_size,
+        "-r",
+        target_frame_rate,
+        "-g",
+        "15",
+        "-pix_fmt",
+        "yuv420p",
+        "-b:v",
+        f"{average_bit_rate}k",
+        "-maxrate:v",
+        "9000k",
+        "-minrate:v",
+        "0",
+        "-bufsize:v",
+        "1835008",
+        # 2-Pass VBR Settings
+        "-pass",
+        "2",
+        "-passlogfile",
+        log_file_path,
+        # Audio, Muxing, and Output
         "-packetsize",
         "2048",
         "-muxrate",
@@ -3194,7 +3282,7 @@ def Transcode_DVD_VOB(
         "expr:if(isnan(prev_forced_n),1,eq(n,prev_forced_n + 15))",
         *video_filters,
         "-b:a",
-        "192000",
+        audio_bit_rate_bps,
         "-ar",
         "48000",
         "-c:a:0",
@@ -3210,14 +3298,18 @@ def Transcode_DVD_VOB(
         "-threads",
         "0",
         vob_file,
+        "-y",
     ]
 
     if task_def:  # Run as a background task
         background_task_qmanager = Task_QManager()
 
+        # Submit the helper worker function to manage the sequential passes
         background_task_qmanager.submit_task(
-            worker_function=Execute_Check_Output,
-            commands=command,
+            worker_function=_two_pass_encoder_worker,
+            commands_1=command_pass1,
+            commands_2=command_pass2,
+            log_path=log_file_path,
             debug=False,
             stderr_to_stdout=False,
             task_id=task_def.task_id,
@@ -3230,12 +3322,25 @@ def Transcode_DVD_VOB(
         return 0, vob_file
 
     else:  # Run in the foreground
+        # Execute Pass 1
         result, message = Execute_Check_Output(
-            commands=command, debug=False, stderr_to_stdout=False
+            commands=command_pass1, debug=True, stderr_to_stdout=False
         )
 
         if result == -1:
-            return -1, message
+            return -1, f"Pass 1 failed: {message}"
+
+        # Execute Pass 2
+        result, message = Execute_Check_Output(
+            commands=command_pass2, debug=True, stderr_to_stdout=False
+        )
+
+        # Cleanup the log file
+        if file_handler.file_exists(log_file_path):
+            file_handler.remove_file(log_file_path)
+
+        if result == -1:
+            return -1, f"Pass 2 failed: {message}"
 
     return 1, vob_file
 
