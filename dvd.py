@@ -607,7 +607,9 @@ class DVD_Config:
         Returns:
             str: The serial number
         """
-        return self._serial_number
+        return f"{self._project_name} - {self._serial_number}"
+
+        # return self._serial_number
 
     @serial_number.setter
     def serial_number(self, value: str) -> None:
@@ -2201,9 +2203,10 @@ class DVD:
                         video_list,
                     ))
             result, message = archive_manager.archive_dvd_build(
-                dvd_name=(
-                    f"{self.dvd_config.serial_number} - {self._dvd_config.project_name}"
-                ),
+                # dvd_name=(
+                #    f"{self.dvd_config.serial_number} - {self._dvd_config.project_name}"
+                # ),
+                dvd_name=self.dvd_config.serial_number,
                 dvd_folder=self.dvd_image_folder,
                 iso_folder=self.iso_folder,
                 menu_layout=menu_layout,
@@ -3373,15 +3376,15 @@ class DVD:
             if timestamp_height == -1:
                 return -1, "Failed to get timestamp height"
 
-            result, message = dvdarch_utils.Write_Text_On_File(
-                input_file=self._background_canvas_file,
-                text=self.dvd_config.timestamp,
-                x=self._dvd_timestamp_x_offset,
-                y=height - timestamp_height,
-                pointsize=self.dvd_config.timestamp_font_point_size,
-                color=self.dvd_config.menu_font_color,
-                font=self.dvd_config.timestamp_font,
-            )
+            # result, message = dvdarch_utils.Write_Text_On_File(
+            #    input_file=self._background_canvas_file,
+            #    text=self.dvd_config.timestamp,
+            #    x=self._dvd_timestamp_x_offset,
+            #    y=height - timestamp_height,
+            #    pointsize=self.dvd_config.timestamp_font_point_size,
+            #    color=self.dvd_config.menu_font_color,
+            #    font=self.dvd_config.timestamp_font,
+            # )
 
             if result == -1:
                 return -1, message
@@ -3426,7 +3429,7 @@ class DVD:
             result, message = dvdarch_utils.Write_Text_On_File(
                 input_file=self._background_canvas_file,
                 text=calling_card,
-                x=width // 2 - progname_width // 2,
+                x=self._dvd_timestamp_x_offset,
                 y=height - progname_height,
                 pointsize=self.dvd_config.timestamp_font_point_size,
                 color=self.dvd_config.menu_font_color,
