@@ -20,6 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from datetime import datetime
 from typing import cast, Any
 
 import platformdirs
@@ -1336,11 +1337,12 @@ class DVD_Archiver(DVD_Archiver_Base):
                 # if sql_result:  # Expect only one result
                 #     product_code = sql_result[0][0]
                 #     product_description = sql_result[0][1]
+                dvd_serial_number = f"{datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
-                dvd_serial_number = _generate_dvd_serial_number(
-                    # product_code=product_code,
-                    # product_description=product_description,
-                )
+                # dvd_serial_number = _generate_dvd_serial_number(
+                # product_code=product_code,
+                # product_description=product_description,
+                # )
                 dvd_config.serial_number = dvd_serial_number
 
                 dvd_config.input_videos = video_files
