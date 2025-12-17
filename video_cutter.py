@@ -36,6 +36,7 @@ from background_task_manager import Task_QManager, Task_Dispatcher, Unpack_Resul
 from break_circular import Task_Def
 from dvdarch_utils import Get_File_Encoding_Info
 from file_renamer_popup import File_Renamer_Popup
+from person_trailer_popup import Person_Trailer_Popup
 from sys_config import (
     DVD_Archiver_Base,
     Video_Data,
@@ -99,8 +100,8 @@ class Edit_List:
 
         Returns:
             tuple[int,str]:
-                arg 1 - error_code
-                arg 2 - error message
+                - arg 1: error_code
+                - arg 2: error message
         """
         assert isinstance(project, str), f"{project=}. Must be a str"
         # Make sure we have a layout with a project and vice versa
@@ -570,8 +571,8 @@ class Video_Editor(DVD_Archiver_Base):
 
     # Public instance variables
     processed_files_callback: Callable
-    display_height: int = sys_consts.PAL_SPECS.height_43  # // 2
-    display_width: int = sys_consts.PAL_SPECS.width_43  # // 2
+    display_height: int = sys_consts.PAL_SPECS.height_43
+    display_width: int = sys_consts.PAL_SPECS.width_43
 
     # Private instance variables
     _aspect_ratio: str = sys_consts.AR43
@@ -612,6 +613,22 @@ class Video_Editor(DVD_Archiver_Base):
     _video_file_input: list[Video_Data] = dataclasses.field(default_factory=list)
     _project_name: str = ""
     _user_lambda: bool = False
+
+    @property
+    def get_last_frame(self) -> int:
+        """Returns the last video frame
+
+        Returns:
+            int: The last video frame
+
+        """
+        return (
+            round(
+                self._video_file_input[0].encoding_info.video_duration
+                * self._video_file_input[0].encoding_info.video_frame_rate
+            )
+            - 1
+        )  # Interesting, video_frame_count was not quite accurate on some video files, this seems to be better
 
     def __post_init__(self) -> None:
         """Configures the instance"""
@@ -795,6 +812,25 @@ class Video_Editor(DVD_Archiver_Base):
                         self._selection_start(event)
                     case "selection_end":
                         self._selection_end(event)
+                    case "save_person_image":
+                        scaled_pixmap = (
+                            self._video_display.guiwidget_get.pixmap().scaled(
+                                self._video_display.guiwidget_get.width(),
+                                self._video_display.guiwidget_get.height(),
+                                qtC.Qt.IgnoreAspectRatio,
+                                qtC.Qt.SmoothTransformation,
+                            )
+                        )
+                        # Generate_People_Trailer(self._project_name, 25)
+                        Person_Trailer_Popup(
+                            person_image=scaled_pixmap,
+                            title="Trailer Person Select",
+                            output_folder=self._output_folder,
+                            project_name=self._project_name,
+                            frame_rate=self._frame_rate,
+                            aspect_ratio=self._aspect_ratio,
+                        ).show()
+
                     case "set_menu_image":
                         current_frame = str(self._video_handler.current_frame())
                         if current_frame:
@@ -940,13 +976,7 @@ class Video_Editor(DVD_Archiver_Base):
         self._frame_count = self._video_file_input[0].encoding_info.video_frame_count
 
         self._video_slider.value_set(0)
-        self._video_slider.range_max_set(
-            round(
-                self._video_file_input[0].encoding_info.video_duration
-                * self._video_file_input[0].encoding_info.video_frame_rate
-            )
-            - 1
-        )  # Interesting, video_frame_count was not quite accurate on some video files, this seems to be better
+        self._video_slider.range_max_set(self.get_last_frame)
 
         self._set_dvd_settings()
 
@@ -1481,6 +1511,8 @@ class Video_Editor(DVD_Archiver_Base):
             cut_out_list = []
 
             for cut_index, (start_frame, end_frame, clip_name) in enumerate(edit_list):
+                end_frame += 1  # Seems to be off by one frame
+
                 if start_frame != end_frame:
                     new_tuple = (prev_start, start_frame, clip_name)
                     cut_out_list.append(new_tuple)
@@ -1494,8 +1526,8 @@ class Video_Editor(DVD_Archiver_Base):
                         next_start_frame
                         <= end_frame
                         <= next_start_frame + (self._frame_rate // 2)
-                    ):
-                        # merge the two tuples into a single tuple
+                    ):  # If overlapping and within the tolerance range can then  merge the two tuples into a
+                        # single tuple
                         cut_out_list[-1] = (
                             cut_out_list[-1][0],
                             next_start_frame,
@@ -2138,10 +2170,15 @@ class Video_Editor(DVD_Archiver_Base):
         Args:
             media_status (str): The status of the media player
         """
+
         match media_status:
             case "end_of_media":
-                self._video_slider.value_set(0)
+                # self._video_slider.value_set(0)
                 self._video_handler.pause()
+
+                # Ensure video stays at the end after playing
+                self._video_handler.seek(self.get_last_frame)
+
             case "invalid_media":
                 popups.PopMessage(
                     title="Media Playback Error...",
@@ -2705,6 +2742,15 @@ class Video_Editor(DVD_Archiver_Base):
                         width=2,
                     ),
                     self._menu_frame,
+                    qtg.Spacer(width=1),
+                    qtg.Button(
+                        tag="save_person_image",
+                        icon=file_utils.App_Path("head-side.svg"),
+                        tooltip="Save A Persons Trailer Image",
+                        callback=self.event_handler,
+                        height=1,
+                        width=2,
+                    ),
                 )
             )
 

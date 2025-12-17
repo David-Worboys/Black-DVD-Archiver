@@ -27,6 +27,7 @@ import os
 import os.path
 import platform
 import pprint
+import re
 import shutil
 import subprocess
 import textwrap
@@ -46,7 +47,7 @@ import QTPYGUI.utils as utils
 from background_task_manager import Task_QManager, Task_Dispatcher, Unpack_Result_Tuple
 from bkp.utils import Get_Unique_Id
 from break_circular import Execute_Check_Output, Task_Def
-from sys_config import Encoding_Details, DVD_Menu_Page
+from sys_config import Encoding_Details, DVD_Menu_Page, Get_Video_Editor_Folder
 
 
 class Color(Enum):
@@ -274,6 +275,273 @@ def Get_Thread_Count() -> str:
         thread_count = "1"
 
     return thread_count
+
+
+def Get_People_Trailer_Video_Paths(project_name: str) -> tuple[str, str]:
+    """
+    Retrieves the paths for the generated MP4 and MPG People Trailer videos
+    for a specified project.
+
+    The expected file paths are constructed relative to the video editor's output
+    folder, inside a sub-folder named after the project, and then inside the
+    'people_trailer' sub-folder.
+
+    Args:
+        project_name: The name of the project, used to construct the file path.
+                      Must be a non-empty string.
+
+    Returns:
+        A tuple (mp4_path, error_message):
+        - mp4_path (str): Full path to the 'people_trailer.mp4' file, or "" if not found.
+        - error_message (str): "" if Ok otherwise An error description if failure occured
+    """
+    assert isinstance(project_name, str) and project_name != "", (
+        f"{project_name=}. Must be a non-empty str"
+    )
+
+    file_handler = file_utils.File()
+
+    output_folder_base = Get_Video_Editor_Folder()
+
+    if not output_folder_base:
+        return "", "Output folder could not be determined."
+
+    project_subfolder = utils.Text_To_File_Name(project_name)
+    output_folder = file_handler.file_join(output_folder_base, project_subfolder)
+
+    people_trailer_folder = file_handler.file_join(
+        output_folder, sys_consts.PEOPLE_TRAILER_FOLDER_NAME
+    )
+
+    people_trailer_file_mp4 = file_handler.file_join(
+        people_trailer_folder, "people_trailer.mp4"
+    )
+
+    return people_trailer_file_mp4, ""
+
+
+def Generate_People_Trailer(
+    project_name: str,
+    frame_rate: float | int,
+    duration: float = 5.0,
+    aspect_ratio: str = sys_consts.AR43,
+):
+    """
+    Generates a single H.264 MP4 trailer from a sequence of JPEG images and muxes it with a silent AAC audio track.
+    Note:Jpegs are assumed to be the correct size for the video standard
+
+    Args:
+        project_name (str): The name of the project, used for folder paths.
+        frame_rate (float | int): The desired output video frame rate (e.g., 25 for PAL).
+        duration (float): The time in seconds a still picture is shown
+        aspect_ratio (str): Video Aspect Ratio (AR43 or AR 169)
+    """
+    assert isinstance(project_name, str) and project_name.strip() != "", (
+        f"{project_name=}. Must be a non-empty str"
+    )
+    assert isinstance(frame_rate, (int, float)) and frame_rate > 0, (
+        f"{frame_rate=}. Must be a positive int or float"
+    )
+    assert isinstance(duration, (float, int)) and duration > 0.0, (
+        f"{duration=}. Must be a float > 0"
+    )
+    assert isinstance(aspect_ratio, str) and aspect_ratio in (
+        sys_consts.AR43,
+        sys_consts.AR169,
+    ), f"{aspect_ratio=}. Must be either {sys_consts.AR43=} or {sys_consts.AR169=}"
+
+    file_handler = file_utils.File()
+    output_folder = Get_Video_Editor_Folder()
+
+    if not output_folder:
+        return -1, "Output folder could not be determined."
+
+    #  Path Setup
+    project_folder_name = utils.Text_To_File_Name(project_name)
+    output_folder_path = file_handler.file_join(output_folder, project_folder_name)
+    people_trailer_folder = file_handler.file_join(
+        output_folder_path, sys_consts.PEOPLE_TRAILER_FOLDER_NAME
+    )
+
+    # Intermediate & Final File Paths
+    people_trailer_concat_file = file_handler.file_join(
+        people_trailer_folder, "people_trailer_list.txt"
+    )
+    silent_audio_file = file_handler.file_join(
+        people_trailer_folder, "silent_audio_track.wav"
+    )
+    people_trailer_file_raw = file_handler.file_join(
+        people_trailer_folder, "people_trailer_raw.mp4"
+    )
+    # This file will be the final muxed output (overwriting the trimmed version)
+    people_trailer_file_final = file_handler.file_join(
+        people_trailer_folder, "people_trailer.mp4"
+    )
+    people_trailer_file_trimmed = file_handler.file_join(
+        people_trailer_folder, "people_trailer_trimmed.mp4"
+    )
+
+    if not file_handler.path_exists(people_trailer_folder):
+        return -1, f"People trailer folder not found: {people_trailer_folder}"
+
+    file_list = file_handler.filelist(people_trailer_folder, ["jpg"])
+    num_files = len(file_list.files)
+
+    if num_files == 0:
+        return -1, "No JPEG files found in the people trailer folder."
+
+    desired_duration = float(num_files * duration)
+    concat_content = []
+
+    for filename in file_list.files:
+        full_filepath = f"'{file_list.path}{file_handler.ossep}{filename}'"
+        concat_content.append(f"file {full_filepath}")
+        concat_content.append(f"duration {duration}")
+
+    # Add the final EOF marker by repeating the last file entry
+    last_filename = file_list.files[-1]
+    last_filepath = f"'{file_list.path}{file_handler.ossep}{last_filename}'"
+    concat_content.append(f"file {last_filepath}")
+
+    result, message = file_handler.write_list_to_txt_file(
+        concat_content, people_trailer_concat_file
+    )
+    if result == -1:
+        return (
+            -1,
+            f"Failed to write concat file: {sys_consts.SDELIM}{message}{sys_consts.SDELIM}",
+        )
+
+    # Generate Silent Audio Track (WAV)
+    commands_silent_audio = [
+        sys_consts.FFMPG,
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc=channel_layout=stereo:sample_rate=48000",
+        "-t",
+        f"{desired_duration:.3f}",
+        "-c:a",
+        "pcm_s16le",
+        silent_audio_file,
+        "-y",
+    ]
+
+    result, message = Execute_Check_Output(commands=commands_silent_audio)
+
+    if result == -1:
+        return (
+            -1,
+            f"Failed to generate silent audio track: {sys_consts.SDELIM}{message}{sys_consts.SDELIM}",
+        )
+
+    commands_raw_mp4 = [
+        sys_consts.FFMPG,
+        "-probesize",
+        "10M",
+        "-analyzeduration",
+        "10M",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-c:v",
+        "mjpeg",  # Input codec (JPEG image)
+        "-i",
+        people_trailer_concat_file,
+        "-c:v",
+        "libx264",
+        "-aspect",
+        aspect_ratio,
+        "-field_order",
+        "bb",  # Bottom Field First (BFF)
+        "-flags",
+        "+ilme+ildct",  # Enforce interlacing flags
+        "-r",
+        str(frame_rate),
+        "-g",
+        "1",
+        "-keyint_min",
+        "1",
+        "-sc_threshold",
+        "0",
+        "-pix_fmt",
+        "yuv420p",
+        "-crf",
+        "23",
+        people_trailer_file_raw,
+        "-y",
+    ]
+
+    result, message = Execute_Check_Output(commands=commands_raw_mp4)
+
+    if result == -1:
+        return -1, f"Failed to generate raw H.264 trailer: {message}"
+
+    # Trim Raw H.264 Video to Exact Duration
+    commands_trim_mp4 = [
+        sys_consts.FFMPG,
+        "-i",
+        people_trailer_file_raw,
+        "-t",
+        f"{desired_duration:.1f}",
+        "-c",
+        "copy",  # Fast, lossless cutting
+        people_trailer_file_trimmed,
+        "-y",
+    ]
+
+    result, message = Execute_Check_Output(commands=commands_trim_mp4)
+
+    if result == -1:
+        file_handler.remove_file(people_trailer_file_raw)
+        return (
+            -1,
+            f"Failed to trim H.264 video to {sys_consts.SDELIM}{desired_duration:.1f} seconds: {message}{sys_consts.SDELIM}",
+        )
+
+    file_handler.remove_file(people_trailer_file_raw)
+
+    # Mux Trimmed MP4 Video with Silent WAV Audio
+    commands_mux = [
+        sys_consts.FFMPG,
+        "-i",
+        people_trailer_file_trimmed,  # Input 0: Video
+        "-i",
+        silent_audio_file,  # Input 1: Audio (WAV silence)
+        "-c:v",
+        "copy",  # Video stream: Copy (no re-encoding)
+        "-c:a",
+        "aac",  # Audio stream: Re-encode silence to AAC
+        "-b:a",
+        "192k",  # Standard AAC bitrate
+        "-map",
+        "0:v:0",  # Map the video stream
+        "-map",
+        "1:a:0",  # Map the audio stream
+        "-ar",
+        "48000",  # Ensure 48kHz sample rate
+        people_trailer_file_final,
+        "-y",
+    ]
+
+    result, message = Execute_Check_Output(commands=commands_mux)
+
+    if result == -1:
+        return (
+            -1,
+            f"Muxing failed for final MP4: {sys_consts.SDELIM}{message}{sys_consts.SDELIM}",
+        )
+
+    file_handler.remove_file(people_trailer_concat_file)
+    file_handler.remove_file(people_trailer_file_trimmed)
+    file_handler.remove_file(silent_audio_file)
+
+    return (
+        1,
+        f"Successfully generated and muxed final interlaced H.264 MP4 trailer: {sys_consts.SDELIM}{people_trailer_file_final} "
+        f"({desired_duration:.1f}s).{sys_consts.SDELIM}",
+    )
 
 
 def Mux_Demux_Video(
@@ -2624,7 +2892,7 @@ def Overlay_File(
 
 
 def Overlay_Text(
-    in_file: str,
+    in_file: Union[str, bytes],
     text: str,
     text_font: str,
     text_pointsize: int,
@@ -2637,38 +2905,199 @@ def Overlay_Text(
     y_offset: int = 0,
     pixel_line_spacing: int = 0,
     out_file: str = "",
-) -> tuple[int, str]:
+) -> tuple[int, Union[str, bytes]]:
     """
-    Overlays text onto an image.
+    Overlays text onto an image with a full-width colored background banner.
+    The banner height adjusts dynamically based on the text content and font size.
 
     Args:
-        in_file (str): The path to the image file.
-        text (str): The text to overlay on the image.
+        in_file (str | bytes): The path to the image file (str) or the image data (bytes).
+        text (str): The text to overlay on the image. Line breaks ('\\n') are supported.
         text_font (str): The font to use for the text.
-        text_pointsize (int): The font size to use for the text.
+        text_pointsize (int): The font size to use for the text in points.
         text_color (str): The color to use for the text.
-        position (str, optional): The position of the text on the image. Defaults to "bottom".
-        justification (str, optional): The justification of the text on the image. Defaults to "center".
-        background_color (str, optional): The color of the background for the text. Defaults to "grey".
-        opacity (float, optional): The opacity of the background for the text. Defaults to 0.5.
-            0.0 is fully transparent and 1.0 is fully opaque.
-        x_offset (int,optional) : The x offset of the text from the center of the text box
-        y_offset (int,optional) : The y offset of the text from the center of the text box
-        pixel_line_spacing (int,optional) : The spacing between lines in pixels
-        out_file (str,optional): The path to the output file. Optional, sam as in_file if not supplied
-
+        position (str, optional): The vertical position of the banner on the image ('top', 'bottom', 'center').
+        Defaults to "bottom".
+        justification (str, optional): The horizontal justification of the text within the banner
+        ('left', 'center', 'right').
+        Defaults to "center".
+        background_color (str, optional): The color of the banner background. Defaults to "grey".
+        opacity (float, optional): The opacity of the background (0.0=transparent, 1.0=opaque). Defaults to 0.5.
+        x_offset (int, optional): Horizontal offset in pixels for the banner, relative to its chosen position.
+        y_offset (int, optional): Vertical offset in pixels for the banner, relative to its chosen position.
+        pixel_line_spacing (int, optional): Additional spacing between lines in pixels
+        out_file (str, optional): The path to the output file (required if in_file is a file path). If empty, overwrites in_file.
+            This argument is ignored if in_file is bytes.
 
     Returns:
-        tuple[int, str]:
-        - arg1: Ok, -1, Error,
-        - arg2: Error message or "" if ok
+        tuple[int, str | bytes]:
+        - arg1: Status code (1: Ok, -1: Error).
+        - arg2: Error message (str) if status is -1,
+                or the modified image data (bytes) if input was bytes,
+                or the output file path (str) if input was a file path.
     """
-    assert isinstance(in_file, str), f"{in_file=} must be a string"
+
+    #### Helper
+    def _image_dims(source: Union[str, bytes]) -> tuple[int, int, str]:
+        """
+        Retrieves the width and height of an image, supporting both file paths and raw data buffers.
+
+        Args:
+            source (Union[str, bytes]): The path to the image file (str) or the image data (bytes).
+
+        Returns:
+            tuple[int, int, str]: (width, height, error_message)
+
+                - width (int): Image width in pixels (-1 on error).
+                - height (int): Image height in pixels (-1 on error).
+                - error_message (str): An error message string, or "" if dimensions were successfully retrieved.
+        """
+        assert isinstance(source, (str, bytes)), (
+            f"Invalid source type. Expected str or bytes, but got {type(source).__name__}."
+        )
+
+        output: Union[str, bytes] = ""
+        result: int = -1
+
+        if isinstance(source, str):  # File
+            if not os.path.exists(source):
+                return -1, -1, f"File not found: {source}"
+
+            command = [sys_consts.IDENTIFY, "-format", "%wx%h", source]
+
+            result, output = Execute_Check_Output(command)
+
+        elif isinstance(source, bytes):  # Bytes as piped input
+            command = [sys_consts.IDENTIFY, "-format", "%wx%h", "-"]
+
+            result, raw_output = _execute_commands(command, source)
+
+            if result == 1:
+                if isinstance(raw_output, bytes):
+                    output = raw_output.decode("utf-8").strip()
+                elif isinstance(raw_output, str):
+                    output = raw_output.strip()
+                else:
+                    output = str(raw_output).strip()
+            else:  # raw_output is the error message string (str)
+                output = str(raw_output).strip()
+
+        if result == -1:  # 'output' holds the error message from the execution utility
+            error_msg = (
+                output
+                if isinstance(output, str)
+                else "Unknown execution error (Non-string output)."
+            )
+            return (
+                -1,
+                -1,
+                f"Could not determine image dimensions: {error_msg}",
+            )
+
+        # Extract 'WIDTH and HEIGHT' from the output string
+        match = re.search(r"(\d+)x(\d+)", str(output))
+
+        if match:
+            width = int(match.group(1))
+            height = int(match.group(2))
+            return width, height, ""
+
+        return -1, -1, "Failed to parse dimensions from identify output."
+
+    def _execute_commands(
+        commands: list[str], input_data: Optional[bytes]
+    ) -> tuple[int, Union[str, bytes]]:
+        """
+        Executes a list of commands, typically for a utility like ImageMagick.
+
+        Handles piping data to the command's stdin via 'input_data' and captures
+        output (stdout) and errors (stderr).
+
+        Args:
+            commands (list[str]): The list of command-line arguments to execute.
+                                  (e.g., ['magick', 'convert', 'input.jpg', '-resize', '50%', 'PNG:-'])
+            input_data (Optional[bytes]): Raw bytes to be piped to the command's standard input,
+                                          or None if input is read from a file path.
+
+        Returns:
+            tuple[int, Union[str, bytes]]: A tuple containing the result code and the output.
+
+                - Result Code (int):
+                    - '1': Successful execution. Output is the processed data (bytes) or an empty string (str) if the
+                    operation was file-based.
+                    - '-1': Execution failed (non-zero return code from subprocess).
+
+                - Output (Union[str, bytes]):
+                    - If Result Code is '-1', this is the error message (str).
+                    - If Result Code is '1' and the command pipeline writes to stdout (e.g., ends in 'PNG:-' or '-'),
+                    this is the raw output (bytes).
+                    - If Result Code is '1' and the command is file-based, this is an empty string (str).
+        """
+        assert isinstance(commands, list) and all(
+            isinstance(cmd, str) for cmd in commands
+        ), f"{commands=}. Must be a list of str"
+        assert isinstance(input_data, bytes) or input_data is None, (
+            f"{input_data=}. Must be bytes or None"
+        )
+
+        try:
+            # Execute the command list
+            process = subprocess.run(
+                commands,
+                input=input_data,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            stdout = process.stdout
+            stderr = process.stderr
+            return_code = process.returncode
+
+            if return_code != 0:
+                # Return error status and decoded error message
+                return (
+                    -1,
+                    f"Error (Code {return_code}): {stderr.decode('utf-8', errors='ignore')}",
+                )
+
+            # Check if the command output was directed to stdout (e.g., "PNG:-" or "-")
+            # If so, return the raw bytes.
+            if commands[-1] in ("PNG:-", "-"):
+                return 1, stdout
+
+            # Otherwise, assume a file operation was successful, and return an empty string.
+            return 1, ""
+
+        except FileNotFoundError:
+            return -1, f"Error: Command executable not found: '{commands[0]}'"
+        except Exception as e:
+            return -1, f"An unexpected error occurred during command execution: {e}"
+
+    #### Main
+    assert isinstance(in_file, (str, bytes)), f"{in_file=}. Must be str or bytes"
+
+    input_is_file = isinstance(in_file, str)
+    input_data = in_file if not input_is_file else None
+
+    if input_is_file:
+        in_arg = in_file
+
+        if not os.path.exists(in_file):
+            return -1, f"Input file {in_file} Does Not Exist"
+
+        out_arg = out_file if out_file else in_file
+    else:  # Input is bytes, pipe, output to bytes
+        in_arg = "-"
+        out_arg = out_file if out_file else "PNG:-"
+
     assert isinstance(text, str), f"{text=} must be a string"
     assert isinstance(text_font, str) and text_font.strip() != "", (
-        f"{text_font=} must be a non-empty str {type(text_font)=}"
+        f"{text_font=} must be a non-empty str"
     )
-    assert isinstance(text_pointsize, int), f"{text_pointsize=} must be an integer"
+    assert isinstance(text_pointsize, int) and text_pointsize > 0, (
+        f"{text_pointsize=} must be a positive integer"
+    )
     assert isinstance(text_color, str) and text_color.upper() in Color.__members__, (
         f"{text_color=}. Must be one of {[member.name for member in Color]}"
     )
@@ -2687,107 +3116,66 @@ def Overlay_Text(
     assert isinstance(x_offset, int), f"{x_offset=}. Must be int"
     assert isinstance(y_offset, int), f"{y_offset=}. Must be int"
     assert isinstance(pixel_line_spacing, int), f"{pixel_line_spacing=}. Must be int"
-    assert isinstance(out_file, str), f"{out_file=} must be a string"
 
-    if y_offset == 0:  # So text does not sit right on the edge
-        y_offset += 10
-
-    if out_file == "":
-        out_file = in_file
-
-    if not os.path.exists(in_file):
-        return -1, f"{in_file} Does Not Exist "
-
-    gravity = {"top": "North", "bottom": "South", "center": "Center"}[position.lower()]
-    justification = {"left": "West", "center": "Center", "right": "East"}[
-        justification.lower()
+    # Convert position/justification to ImageMagick gravity
+    gravity_outer = {"top": "North", "bottom": "South", "center": "Center"}[
+        position.lower()
     ]
 
-    background_color_hex = Get_Hex_Color(background_color)
-
-    if background_color_hex == "":
-        return -1, f"Unknown color {background_color}"
-
-    result, text_hex = Make_Opaque(color=text_color, opacity=1)
-
-    if result == -1:
-        return -1, f"Invalid System Color {text_color}"
-
-    result, background_hex = Make_Opaque(color=background_color, opacity=opacity)
-
-    if result == -1:
-        return -1, f"Invalid System Color {text_color}"
-
-    image_width, message = Get_Image_Width(in_file)
+    image_width, image_height, message = _image_dims(in_file)
 
     if image_width == -1:
         return -1, message
 
-    if "\n" in text:
-        text_lines = text.split("\n")
-        text_width, text_height = Get_Text_Dims(
-            text=text_lines[0], font=text_font, pointsize=text_pointsize
-        )
+    result, text_hex = Make_Opaque(color=text_color, opacity=1.0)
 
-        y_offset = y_offset
+    if result == -1:
+        return -1, f"Invalid text color {text_color}"
 
-        for line_index, text_line in enumerate(text_lines):
-            result, message = Overlay_Text(
-                in_file=in_file,
-                text=text_line,
-                text_font=text_font,
-                text_pointsize=text_pointsize,
-                text_color=text_color,
-                position=position,
-                background_color=background_color,
-                opacity=opacity,
-                x_offset=x_offset,
-                y_offset=y_offset,
-                out_file=out_file,
-            )
+    result, background_hex = Make_Opaque(color=background_color, opacity=opacity)
 
-            if result == -1:
-                return -1, message
+    if result == -1:
+        return -1, f"Invalid background color {background_color}"
 
-            y_offset += text_height + pixel_line_spacing
-        return result, message
-    else:
-        text_width, text_height = Get_Text_Dims(
-            text=text, font=text_font, pointsize=text_pointsize
-        )
+    command = [
+        sys_consts.CONVERT,
+        "-density",
+        "72",
+        "-units",
+        "pixelsperinch",
+        in_arg,
+        "-background",
+        background_hex,
+        "-fill",
+        text_hex,
+        "-gravity",
+        justification,
+        "-font",
+        text_font,
+        "-pointsize",
+        f"{text_pointsize}",
+        "-size",
+        f"{image_width}x",
+        f"caption:{text}",
+        "-gravity",
+        gravity_outer,
+        "-geometry",
+        f"+{x_offset}+{y_offset}",
+        "-composite",
+        out_arg,
+    ]
 
-        if text_width == -1:
-            return -1, "Could Not Get Text Width"
+    result, message = _execute_commands(commands=command, input_data=input_data)
 
-        command = [
-            sys_consts.CONVERT,
-            "-density",
-            "72",
-            "-units",
-            "pixelsperinch",
-            in_file,
-            "-background",
-            background_hex,
-            "-fill",
-            text_hex,
-            "-gravity",
-            justification,
-            "-font",
-            text_font,
-            "-pointsize",
-            f"{text_pointsize}",
-            "-size",
-            f"{image_width}x",
-            f"caption:{text}",
-            "-gravity",
-            gravity,
-            "-geometry",
-            f"+{x_offset}+{y_offset}",
-            "-composite",
-            out_file,
-        ]
-
-        return Execute_Check_Output(commands=command)
+    if result == 1:  # Ok
+        if (
+            input_is_file
+        ):  # input was a file path, return the output file path (or overwritten input)
+            return 1, out_arg
+        else:  # input was bytes, return is bytes
+            return result, message
+    else:  # Output contains error message
+        return -1, message
 
 
 def Build_Video_Filters(
@@ -3292,7 +3680,7 @@ def Transcode_DVD_VOB(
         "-map",
         "0:V",
         "-map",
-        "0:a",
+        "0:a?",
         "-map",
         "-0:s",
         "-threads",

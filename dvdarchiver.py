@@ -1262,6 +1262,9 @@ class DVD_Archiver(DVD_Archiver_Base):
                     menu_layout=menu_layout,  # Pass by reference
                     project_name=project_name,
                     dvd_layout_name=dvd_layout_name,
+                    frame_rate=sys_consts.PAL_FRAME_RATE
+                    if self._video_file_grid.project_video_standard == sys_consts.PAL
+                    else sys_consts.NTSC_FRAME_RATE,
                 ).show()
                 == "cancel"
             ):

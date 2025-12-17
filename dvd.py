@@ -1521,7 +1521,8 @@ class DVD:
                 and worker_error_no == 1
                 and task_message.lower() == "all done"
             ):
-                self._create_dvd_menu_complete = True
+                self._extract_menu_images_complete = True
+                # self._create_dvd_menu_complete = True
 
                 if DEBUG:
                     print(f"DBG DVD FMIT: (prefix '{CREATE_DVD_MENU}') is complete.")
@@ -2660,7 +2661,6 @@ class DVD:
             return -1, message
 
         result, message = self._create_menu_mpg(cell_coords=cell_coords)
-
         if result == -1:
             return -1, message
 
@@ -2676,7 +2676,6 @@ class DVD:
             )
             if canvas_width == -1:
                 return -1, message
-
         return 1, ""
 
     def _create_labels(self, cell_coords: list[_Cell_Coord]) -> tuple[int, str]:

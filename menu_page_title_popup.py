@@ -28,7 +28,12 @@ import QTPYGUI.popups as popups
 import QTPYGUI.qtpygui as qtg
 import QTPYGUI.sqldb as sqldb
 import sys_consts
-from dvdarch_utils import DVD_Percent_Used
+from dvdarch_utils import (
+    DVD_Percent_Used,
+    Get_People_Trailer_Video_Paths,
+    Get_File_Encoding_Info,
+    Generate_People_Trailer,
+)
 from print_popup import Print_DVD_Label_Popup
 from sys_config import (
     DVD_Menu_Settings,
@@ -36,6 +41,7 @@ from sys_config import (
     Set_Shelved_DVD_Layout,
     Video_Data,
     DVD_Menu_Page,
+    Video_File_Settings,
 )
 from sys_consts import SDELIM
 
@@ -54,6 +60,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
     )  # Pass by reference
     project_name: str = ""
     dvd_layout_name: str = ""
+    frame_rate: int | float = -1
 
     # Private instance variable
     _db_settings: sqldb.App_Settings = sqldb.App_Settings(sys_consts.PROGRAM_NAME)
@@ -77,6 +84,12 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         assert (
             isinstance(self.dvd_layout_name, str) and self.dvd_layout_name.strip() != ""
         ), f"{self.dvd_layout_name=}. Must be non-empty str"
+        assert isinstance(self.frame_rate, (int, float)) and self.frame_rate in (
+            sys_consts.PAL_FRAME_RATE,
+            sys_consts.NTSC_FRAME_RATE,
+        ), (
+            f"{self.frame_rate=}. Must be {sys_consts.PAL_FRAME_RATE or sys_consts.NTSC_FRAME_RATE}"
+        )
 
         super().__post_init__()  # This statement must be last
 
@@ -307,6 +320,7 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
         assert isinstance(event, qtg.Action), (
             f"{event=}. Must be an instance of qtg.Action"
         )
+
         menu_title_grid: qtg.Grid = cast(
             qtg.Grid,
             event.widget_get(
@@ -322,6 +336,24 @@ class Menu_Page_Title_Popup(qtg.PopContainer):
                 tag="disk_title",
             ),
         )
+
+        mp4_path, message = Get_People_Trailer_Video_Paths(self.project_name)
+
+        if mp4_path:
+            file_handler = file_utils.File()
+            mpg_folder, mpg_name, mpg_extn = file_handler.split_file_path(mp4_path)
+            mpg_encoding_info = Get_File_Encoding_Info(mp4_path)
+            mpg_settings = Video_File_Settings()
+            mpg_settings.menu_group = 999
+            mpg_settings.button_title = "Person Trailer"
+            mpg_video_data = Video_Data(
+                video_folder=mpg_folder,
+                video_file=mpg_name,
+                video_extension=mpg_extn,
+                encoding_info=mpg_encoding_info,
+                video_file_settings=mpg_settings,
+            )
+            self.video_data_list.append(mpg_video_data)
 
         buttons_per_page = DVD_Menu_Settings().buttons_per_page
 
